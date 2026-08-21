@@ -486,7 +486,6 @@ function writeCache(name, data) {
     try { fs.writeFileSync(path.join(CACHE_DIR, `cache_${name}.json`), JSON.stringify(data)); } catch { /* ignore */ }
 }
 
-// ─── scrapeGuild ──────────────────────────────────────────────────────────────
 async function scrapeGuild(guildName, maxPages = 50) {
     const key = `guild_${guildName.replace(/\s+/g, '_')}`;
     const cached = readCache(key);
@@ -496,56 +495,87 @@ async function scrapeGuild(guildName, maxPages = 50) {
     }
 
     console.log(`[Scraper] Scraping Guild: ${guildName}...`);
-    let pageNum = 1;
-    let keepGoing = true;
     const allMembers = [];
+    
+    // We must control the Puppeteer page manually to click the Next button
+    const page = await getGuildPage();
+    if (!page) return [];
 
-    while (keepGoing && pageNum <= maxPages) {
-        const url  = `https://rubinot.com.br/guilds/${encodeURIComponent(guildName)}?page=${pageNum}`;
-        const html = await getPageContent(url);
-        if (!html) break;
+    try {
+        const url  = `https://rubinot.com.br/guilds/${encodeURIComponent(guildName)}`;
+        await safeGoto(page, url);
 
-        const $ = cheerio.load(html);
-        const membersOnPage = [];
+        let pageNum = 1;
+        let keepGoing = true;
 
-        $('tr').each((i, row) => {
-            const cols = $(row).find('td');
-            if (cols.length >= 6) {
-                const rank          = $(cols[0]).text().trim();
-                const nameAndTitle  = $(cols[1]).find('a').first().text().trim() || $(cols[1]).text().trim();
-                const vocation      = $(cols[2]).text().trim();
-                const level         = parseInt($(cols[3]).text().trim(), 10);
-                const joiningDate   = $(cols[4]).text().trim();
-                const status        = $(cols[5]).text().trim();
+        while (keepGoing && pageNum <= maxPages) {
+            const html = await page.content();
+            const $ = cheerio.load(html);
+            const membersOnPage = [];
 
-                if (nameAndTitle && !isNaN(level) && nameAndTitle !== 'Name and Title') {
-                    const name = nameAndTitle.replace(/\s*\([^)]*\)/g, '').trim();
-                    membersOnPage.push({
-                        rank: rank || 'Member',
-                        name,
-                        vocation,
-                        level,
-                        joiningDate,
-                        status: status.toLowerCase().includes('online') ? 'Online' : 'Offline',
-                    });
+            $('tr').each((i, row) => {
+                const cols = $(row).find('td');
+                if (cols.length >= 6) {
+                    const rank          = $(cols[0]).text().trim();
+                    const nameAndTitle  = $(cols[1]).find('a').first().text().trim() || $(cols[1]).text().trim();
+                    const vocation      = $(cols[2]).text().trim();
+                    const level         = parseInt($(cols[3]).text().trim(), 10);
+                    const joiningDate   = $(cols[4]).text().trim();
+                    const status        = $(cols[5]).text().trim();
+
+                    if (nameAndTitle && !isNaN(level) && nameAndTitle !== 'Name and Title') {
+                        const name = nameAndTitle.replace(/\s*\([^)]*\)/g, '').trim();
+                        membersOnPage.push({
+                            rank: rank || 'Member',
+                            name,
+                            vocation,
+                            level,
+                            joiningDate,
+                            status: status.toLowerCase().includes('online') ? 'Online' : 'Offline',
+                        });
+                    }
                 }
-            }
-        });
+            });
 
-        if (membersOnPage.length === 0) {
-            keepGoing = false;
-        } else {
-            // Se o site simplesmente repetiu a última página ao passar do limite, quebra o loop
+            if (membersOnPage.length === 0) {
+                keepGoing = false;
+                break;
+            }
+
+            // Evitar duplicatas em caso de falha na paginação
             if (allMembers.length > 0 && allMembers[allMembers.length - 1].name === membersOnPage[membersOnPage.length - 1].name) {
-                console.log(`[Scraper] Fim da paginação detectado na página ${pageNum} (conteúdo repetido).`);
+                console.log(`[Scraper] Fim da paginação detectado na página ${pageNum} (repetido).`);
                 keepGoing = false;
                 break;
             }
 
             allMembers.push(...membersOnPage);
             console.log(`[Scraper] Guilda ${guildName} - Página ${pageNum}: ${membersOnPage.length} membros`);
-            pageNum++;
+
+            // Find Next Button
+            // O botão de "Próxima Página" tem title="Próxima Página" ou chevron-right
+            const hasNextButton = await page.evaluate(() => {
+                const btns = Array.from(document.querySelectorAll('button'));
+                const nextBtn = btns.find(b => b.title === 'Próxima Página' || b.innerHTML.includes('chevron-right'));
+                if (nextBtn && !nextBtn.disabled) {
+                    nextBtn.click();
+                    return true;
+                }
+                return false;
+            });
+
+            if (hasNextButton) {
+                pageNum++;
+                // Wait for the table to update. We can wait for a short timeout since it's SPA
+                await new Promise(r => setTimeout(r, 2000));
+            } else {
+                keepGoing = false;
+            }
         }
+    } catch (e) {
+        console.error(`[Scraper] Erro ao paginar guilda:`, e);
+    } finally {
+        await page.close();
     }
 
     if (allMembers.length > 0) writeCache(key, allMembers);
