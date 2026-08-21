@@ -3,10 +3,10 @@ import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings,
 
 export default function TopNav({ currentView, setCurrentView }) {
   const navItems = [
-    { id: 'dashboard', label: 'Monitor ao Vivo', icon: <Activity size={18} /> },
-    { id: 'analytics', label: 'Analytics & Auditoria', icon: <TrendingDown size={18} /> },
-    { id: 'planilha', label: 'Censo e Planilha', icon: <CalendarDays size={18} /> },
-    { id: 'players', label: 'Busca de Jogador', icon: <Users size={18} /> },
+    { id: 'live', label: 'Monitor ao Vivo', icon: <Activity size={18} /> },
+    { id: 'tracker', label: 'Censo Macro', icon: <Users size={18} /> },
+    { id: 'analytics', label: 'Dossiê & Rankings', icon: <TrendingDown size={18} /> },
+    { id: 'planilha', label: 'Respawns', icon: <CalendarDays size={18} /> },
   ];
 
   return (

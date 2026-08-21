@@ -20,14 +20,9 @@ export default function LiveDashboard() {
       .order('slot_start', { ascending: true });
       
     if (!error && data) {
-      // Mock status calculation if telemetry data isn't joined yet
-      // In a fully real scenario, this would JOIN with slot_audit_logs or be computed
       const processedParties = data.map(p => ({
         ...p,
-        category: p.respawn_category,
-        // For demonstration, randomly assign statuses until real telemetry matches
-        status: p.status || (Math.random() > 0.7 ? 'GHOST_SLOT' : 'EFFICIENT'),
-        delta_xp: p.delta_xp || (Math.floor(Math.random() * 10) + 'M')
+        category: p.respawn_category
       }));
       setParties(processedParties);
     }
