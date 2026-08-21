@@ -63,7 +63,7 @@ export default function App() {
           </div>
         );
       case 'analytics':
-        return <Rankings />;
+        return <Rankings isAdmin={isAdmin} />;
       default: return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
     }
   };

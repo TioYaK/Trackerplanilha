@@ -104,6 +104,44 @@ export const runAuditSlots = async () => {
       } else {
         console.log(`[AUDIT] Party ${party.party_name} -> Status: ${newStatus} | XP Gerada: ${totalDelta}`);
       }
+
+      // NOVIDADE: Sistema de Tribunal (Strikes Automatizados)
+      if (newStatus === 'GHOST_SLOT') {
+        const strikeReason = `Falta injustificada no agendamento: ${party.party_name} [${party.id}]`;
+        
+        // Verifica se a punição já foi aplicada hoje para esta party específica
+        const { data: existingStrikes } = await supabase
+          .from('player_strikes')
+          .select('id')
+          .eq('reason', strikeReason)
+          .limit(1);
+
+        if (!existingStrikes || existingStrikes.length === 0) {
+          console.log(`[AUDIT] 🚨 Aplicando Strikes Automáticos para GHOST_SLOT: ${party.party_name}`);
+          
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 3); // 3 dias de punição padrão
+
+          const newStrikes = party.members.map(member => ({
+            character_name: member,
+            reason: strikeReason,
+            admin_name: 'Robô Xerife',
+            expires_at: expiresAt.toISOString()
+          }));
+
+          if (newStrikes.length > 0) {
+            const { error: strikeError } = await supabase
+              .from('player_strikes')
+              .insert(newStrikes);
+              
+            if (strikeError) {
+              console.error(`[AUDIT] Erro ao aplicar strikes:`, strikeError.message);
+            } else {
+              console.log(`[AUDIT] ⚖️ ${newStrikes.length} strikes aplicados com sucesso.`);
+            }
+          }
+        }
+      }
     }
 
     console.log(`[AUDIT] Auditoria concluída com sucesso.`);

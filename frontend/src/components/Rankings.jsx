@@ -1,106 +1,232 @@
-import React from 'react';
-import { Trophy, AlertOctagon } from 'lucide-react';
-import ReportExport from './ReportExport';
+﻿import React, { useState, useEffect } from 'react';
+import { Trophy, AlertOctagon, Gavel, Trash2, Clock } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-export default function Rankings() {
-  const hallOfFame = [
-    { name: 'Kina Master', efficiency: 94, category: 'Sanguine' },
-    { name: 'Shooter Liso', efficiency: 89, category: 'Darashia' },
-    { name: 'Healer Top', efficiency: 85, category: 'Darklight' },
-  ];
+export default function Rankings({ isAdmin }) {
+  const [topRushers, setTopRushers] = useState([]);
+  const [topParty, setTopParty] = useState(null);
+  const [activeStrikes, setActiveStrikes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const wallOfShame = [
-    { name: 'Ghost Hunt 1', ghostSlots: 14, lostXp: '150M' },
-    { name: 'Dorminhoco', ghostSlots: 9, lostXp: '90M' },
-    { name: 'Atrasado', ghostSlots: 7, lostXp: '70M' },
-  ];
+  const fetchData = async () => {
+    setLoading(true);
+
+    // 1. Top Rushers (24h)
+    const { data: rushersData } = await supabase
+      .from('guild_members')
+      .select('name, xp_gained, vocation, level')
+      .gt('xp_gained', 0)
+      .order('xp_gained', { ascending: false })
+      .limit(5);
+
+    if (rushersData) setTopRushers(rushersData);
+
+    // 2. PT de Elite (Maior XP Registrada Hoje)
+    const today = new Date().toISOString().split('T')[0];
+    const { data: partiesData } = await supabase
+      .from('parties_planilhadas')
+      .select('*')
+      .gte('created_at', today)
+      .order('created_at', { ascending: false });
+
+    if (partiesData && partiesData.length > 0) {
+      let bestParty = null;
+      let maxXP = -1;
+      partiesData.forEach(p => {
+        let numericXp = 0;
+        if (p.delta_xp) {
+          if (p.delta_xp.endsWith('M')) numericXp = parseFloat(p.delta_xp) * 1000000;
+          else if (p.delta_xp.endsWith('K') || p.delta_xp.endsWith('k')) numericXp = parseFloat(p.delta_xp) * 1000;
+          else numericXp = parseInt(p.delta_xp) || 0;
+        }
+        if (numericXp > maxXP) {
+          maxXP = numericXp;
+          bestParty = { ...p, numericXp };
+        }
+      });
+      if (maxXP > 0) setTopParty(bestParty);
+    }
+
+    // 3. Tribunal (Strikes Ativos)
+    const { data: strikesData } = await supabase
+      .from('player_strikes')
+      .select('*')
+      .gte('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+
+    if (strikesData) setActiveStrikes(strikesData);
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const formatXP = (xp) => {
+    if (xp >= 1000000) return (xp / 1000000).toFixed(1) + 'M';
+    if (xp >= 1000) return (xp / 1000).toFixed(1) + 'k';
+    return xp.toString();
+  };
+
+  const handleRevokeStrike = async (id) => {
+    if (!isAdmin) return;
+    if (confirm('Tem certeza que deseja perdoar esta punição? Ela será removida permanentemente do histórico ativo.')) {
+      await supabase.from('player_strikes').delete().eq('id', id);
+      fetchData();
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center items-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tibia-primary"></div></div>;
+  }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full" id="report-content">
-      <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
-        <div>
-          <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Auditoria da Guilda (Últimos 30 dias)</h2>
-          <p className="text-gray-400 font-sans">Livro-caixa de horas desperdiçadas e eficiência global gerado para a Administração.</p>
-        </div>
-        <ReportExport elementId="report-content" filename="Auditoria_Guilda_30d.pdf" />
+    <div className="p-8 max-w-7xl mx-auto w-full">
+      <div className="mb-8 border-b border-tibia-border pb-4">
+        <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Leaderboards & Tribunal</h2>
+        <p className="text-gray-400 font-sans">Celebre os melhores jogadores e gerencie as punições ativas da guilda.</p>
       </div>
       
-      {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-tibia-card border border-red-900 shadow-tibia-inset p-6 rounded relative overflow-hidden">
-          <div className="absolute top-0 right-0 bg-red-900 text-xs px-2 py-1 text-white uppercase font-bold">Crítico</div>
-          <h3 className="text-red-500 font-medieval text-xl mb-2">Prejuízo Estimado</h3>
-          <p className="text-5xl font-black text-white font-sans">142<span className="text-xl text-gray-500 font-normal">h perdidas</span></p>
-          <p className="text-sm text-gray-400 mt-3 font-sans border-t border-tibia-border pt-2">Equivalente a ~4.2kkk de XP desperdiçada por ausências e ghost slots.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Hall da Fama - Top Rushers */}
+        <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl overflow-hidden">
+          <div className="p-4 bg-black/40 border-b border-tibia-border flex items-center">
+            <Trophy className="text-yellow-500 mr-3" size={24} />
+            <h3 className="font-bold text-white text-xl">Top 5 Rushadores (24h)</h3>
+          </div>
+          <table className="w-full text-left text-sm text-gray-300">
+            <thead className="bg-black/20 text-gray-400 uppercase font-semibold">
+              <tr>
+                <th className="px-6 py-3">#</th>
+                <th className="px-6 py-3">Jogador</th>
+                <th className="px-6 py-3 text-right">XP Ganhos</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-tibia-border/50">
+              {topRushers.length === 0 ? (
+                <tr><td colSpan="3" className="text-center py-6 text-gray-500">Nenhum ganho de XP registrado hoje.</td></tr>
+              ) : (
+                topRushers.map((r, i) => (
+                  <tr key={r.name} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-bold text-yellow-500">{i + 1}º</td>
+                    <td className="px-6 py-4 font-medium text-white">{r.name} <span className="text-xs text-gray-500 block">{r.vocation} - Lvl {r.level}</span></td>
+                    <td className="px-6 py-4 text-right font-bold text-green-400">+{formatXP(r.xp_gained)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-        <div className="bg-tibia-card border border-green-900 shadow-tibia-inset p-6 rounded relative overflow-hidden">
-          <div className="absolute top-0 right-0 bg-green-900 text-xs px-2 py-1 text-white uppercase font-bold">Excelente</div>
-          <h3 className="text-green-500 font-medieval text-xl mb-2">Eficiência Global</h3>
-          <p className="text-5xl font-black text-white font-sans text-tibia-highlight">68%</p>
-          <p className="text-sm text-gray-400 mt-3 font-sans border-t border-tibia-border pt-2">Média de aproveitamento de todos os slots reservados.</p>
+
+        {/* Hall da Fama - PT de Elite */}
+        <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-4 opacity-5"><Trophy size={150} /></div>
+          <div className="p-4 bg-black/40 border-b border-tibia-border flex items-center">
+            <Trophy className="text-blue-400 mr-3" size={24} />
+            <h3 className="font-bold text-white text-xl">PT de Elite (Hoje)</h3>
+          </div>
+          
+          <div className="p-8 relative z-10">
+            {!topParty ? (
+              <div className="text-center text-gray-500 py-8">Nenhuma party registrou XP hoje ainda.</div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center">
+                <span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm font-bold uppercase mb-4 border border-blue-500/30">
+                  Maior Eficiência do Dia
+                </span>
+                <h4 className="text-4xl font-black text-white mb-2">{topParty.party_name}</h4>
+                <p className="text-tibia-highlight font-medium mb-6">📍 {topParty.respawn_category} / {topParty.hunt_name}</p>
+                
+                <div className="bg-black/40 p-4 rounded-lg border border-tibia-border w-full">
+                  <p className="text-xs text-gray-500 uppercase font-bold mb-1">XP Registrada pela Equipe</p>
+                  <p className="text-3xl font-bold text-green-400">+{topParty.delta_xp}</p>
+                </div>
+                
+                <div className="mt-6 flex flex-wrap justify-center gap-2">
+                  <span className="text-xs text-gray-400 font-bold w-full mb-1">MEMBROS DA EQUIPE</span>
+                  {topParty.members?.map(m => (
+                    <span key={m} className="bg-white/5 border border-white/10 px-3 py-1 rounded text-sm text-gray-300">
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Tribunal */}
+      <div className="bg-tibia-card border border-red-900/50 rounded-lg shadow-xl overflow-hidden">
+        <div className="p-4 bg-red-900/20 border-b border-red-900/50 flex items-center justify-between">
+          <div className="flex items-center">
+            <Gavel className="text-red-500 mr-3" size={24} />
+            <h3 className="font-bold text-white text-xl">Tribunal (Strikes Ativos)</h3>
+          </div>
+          {isAdmin && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded border border-red-500/30">Modo Admin Ativo</span>}
+        </div>
         
-        {/* Hall da Fama */}
-        <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl">
-          <div className="flex items-center mb-6 border-b border-tibia-border pb-3">
-            <Trophy className="text-yellow-500 mr-3" size={24} />
-            <h3 className="text-2xl font-medieval text-white">Hall da Fama</h3>
-          </div>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="text-gray-400 text-sm uppercase">
-                <th className="pb-3 font-medium">Líder</th>
-                <th className="pb-3 font-medium">Respawn Favorito</th>
-                <th className="pb-3 font-medium text-right">Eficiência</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-gray-300">
+            <thead className="bg-black/20 text-gray-400 uppercase font-semibold">
+              <tr>
+                <th className="px-6 py-4">Infrator</th>
+                <th className="px-6 py-4">Motivo da Punição</th>
+                <th className="px-6 py-4">Aplicado Por</th>
+                <th className="px-6 py-4">Expira em</th>
+                {isAdmin && <th className="px-6 py-4 text-right">Ações</th>}
               </tr>
             </thead>
-            <tbody>
-              {hallOfFame.map((p, idx) => (
-                <tr key={idx} className="border-t border-tibia-border/50">
-                  <td className="py-3 text-white font-medium">{p.name}</td>
-                  <td className="py-3 text-gray-300">{p.category}</td>
-                  <td className="py-3 text-right">
-                    <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-sm">{p.efficiency}%</span>
+            <tbody className="divide-y divide-red-900/30">
+              {activeStrikes.length === 0 ? (
+                <tr>
+                  <td colSpan={isAdmin ? 5 : 4} className="text-center py-12 text-gray-500">
+                    <AlertOctagon className="mx-auto mb-2 opacity-50" size={32} />
+                    Nenhum jogador possui advertências ativas.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                activeStrikes.map(strike => (
+                  <tr key={strike.id} className="hover:bg-red-900/10 transition-colors">
+                    <td className="px-6 py-4 font-bold text-white">{strike.character_name}</td>
+                    <td className="px-6 py-4 text-gray-400">
+                      {strike.reason.includes('GHOST_SLOT') || strike.reason.includes('Falta injustificada') ? (
+                        <span className="text-red-400 flex items-center">
+                          <AlertOctagon size={14} className="mr-2" /> {strike.reason}
+                        </span>
+                      ) : strike.reason}
+                    </td>
+                    <td className="px-6 py-4">
+                      {strike.admin_name === 'Robô Xerife' ? (
+                        <span className="text-purple-400 font-medium">🤖 {strike.admin_name}</span>
+                      ) : (
+                        strike.admin_name
+                      )}
+                    </td>
+                    <td className="px-6 py-4 flex items-center text-yellow-500/80">
+                      <Clock size={14} className="mr-2" />
+                      {formatDistanceToNow(new Date(strike.expires_at), { addSuffix: true, locale: ptBR })}
+                    </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => handleRevokeStrike(strike.id)}
+                          className="bg-red-900/50 hover:bg-red-800 text-white p-2 rounded transition flex items-center ml-auto border border-red-500/30"
+                          title="Perdoar Punição"
+                        >
+                          <Trash2 size={16} className="mr-2" /> Perdoar
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-
-        {/* Ranking da Vergonha */}
-        <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl">
-          <div className="flex items-center mb-6 border-b border-tibia-border pb-3">
-            <AlertOctagon className="text-red-500 mr-3" size={24} />
-            <h3 className="text-2xl font-medieval text-white">Ranking da Vergonha</h3>
-          </div>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="text-gray-400 text-sm uppercase">
-                <th className="pb-3 font-medium">Líder Ofensor</th>
-                <th className="pb-3 font-medium">Ghost Slots</th>
-                <th className="pb-3 font-medium text-right">XP Desperdiçada</th>
-              </tr>
-            </thead>
-            <tbody>
-              {wallOfShame.map((p, idx) => (
-                <tr key={idx} className="border-t border-tibia-border/50">
-                  <td className="py-3 text-white font-medium">{p.name}</td>
-                  <td className="py-3">
-                    <span className="text-red-400 font-bold">{p.ghostSlots} </span>
-                    <span className="text-gray-500 text-xs">slots</span>
-                  </td>
-                  <td className="py-3 text-right text-gray-300">{p.lostXp}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="mt-4 text-xs text-gray-500 italic">* Ghost Slots: Tolerância de 15 min esgotada sem check-in de XP contínua.</p>
-        </div>
-
       </div>
     </div>
   );

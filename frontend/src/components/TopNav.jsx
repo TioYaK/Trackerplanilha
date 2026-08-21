@@ -8,7 +8,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdm
     { id: 'radar', label: 'Radar de Caçadores', icon: <Crosshair size={18} /> },
     { id: 'planilha', label: 'Respawns', icon: <CalendarDays size={18} /> },
     { id: 'tracker', label: 'Censo Macro', icon: <LayoutDashboard size={18} /> },
-    { id: 'analytics', label: 'Dossiê & Rankings', icon: <TrendingDown size={18} /> },
+    { id: 'analytics', label: 'Rankings & Tribunal', icon: <TrendingDown size={18} /> },
   ];
 
   return (
