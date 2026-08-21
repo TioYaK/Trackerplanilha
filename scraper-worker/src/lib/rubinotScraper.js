@@ -686,14 +686,26 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20) {
                     return null;
                 }).catch(() => null);
 
-                await new Promise(r => setTimeout(r, 300));
-
                 let clicked = false;
                 try {
-                    clicked = await page.evaluate((next) => {
-                        const link = Array.from(document.querySelectorAll('a, button'))
-                            .find(el => el.textContent.trim() === String(next));
-                        if (link) { link.click(); return true; }
+                    clicked = await page.evaluate((nextNum) => {
+                        const buttons = Array.from(document.querySelectorAll('button, a'));
+                        
+                        // Primeiro tenta encontrar "Próxima" ou "Next"
+                        let nextBtn = buttons.find(b => {
+                            const txt = b.textContent.trim().toLowerCase();
+                            return txt.includes('próxima') || txt.includes('next');
+                        });
+                        
+                        // Se não achou, tenta achar o botão numérico exato
+                        if (!nextBtn) {
+                            nextBtn = buttons.find(b => b.textContent.trim() === String(nextNum));
+                        }
+                        
+                        if (nextBtn) { 
+                            nextBtn.click(); 
+                            return true; 
+                        }
                         return false;
                     }, pageNum + 1);
                 } catch (e) {
@@ -711,8 +723,7 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20) {
                                     if (cols.length >= 6) {
                                         const rank = cols[0].textContent.trim();
                                         if (rank !== 'Rank' && rank !== '') {
-                                            const currentName = cols[1].textContent.trim();
-                                            return currentName !== oldName;
+                                            return cols[1].textContent.trim() !== oldName;
                                         }
                                     }
                                 }
