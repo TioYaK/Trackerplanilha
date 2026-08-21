@@ -18,8 +18,11 @@ export default function RespawnCard({ party }) {
     <div className={`p-5 rounded-lg border-2 ${colorClass} transition-all`}>
       <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="text-xl font-bold text-white">{party.party_name}</h3>
-          <p className="text-sm text-gray-400">Líder: {party.leader_name}</p>
+          <h3 className="text-xl font-bold text-white flex items-center">
+            {party.party_name}
+          </h3>
+          <p className="text-sm text-tibia-highlight font-medium mt-1">📍 Local: <span className="text-orange-300">{party.hunt_name || 'Desconhecido'}</span></p>
+          <p className="text-sm text-gray-400 mt-1">Líder: {party.leader_name}</p>
         </div>
         <div className="flex flex-col items-end">
           <span className="text-sm font-semibold bg-black/30 px-3 py-1 rounded-full text-gray-300">

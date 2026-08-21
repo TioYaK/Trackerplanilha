@@ -9,10 +9,12 @@ export default function LiveDashboard() {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Derivar as categorias únicas baseadas nas parties cadastradas
-  const dynamicCategories = Array.from(new Set(parties.map(p => p.respawn_category))).sort();
+  const [areas, setAreas] = useState([]);
 
-  // Se a aba ativa atual não existe mais (ex: apagou), seleciona a primeira disponível
+  // Extrai as categorias dinâmicas das parties atuais E as categorias oficiais
+  const dynamicCategories = Array.from(new Set([...areas.map(a => a.name), ...parties.map(p => p.category)])).sort();
+
+  // Se a aba ativa atual não existe mais, seleciona a primeira disponível
   useEffect(() => {
     if (dynamicCategories.length > 0 && (!activeTab || !dynamicCategories.includes(activeTab))) {
       setActiveTab(dynamicCategories[0]);
@@ -21,14 +23,16 @@ export default function LiveDashboard() {
 
   const fetchParties = async () => {
     setLoading(true);
-    // Busca dados reais da planilha
-    const { data, error } = await supabase
-      .from('parties_planilhadas')
-      .select('*')
-      .order('slot_start', { ascending: true });
+    // Busca áreas oficiais e parties
+    const [areasRes, partiesRes] = await Promise.all([
+      supabase.from('respawn_areas').select('name').order('name'),
+      supabase.from('parties_planilhadas').select('*').order('slot_start', { ascending: true })
+    ]);
+
+    if (areasRes.data) setAreas(areasRes.data);
       
-    if (!error && data) {
-      const processedParties = data.map(p => ({
+    if (partiesRes.data) {
+      const processedParties = partiesRes.data.map(p => ({
         ...p,
         category: p.respawn_category
       }));

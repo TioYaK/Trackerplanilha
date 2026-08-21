@@ -4,20 +4,50 @@ import { Plus, Trash2, Edit } from 'lucide-react';
 
 export default function PlanilhaManager({ isAdmin }) {
   const [parties, setParties] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [newArea, setNewArea] = useState('');
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    party_name: '', leader_name: '', respawn_category: 'Sanguine', slot_start: '18:00', slot_end: '22:00', members: ''
+    party_name: '', leader_name: '', respawn_category: '', hunt_name: '', slot_start: '18:00', slot_end: '22:00', members: ''
   });
 
-  const loadParties = async () => {
+  const loadData = async () => {
     setLoading(true);
-    const { data } = await supabase.from('parties_planilhadas').select('*').order('created_at', { ascending: false });
-    if (data) setParties(data);
+    const [partiesRes, areasRes] = await Promise.all([
+      supabase.from('parties_planilhadas').select('*').order('created_at', { ascending: false }),
+      supabase.from('respawn_areas').select('*').order('name', { ascending: true })
+    ]);
+    if (partiesRes.data) setParties(partiesRes.data);
+    if (areasRes.data) {
+      setAreas(areasRes.data);
+      if (areasRes.data.length > 0 && !formData.respawn_category) {
+        setFormData(prev => ({ ...prev, respawn_category: areasRes.data[0].name }));
+      }
+    }
     setLoading(false);
   };
 
-  useEffect(() => { loadParties(); }, []);
+  useEffect(() => { loadData(); }, []);
+
+  const handleAddArea = async (e) => {
+    e.preventDefault();
+    if (!newArea.trim()) return;
+    const { error } = await supabase.from('respawn_areas').insert([{ name: newArea.trim() }]);
+    if (!error) {
+      setNewArea('');
+      loadData();
+    } else {
+      alert("Erro ao adicionar área: " + error.message);
+    }
+  };
+
+  const handleDeleteArea = async (id, name) => {
+    if(confirm(`Tem certeza que deseja remover a aba ${name}? Isso não removerá os agendamentos já criados nela, mas ela sumirá das opções.`)) {
+      await supabase.from('respawn_areas').delete().eq('id', id);
+      loadData();
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,6 +59,7 @@ export default function PlanilhaManager({ isAdmin }) {
         party_name: formData.party_name,
         leader_name: formData.leader_name,
         respawn_category: formData.respawn_category,
+        hunt_name: formData.hunt_name,
         slot_start: formData.slot_start,
         slot_end: formData.slot_end,
         members: membersArray
@@ -39,6 +70,7 @@ export default function PlanilhaManager({ isAdmin }) {
         party_name: formData.party_name,
         leader_name: formData.leader_name,
         respawn_category: formData.respawn_category,
+        hunt_name: formData.hunt_name,
         slot_start: formData.slot_start,
         slot_end: formData.slot_end,
         members: membersArray
@@ -47,9 +79,9 @@ export default function PlanilhaManager({ isAdmin }) {
     }
 
     if (!error) {
-      setFormData({ party_name: '', leader_name: '', respawn_category: 'Sanguine', slot_start: '', slot_end: '', members: '' });
+      setFormData({ party_name: '', leader_name: '', respawn_category: areas.length > 0 ? areas[0].name : '', hunt_name: '', slot_start: '', slot_end: '', members: '' });
       setEditingId(null);
-      loadParties();
+      loadData();
     } else {
       alert("Erro ao salvar: " + error.message);
     }
@@ -60,6 +92,7 @@ export default function PlanilhaManager({ isAdmin }) {
       party_name: p.party_name,
       leader_name: p.leader_name,
       respawn_category: p.respawn_category,
+      hunt_name: p.hunt_name || '',
       slot_start: p.slot_start.substring(0, 5),
       slot_end: p.slot_end.substring(0, 5),
       members: p.members ? p.members.join(', ') : ''
@@ -69,14 +102,11 @@ export default function PlanilhaManager({ isAdmin }) {
   };
 
   const cancelEdit = () => {
-    setFormData({ party_name: '', leader_name: '', respawn_category: 'Sanguine', slot_start: '', slot_end: '', members: '' });
-    setEditingId(null);
-  };
-
-  const handleDelete = async (id) => {
+    setFormData({ party_name: '', leader_name: '', respawn_category: areas.length > 0 ? areas[0].name : '', hunt_name: '', slot_start: '', slot_end: '', members: '' });
+    setEditingId(null);  const handleDelete = async (id) => {
     if(confirm("Tem certeza que deseja remover este slot?")) {
       await supabase.from('parties_planilhadas').delete().eq('id', id);
-      loadParties();
+      loadData();
     }
   };
 
@@ -84,6 +114,27 @@ export default function PlanilhaManager({ isAdmin }) {
     <div className="p-8 max-w-7xl mx-auto w-full">
       <h2 className="text-3xl font-black text-white mb-2">Gerenciar Planilha</h2>
       <p className="text-gray-400 mb-8">Adicione ou remova os agendamentos oficiais do Discord aqui.</p>
+
+      {isAdmin && (
+        <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 mb-8 shadow-sm">
+          <h3 className="text-xl font-bold text-white mb-4">Gerenciar Áreas (Abas)</h3>
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <form onSubmit={handleAddArea} className="flex-1 flex gap-2">
+              <input type="text" className="flex-1 bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={newArea} onChange={e => setNewArea(e.target.value)} placeholder="Nova Área (ex: Venore)" />
+              <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded transition">Adicionar</button>
+            </form>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {areas.map(a => (
+              <span key={a.id} className="bg-black/30 border border-tibia-border px-3 py-1 rounded-full text-sm text-gray-300 flex items-center">
+                {a.name}
+                <button onClick={() => handleDeleteArea(a.id, a.name)} className="ml-2 text-red-500 hover:text-red-400"><Trash2 size={14}/></button>
+              </span>
+            ))}
+            {areas.length === 0 && <span className="text-gray-500 text-sm">Nenhuma área cadastrada.</span>}
+          </div>
+        </div>
+      )}
 
       {isAdmin ? (
         <div className={`border rounded-lg p-6 mb-8 shadow-sm ${editingId ? 'bg-tibia-card border-blue-500/50 shadow-blue-900/20' : 'bg-tibia-card border-tibia-border'}`}>
@@ -101,8 +152,15 @@ export default function PlanilhaManager({ isAdmin }) {
               <input required type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.leader_name} onChange={e => setFormData({...formData, leader_name: e.target.value})} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Respawn</label>
-              <input required type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.respawn_category} onChange={e => setFormData({...formData, respawn_category: e.target.value})} placeholder="Ex: Darashia, Falcons..." />
+              <label className="block text-sm text-gray-400 mb-1">Área (Aba)</label>
+              <select required className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.respawn_category} onChange={e => setFormData({...formData, respawn_category: e.target.value})}>
+                {areas.length === 0 && <option value="">Cadastre uma área primeiro</option>}
+                {areas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Local Exato (Respawn)</label>
+              <input required type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.hunt_name} onChange={e => setFormData({...formData, hunt_name: e.target.value})} placeholder="Ex: Lions, Falcons" />
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Início (HH:MM)</label>
@@ -120,7 +178,7 @@ export default function PlanilhaManager({ isAdmin }) {
               {editingId && (
                 <button type="button" onClick={cancelEdit} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded transition">Cancelar</button>
               )}
-              <button type="submit" className={`${editingId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-green-600 hover:bg-green-500'} text-white font-bold py-2 px-6 rounded transition`}>
+              <button type="submit" disabled={areas.length === 0} className={`${editingId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-green-600 hover:bg-green-500'} disabled:opacity-50 text-white font-bold py-2 px-6 rounded transition`}>
                 {editingId ? 'Salvar Alterações' : 'Salvar Agendamento'}
               </button>
             </div>
@@ -137,6 +195,7 @@ export default function PlanilhaManager({ isAdmin }) {
           <thead className="bg-black/40 text-gray-400 uppercase font-semibold">
             <tr>
               <th className="px-6 py-4">Equipe</th>
+              <th className="px-6 py-4">Área</th>
               <th className="px-6 py-4">Respawn</th>
               <th className="px-6 py-4">Horário</th>
               <th className="px-6 py-4">Líder</th>
@@ -145,11 +204,12 @@ export default function PlanilhaManager({ isAdmin }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-tibia-border/50">
-            {loading ? <tr><td colSpan={isAdmin ? 6 : 5} className="text-center py-4">Carregando...</td></tr> : null}
+            {loading ? <tr><td colSpan={isAdmin ? 7 : 6} className="text-center py-4">Carregando...</td></tr> : null}
             {!loading && parties.map(p => (
               <tr key={p.id} className={`hover:bg-white/5 ${editingId === p.id ? 'bg-blue-900/20' : ''}`}>
                 <td className="px-6 py-4 font-medium text-white">{p.party_name}</td>
                 <td className="px-6 py-4 font-bold text-tibia-highlight">{p.respawn_category}</td>
+                <td className="px-6 py-4 text-orange-300">{p.hunt_name || 'Desconhecido'}</td>
                 <td className="px-6 py-4 text-blue-400">{p.slot_start.substring(0,5)} - {p.slot_end.substring(0,5)}</td>
                 <td className="px-6 py-4 text-white font-medium">{p.leader_name}</td>
                 <td className="px-6 py-4 text-gray-400 text-xs">
@@ -167,7 +227,7 @@ export default function PlanilhaManager({ isAdmin }) {
                 )}
               </tr>
             ))}
-            {!loading && parties.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-gray-500">Nenhuma party cadastrada.</td></tr>}
+            {!loading && parties.length === 0 && <tr><td colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-gray-500">Nenhuma party cadastrada.</td></tr>}
           </tbody>
         </table>
       </div>
