@@ -1,83 +1,62 @@
-import { fetchPage } from '../utils/scraper.js';
 import { supabase } from '../db.js';
+import { scrapeHighscores } from '../lib/rubinotScraper.js';
+import 'dotenv/config';
 
-export const runFetchHighscores = async (page = 1) => {
-  const path = `/?subtopic=highscores&list=experience&page=${page}`;
-  console.log(`[JOB] Fetching Highscores (Page ${page})...`);
-
+export const runFetchHighscores = async () => {
+  console.log(`[JOB] Fetching Highscores (Global)...`);
+  
   try {
-    const $ = await fetchPage(path);
-    const logs = [];
+    const players = await scrapeHighscores(null, null, 10); // max 10 pages for now to not overload
 
-    // Lógica para extrair tabela de Highscores
-    $('table tr').each((i, row) => {
-      const tds = $(row).find('td');
-      // Espera-se: Rank, Nome, Vocação, Level, Pontos (XP)
-      if (tds.length >= 5) {
-        const name = $(tds[1]).text().trim();
-        const levelText = $(tds[3]).text().trim();
-        const xpText = $(tds[4]).text().replace(/,/g, '').trim(); // Remove vírgulas
-        
-        const level = parseInt(levelText, 10);
-        const xp = parseInt(xpText, 10);
-        
-        if (name && !isNaN(level) && !isNaN(xp)) {
-          logs.push({
-            character_name: name,
-            level: level,
-            xp_total: xp,
-            // is_online pode ser preenchido cruzando com um redis/db cache dos onlines
-          });
-        }
-      }
-    });
+    if (!players || players.length === 0) {
+      console.log(`[JOB] Nenhum highscore encontrado.`);
+      return;
+    }
 
-    if (logs.length === 0) return;
+    // Buscamos quem está na nossa guilda
+    const { data: guildMembers } = await supabase.from('guild_members').select('name');
+    const memberNames = new Set(guildMembers?.map(m => m.name.toLowerCase()) || []);
 
-    // Antes de inserir o novo log, precisamos calcular o delta_xp em relação ao log mais recente
-    // Como estamos inserindo em massa, a forma mais eficiente é buscar a última XP de todos esses nomes de uma vez
-    const names = logs.map(l => l.character_name);
+    const logsToInsert = [];
     
-    // Pega o último log de cada player
-    const { data: lastLogs, error } = await supabase
+    // Calcula Delta XP
+    const names = players.filter(p => memberNames.has(p.name.toLowerCase())).map(p => p.name);
+    const { data: lastLogs } = await supabase
       .from('telemetry_logs')
       .select('character_name, xp_total')
       .in('character_name', names)
       .order('recorded_at', { ascending: false });
 
-    // Cria um mapa para busca rápida (pega só o mais recente)
     const lastXpMap = {};
     if (lastLogs) {
       lastLogs.forEach(row => {
-        if (!lastXpMap[row.character_name]) {
-          lastXpMap[row.character_name] = row.xp_total;
-        }
+        if (!lastXpMap[row.character_name]) lastXpMap[row.character_name] = parseInt(row.xp_total, 10);
       });
     }
-
-    // Calcula Delta
-    const logsToInsert = logs.map(log => {
-      const prevXp = lastXpMap[log.character_name] || log.xp_total;
-      const delta = log.xp_total - prevXp;
-      
-      return {
-        ...log,
-        delta_xp: delta >= 0 ? delta : 0, // Evita delta negativo se o cara morreu (ou trata conforme regra de negócio)
-      };
-    });
-
-    // Insere os logs
-    const { error: insertError } = await supabase
-      .from('telemetry_logs')
-      .insert(logsToInsert);
-
-    if (insertError) {
-      console.error(`[JOB] Erro ao inserir logs de telemetria da pág ${page}:`, insertError);
-    } else {
-      console.log(`[JOB] Pág ${page}: ${logsToInsert.length} logs inseridos com sucesso.`);
+    
+    for (const player of players) {
+      if (memberNames.has(player.name.toLowerCase())) {
+        const lastXp = lastXpMap[player.name] || player.experience;
+        logsToInsert.push({
+          character_name: player.name,
+          level: player.level,
+          xp_total: player.experience,
+          delta_xp: player.experience - lastXp,
+          is_online: false // Será atualizado por telemetry fetchGuild
+        });
+      }
     }
 
+    if (logsToInsert.length === 0) {
+      console.log(`[JOB] Nenhum membro da guilda encontrado nos highscores.`);
+      return;
+    }
+
+    const { error } = await supabase.from('telemetry_logs').insert(logsToInsert);
+    if (error) throw error;
+
+    console.log(`[JOB] Inseridos ${logsToInsert.length} logs de telemetria baseados nos Highscores.`);
   } catch (error) {
-    console.error(`[JOB] Erro na task FETCH_HIGHSCORE (Pág ${page}):`, error.message);
+    console.error(`[JOB] Erro na task FETCH_HIGHSCORES:`, error.message);
   }
 };
