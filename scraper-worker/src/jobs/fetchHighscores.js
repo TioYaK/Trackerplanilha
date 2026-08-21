@@ -3,11 +3,11 @@ import { scrapeHighscores } from '../lib/rubinotScraper.js';
 import 'dotenv/config';
 
 export const runFetchHighscores = async () => {
-  console.log(`[JOB] Fetching Highscores (Global)...`);
-  
   try {
-    const players = await scrapeHighscores(null, null, 10); // max 10 pages for now to not overload
-
+    console.log('[JOB] Fetching Highscores (Global)...');
+    
+    const players = await scrapeHighscores(null, null, 50); // max 50 pages (2500 players)
+    
     if (!players || players.length === 0) {
       console.log(`[JOB] Nenhum highscore encontrado.`);
       return;
