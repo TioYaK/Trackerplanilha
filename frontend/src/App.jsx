@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Sidebar from './components/Sidebar';
 import TopNav from './components/TopNav';
 import LiveDashboard from './views/LiveDashboard';
 import GlobalTracker from './components/GlobalTracker';
@@ -10,7 +9,6 @@ import ReportExport from './components/ReportExport';
 import Rankings from './components/Rankings';
 
 export default function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentView, setCurrentView] = useState('live');
 
   const renderView = () => {

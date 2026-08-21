@@ -4,10 +4,10 @@ import 'dotenv/config';
 
 export const runFetchHighscores = async () => {
   try {
-    console.log('[JOB] Fetching Highscores (Global)...');
+    console.log('[JOB] Fetching Highscores (Auroria)...');
     
-    // Scrape up to 500 pages (25.000 players) to ensure no one is missed
-    const players = await scrapeHighscores(null, null, 500); 
+    // Scrape up to 500 pages (25.000 players) specifically on the 'Auroria' server
+    const players = await scrapeHighscores('Auroria', null, 500); 
     
     if (!players || players.length === 0) {
       console.log(`[JOB] Nenhum highscore encontrado.`);
