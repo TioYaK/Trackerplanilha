@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS slot_audit_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 6. Tabela player_strikes: Sistema de Punições da Guilda
+CREATE TABLE IF NOT EXISTS player_strikes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_name TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    duration_days INT NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ========================================================================================
 -- VIEWS DE CONSOLIDAÇÃO PARA O DASHBOARD (Calculadas em tempo real / sob demanda)
 -- ========================================================================================

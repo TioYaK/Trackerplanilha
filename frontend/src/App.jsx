@@ -11,20 +11,26 @@ import Rankings from './components/Rankings';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('live');
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+
+  const handlePlayerClick = (playerName) => {
+    setSelectedPlayer(playerName);
+    setCurrentView('players');
+  };
 
   const renderView = () => {
     switch(currentView) {
       case 'live': return <LiveDashboard />;
-      case 'roster': return <GuildRoster />;
+      case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} />;
       case 'radar': return <RadarHunters />;
       case 'tracker': return <GlobalTracker />;
       case 'planilha': return <PlanilhaManager />;
       case 'players': 
         return (
           <div className="p-8 max-w-7xl mx-auto w-full">
-            <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Inspeção de Membro</h2>
-            <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência e a telemetria histórica de qualquer jogador da guilda.</p>
-            <PlayerDashboard playerName="Exemplo de Jogador" />
+            <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Investigação de Membro</h2>
+            <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência, histórico criminal e aplique punições ao jogador.</p>
+            <PlayerDashboard playerName={selectedPlayer} />
           </div>
         );
       case 'analytics':

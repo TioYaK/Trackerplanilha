@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Search, User, UserCheck, UserMinus } from 'lucide-react';
 
-export default function GuildRoster() {
+export default function GuildRoster({ onPlayerClick }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -147,9 +147,14 @@ export default function GuildRoster() {
                 </tr>
               ) : (
                 filteredMembers.map(m => (
-                  <tr key={m.name} className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-3 font-medium text-white">{m.name}</td>
-                    <td className="px-6 py-3 text-gray-400">{m.vocation}</td>
+                <tr key={m.name} className="hover:bg-white/5 transition-colors">
+                  <td 
+                    className="px-6 py-3 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline"
+                    onClick={() => onPlayerClick && onPlayerClick(m.name)}
+                  >
+                    {m.name}
+                  </td>
+                  <td className="px-6 py-3 text-gray-400">{m.vocation}</td>
                     <td className="px-6 py-3">
                       <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20">Lvl {m.level}</span>
                     </td>
