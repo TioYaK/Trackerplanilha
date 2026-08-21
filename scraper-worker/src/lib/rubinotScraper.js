@@ -691,18 +691,24 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20) {
                     clicked = await page.evaluate((nextNum) => {
                         const buttons = Array.from(document.querySelectorAll('button, a'));
                         
-                        // Primeiro tenta encontrar "Próxima" ou "Next"
+                        // Primeiro tenta lógica exata da guilda (title, chevron) ou texto
                         let nextBtn = buttons.find(b => {
                             const txt = b.textContent.trim().toLowerCase();
-                            return txt.includes('próxima') || txt.includes('next');
+                            const title = (b.title || '').toLowerCase();
+                            const html = b.innerHTML || '';
+                            return title.includes('próxima') || 
+                                   title.includes('next') || 
+                                   txt.includes('próxima') || 
+                                   txt.includes('next') ||
+                                   html.includes('chevron-right');
                         });
                         
-                        // Se não achou, tenta achar o botão numérico exato
+                        // Fallback: numérico (ex: 2, 3, 4...)
                         if (!nextBtn) {
                             nextBtn = buttons.find(b => b.textContent.trim() === String(nextNum));
                         }
                         
-                        if (nextBtn) { 
+                        if (nextBtn && !nextBtn.disabled) { 
                             nextBtn.click(); 
                             return true; 
                         }
