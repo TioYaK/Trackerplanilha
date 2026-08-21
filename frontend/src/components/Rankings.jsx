@@ -15,10 +15,9 @@ export default function Rankings({ isAdmin }) {
 
     // 1. Top Rushers (24h)
     const { data: rushersData } = await supabase
-      .from('guild_members')
-      .select('name, xp_gained, vocation, level')
+      .from('view_top_rushers_24h')
+      .select('*')
       .gt('xp_gained', 0)
-      .order('xp_gained', { ascending: false })
       .limit(5);
 
     if (rushersData) setTopRushers(rushersData);

@@ -17,7 +17,7 @@ export default function GuildRoster({ onPlayerClick }) {
 
     while (hasMore) {
       const { data, error } = await supabase
-        .from('guild_members')
+        .from('view_guild_roster')
         .select('*')
         .order('level', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -172,7 +172,7 @@ export default function GuildRoster({ onPlayerClick }) {
                       )}
                     </td>
                     <td className="px-6 py-3 text-right text-gray-400">
-                      {m.xp_total ? m.xp_total.toLocaleString() : '-'}
+                      {m.xp_gained_24h ? `+${m.xp_gained_24h.toLocaleString()}` : '0'}
                     </td>
                   </tr>
                 ))
