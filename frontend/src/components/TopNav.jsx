@@ -16,11 +16,11 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdm
       <div className="max-w-7xl mx-auto px-4 flex justify-between items-center h-16">
         
         {/* Logo Section */}
-        <div className="flex items-center space-x-2">
-          <Swords size={28} className="text-tibia-highlight" />
+        <div className="flex items-center space-x-3">
+          <img src="/logo.jpg" alt="BattleStorm Logo" className="w-10 h-10 rounded-full border-2 border-tibia-highlight shadow-tibia-glow" />
           <div>
             <h1 className="text-2xl font-medieval text-tibia-highlight tracking-wider shadow-black drop-shadow-md">
-              Auroria <span className="text-white">Tracker</span>
+              BattleStorm <span className="text-white">Tracker</span>
             </h1>
           </div>
         </div>
