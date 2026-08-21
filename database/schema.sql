@@ -82,6 +82,19 @@ SELECT
     (SELECT COUNT(*) FROM guild_members) as total_members,
     (SELECT COUNT(DISTINCT character_name) FROM telemetry_logs WHERE recorded_at >= NOW() - INTERVAL '7 days') as active_members;
 
+-- View de Caçadores Recentes (Últimas 24h)
+CREATE OR REPLACE VIEW view_recent_hunters AS
+SELECT 
+    character_name,
+    MAX(level) as level,
+    SUM(delta_xp) as xp_gained,
+    MAX(recorded_at) as last_hunt
+FROM telemetry_logs 
+WHERE recorded_at >= NOW() - INTERVAL '24 hours'
+GROUP BY character_name 
+HAVING SUM(delta_xp) > 0
+ORDER BY xp_gained DESC;
+
 -- ========================================================================================
 -- TRIGGERS PARA UPDATED_AT
 -- ========================================================================================

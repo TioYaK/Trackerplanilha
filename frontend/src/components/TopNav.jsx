@@ -1,10 +1,11 @@
 import React from 'react';
-import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings, Swords } from 'lucide-react';
+import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings, Swords, Crosshair } from 'lucide-react';
 
 export default function TopNav({ currentView, setCurrentView }) {
   const navItems = [
     { id: 'live', label: 'Monitor ao Vivo', icon: <Activity size={18} /> },
     { id: 'roster', label: 'Roster da Guilda', icon: <Users size={18} /> },
+    { id: 'radar', label: 'Radar de Caçadores', icon: <Crosshair size={18} /> },
     { id: 'planilha', label: 'Respawns', icon: <CalendarDays size={18} /> },
     { id: 'tracker', label: 'Censo Macro', icon: <LayoutDashboard size={18} /> },
     { id: 'analytics', label: 'Dossiê & Rankings', icon: <TrendingDown size={18} /> },

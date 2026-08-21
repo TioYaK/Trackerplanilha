@@ -4,6 +4,7 @@ import LiveDashboard from './views/LiveDashboard';
 import GlobalTracker from './components/GlobalTracker';
 import PlanilhaManager from './views/PlanilhaManager';
 import GuildRoster from './views/GuildRoster';
+import RadarHunters from './views/RadarHunters';
 import PlayerDashboard from './components/PlayerDashboard';
 import ReportExport from './components/ReportExport';
 import Rankings from './components/Rankings';
@@ -15,6 +16,7 @@ export default function App() {
     switch(currentView) {
       case 'live': return <LiveDashboard />;
       case 'roster': return <GuildRoster />;
+      case 'radar': return <RadarHunters />;
       case 'tracker': return <GlobalTracker />;
       case 'planilha': return <PlanilhaManager />;
       case 'players': 
