@@ -12,6 +12,27 @@ import Rankings from './components/Rankings';
 export default function App() {
   const [currentView, setCurrentView] = useState('live');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  
+  // Admin state
+  const [isAdmin, setIsAdmin] = useState(() => {
+    return localStorage.getItem('auroria_admin') === 'true';
+  });
+
+  const toggleAdmin = () => {
+    if (isAdmin) {
+      localStorage.removeItem('auroria_admin');
+      setIsAdmin(false);
+    } else {
+      const pwd = prompt('Digite a senha de Administrador:');
+      if (pwd === 'admin123') { // Senha super secreta para MVP
+        localStorage.setItem('auroria_admin', 'true');
+        setIsAdmin(true);
+        alert('Modo Administrador ativado com sucesso!');
+      } else if (pwd !== null) {
+        alert('Senha incorreta.');
+      }
+    }
+  };
 
   const handlePlayerClick = (playerName) => {
     setSelectedPlayer(playerName);
@@ -30,7 +51,7 @@ export default function App() {
           <div className="p-8 max-w-7xl mx-auto w-full">
             <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Investigação de Membro</h2>
             <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência, histórico criminal e aplique punições ao jogador.</p>
-            <PlayerDashboard playerName={selectedPlayer} />
+            <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} />
           </div>
         );
       case 'analytics':
@@ -41,7 +62,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-tibia-bg text-gray-200 font-sans" style={{ backgroundImage: 'radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%)' }}>
-      <TopNav currentView={currentView} setCurrentView={setCurrentView} />
+      <TopNav 
+        currentView={currentView} 
+        setCurrentView={setCurrentView} 
+        isAdmin={isAdmin}
+        toggleAdmin={toggleAdmin}
+      />
       <main className="w-full">
         {renderView()}
       </main>

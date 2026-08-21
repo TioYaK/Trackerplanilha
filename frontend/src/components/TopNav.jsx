@@ -1,7 +1,7 @@
 import React from 'react';
-import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings, Swords, Crosshair } from 'lucide-react';
+import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings, Swords, Crosshair, Lock, Unlock } from 'lucide-react';
 
-export default function TopNav({ currentView, setCurrentView }) {
+export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdmin }) {
   const navItems = [
     { id: 'live', label: 'Monitor ao Vivo', icon: <Activity size={18} /> },
     { id: 'roster', label: 'Roster da Guilda', icon: <Users size={18} /> },
@@ -26,34 +26,36 @@ export default function TopNav({ currentView, setCurrentView }) {
         </div>
 
         {/* Desktop Menu */}
-        <nav className="hidden md:flex space-x-1">
+        <nav className="hidden lg:flex space-x-1">
           {navItems.map(item => (
             <button
               key={item.id}
               onClick={() => setCurrentView(item.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded font-medieval transition-all duration-300 ${
+              className={`flex items-center space-x-2 px-3 py-2 rounded font-medieval transition-all duration-300 ${
                 currentView === item.id 
                   ? 'bg-tibia-primary text-black font-bold shadow-tibia-glow' 
                   : 'text-tibia-primary hover:text-tibia-highlight hover:bg-black/30'
               }`}
             >
               {item.icon}
-              <span className="text-lg tracking-wide">{item.label}</span>
+              <span className="text-md tracking-wide">{item.label}</span>
             </button>
           ))}
         </nav>
 
         {/* Right Icons */}
-        <div className="flex items-center">
+        <div className="flex items-center space-x-4">
           <button 
-            onClick={() => setCurrentView('settings')}
-            className={`p-2 rounded transition-colors ${
-              currentView === 'settings' 
-                ? 'text-tibia-highlight bg-black/50' 
-                : 'text-tibia-primary hover:text-tibia-highlight hover:bg-black/30'
+            onClick={toggleAdmin}
+            className={`flex items-center px-3 py-1.5 rounded transition-colors border ${
+              isAdmin 
+                ? 'bg-red-900/40 text-red-400 border-red-900/50 hover:bg-red-900/60' 
+                : 'bg-black/30 text-gray-500 border-gray-800 hover:text-white'
             }`}
+            title={isAdmin ? "Desativar Modo Admin" : "Ativar Modo Admin"}
           >
-            <Settings size={22} />
+            {isAdmin ? <Unlock size={16} className="mr-2" /> : <Lock size={16} className="mr-2" />}
+            <span className="text-xs font-bold uppercase">{isAdmin ? 'Admin ON' : 'Admin OFF'}</span>
           </button>
         </div>
 

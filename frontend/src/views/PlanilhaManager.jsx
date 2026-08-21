@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Plus, Trash2, Edit } from 'lucide-react';
 
-export default function PlanilhaManager() {
+export default function PlanilhaManager({ isAdmin }) {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
@@ -53,66 +53,80 @@ export default function PlanilhaManager() {
       <h2 className="text-3xl font-black text-white mb-2">Gerenciar Planilha</h2>
       <p className="text-gray-400 mb-8">Adicione ou remova os agendamentos oficiais do Discord aqui.</p>
 
-      <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 mb-8 shadow-sm">
-        <h3 className="text-xl font-bold text-white mb-4 flex items-center"><Plus size={20} className="mr-2 text-green-400"/> Novo Agendamento</h3>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Nome da Party</label>
-            <input required type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.party_name} onChange={e => setFormData({...formData, party_name: e.target.value})} placeholder="Ex: Rushadores" />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Líder (Nick exato)</label>
-            <input required type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.leader_name} onChange={e => setFormData({...formData, leader_name: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Respawn</label>
-            <select className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.respawn_category} onChange={e => setFormData({...formData, respawn_category: e.target.value})}>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Início (HH:MM)</label>
-            <input required type="time" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.slot_start} onChange={e => setFormData({...formData, slot_start: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Fim (HH:MM)</label>
-            <input required type="time" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.slot_end} onChange={e => setFormData({...formData, slot_end: e.target.value})} />
-          </div>
-          <div className="lg:col-span-3">
-            <label className="block text-sm text-gray-400 mb-1">Integrantes (separados por vírgula)</label>
-            <input type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.members} onChange={e => setFormData({...formData, members: e.target.value})} placeholder="Player 1, Player 2, Player 3..." />
-          </div>
-          <div className="lg:col-span-3 flex justify-end mt-2">
-            <button type="submit" className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded transition">Salvar Agendamento</button>
-          </div>
-        </form>
-      </div>
+      {isAdmin ? (
+        <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 mb-8 shadow-sm">
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center"><Plus size={20} className="mr-2 text-green-400"/> Novo Agendamento</h3>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Nome da Party</label>
+              <input required type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.party_name} onChange={e => setFormData({...formData, party_name: e.target.value})} placeholder="Ex: Rushadores" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Líder (Nick exato)</label>
+              <input required type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.leader_name} onChange={e => setFormData({...formData, leader_name: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Respawn</label>
+              <select className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.respawn_category} onChange={e => setFormData({...formData, respawn_category: e.target.value})}>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Início (HH:MM)</label>
+              <input required type="time" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.slot_start} onChange={e => setFormData({...formData, slot_start: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Fim (HH:MM)</label>
+              <input required type="time" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.slot_end} onChange={e => setFormData({...formData, slot_end: e.target.value})} />
+            </div>
+            <div className="lg:col-span-3">
+              <label className="block text-sm text-gray-400 mb-1">Integrantes (separados por vírgula)</label>
+              <input type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.members} onChange={e => setFormData({...formData, members: e.target.value})} placeholder="Player 1, Player 2, Player 3..." />
+            </div>
+            <div className="lg:col-span-3 flex justify-end mt-2">
+              <button type="submit" className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded transition">Salvar Agendamento</button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 mb-8 flex justify-center items-center text-gray-500 text-sm">
+          Apenas Administradores podem criar ou editar agendamentos.
+        </div>
+      )}
 
       <div className="bg-tibia-card border border-tibia-border rounded-lg overflow-hidden">
         <table className="w-full text-left text-sm text-gray-300">
-          <thead className="bg-black/20 text-gray-400 uppercase font-semibold">
+          <thead className="bg-black/40 text-gray-400 uppercase font-semibold">
             <tr>
-              <th className="px-4 py-3">Party</th>
-              <th className="px-4 py-3">Respawn</th>
-              <th className="px-4 py-3">Horário</th>
-              <th className="px-4 py-3">Líder</th>
-              <th className="px-4 py-3 text-right">Ações</th>
+              <th className="px-6 py-4">Equipe</th>
+              <th className="px-6 py-4">Respawn</th>
+              <th className="px-6 py-4">Horário</th>
+              <th className="px-6 py-4">Líder</th>
+              <th className="px-6 py-4">Integrantes</th>
+              {isAdmin && <th className="px-6 py-4 text-right">Ações</th>}
             </tr>
           </thead>
-          <tbody>
-            {loading ? <tr><td colSpan="5" className="text-center py-4">Carregando...</td></tr> : null}
-            {parties.map(p => (
-              <tr key={p.id} className="border-t border-tibia-border hover:bg-white/5">
-                <td className="px-4 py-3 font-medium text-white">{p.party_name}</td>
-                <td className="px-4 py-3"><span className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded text-xs">{p.respawn_category}</span></td>
-                <td className="px-4 py-3">{p.slot_start} - {p.slot_end}</td>
-                <td className="px-4 py-3">{p.leader_name}</td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={() => handleDelete(p.id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={18} /></button>
+          <tbody className="divide-y divide-tibia-border/50">
+            {loading ? <tr><td colSpan={isAdmin ? 6 : 5} className="text-center py-4">Carregando...</td></tr> : null}
+            {!loading && parties.map(p => (
+              <tr key={p.id} className="hover:bg-white/5">
+                <td className="px-6 py-4 font-medium text-white">{p.party_name}</td>
+                <td className="px-6 py-4 font-bold text-tibia-highlight">{p.respawn_category}</td>
+                <td className="px-6 py-4 text-blue-400">{p.slot_start.substring(0,5)} - {p.slot_end.substring(0,5)}</td>
+                <td className="px-6 py-4 text-white font-medium">{p.leader_name}</td>
+                <td className="px-6 py-4 text-gray-400 text-xs">
+                  {p.members && p.members.length > 0 ? p.members.join(', ') : 'Solo'}
                 </td>
+                {isAdmin && (
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-400 p-2 hover:bg-red-500/10 rounded transition">
+                      <Trash2 size={18} />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
-            {!loading && parties.length === 0 && <tr><td colSpan="5" className="text-center py-8 text-gray-500">Nenhuma party cadastrada.</td></tr>}
+            {!loading && parties.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-gray-500">Nenhuma party cadastrada.</td></tr>}
           </tbody>
         </table>
       </div>

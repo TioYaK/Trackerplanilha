@@ -7,7 +7,7 @@ import { Gavel, AlertOctagon, Ghost, Activity, Clock } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-export default function PlayerDashboard({ playerName }) {
+export default function PlayerDashboard({ playerName, isAdmin }) {
   const [telemetry, setTelemetry] = useState([]);
   const [strikes, setStrikes] = useState([]);
   const [stats, setStats] = useState({ ghostSlots: 0, totalHours: 0 });
@@ -100,15 +100,21 @@ export default function PlayerDashboard({ playerName }) {
           </div>
           <Ghost className="text-gray-500 opacity-50" size={32} />
         </div>
-        <div className="bg-tibia-card p-4 rounded-lg border border-tibia-border flex justify-center items-center">
-          <button 
-            onClick={() => setShowStrikeModal(true)}
-            className="w-full h-full py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
-          >
-            <AlertOctagon className="mr-2" size={20} />
-            Aplicar Strike
-          </button>
-        </div>
+        {isAdmin ? (
+          <div className="bg-tibia-card p-4 rounded-lg border border-tibia-border flex justify-center items-center">
+            <button 
+              onClick={() => setShowStrikeModal(true)}
+              className="w-full h-full py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
+            >
+              <AlertOctagon className="mr-2" size={20} />
+              Aplicar Strike
+            </button>
+          </div>
+        ) : (
+          <div className="bg-tibia-card p-4 rounded-lg border border-tibia-border flex justify-center items-center text-gray-600 text-sm">
+            Somente Admins podem aplicar punições.
+          </div>
+        )}
       </div>
 
       {/* Tabela de Strikes */}
