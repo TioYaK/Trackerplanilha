@@ -691,20 +691,8 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20) {
                     clicked = await page.evaluate((nextNum) => {
                         const buttons = Array.from(document.querySelectorAll('button, a'));
                         
-                        let nextBtn = buttons.find(b => {
-                            const txt = b.textContent.trim().toLowerCase();
-                            const title = (b.title || '').toLowerCase();
-                            const html = b.innerHTML || '';
-                            return title.includes('xima') || 
-                                   title.includes('next') || 
-                                   txt.includes('xima') || 
-                                   txt.includes('next') ||
-                                   html.includes('chevron-right');
-                        });
-                        
-                        if (!nextBtn) {
-                            nextBtn = buttons.find(b => b.textContent.trim() === String(nextNum));
-                        }
+                        // Highscores pagination is just numbers: 1, 2, 3, 4...
+                        let nextBtn = buttons.find(b => b.textContent.trim() === String(nextNum));
                         
                         if (nextBtn && !nextBtn.disabled) { 
                             nextBtn.click(); 
