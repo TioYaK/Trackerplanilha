@@ -3,10 +3,31 @@ import { runFetchGuild } from './jobs/fetchGuild.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
 import { runAuditSlots } from './jobs/auditSlots.js';
+import { exec } from 'child_process';
 
 const WORKER_ID = `worker-${Math.random().toString(36).substring(2, 9)}`;
 const POLL_INTERVAL = 5000; // 5 segundos
 const LOCK_TIMEOUT_MINUTES = 3;
+
+// Função de Auto-Update via GitHub
+const checkForUpdates = () => {
+  return new Promise((resolve) => {
+    exec('git pull', (error, stdout, stderr) => {
+      if (error) {
+        console.error('[UPDATER] Erro ao buscar atualizações:', error.message);
+        resolve(false);
+        return;
+      }
+      if (stdout && !stdout.includes('Already up to date')) {
+        console.log('[UPDATER] Nova atualização encontrada no GitHub! Código baixado.');
+        console.log('[UPDATER] Reiniciando worker para aplicar alterações...');
+        process.exit(0); // O PM2 vai automaticamente reviver o processo rodando o novo código
+      } else {
+        resolve(false);
+      }
+    });
+  });
+};
 
 console.log(`[WORKER] Iniciando worker ID: ${WORKER_ID}`);
 
@@ -95,12 +116,22 @@ const processTask = async (task) => {
   }
 };
 
+// Temporizador para não fazer git pull todo segundo, a cada 1 hora ou a cada ciclo vazio longo
+let emptyCycles = 0;
+
 const loop = async () => {
   const task = await fetchTask();
   if (task) {
+    emptyCycles = 0;
     await processTask(task);
     setTimeout(loop, 1000); // Se achou tarefa, tenta achar outra logo em seguida
   } else {
+    emptyCycles++;
+    // Checa atualização no GitHub a cada ~1 minuto de ociosidade (12 ciclos de 5s)
+    if (emptyCycles >= 12) {
+      emptyCycles = 0;
+      await checkForUpdates();
+    }
     setTimeout(loop, POLL_INTERVAL); // Se não achou, dorme
   }
 };
