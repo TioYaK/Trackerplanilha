@@ -7,7 +7,8 @@ export const runFetchGuild = async () => {
   console.log(`[JOB] Fetching guild data for: ${guildName}`);
 
   try {
-    const members = await scrapeGuild(guildName);
+    // Passar maxPages = 200 para garantir que pega guildas de até 5000 membros
+    const members = await scrapeGuild(guildName, 200);
 
     if (!members || members.length === 0) {
       console.log(`[JOB] Nenhum membro encontrado na guilda (Cloudflare bloqueou ou guilda vazia).`);
