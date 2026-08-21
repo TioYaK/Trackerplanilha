@@ -2,11 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Users, Activity, Crosshair } from 'lucide-react';
 
-export default function HeaderMetrics() {
+export default function HeaderMetrics({ parties = [] }) {
   const [metrics, setMetrics] = useState({ total_members: 0, active_members: 0 });
 
   useEffect(() => {
-    // Busca dados consolidados da View (Macro Censo)
     const fetchMetrics = async () => {
       const { data, error } = await supabase.from('view_macro_census').select('*').single();
       if (!error && data) {
@@ -14,8 +13,17 @@ export default function HeaderMetrics() {
       }
     };
     fetchMetrics();
-    // Poderia configurar Realtime channel aqui se necessário
   }, []);
+
+  // Calcular slots atuais (baseado na hora atual)
+  const now = new Date();
+  const currentHour = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+  
+  const currentParties = parties.filter(p => p.slot_start <= currentHour && p.slot_end >= currentHour);
+  const totalCurrentSlots = currentParties.length;
+  // Para MVP sem a view complexa no frontend, consideramos Ghost Slot se status for explicitamente 'GHOST_SLOT'
+  // ou apenas exibimos o total se não tiver telemetria embutida
+  const idleSlots = currentParties.filter(p => p.status === 'GHOST_SLOT').length;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -42,11 +50,10 @@ export default function HeaderMetrics() {
       <div className="bg-tibia-card p-6 rounded-lg border border-tibia-border shadow-sm flex items-center justify-between">
         <div>
           <p className="text-gray-400 text-sm font-semibold uppercase">Respawns Ociosos Agora</p>
-          {/* Placeholder para contador em tempo real */}
-          <p className="text-3xl font-bold text-red-500 mt-2">2 <span className="text-sm font-normal text-gray-500">/ 5 slots</span></p>
+          <p className="text-3xl font-bold text-red-500 mt-2">{idleSlots} <span className="text-sm font-normal text-gray-500">/ {totalCurrentSlots} slots ativos</span></p>
         </div>
         <div className="bg-tibia-bg p-3 rounded-full">
-          <Crosshair className="text-red-500" size={24} />
+          <Crosshair className={idleSlots > 0 ? "text-red-500" : "text-gray-600"} size={24} />
         </div>
       </div>
     </div>

@@ -61,7 +61,7 @@ export default function LiveDashboard() {
         </button>
       </div>
 
-      <HeaderMetrics />
+      <HeaderMetrics parties={parties} />
 
       <div className="mb-6 flex space-x-2 overflow-x-auto pb-2 border-b border-tibia-border">
         {dynamicCategories.length === 0 ? (

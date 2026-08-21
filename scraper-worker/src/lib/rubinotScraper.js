@@ -691,19 +691,17 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20) {
                     clicked = await page.evaluate((nextNum) => {
                         const buttons = Array.from(document.querySelectorAll('button, a'));
                         
-                        // Primeiro tenta lógica exata da guilda (title, chevron) ou texto
                         let nextBtn = buttons.find(b => {
                             const txt = b.textContent.trim().toLowerCase();
                             const title = (b.title || '').toLowerCase();
                             const html = b.innerHTML || '';
-                            return title.includes('próxima') || 
+                            return title.includes('xima') || 
                                    title.includes('next') || 
-                                   txt.includes('próxima') || 
+                                   txt.includes('xima') || 
                                    txt.includes('next') ||
                                    html.includes('chevron-right');
                         });
                         
-                        // Fallback: numérico (ex: 2, 3, 4...)
                         if (!nextBtn) {
                             nextBtn = buttons.find(b => b.textContent.trim() === String(nextNum));
                         }
@@ -724,17 +722,20 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20) {
                         try {
                             await page.waitForFunction((oldName) => {
                                 const rows = Array.from(document.querySelectorAll('tr'));
+                                if (rows.length < 10) return false;
+                                
                                 for (const row of rows) {
                                     const cols = Array.from(row.querySelectorAll('td'));
                                     if (cols.length >= 6) {
                                         const rank = cols[0].textContent.trim();
                                         if (rank !== 'Rank' && rank !== '') {
-                                            return cols[1].textContent.trim() !== oldName;
+                                            const currentName = cols[1].textContent.trim();
+                                            return currentName !== oldName && currentName !== '';
                                         }
                                     }
                                 }
                                 return false;
-                            }, { timeout: 1000 }, oldFirstName);
+                            }, { timeout: 15000 }, oldFirstName);
                         } catch (e) {
                             // Prossegue após 1s de timeout se não atualizar no DOM
                         }
