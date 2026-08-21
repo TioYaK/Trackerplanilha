@@ -50,18 +50,18 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick }) {
   }, []);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
+      <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
         <div>
-          <h2 className="text-3xl font-black text-white">Monitor ao Vivo</h2>
-          <p className="text-gray-400 mt-1">Acompanhamento em tempo real dos respawns planilhados.</p>
+          <h2 className="text-4xl font-medieval text-gradient-gold mb-2">Monitoramento ao Vivo</h2>
+          <p className="text-gray-400 font-sans">Acompanhe as PTs e o tempo restante dos slots do Discord em tempo real.</p>
         </div>
         <button 
           onClick={fetchParties}
-          className="flex items-center text-tibia-primary hover:text-blue-400 bg-blue-500/10 px-4 py-2 rounded-lg transition"
+          className="glass-button text-tibia-highlight px-4 py-2 rounded flex items-center font-bold"
         >
           <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Atualizar Agora
+          {loading ? 'Atualizando...' : 'Sincronizar'}
         </button>
       </div>
 

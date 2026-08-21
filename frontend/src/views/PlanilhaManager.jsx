@@ -114,9 +114,11 @@ export default function PlanilhaManager({ isAdmin }) {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
-      <h2 className="text-3xl font-black text-white mb-2">Gerenciar Planilha</h2>
-      <p className="text-gray-400 mb-8">Adicione ou remova os agendamentos oficiais do Discord aqui.</p>
+    <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
+      <div className="mb-8 border-b border-tibia-border pb-4">
+        <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Gerenciar Respawns</h2>
+        <p className="text-gray-400 font-sans">Adicione ou remova os agendamentos oficiais do Discord aqui.</p>
+      </div>
 
       {isAdmin && (
         <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 mb-8 shadow-sm">

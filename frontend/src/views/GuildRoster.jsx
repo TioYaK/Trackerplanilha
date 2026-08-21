@@ -54,10 +54,12 @@ export default function GuildRoster({ onPlayerClick }) {
   const onlineCount = members.filter(m => m.is_online).length;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
-      <div className="mb-8">
-        <h2 className="text-3xl font-black text-white">Membros da Guilda</h2>
-        <p className="text-gray-400 mt-1">Lista completa de jogadores sincronizada com o banco de dados.</p>
+    <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
+      <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
+        <div>
+          <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Roster da Guilda</h2>
+          <p className="text-gray-400 font-sans">Busque membros, analise quem está online e verifique históricos rápidos.</p>
+        </div>
       </div>
 
       {/* Estatísticas Rápidas */}

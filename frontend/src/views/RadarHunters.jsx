@@ -32,13 +32,12 @@ export default function RadarHunters({ onPlayerClick }) {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
-      <div className="mb-8">
-        <h2 className="text-3xl font-black text-white flex items-center">
-          <Target className="mr-3 text-tibia-primary" size={32} />
-          Radar de Caçadores
-        </h2>
-        <p className="text-gray-400 mt-1">Jogadores da guilda que registraram ganho de XP nas últimas 24 horas.</p>
+    <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
+      <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
+        <div>
+          <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Radar de Caçadores (24h)</h2>
+          <p className="text-gray-400 font-sans">Acompanhe quem está ativo e upando no servidor nas últimas 24 horas.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

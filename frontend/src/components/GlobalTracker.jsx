@@ -35,10 +35,12 @@ export default function GlobalTracker() {
   ];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
-      <div className="mb-8">
-        <h2 className="text-3xl font-black text-white">Censo Macro do Servidor</h2>
-        <p className="text-gray-400 mt-1">Análise global da guilda, membros ativos e balanço de presença no jogo.</p>
+    <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
+      <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
+        <div>
+          <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Censo Macro da Guilda</h2>
+          <p className="text-gray-400 font-sans">Acompanhamento global de atividade e progresso de todos os membros.</p>
+        </div>
       </div>
 
       {loading ? (

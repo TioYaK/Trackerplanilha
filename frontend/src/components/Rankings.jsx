@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trophy, AlertOctagon, Gavel, Trash2, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
@@ -84,9 +84,9 @@ export default function Rankings({ isAdmin }) {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
+    <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
       <div className="mb-8 border-b border-tibia-border pb-4">
-        <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Leaderboards & Tribunal</h2>
+        <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Leaderboards & Tribunal</h2>
         <p className="text-gray-400 font-sans">Celebre os melhores jogadores e gerencie as punições ativas da guilda.</p>
       </div>
       
