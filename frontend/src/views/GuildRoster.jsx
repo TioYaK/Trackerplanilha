@@ -10,15 +10,33 @@ export default function GuildRoster() {
 
   const fetchMembers = async () => {
     setLoading(true);
-    // Fetch members sorted by level descending
-    const { data, error } = await supabase
-      .from('guild_members')
-      .select('*')
-      .order('level', { ascending: false });
+    let allData = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('guild_members')
+        .select('*')
+        .order('level', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+      if (error) {
+        console.error(error);
+        break;
+      }
       
-    if (data && !error) {
-      setMembers(data);
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        if (data.length < pageSize) hasMore = false;
+        else page++;
+      } else {
+        hasMore = false;
+      }
     }
+    
+    setMembers(allData);
     setLoading(false);
   };
 
