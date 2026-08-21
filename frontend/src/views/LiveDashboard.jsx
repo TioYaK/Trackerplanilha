@@ -5,11 +5,19 @@ import { supabase } from '../lib/supabase';
 import { RefreshCw } from 'lucide-react';
 
 export default function LiveDashboard() {
-  const [activeTab, setActiveTab] = useState('Sanguine');
+  const [activeTab, setActiveTab] = useState('');
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const categories = ['Darashia', 'Sanguine', 'Darklight', 'Piranhas', 'Totem', 'Outros'];
+  // Derivar as categorias únicas baseadas nas parties cadastradas
+  const dynamicCategories = Array.from(new Set(parties.map(p => p.respawn_category))).sort();
+
+  // Se a aba ativa atual não existe mais (ex: apagou), seleciona a primeira disponível
+  useEffect(() => {
+    if (dynamicCategories.length > 0 && (!activeTab || !dynamicCategories.includes(activeTab))) {
+      setActiveTab(dynamicCategories[0]);
+    }
+  }, [dynamicCategories, activeTab]);
 
   const fetchParties = async () => {
     setLoading(true);
@@ -56,19 +64,23 @@ export default function LiveDashboard() {
       <HeaderMetrics />
 
       <div className="mb-6 flex space-x-2 overflow-x-auto pb-2 border-b border-tibia-border">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setActiveTab(cat)}
-            className={`px-6 py-3 font-bold whitespace-nowrap transition border-b-2 ${
-              activeTab === cat 
-                ? 'border-tibia-primary text-tibia-primary' 
-                : 'border-transparent text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+        {dynamicCategories.length === 0 ? (
+          <div className="text-gray-500 italic px-4 py-2">Nenhum respawn planilhado no momento. Adicione na aba Respawns.</div>
+        ) : (
+          dynamicCategories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveTab(cat)}
+              className={`px-6 py-3 font-bold rounded-t-lg transition-all ${
+                activeTab === cat 
+                  ? 'bg-tibia-primary text-black shadow-tibia-glow' 
+                  : 'bg-tibia-card text-gray-400 hover:text-white hover:bg-black/40'
+              }`}
+            >
+              {cat}
+            </button>
+          ))
+        )}
       </div>
 
       {loading ? (

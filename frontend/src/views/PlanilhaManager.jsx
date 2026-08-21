@@ -6,10 +6,8 @@ export default function PlanilhaManager({ isAdmin }) {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
-    party_name: '', leader_name: '', respawn_category: 'Sanguine', slot_start: '', slot_end: '', members: ''
+    party_name: '', leader_name: '', respawn_category: 'Sanguine', slot_start: '18:00', slot_end: '22:00', members: ''
   });
-
-  const categories = ['Darashia', 'Sanguine', 'Darklight', 'Piranhas', 'Totem', 'Outros'];
 
   const loadParties = async () => {
     setLoading(true);
@@ -67,9 +65,7 @@ export default function PlanilhaManager({ isAdmin }) {
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Respawn</label>
-              <select className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.respawn_category} onChange={e => setFormData({...formData, respawn_category: e.target.value})}>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <input required type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.respawn_category} onChange={e => setFormData({...formData, respawn_category: e.target.value})} placeholder="Ex: Darashia, Falcons..." />
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Início (HH:MM)</label>
