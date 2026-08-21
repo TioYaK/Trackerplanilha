@@ -5,6 +5,7 @@ import { Plus, Trash2, Edit } from 'lucide-react';
 export default function PlanilhaManager({ isAdmin }) {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     party_name: '', leader_name: '', respawn_category: 'Sanguine', slot_start: '18:00', slot_end: '22:00', members: ''
   });
@@ -22,21 +23,54 @@ export default function PlanilhaManager({ isAdmin }) {
     e.preventDefault();
     const membersArray = formData.members.split(',').map(m => m.trim()).filter(m => m);
     
-    const { error } = await supabase.from('parties_planilhadas').insert([{
-      party_name: formData.party_name,
-      leader_name: formData.leader_name,
-      respawn_category: formData.respawn_category,
-      slot_start: formData.slot_start,
-      slot_end: formData.slot_end,
-      members: membersArray
-    }]);
+    let error;
+    if (editingId) {
+      const res = await supabase.from('parties_planilhadas').update({
+        party_name: formData.party_name,
+        leader_name: formData.leader_name,
+        respawn_category: formData.respawn_category,
+        slot_start: formData.slot_start,
+        slot_end: formData.slot_end,
+        members: membersArray
+      }).eq('id', editingId);
+      error = res.error;
+    } else {
+      const res = await supabase.from('parties_planilhadas').insert([{
+        party_name: formData.party_name,
+        leader_name: formData.leader_name,
+        respawn_category: formData.respawn_category,
+        slot_start: formData.slot_start,
+        slot_end: formData.slot_end,
+        members: membersArray
+      }]);
+      error = res.error;
+    }
 
     if (!error) {
       setFormData({ party_name: '', leader_name: '', respawn_category: 'Sanguine', slot_start: '', slot_end: '', members: '' });
+      setEditingId(null);
       loadParties();
     } else {
       alert("Erro ao salvar: " + error.message);
     }
+  };
+
+  const handleEdit = (p) => {
+    setFormData({
+      party_name: p.party_name,
+      leader_name: p.leader_name,
+      respawn_category: p.respawn_category,
+      slot_start: p.slot_start.substring(0, 5),
+      slot_end: p.slot_end.substring(0, 5),
+      members: p.members ? p.members.join(', ') : ''
+    });
+    setEditingId(p.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setFormData({ party_name: '', leader_name: '', respawn_category: 'Sanguine', slot_start: '', slot_end: '', members: '' });
+    setEditingId(null);
   };
 
   const handleDelete = async (id) => {
@@ -52,8 +86,11 @@ export default function PlanilhaManager({ isAdmin }) {
       <p className="text-gray-400 mb-8">Adicione ou remova os agendamentos oficiais do Discord aqui.</p>
 
       {isAdmin ? (
-        <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 mb-8 shadow-sm">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center"><Plus size={20} className="mr-2 text-green-400"/> Novo Agendamento</h3>
+        <div className={`border rounded-lg p-6 mb-8 shadow-sm ${editingId ? 'bg-tibia-card border-blue-500/50 shadow-blue-900/20' : 'bg-tibia-card border-tibia-border'}`}>
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center">
+            {editingId ? <Edit size={20} className="mr-2 text-blue-400"/> : <Plus size={20} className="mr-2 text-green-400"/>}
+            {editingId ? 'Editar Agendamento' : 'Novo Agendamento'}
+          </h3>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm text-gray-400 mb-1">Nome da Party</label>
@@ -79,8 +116,13 @@ export default function PlanilhaManager({ isAdmin }) {
               <label className="block text-sm text-gray-400 mb-1">Integrantes (separados por vírgula)</label>
               <input type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.members} onChange={e => setFormData({...formData, members: e.target.value})} placeholder="Player 1, Player 2, Player 3..." />
             </div>
-            <div className="lg:col-span-3 flex justify-end mt-2">
-              <button type="submit" className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded transition">Salvar Agendamento</button>
+            <div className="lg:col-span-3 flex justify-end mt-2 space-x-3">
+              {editingId && (
+                <button type="button" onClick={cancelEdit} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded transition">Cancelar</button>
+              )}
+              <button type="submit" className={`${editingId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-green-600 hover:bg-green-500'} text-white font-bold py-2 px-6 rounded transition`}>
+                {editingId ? 'Salvar Alterações' : 'Salvar Agendamento'}
+              </button>
             </div>
           </form>
         </div>
@@ -105,7 +147,7 @@ export default function PlanilhaManager({ isAdmin }) {
           <tbody className="divide-y divide-tibia-border/50">
             {loading ? <tr><td colSpan={isAdmin ? 6 : 5} className="text-center py-4">Carregando...</td></tr> : null}
             {!loading && parties.map(p => (
-              <tr key={p.id} className="hover:bg-white/5">
+              <tr key={p.id} className={`hover:bg-white/5 ${editingId === p.id ? 'bg-blue-900/20' : ''}`}>
                 <td className="px-6 py-4 font-medium text-white">{p.party_name}</td>
                 <td className="px-6 py-4 font-bold text-tibia-highlight">{p.respawn_category}</td>
                 <td className="px-6 py-4 text-blue-400">{p.slot_start.substring(0,5)} - {p.slot_end.substring(0,5)}</td>
@@ -114,8 +156,11 @@ export default function PlanilhaManager({ isAdmin }) {
                   {p.members && p.members.length > 0 ? p.members.join(', ') : 'Solo'}
                 </td>
                 {isAdmin && (
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-400 p-2 hover:bg-red-500/10 rounded transition">
+                  <td className="px-6 py-4 text-right flex justify-end space-x-2">
+                    <button onClick={() => handleEdit(p)} className="text-blue-400 hover:text-blue-300 p-2 hover:bg-blue-500/10 rounded transition" title="Editar">
+                      <Edit size={18} />
+                    </button>
+                    <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-400 p-2 hover:bg-red-500/10 rounded transition" title="Remover">
                       <Trash2 size={18} />
                     </button>
                   </td>
