@@ -41,7 +41,7 @@ const fetchTask = async () => {
       .from('task_queue')
       .select('*')
       .or(`status.eq.PENDING,and(status.eq.IN_PROGRESS,locked_at.lt.${timeLimit.toISOString()})`)
-      .order('id', { ascending: true })
+      .order('updated_at', { ascending: true })
       .limit(1);
 
     if (error) throw error;
@@ -74,15 +74,15 @@ const fetchTask = async () => {
 };
 
 const completeTask = async (taskId) => {
+  // Para manter o worker em loop infinito, voltamos a tarefa para PENDING.
+  // Assim ele sempre fica atualizando a guild, onlines, highscores e audit slots continuamente.
   await supabase
     .from('task_queue')
-    .update({ status: 'COMPLETED' })
+    .update({ status: 'PENDING', locked_at: null, worker_id: null })
     .eq('id', taskId);
 };
 
 const requeueTask = async (taskId) => {
-  // Para tarefas recorrentes, voltamos para PENDING para a próxima rodada do cron externo,
-  // ou lidamos via crontab. Neste exemplo, completamos.
   await completeTask(taskId);
 };
 
@@ -99,6 +99,7 @@ const processTask = async (task) => {
         break;
       case 'FETCH_HIGHSCORE':
         await runFetchHighscores(task.page_number || 1);
+        await runAuditSlots();
         break;
       case 'AUDIT_SLOTS':
         await runAuditSlots();
@@ -127,11 +128,6 @@ const loop = async () => {
     setTimeout(loop, 1000); // Se achou tarefa, tenta achar outra logo em seguida
   } else {
     emptyCycles++;
-    // Checa atualização no GitHub a cada ~1 minuto de ociosidade (12 ciclos de 5s)
-    if (emptyCycles >= 12) {
-      emptyCycles = 0;
-      await checkForUpdates();
-    }
     setTimeout(loop, POLL_INTERVAL); // Se não achou, dorme
   }
 };
