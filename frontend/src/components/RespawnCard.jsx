@@ -1,7 +1,7 @@
 import React from 'react';
 import { Clock, TrendingUp, AlertTriangle } from 'lucide-react';
 
-export default function RespawnCard({ party }) {
+export default function RespawnCard({ party, onPlayerClick }) {
   // party: { party_name, leader_name, slot_start, slot_end, members, status (EFFICIENT, SUBOPTIMAL, GHOST_SLOT) }
   
   const statusColors = {
@@ -22,7 +22,7 @@ export default function RespawnCard({ party }) {
             {party.party_name}
           </h3>
           <p className="text-sm text-tibia-highlight font-medium mt-1">📍 Local: <span className="text-orange-300">{party.hunt_name || 'Desconhecido'}</span></p>
-          <p className="text-sm text-gray-400 mt-1">Líder: {party.leader_name}</p>
+          <p className="text-sm text-gray-400 mt-1">Líder: <span className="cursor-pointer hover:text-tibia-primary hover:underline" onClick={() => onPlayerClick && onPlayerClick(party.leader_name)}>{party.leader_name}</span></p>
         </div>
         <div className="flex flex-col items-end">
           <span className="text-sm font-semibold bg-black/30 px-3 py-1 rounded-full text-gray-300">
@@ -36,7 +36,11 @@ export default function RespawnCard({ party }) {
         <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Integrantes Esperados</h4>
         <div className="flex flex-wrap gap-2">
           {party.members?.map((member, idx) => (
-            <span key={idx} className="bg-tibia-bg border border-tibia-border px-2 py-1 text-xs rounded text-gray-300">
+            <span 
+              key={idx} 
+              onClick={() => onPlayerClick && onPlayerClick(member)}
+              className="bg-tibia-bg border border-tibia-border px-2 py-1 text-xs rounded text-gray-300 cursor-pointer hover:border-tibia-primary hover:text-white transition-colors"
+            >
               {member}
             </span>
           ))}

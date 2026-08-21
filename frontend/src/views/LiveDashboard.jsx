@@ -4,7 +4,7 @@ import RespawnCard from '../components/RespawnCard';
 import { supabase } from '../lib/supabase';
 import { RefreshCw } from 'lucide-react';
 
-export default function LiveDashboard() {
+export default function LiveDashboard({ onPlayerClick }) {
   const [activeTab, setActiveTab] = useState('');
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +69,7 @@ export default function LiveDashboard() {
 
       <div className="mb-6 flex space-x-2 overflow-x-auto pb-2 border-b border-tibia-border">
         {dynamicCategories.length === 0 ? (
-          <div className="text-gray-500 italic px-4 py-2">Nenhum respawn planilhado no momento. Adicione na aba Respawns.</div>
+          <div className="text-gray-500 italic px-4 py-2">Nenhuma aba encontrada. Cadastre no Gerenciador de Planilha.</div>
         ) : (
           dynamicCategories.map(cat => (
             <button
@@ -101,7 +101,7 @@ export default function LiveDashboard() {
           {parties
             .filter(p => p.category === activeTab)
             .map(party => (
-              <RespawnCard key={party.id} party={party} />
+              <RespawnCard key={party.id} party={party} onPlayerClick={onPlayerClick} />
             ))}
         </div>
       )}

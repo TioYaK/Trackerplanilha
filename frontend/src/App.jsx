@@ -41,10 +41,10 @@ export default function App() {
 
   const renderView = () => {
     switch(currentView) {
-      case 'live': return <LiveDashboard />;
+      case 'live': return <LiveDashboard onPlayerClick={handlePlayerClick} />;
       case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} />;
-      case 'radar': return <RadarHunters />;
-      case 'tracker': return <GlobalTracker />;
+      case 'radar': return <RadarHunters onPlayerClick={handlePlayerClick} />;
+      case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
       case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
       case 'players': 
         return (

@@ -4,7 +4,7 @@ import { Target, TrendingUp, Clock, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-export default function RadarHunters() {
+export default function RadarHunters({ onPlayerClick }) {
   const [hunters, setHunters] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,7 +81,12 @@ export default function RadarHunters() {
               ) : (
                 hunters.map(h => (
                   <tr key={h.character_name} className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium text-white">{h.character_name}</td>
+                    <td 
+                      className="px-6 py-4 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline"
+                      onClick={() => onPlayerClick && onPlayerClick(h.character_name)}
+                    >
+                      {h.character_name}
+                    </td>
                     <td className="px-6 py-4">
                       <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20">Lvl {h.level}</span>
                     </td>
