@@ -4,7 +4,7 @@ import RespawnCard from '../components/RespawnCard';
 import { supabase } from '../lib/supabase';
 import { RefreshCw } from 'lucide-react';
 
-export default function LiveDashboard({ onPlayerClick }) {
+export default function LiveDashboard({ onPlayerClick, onPartyClick }) {
   const [activeTab, setActiveTab] = useState('');
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +101,7 @@ export default function LiveDashboard({ onPlayerClick }) {
           {parties
             .filter(p => p.category === activeTab)
             .map(party => (
-              <RespawnCard key={party.id} party={party} onPlayerClick={onPlayerClick} />
+              <RespawnCard key={party.id} party={party} onPlayerClick={onPlayerClick} onPartyClick={onPartyClick} />
             ))}
         </div>
       )}

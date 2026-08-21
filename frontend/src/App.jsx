@@ -6,12 +6,14 @@ import PlanilhaManager from './views/PlanilhaManager';
 import GuildRoster from './views/GuildRoster';
 import RadarHunters from './views/RadarHunters';
 import PlayerDashboard from './components/PlayerDashboard';
+import PartyDashboard from './components/PartyDashboard';
 import ReportExport from './components/ReportExport';
 import Rankings from './components/Rankings';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('live');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [selectedParty, setSelectedParty] = useState(null);
   
   // Admin state
   const [isAdmin, setIsAdmin] = useState(() => {
@@ -39,13 +41,19 @@ export default function App() {
     setCurrentView('players');
   };
 
+  const handlePartyClick = (partyObj) => {
+    setSelectedParty(partyObj);
+    setCurrentView('party');
+  };
+
   const renderView = () => {
     switch(currentView) {
-      case 'live': return <LiveDashboard onPlayerClick={handlePlayerClick} />;
+      case 'live': return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
       case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} />;
       case 'radar': return <RadarHunters onPlayerClick={handlePlayerClick} />;
       case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
       case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
+      case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
       case 'players': 
         return (
           <div className="p-8 max-w-7xl mx-auto w-full">
@@ -56,7 +64,7 @@ export default function App() {
         );
       case 'analytics':
         return <Rankings />;
-      default: return <LiveDashboard />;
+      default: return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
     }
   };
 

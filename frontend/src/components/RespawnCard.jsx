@@ -1,7 +1,7 @@
 import React from 'react';
 import { Clock, TrendingUp, AlertTriangle } from 'lucide-react';
 
-export default function RespawnCard({ party, onPlayerClick }) {
+export default function RespawnCard({ party, onPlayerClick, onPartyClick }) {
   // party: { party_name, leader_name, slot_start, slot_end, members, status (EFFICIENT, SUBOPTIMAL, GHOST_SLOT) }
   
   const statusColors = {
@@ -15,10 +15,13 @@ export default function RespawnCard({ party, onPlayerClick }) {
   const colorClass = statusColors[currentStatus];
 
   return (
-    <div className={`p-5 rounded-lg border-2 ${colorClass} transition-all`}>
+    <div className={`p-5 rounded-lg border-2 ${colorClass} transition-all hover:scale-[1.01]`}>
       <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="text-xl font-bold text-white flex items-center">
+          <h3 
+            className="text-xl font-bold text-white flex items-center cursor-pointer hover:text-tibia-primary hover:underline"
+            onClick={() => onPartyClick && onPartyClick(party)}
+          >
             {party.party_name}
           </h3>
           <p className="text-sm text-tibia-highlight font-medium mt-1">📍 Local: <span className="text-orange-300">{party.hunt_name || 'Desconhecido'}</span></p>
