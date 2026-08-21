@@ -2,6 +2,7 @@ import { supabase } from './db.js';
 import { runFetchGuild } from './jobs/fetchGuild.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
+import { runAuditSlots } from './jobs/auditSlots.js';
 
 const WORKER_ID = `worker-${Math.random().toString(36).substring(2, 9)}`;
 const POLL_INTERVAL = 5000; // 5 segundos
@@ -77,6 +78,9 @@ const processTask = async (task) => {
         break;
       case 'FETCH_HIGHSCORE':
         await runFetchHighscores(task.page_number || 1);
+        break;
+      case 'AUDIT_SLOTS':
+        await runAuditSlots();
         break;
       default:
         console.log(`[WORKER] Tipo de tarefa desconhecido: ${task.task_type}`);

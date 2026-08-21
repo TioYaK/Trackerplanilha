@@ -4,7 +4,7 @@
 -- ========================================================================================
 
 -- Criando ENUMs para a máquina de estados do Worker e Status do Slot
-CREATE TYPE task_type_enum AS ENUM ('FETCH_GUILD', 'FETCH_ONLINES', 'FETCH_HIGHSCORE');
+CREATE TYPE task_type_enum AS ENUM ('FETCH_GUILD', 'FETCH_ONLINES', 'FETCH_HIGHSCORE', 'AUDIT_SLOTS');
 CREATE TYPE task_status_enum AS ENUM ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED');
 CREATE TYPE slot_status_enum AS ENUM ('EFFICIENT', 'SUBOPTIMAL', 'GHOST_SLOT');
 
@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS parties_planilhadas (
     slot_start TIME NOT NULL,
     slot_end TIME NOT NULL,
     members JSONB DEFAULT '[]'::jsonb, -- Array de nomes [ "Player 1", "Player 2" ]
+    status slot_status_enum DEFAULT 'EFFICIENT',
+    delta_xp TEXT DEFAULT '0',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -104,6 +106,7 @@ FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 -- O worker pode recriar essas tasks ao finalizá-las, ou via cron.
 INSERT INTO task_queue (task_type) VALUES ('FETCH_GUILD');
 INSERT INTO task_queue (task_type) VALUES ('FETCH_ONLINES');
+INSERT INTO task_queue (task_type) VALUES ('AUDIT_SLOTS');
 -- Highscores paginadas de 1 a 20
 DO $$
 BEGIN
