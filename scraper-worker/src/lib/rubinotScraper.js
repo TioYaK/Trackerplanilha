@@ -487,7 +487,7 @@ function writeCache(name, data) {
 }
 
 // ─── scrapeGuild ──────────────────────────────────────────────────────────────
-async function scrapeGuild(guildName) {
+async function scrapeGuild(guildName, maxPages = 50) {
     const key = `guild_${guildName.replace(/\s+/g, '_')}`;
     const cached = readCache(key);
     if (cached) {
@@ -496,39 +496,53 @@ async function scrapeGuild(guildName) {
     }
 
     console.log(`[Scraper] Scraping Guild: ${guildName}...`);
-    const url  = `https://rubinot.com.br/guilds/${encodeURIComponent(guildName)}`;
-    const html = await getPageContent(url);
-    if (!html) return [];
+    let pageNum = 1;
+    let keepGoing = true;
+    const allMembers = [];
 
-    const $ = cheerio.load(html);
-    const members = [];
+    while (keepGoing && pageNum <= maxPages) {
+        const url  = `https://rubinot.com.br/guilds/${encodeURIComponent(guildName)}?page=${pageNum}`;
+        const html = await getPageContent(url);
+        if (!html) break;
 
-    $('tr').each((i, row) => {
-        const cols = $(row).find('td');
-        if (cols.length >= 6) {
-            const rank          = $(cols[0]).text().trim();
-            const nameAndTitle  = $(cols[1]).find('a').first().text().trim() || $(cols[1]).text().trim();
-            const vocation      = $(cols[2]).text().trim();
-            const level         = parseInt($(cols[3]).text().trim(), 10);
-            const joiningDate   = $(cols[4]).text().trim();
-            const status        = $(cols[5]).text().trim();
+        const $ = cheerio.load(html);
+        const membersOnPage = [];
 
-            if (nameAndTitle && !isNaN(level) && nameAndTitle !== 'Name and Title') {
-                const name = nameAndTitle.replace(/\s*\([^)]*\)/g, '').trim();
-                members.push({
-                    rank: rank || 'Member',
-                    name,
-                    vocation,
-                    level,
-                    joiningDate,
-                    status: status.toLowerCase().includes('online') ? 'Online' : 'Offline',
-                });
+        $('tr').each((i, row) => {
+            const cols = $(row).find('td');
+            if (cols.length >= 6) {
+                const rank          = $(cols[0]).text().trim();
+                const nameAndTitle  = $(cols[1]).find('a').first().text().trim() || $(cols[1]).text().trim();
+                const vocation      = $(cols[2]).text().trim();
+                const level         = parseInt($(cols[3]).text().trim(), 10);
+                const joiningDate   = $(cols[4]).text().trim();
+                const status        = $(cols[5]).text().trim();
+
+                if (nameAndTitle && !isNaN(level) && nameAndTitle !== 'Name and Title') {
+                    const name = nameAndTitle.replace(/\s*\([^)]*\)/g, '').trim();
+                    membersOnPage.push({
+                        rank: rank || 'Member',
+                        name,
+                        vocation,
+                        level,
+                        joiningDate,
+                        status: status.toLowerCase().includes('online') ? 'Online' : 'Offline',
+                    });
+                }
             }
-        }
-    });
+        });
 
-    if (members.length > 0) writeCache(key, members);
-    return members;
+        if (membersOnPage.length === 0) {
+            keepGoing = false;
+        } else {
+            allMembers.push(...membersOnPage);
+            console.log(`[Scraper] Guilda ${guildName} - Página ${pageNum}: ${membersOnPage.length} membros`);
+            pageNum++;
+        }
+    }
+
+    if (allMembers.length > 0) writeCache(key, allMembers);
+    return allMembers;
 }
 
 // ─── scrapeHighscores ─────────────────────────────────────────────────────────
