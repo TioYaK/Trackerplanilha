@@ -45,7 +45,7 @@ export default function App() {
       case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} />;
       case 'radar': return <RadarHunters />;
       case 'tracker': return <GlobalTracker />;
-      case 'planilha': return <PlanilhaManager />;
+      case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
       case 'players': 
         return (
           <div className="p-8 max-w-7xl mx-auto w-full">
