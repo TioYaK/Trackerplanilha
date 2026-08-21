@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Clock, TrendingUp, AlertTriangle, Users } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -79,7 +79,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         <p className="text-gray-400 font-sans">Verifique o rendimento coletivo e individual da hunt.</p>
       </div>
       
-      <div className={\p-6 rounded-lg border-2 \ mb-8 relative overflow-hidden\}>
+      <div className={`p-6 rounded-lg border-2 ${statusColors[currentStatus].split(' text-')[0]} mb-8 relative overflow-hidden`}>
         <div className="absolute top-0 right-0 p-4 opacity-10"><Users size={120} /></div>
         <h2 className="text-4xl font-black text-white mb-2">{party.party_name}</h2>
         <div className="flex flex-wrap gap-4 text-sm font-medium">
@@ -90,7 +90,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         <div className="mt-6 flex gap-8">
           <div>
             <p className="text-xs text-gray-500 uppercase font-bold">Status do Slot</p>
-            <p className={\	ext-lg font-bold flex items-center \\}>
+            <p className={`text-lg font-bold flex items-center ${statusColors[currentStatus].split(' ')[2]}`}>
               {currentStatus === 'EFFICIENT' && <TrendingUp size={20} className="mr-2" />}
               {currentStatus === 'SUBOPTIMAL' && <Clock size={20} className="mr-2" />}
               {currentStatus === 'GHOST_SLOT' && <AlertTriangle size={20} className="mr-2" />}
@@ -138,7 +138,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={true} vertical={false} />
                   <XAxis type="number" stroke="#666" tickFormatter={formatXpAxis} />
                   <YAxis dataKey="name" type="category" stroke="#999" width={80} tick={{fill: '#ccc', fontSize: 12}} />
-                  <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} formatter={(value) => [\\ XP\, 'Ganho']} />
+                  <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} formatter={(value) => [`${formatXpAxis(value)} XP`, 'Ganho']} />
                   <Bar dataKey="xp" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>

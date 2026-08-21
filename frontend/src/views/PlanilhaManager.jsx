@@ -103,7 +103,10 @@ export default function PlanilhaManager({ isAdmin }) {
 
   const cancelEdit = () => {
     setFormData({ party_name: '', leader_name: '', respawn_category: areas.length > 0 ? areas[0].name : '', hunt_name: '', slot_start: '', slot_end: '', members: '' });
-    setEditingId(null);  const handleDelete = async (id) => {
+    setEditingId(null);
+  };
+
+  const handleDelete = async (id) => {
     if(confirm("Tem certeza que deseja remover este slot?")) {
       await supabase.from('parties_planilhadas').delete().eq('id', id);
       loadData();
