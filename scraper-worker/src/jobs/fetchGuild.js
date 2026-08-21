@@ -28,10 +28,20 @@ export const runFetchGuild = async () => {
     
     const upsertData = Array.from(uniqueMembersMap.values());
 
-    const { error } = await supabase.from('guild_members').upsert(upsertData, { onConflict: 'name' });
-    if (error) throw error;
+    // Chunking the upsert to prevent payload limits
+    const chunkSize = 500;
+    let insertedCount = 0;
+    for (let i = 0; i < upsertData.length; i += chunkSize) {
+      const chunk = upsertData.slice(i, i + chunkSize);
+      const { error } = await supabase.from('guild_members').upsert(chunk, { onConflict: 'name' });
+      if (error) {
+        console.error(`[JOB] Erro ao inserir chunk da guilda:`, error.message);
+      } else {
+        insertedCount += chunk.length;
+      }
+    }
 
-    console.log(`[JOB] Sucesso! ${members.length} membros processados e atualizados.`);
+    console.log(`[JOB] Sucesso! ${insertedCount} membros processados e atualizados.`);
   } catch (error) {
     console.error(`[JOB] Erro na task FETCH_GUILD:`, error.message);
   } finally {
