@@ -79,9 +79,8 @@ CREATE TABLE IF NOT EXISTS slot_audit_logs (
 -- View de Macro Censo
 CREATE OR REPLACE VIEW view_macro_census AS
 SELECT
-    COUNT(*) as total_members,
-    SUM(CASE WHEN is_active_7d = true THEN 1 ELSE 0 END) as active_members
-FROM guild_members;
+    (SELECT COUNT(*) FROM guild_members) as total_members,
+    (SELECT COUNT(DISTINCT character_name) FROM telemetry_logs WHERE recorded_at >= NOW() - INTERVAL '7 days') as active_members;
 
 -- ========================================================================================
 -- TRIGGERS PARA UPDATED_AT
