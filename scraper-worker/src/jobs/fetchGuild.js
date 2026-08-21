@@ -14,13 +14,18 @@ export const runFetchGuild = async () => {
       return;
     }
 
-    // Salvar no BD
-    const upsertData = members.map(m => ({
-      name: m.name,
-      vocation: m.vocation,
-      level: m.level,
-      is_online: m.status === 'Online'
-    }));
+    // Salvar no BD - Remove duplicatas para evitar erro "ON CONFLICT DO UPDATE cannot affect row a second time"
+    const uniqueMembersMap = new Map();
+    members.forEach(m => {
+      uniqueMembersMap.set(m.name, {
+        name: m.name,
+        vocation: m.vocation,
+        level: m.level,
+        is_online: m.status === 'Online'
+      });
+    });
+    
+    const upsertData = Array.from(uniqueMembersMap.values());
 
     const { error } = await supabase.from('guild_members').upsert(upsertData, { onConflict: 'name' });
     if (error) throw error;

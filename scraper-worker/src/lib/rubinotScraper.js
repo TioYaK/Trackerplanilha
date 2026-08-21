@@ -535,6 +535,13 @@ async function scrapeGuild(guildName, maxPages = 50) {
         if (membersOnPage.length === 0) {
             keepGoing = false;
         } else {
+            // Se o site simplesmente repetiu a última página ao passar do limite, quebra o loop
+            if (allMembers.length > 0 && allMembers[allMembers.length - 1].name === membersOnPage[membersOnPage.length - 1].name) {
+                console.log(`[Scraper] Fim da paginação detectado na página ${pageNum} (conteúdo repetido).`);
+                keepGoing = false;
+                break;
+            }
+
             allMembers.push(...membersOnPage);
             console.log(`[Scraper] Guilda ${guildName} - Página ${pageNum}: ${membersOnPage.length} membros`);
             pageNum++;
