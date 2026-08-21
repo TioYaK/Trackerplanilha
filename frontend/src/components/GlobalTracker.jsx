@@ -4,15 +4,40 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 
 export default function GlobalTracker() {
   const [census, setCensus] = useState({ total_members: 0, active_members: 0 });
+  const [barData, setBarData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCensus = async () => {
       setLoading(true);
+      // Fetch current census
       const { data, error } = await supabase.from('view_macro_census').select('*').single();
       if (data && !error) {
         setCensus(data);
       }
+      
+      // Fetch historical daily data
+      const { data: dailyData, error: dailyError } = await supabase
+        .from('view_macro_daily')
+        .select('*')
+        .order('day_date', { ascending: true });
+        
+      if (dailyData && !dailyError) {
+        const formattedData = dailyData.map(d => {
+          const date = new Date(d.day_date);
+          const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+          return {
+            day: days[date.getDay()],
+            logadas: d.logadas,
+            cacando: d.cacando
+          };
+        });
+        setBarData(formattedData);
+      } else {
+        // Fallback or empty state if view not created yet
+        setBarData([]);
+      }
+      
       setLoading(false);
     };
     fetchCensus();
@@ -21,17 +46,6 @@ export default function GlobalTracker() {
   const pieData = [
     { name: 'Ativos (7 dias)', value: parseInt(census.active_members) || 0, color: '#10B981' }, // emerald-500
     { name: 'Inativos', value: (parseInt(census.total_members) || 0) - (parseInt(census.active_members) || 0), color: '#374151' } // gray-700
-  ];
-
-  // Mock histórico até a ferramenta ter rodado por 7 dias.
-  const barData = [
-    { day: 'Segunda', logadas: 120, cacando: 85 },
-    { day: 'Terça', logadas: 140, cacando: 90 },
-    { day: 'Quarta', logadas: 110, cacando: 70 },
-    { day: 'Quinta', logadas: 130, cacando: 95 },
-    { day: 'Sexta', logadas: 150, cacando: 110 },
-    { day: 'Sábado', logadas: 200, cacando: 150 },
-    { day: 'Domingo', logadas: 220, cacando: 170 },
   ];
 
   return (

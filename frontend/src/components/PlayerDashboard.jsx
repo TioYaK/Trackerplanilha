@@ -93,13 +93,6 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
           </div>
           <Gavel className="text-red-500 opacity-50" size={32} />
         </div>
-        <div className="bg-tibia-card p-4 rounded-lg border border-gray-700 flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-400">Ghost Slots Recentes</p>
-            <p className="text-3xl font-bold text-gray-300">?</p>
-          </div>
-          <Ghost className="text-gray-500 opacity-50" size={32} />
-        </div>
         {isAdmin ? (
           <div className="bg-tibia-card p-4 rounded-lg border border-tibia-border flex justify-center items-center">
             <button 
