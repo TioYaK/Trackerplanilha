@@ -57,6 +57,7 @@ export default function App() {
       case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
       case 'bank': return <GuildBank isAdmin={isAdmin} />;
       case 'market': return <GuildMarket isAdmin={isAdmin} />;
+      case 'loot': return <LootTracker isAdmin={isAdmin} />;
       case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
       case 'players': 
         return (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
-import { AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users, DollarSign, Clock, Network } from 'lucide-react';
+import { AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users, DollarSign, Clock, Network, FileText } from 'lucide-react';
 
 export default function GlobalTracker() {
   const [census, setCensus] = useState({ total_members: 0, active_members: 0 });
@@ -25,6 +25,46 @@ export default function GlobalTracker() {
   const [topSolos, setTopSolos] = useState([]);
   
   const [loading, setLoading] = useState(true);
+
+  const generateDiscordReport = () => {
+    let report = `⚔️ **RELATÓRIO DIÁRIO DE GUILDA** ⚔️\n\n`;
+    
+    report += `📊 **CENSO MACRO:**\n`;
+    report += `- Membros Ativos Hoje: ${census.active_members}\n`;
+    report += `- Total de PTs Agendadas: ${primeTime.reduce((acc, curr) => acc + curr.parties, 0)} PTs\n\n`;
+    
+    if (paretoData.length > 0) {
+      report += `🏆 **TOP CARREGADORES (Lei de Pareto):**\n`;
+      report += `- Top 50 Membros: +${(paretoData[0].value / 1000000).toFixed(1)}M XP\n`;
+      report += `- Resto da Guilda: +${(paretoData[1].value / 1000000).toFixed(1)}M XP\n\n`;
+    }
+
+    if (topSolos.length > 0) {
+      report += `🐺 **TOP LOBOS SOLITÁRIOS (Sem Planilha):**\n`;
+      topSolos.slice(0,3).forEach((s, i) => {
+        report += `${i+1}. ${s.name} (+${(s.xp_gained_24h / 1000000).toFixed(1)}M XP)\n`;
+      });
+      report += `\n`;
+    }
+
+    if (deaths.length > 0) {
+      report += `💀 **MURO DAS LAMENTAÇÕES (Piores Mortes):**\n`;
+      deaths.slice(0,3).forEach((d) => {
+        report += `- ${d.name} perdeu ${(d.xp_gained_24h / 1000000).toFixed(1)}M XP\n`;
+      });
+      report += `\n`;
+    }
+
+    if (wastedXp.length > 0) {
+      report += `💸 **XP DEIXADA NA MESA:**\n`;
+      report += `A guilda perdeu de fazer ${(wastedXp[0].missedXp / 1000000).toFixed(1)}M XP hoje porque o respawn "${wastedXp[0].name}" não foi 100% ocupado!\n\n`;
+    }
+
+    report += `🚀 *Bom jogo a todos! Organizem suas PTs e não deixem os respawns vazios!*`;
+
+    navigator.clipboard.writeText(report);
+    alert('Jornal da Guilda copiado! Dê Ctrl+V no Discord.');
+  };
 
   useEffect(() => {
     const fetchCensus = async () => {
@@ -323,6 +363,13 @@ export default function GlobalTracker() {
           <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Sala de Guerra (War Room)</h2>
           <p className="text-gray-400 font-sans">Business Intelligence e comportamento estratégico da guilda Shellpatrocina.</p>
         </div>
+        <button 
+          onClick={generateDiscordReport}
+          className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2 px-4 rounded shadow-[0_0_15px_rgba(88,101,242,0.5)] flex items-center transition-all"
+        >
+          <FileText className="mr-2" size={20} />
+          Jornal Diário (Discord)
+        </button>
       </div>
 
       {loading ? (
