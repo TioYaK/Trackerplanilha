@@ -14,17 +14,24 @@ export default function PlanilhaManager({ isAdmin }) {
 
   const loadData = async () => {
     setLoading(true);
-    const [partiesRes, areasRes] = await Promise.all([
-      supabase.from('parties_planilhadas').select('*').order('created_at', { ascending: false }),
-      supabase.from('respawn_areas').select('*').order('name', { ascending: true })
-    ]);
-    if (partiesRes.data) setParties(partiesRes.data);
-    if (areasRes.data) {
-      setAreas(areasRes.data);
-      if (areasRes.data.length > 0 && !formData.respawn_category) {
-        setFormData(prev => ({ ...prev, respawn_category: areasRes.data[0].name }));
+    const { data: areasData } = await supabase.from('respawn_areas').select('*').order('name', { ascending: true });
+    if (areasData) {
+      setAreas(areasData);
+      if (areasData.length > 0 && !formData.respawn_category) {
+        setFormData(prev => ({ ...prev, respawn_category: areasData[0].name }));
       }
     }
+
+    let allParties = [];
+    let page = 0;
+    while(true) {
+        const { data } = await supabase.from('parties_planilhadas').select('*').order('created_at', { ascending: false }).range(page*1000, (page+1)*1000-1);
+        if (!data || data.length === 0) break;
+        allParties.push(...data);
+        if (data.length < 1000) break;
+        page++;
+    }
+    setParties(allParties);
     setLoading(false);
   };
 

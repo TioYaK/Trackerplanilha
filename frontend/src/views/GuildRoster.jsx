@@ -54,7 +54,15 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
 
   const generateHR = async () => {
     setLoading(true);
-    const { data: strikesData } = await supabase.from('player_strikes').select('*');
+    let strikesData = [];
+    let page = 0;
+    while(true) {
+      const { data } = await supabase.from('player_strikes').select('*').range(page*1000, (page+1)*1000-1);
+      if (!data || data.length === 0) break;
+      strikesData.push(...data);
+      if (data.length < 1000) break;
+      page++;
+    }
     
     const scoredMembers = members.map(m => {
        const pStrikes = strikesData ? strikesData.filter(s => s.character_name === m.name).length : 0;

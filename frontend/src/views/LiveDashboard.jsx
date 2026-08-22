@@ -24,20 +24,29 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick }) {
 
   const fetchParties = async () => {
     setLoading(true);
-    // Busca áreas oficiais e parties
-    const [areasRes, partiesRes] = await Promise.all([
-      supabase.from('respawn_areas').select('name').order('name'),
-      supabase.from('parties_planilhadas').select('*').order('slot_start', { ascending: true })
-    ]);
-
-    if (areasRes.data) setAreas(areasRes.data);
-      
-    if (partiesRes.data) {
-      const processedParties = partiesRes.data.map(p => ({
+    // Fetch áreas oficiais
+    const { data: areasData } = await supabase.from('respawn_areas').select('name').order('name');
+    if (areasData) setAreas(areasData);
+    
+    // Fetch parties com paginação
+    let allParties = [];
+    let page = 0;
+    while(true) {
+        const { data } = await supabase.from('parties_planilhadas').select('*').order('slot_start', { ascending: true }).range(page*1000, (page+1)*1000-1);
+        if (!data || data.length === 0) break;
+        allParties.push(...data);
+        if (data.length < 1000) break;
+        page++;
+    }
+    
+    if (allParties.length > 0) {
+      const processedParties = allParties.map(p => ({
         ...p,
         category: p.respawn_category
       }));
       setParties(processedParties);
+    } else {
+      setParties([]);
     }
     setLoading(false);
   };

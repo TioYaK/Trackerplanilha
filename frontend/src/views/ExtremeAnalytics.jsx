@@ -30,11 +30,27 @@ export default function ExtremeAnalytics() {
             page++;
         }
 
+        // Helper for pagination
+        const fetchAll = async (table, filter = null) => {
+          let all = [];
+          let p = 0;
+          while (true) {
+            let query = supabase.from(table).select('*').range(p * 1000, (p + 1) * 1000 - 1);
+            if (filter) query = filter(query);
+            const { data } = await query;
+            if (!data || data.length === 0) break;
+            all.push(...data);
+            if (data.length < 1000) break;
+            p++;
+          }
+          return all;
+        };
+
         // 2. Fetch Hunts History (For GDP and Elite Quadrant)
-        const { data: huntsData } = await supabase.from('guild_hunts_history').select('*');
+        const huntsData = await fetchAll('guild_hunts_history');
         
         // 3. Fetch Parties (For Synergy and Churn)
-        const { data: partiesData } = await supabase.from('parties_planilhadas').select('*').not('delta_xp', 'is', null);
+        const partiesData = await fetchAll('parties_planilhadas', q => q.not('delta_xp', 'is', null));
 
         // --- CALC: PIB da Guilda (GDP) ---
         let gdpMap = {};

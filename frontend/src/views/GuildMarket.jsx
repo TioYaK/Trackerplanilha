@@ -26,13 +26,22 @@ export default function GuildMarket({ isAdmin }) {
       return;
     }
 
-    const { data } = await supabase
-      .from('guild_market')
-      .select('*')
-      .eq('status', 'Active')
-      .order('created_at', { ascending: false });
+    let allItems = [];
+    let page = 0;
+    while(true) {
+        const { data } = await supabase
+          .from('guild_market')
+          .select('*')
+          .eq('status', 'Active')
+          .order('created_at', { ascending: false })
+          .range(page*1000, (page+1)*1000-1);
+        if (!data || data.length === 0) break;
+        allItems.push(...data);
+        if (data.length < 1000) break;
+        page++;
+    }
       
-    if (data) setItems(data);
+    setItems(allItems);
     setLoading(false);
   };
 
