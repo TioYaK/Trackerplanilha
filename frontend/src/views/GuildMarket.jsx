@@ -1,0 +1,283 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { ShoppingBag, Search, Plus, ShieldAlert, Tag, Coins, Clock, CheckCircle } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+export default function GuildMarket({ isAdmin }) {
+  const [loading, setLoading] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [items, setItems] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  
+  // Post modal state
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [postForm, setPostForm] = useState({ seller: '', item: '', price: '', category: 'Equipamento' });
+
+  const fetchData = async () => {
+    setLoading(true);
+    
+    // Test if table exists
+    const { error: testErr } = await supabase.from('guild_market').select('id').limit(1);
+    if (testErr && testErr.code === '42P01') {
+      setNeedsSetup(true);
+      setLoading(false);
+      return;
+    }
+
+    const { data } = await supabase
+      .from('guild_market')
+      .select('*')
+      .eq('status', 'Active')
+      .order('created_at', { ascending: false });
+      
+    if (data) setItems(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handlePostItem = async (e) => {
+    e.preventDefault();
+    if (!postForm.seller || !postForm.item || !postForm.price) {
+      alert("Preencha todos os campos obrigatórios.");
+      return;
+    }
+
+    await supabase.from('guild_market').insert([{
+      seller_name: postForm.seller,
+      item_name: postForm.item,
+      price: postForm.price,
+      category: postForm.category
+    }]);
+
+    setPostForm({ seller: '', item: '', price: '', category: 'Equipamento' });
+    setShowPostModal(false);
+    fetchData();
+  };
+
+  const handleMarkSold = async (id) => {
+    const pwd = prompt("Tem certeza que vendeu este item? Digite 'sim' para confirmar a remoção:");
+    if (pwd && pwd.toLowerCase() === 'sim') {
+      await supabase.from('guild_market').update({ status: 'Sold' }).eq('id', id);
+      fetchData();
+    }
+  };
+
+  const handleAdminDelete = async (id) => {
+    if (!isAdmin) return;
+    if (confirm("Admin: Tem certeza que deseja deletar este anúncio?")) {
+      await supabase.from('guild_market').delete().eq('id', id);
+      fetchData();
+    }
+  };
+
+  const sqlSetup = `
+CREATE TABLE IF NOT EXISTS guild_market (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    seller_name TEXT NOT NULL,
+    item_name TEXT NOT NULL,
+    price TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'Equipamento',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    status TEXT NOT NULL DEFAULT 'Active'
+);
+  `;
+
+  if (needsSetup) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto w-full text-center animate-fade-in">
+        <ShoppingBag size={64} className="mx-auto text-yellow-500 mb-6" />
+        <h2 className="text-4xl font-medieval text-white mb-4">Mercado Negro (Classificados)</h2>
+        <p className="text-gray-400 mb-8">O mercado interno precisa ser inicializado no banco de dados.</p>
+        
+        <div className="bg-black/50 border border-gray-700 p-6 rounded-lg text-left">
+          <p className="text-yellow-400 font-bold mb-2 flex items-center"><ShieldAlert size={18} className="mr-2"/> Ação Necessária (Admin)</p>
+          <p className="text-sm text-gray-300 mb-4">Rode o seguinte código SQL no painel do seu Supabase (SQL Editor) para habilitar esta aba:</p>
+          <pre className="bg-gray-900 text-green-400 p-4 rounded font-mono text-sm overflow-x-auto border border-gray-700">{sqlSetup}</pre>
+          <button onClick={() => window.location.reload()} className="mt-6 bg-tibia-primary text-black font-bold px-6 py-2 rounded">
+            Já rodei o comando! (Recarregar)
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const filteredItems = items.filter(i => {
+    const matchesSearch = i.item_name.toLowerCase().includes(searchTerm.toLowerCase()) || i.seller_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter === 'All' || i.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
+      <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
+        <div>
+          <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Mercado Interno</h2>
+          <p className="text-gray-400 font-sans">Compre e venda itens direto com membros da guilda, sem taxas de Market.</p>
+        </div>
+        <button 
+          onClick={() => setShowPostModal(true)}
+          className="bg-yellow-900/50 hover:bg-yellow-800 text-yellow-500 border border-yellow-500/50 font-bold px-6 py-3 rounded-lg flex items-center shadow-[0_0_15px_rgba(234,179,8,0.2)] transition-colors"
+        >
+          <Plus size={20} className="mr-2" />
+          Anunciar Item
+        </button>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4 mb-8 bg-tibia-card p-4 rounded-lg border border-tibia-border">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-3 text-gray-500" size={18} />
+          <input 
+            type="text" 
+            placeholder="Buscar por item ou vendedor..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-tibia-bg border border-tibia-border rounded py-2.5 pl-10 pr-4 text-white focus:outline-none focus:border-yellow-500"
+          />
+        </div>
+        <div className="flex gap-2 overflow-x-auto custom-scrollbar">
+          {['All', 'Equipamento', 'Imbuements', 'Tibia Coins', 'Outros'].map(cat => (
+            <button 
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`px-4 py-2 rounded whitespace-nowrap transition-colors ${categoryFilter === cat ? 'bg-yellow-600 text-white font-bold shadow-tibia-glow' : 'bg-black/40 text-gray-400 hover:text-white border border-white/5'}`}
+            >
+              {cat === 'All' ? 'Todas Categorias' : cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          <div className="col-span-full py-12 flex justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500"></div>
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="col-span-full py-12 text-center text-gray-500 bg-black/30 rounded-lg border border-white/5">
+            <ShoppingBag size={48} className="mx-auto mb-4 opacity-20" />
+            <p>Nenhum anúncio encontrado.</p>
+          </div>
+        ) : (
+          filteredItems.map(item => (
+            <div key={item.id} className="bg-tibia-card border border-tibia-border rounded-lg overflow-hidden shadow-xl hover:border-yellow-500/50 transition-colors group relative">
+              {isAdmin && (
+                <button onClick={() => handleAdminDelete(item.id)} className="absolute top-2 right-2 bg-red-600/80 hover:bg-red-500 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                  <X size={14} />
+                </button>
+              )}
+              <div className="bg-black/60 p-4 border-b border-tibia-border">
+                <span className="text-[10px] text-yellow-500/70 font-bold uppercase tracking-wider bg-yellow-900/20 px-2 py-1 rounded border border-yellow-500/20 mb-2 inline-block">
+                  {item.category}
+                </span>
+                <h3 className="text-xl font-bold text-white mb-1 truncate">{item.item_name}</h3>
+                <div className="flex items-center text-green-400 font-mono text-lg">
+                  <Coins size={16} className="mr-2" />
+                  {item.price}
+                </div>
+              </div>
+              <div className="p-4 bg-tibia-card">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 mb-1">Vendedor</span>
+                    <span className="text-sm font-bold text-gray-300 flex items-center">
+                      <Tag size={12} className="mr-1 text-gray-500" /> {item.seller_name}
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs text-gray-500 mb-1">Anunciado</span>
+                    <span className="text-xs text-gray-400 flex items-center justify-end">
+                      <Clock size={10} className="mr-1" /> {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: ptBR })}
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleMarkSold(item.id)}
+                  className="w-full bg-black/40 hover:bg-green-900/40 text-gray-400 hover:text-green-400 border border-white/5 hover:border-green-500/50 py-2 rounded text-sm transition-colors flex justify-center items-center"
+                >
+                  <CheckCircle size={14} className="mr-2" /> Marcar como Vendido
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Post Modal */}
+      {showPostModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-tibia-card border border-yellow-500/50 rounded-lg p-6 max-w-md w-full shadow-[0_0_30px_rgba(234,179,8,0.15)] animate-fade-in">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-medieval text-yellow-500">Novo Anúncio</h3>
+              <button onClick={() => setShowPostModal(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+            </div>
+            
+            <form onSubmit={handlePostItem} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Seu Nick (Vendedor)</label>
+                <input 
+                  type="text" 
+                  value={postForm.seller}
+                  onChange={e => setPostForm({...postForm, seller: e.target.value})}
+                  className="w-full bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-yellow-500"
+                  placeholder="Ex: Lord YaK"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Nome do Item</label>
+                <input 
+                  type="text" 
+                  value={postForm.item}
+                  onChange={e => setPostForm({...postForm, item: e.target.value})}
+                  className="w-full bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-yellow-500"
+                  placeholder="Ex: Falcon Greaves"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Preço</label>
+                  <input 
+                    type="text" 
+                    value={postForm.price}
+                    onChange={e => setPostForm({...postForm, price: e.target.value})}
+                    className="w-full bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-yellow-500"
+                    placeholder="Ex: 40kk ou 250 TC"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Categoria</label>
+                  <select 
+                    value={postForm.category}
+                    onChange={e => setPostForm({...postForm, category: e.target.value})}
+                    className="w-full bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-yellow-500"
+                  >
+                    <option>Equipamento</option>
+                    <option>Imbuements</option>
+                    <option>Tibia Coins</option>
+                    <option>Outros</option>
+                  </select>
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 rounded mt-4 transition-colors shadow-tibia-glow"
+              >
+                Publicar Anúncio
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

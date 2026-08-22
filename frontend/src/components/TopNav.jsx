@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings, Swords, Crosshair, Lock, Unlock, Landmark } from 'lucide-react';
+import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings, Swords, Crosshair, Lock, Unlock, Landmark, ShoppingBag } from 'lucide-react';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdmin }) {
   const navItems = [
@@ -10,6 +10,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdm
     { id: 'tracker', label: 'Censo Macro', icon: <LayoutDashboard size={18} /> },
     { id: 'analytics', label: 'Rankings & Tribunal', icon: <TrendingDown size={18} /> },
     { id: 'bank', label: 'Guild Bank', icon: <Landmark size={18} /> },
+    { id: 'market', label: 'Mercado Interno', icon: <ShoppingBag size={18} /> },
   ];
 
   return (
