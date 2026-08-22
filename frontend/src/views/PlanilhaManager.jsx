@@ -247,6 +247,22 @@ export default function PlanilhaManager({ isAdmin }) {
                       );
                       
                       const rowsWithGaps = [];
+                      const ssStartMinutes = 10 * 60; // 10:00
+                      const ssEndMinutes = 34 * 60; // 10:00 next day (24+10)
+
+                      // Gap before the very first party
+                      if (sortedParties.length > 0) {
+                        const firstStart = getNormalizedMinutes(sortedParties[0].slot_start);
+                        if (firstStart > ssStartMinutes) {
+                          rowsWithGaps.push({
+                            isGap: true,
+                            id: 'gap-start',
+                            slot_start: '10:00',
+                            slot_end: sortedParties[0].slot_start
+                          });
+                        }
+                      }
+
                       for (let i = 0; i < sortedParties.length; i++) {
                         const p = sortedParties[i];
                         if (i > 0) {
@@ -264,6 +280,28 @@ export default function PlanilhaManager({ isAdmin }) {
                           }
                         }
                         rowsWithGaps.push({ isGap: false, ...p });
+                      }
+
+                      // Gap after the very last party until Server Save
+                      if (sortedParties.length > 0) {
+                        const lastParty = sortedParties[sortedParties.length - 1];
+                        const lastEnd = getNormalizedMinutes(lastParty.slot_end);
+                        if (lastEnd < ssEndMinutes) {
+                          rowsWithGaps.push({
+                            isGap: true,
+                            id: 'gap-end',
+                            slot_start: lastParty.slot_end,
+                            slot_end: '10:00'
+                          });
+                        }
+                      } else {
+                        // Se a hunt não tiver parties (tecnicamente não acontece, mas por segurança)
+                        rowsWithGaps.push({
+                          isGap: true,
+                          id: 'gap-all',
+                          slot_start: '10:00',
+                          slot_end: '10:00'
+                        });
                       }
 
                       return rowsWithGaps.map(p => {
