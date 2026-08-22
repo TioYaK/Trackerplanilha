@@ -234,30 +234,77 @@ export default function PlanilhaManager({ isAdmin }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-tibia-border/50">
-                  {huntParties
-                    .sort((a, b) => a.slot_start.localeCompare(b.slot_start))
-                    .map(p => (
-                    <tr key={p.id} className={`hover:bg-white/5 ${editingId === p.id ? 'bg-blue-900/20' : ''}`}>
-                      <td className="px-6 py-4 text-blue-400 font-medium">
-                        {p.slot_start.substring(0,5)} - {p.slot_end.substring(0,5)}
-                      </td>
-                      <td className="px-6 py-4 font-bold text-white">{p.party_name}</td>
-                      <td className="px-6 py-4 text-yellow-500 font-medium">{p.leader_name}</td>
-                      <td className="px-6 py-4 text-gray-400 text-xs">
-                        {p.members && p.members.length > 0 ? p.members.join(', ') : 'Solo'}
-                      </td>
-                      {isAdmin && (
-                        <td className="px-6 py-4 text-right flex justify-end space-x-2">
-                          <button onClick={() => handleEdit(p)} className="text-blue-400 hover:text-blue-300 p-2 hover:bg-blue-500/10 rounded transition" title="Editar">
-                            <Edit size={18} />
-                          </button>
-                          <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-400 p-2 hover:bg-red-500/10 rounded transition" title="Remover">
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
+                    {(() => {
+                      const getNormalizedMinutes = (timeStr) => {
+                        if (!timeStr) return 0;
+                        const [h, m] = timeStr.split(':').map(Number);
+                        const adjustedH = h < 10 ? h + 24 : h; // Server Save as 10:00 boundary
+                        return adjustedH * 60 + m;
+                      };
+
+                      const sortedParties = [...huntParties].sort((a, b) => 
+                        getNormalizedMinutes(a.slot_start) - getNormalizedMinutes(b.slot_start)
+                      );
+                      
+                      const rowsWithGaps = [];
+                      for (let i = 0; i < sortedParties.length; i++) {
+                        const p = sortedParties[i];
+                        if (i > 0) {
+                          const prev = sortedParties[i - 1];
+                          const prevEnd = getNormalizedMinutes(prev.slot_end);
+                          const currStart = getNormalizedMinutes(p.slot_start);
+                          
+                          if (currStart > prevEnd) {
+                            rowsWithGaps.push({
+                              isGap: true,
+                              id: `gap-${p.id}`,
+                              slot_start: prev.slot_end,
+                              slot_end: p.slot_start
+                            });
+                          }
+                        }
+                        rowsWithGaps.push({ isGap: false, ...p });
+                      }
+
+                      return rowsWithGaps.map(p => {
+                        if (p.isGap) {
+                          return (
+                            <tr key={p.id} className="bg-red-950/20 border-l-4 border-red-600/50">
+                              <td className="px-6 py-4 text-red-400 font-bold border-l border-red-500">
+                                {p.slot_start.substring(0,5)} - {p.slot_end.substring(0,5)}
+                              </td>
+                              <td colSpan={isAdmin ? 4 : 3} className="px-6 py-4 text-red-500/70 font-bold uppercase tracking-widest text-sm flex items-center">
+                                <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse"></span>
+                                Horário Vago (Livre para claim)
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return (
+                          <tr key={p.id} className={`hover:bg-white/5 transition-colors ${editingId === p.id ? 'bg-blue-900/20 border-l-4 border-blue-500' : 'border-l-4 border-transparent'}`}>
+                            <td className="px-6 py-4 text-blue-400 font-medium">
+                              {p.slot_start.substring(0,5)} - {p.slot_end.substring(0,5)}
+                            </td>
+                            <td className="px-6 py-4 font-bold text-white">{p.party_name}</td>
+                            <td className="px-6 py-4 text-yellow-500 font-medium">{p.leader_name}</td>
+                            <td className="px-6 py-4 text-gray-400 text-xs">
+                              {p.members && p.members.length > 0 ? p.members.join(', ') : 'Solo'}
+                            </td>
+                            {isAdmin && (
+                              <td className="px-6 py-4 text-right flex justify-end space-x-2">
+                                <button onClick={() => handleEdit(p)} className="text-blue-400 hover:text-blue-300 p-2 hover:bg-blue-500/10 rounded transition" title="Editar">
+                                  <Edit size={18} />
+                                </button>
+                                <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-400 p-2 hover:bg-red-500/10 rounded transition" title="Remover">
+                                  <Trash2 size={18} />
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      });
+                    })()}
                 </tbody>
               </table>
             </div>
