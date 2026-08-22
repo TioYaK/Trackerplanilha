@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, AlertOctagon, Gavel, Trash2, Clock } from 'lucide-react';
+import { Trophy, AlertOctagon, Gavel, Trash2, Clock, Ghost } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -8,6 +8,7 @@ export default function Rankings({ isAdmin }) {
   const [topRushers, setTopRushers] = useState([]);
   const [topParty, setTopParty] = useState(null);
   const [activeStrikes, setActiveStrikes] = useState([]);
+  const [ghosts, setGhosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -23,22 +24,29 @@ export default function Rankings({ isAdmin }) {
     if (rushersData) setTopRushers(rushersData);
 
     // 2. PT de Elite (Maior XP Registrada Hoje)
-    const today = new Date().toISOString().split('T')[0];
-    const { data: partiesData } = await supabase
+    const now2 = new Date();
+    let todayStr2 = now2.toISOString().split('T')[0];
+    if (now2.getHours() < 10) {
+       const yesterday2 = new Date(now2);
+       yesterday2.setDate(yesterday2.getDate() - 1);
+       todayStr2 = yesterday2.toISOString().split('T')[0];
+    }
+    const { data: partiesDataXP } = await supabase
       .from('parties_planilhadas')
       .select('*')
-      .gte('created_at', today)
-      .order('created_at', { ascending: false });
+      .eq('date', todayStr2);
 
-    if (partiesData && partiesData.length > 0) {
+    if (partiesDataXP && partiesDataXP.length > 0) {
       let bestParty = null;
       let maxXP = -1;
-      partiesData.forEach(p => {
+      partiesDataXP.forEach(p => {
         let numericXp = 0;
-        if (p.delta_xp) {
-          if (p.delta_xp.endsWith('M')) numericXp = parseFloat(p.delta_xp) * 1000000;
-          else if (p.delta_xp.endsWith('K') || p.delta_xp.endsWith('k')) numericXp = parseFloat(p.delta_xp) * 1000;
+        if (p.delta_xp && typeof p.delta_xp === 'string') {
+          if (p.delta_xp.toUpperCase().endsWith('M')) numericXp = parseFloat(p.delta_xp) * 1000000;
+          else if (p.delta_xp.toUpperCase().endsWith('K')) numericXp = parseFloat(p.delta_xp) * 1000;
           else numericXp = parseInt(p.delta_xp) || 0;
+        } else {
+          numericXp = parseInt(p.delta_xp) || 0;
         }
         if (numericXp > maxXP) {
           maxXP = numericXp;
@@ -56,6 +64,69 @@ export default function Rankings({ isAdmin }) {
       .order('created_at', { ascending: false });
 
     if (strikesData) setActiveStrikes(strikesData);
+
+    // 4. Tribunal Autônomo (Auditoria de Fantasmas)
+    const now = new Date();
+    let todayStr = now.toISOString().split('T')[0];
+    if (now.getHours() < 10) {
+       const yesterday = new Date(now);
+       yesterday.setDate(yesterday.getDate() - 1);
+       todayStr = yesterday.toISOString().split('T')[0];
+    }
+    
+    const { data: partiesData } = await supabase
+      .from('parties_planilhadas')
+      .select('*')
+      .eq('date', todayStr);
+
+    const detectedGhosts = [];
+    
+    if (partiesData && strikesData) {
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      const currentNormalized = currentMins < 600 ? currentMins + 1440 : currentMins;
+      
+      const membersToCheck = new Set();
+      partiesData.forEach(p => {
+         const [sh, sm] = p.slot_start.split(':').map(Number);
+         const [eh, em] = p.slot_end.split(':').map(Number);
+         const endMins = eh * 60 + em;
+         const normEnd = endMins <= 600 ? endMins + 1440 : endMins;
+         
+         if (currentNormalized > normEnd && p.members) {
+           p.members.forEach(m => membersToCheck.add(JSON.stringify({ member: m, party: p })));
+         }
+      });
+      
+      if (membersToCheck.size > 0) {
+        const uniqueChecks = Array.from(membersToCheck).map(m => JSON.parse(m));
+        const names = uniqueChecks.map(m => m.member);
+        
+        const { data: rosterData } = await supabase
+          .from('view_guild_roster')
+          .select('name, xp_gained_24h, level')
+          .in('name', names);
+          
+        if (rosterData) {
+          uniqueChecks.forEach(mInfo => {
+             const rosterMem = rosterData.find(r => r.name === mInfo.member);
+             if (rosterMem && (!rosterMem.xp_gained_24h || rosterMem.xp_gained_24h === 0)) {
+               const hasStrike = strikesData.some(s => s.character_name === mInfo.member && s.reason.includes('GHOST_SLOT'));
+               if (!hasStrike) {
+                  detectedGhosts.push({
+                    name: mInfo.member,
+                    level: rosterMem.level,
+                    hunt: mInfo.party.hunt_name,
+                    slot: `${mInfo.party.slot_start} - ${mInfo.party.slot_end}`
+                  });
+               }
+             }
+          });
+        }
+      }
+    }
+    
+    const uniqueGhosts = Array.from(new Map(detectedGhosts.map(item => [item.name, item])).values());
+    setGhosts(uniqueGhosts);
 
     setLoading(false);
   };
@@ -76,6 +147,23 @@ export default function Rankings({ isAdmin }) {
       await supabase.from('player_strikes').delete().eq('id', id);
       fetchData();
     }
+  };
+
+  const handlePunishGhost = async (ghost) => {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 3);
+    
+    const reason = `[GHOST_SLOT] Falta injustificada na ${ghost.hunt} (${ghost.slot})`;
+    
+    await supabase.from('player_strikes').insert([{
+      character_name: ghost.name,
+      reason: reason,
+      duration_days: 3,
+      expires_at: expiresAt.toISOString(),
+      admin_name: 'Robô Xerife'
+    }]);
+    
+    fetchData();
   };
 
   if (loading) {
@@ -157,6 +245,33 @@ export default function Rankings({ isAdmin }) {
           </div>
         </div>
       </div>
+      
+      {/* Auditoria Autônoma */}
+      {isAdmin && ghosts.length > 0 && (
+         <div className="bg-red-950/40 border border-red-500 rounded-lg p-6 mb-8 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+            <h3 className="text-xl font-bold text-red-500 flex items-center mb-4">
+              <Ghost size={24} className="mr-2" /> 
+              Fantasmas Detectados (Auditoria Automática)
+            </h3>
+            <p className="text-red-300 text-sm mb-4">O "Robô Xerife" detectou que os seguintes jogadores planilharam hunts hoje que já terminaram, mas geraram 0 XP no servidor. Deseja puni-los?</p>
+            <div className="space-y-3">
+               {ghosts.map(g => (
+                 <div key={g.name} className="flex flex-col md:flex-row items-center justify-between bg-black/50 p-4 rounded border border-red-900/50">
+                    <div className="mb-2 md:mb-0 w-full md:w-auto text-left">
+                       <p className="text-white font-bold">{g.name} <span className="text-xs text-gray-400">Lvl {g.level}</span></p>
+                       <p className="text-xs text-red-400 font-mono mt-1">Faltou na {g.hunt} ({g.slot})</p>
+                    </div>
+                    <button 
+                       onClick={() => handlePunishGhost(g)}
+                       className="bg-red-600 hover:bg-red-500 w-full md:w-auto text-white px-4 py-2 rounded text-sm font-bold transition flex items-center justify-center shadow-tibia-glow whitespace-nowrap"
+                    >
+                       <AlertOctagon size={16} className="mr-2" /> Aplicar Strike (3 dias)
+                    </button>
+                 </div>
+               ))}
+            </div>
+         </div>
+      )}
 
       {/* Tribunal */}
       <div className="bg-tibia-card border border-red-900/50 rounded-lg shadow-xl overflow-hidden">
