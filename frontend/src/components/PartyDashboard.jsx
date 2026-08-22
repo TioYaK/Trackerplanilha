@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Clock, TrendingUp, AlertTriangle, Users } from 'lucide-react';
+import { Clock, TrendingUp, AlertTriangle, Users, Info } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function PartyDashboard({ party, onPlayerClick }) {
@@ -143,7 +143,9 @@ export default function PartyDashboard({ party, onPlayerClick }) {
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase font-bold">Horário Real (Telemetria)</p>
+              <p className="text-xs text-gray-500 uppercase font-bold flex items-center">
+                  Horário Real (Telemetria)
+              </p>
               <p className="text-lg font-bold text-white flex items-center">
                  {actualHuntTime ? (
                      actualHuntTime.single ? (
@@ -154,6 +156,11 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                  ) : (
                      <span className="text-gray-500 text-sm italic">Não detectado</span>
                  )}
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1 leading-tight flex items-start">
+                 <Info size={10} className="mr-1 mt-[2px] flex-shrink-0" />
+                 <span>Aviso: Margem de erro de ~5 minutos devido ao intervalo do robô. 
+                 {actualHuntTime && actualHuntTime.single && " 'Pico Isolado' indica que a hunt durou menos de 5 minutos (registrada em apenas um ciclo)."}</span>
               </p>
             </div>
             <div>
