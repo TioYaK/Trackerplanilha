@@ -55,7 +55,111 @@ export default function GlobalTracker() {
         setBarData(bData);
       }
 
-      // Fetch parties for Respawn Tier List and SupplyDemand
+      // Fetch FULL Roster for BI
+      let vData = [];
+      let lData = [];
+      let bRisk = [];
+      try {
+        let allRoster = [];
+        let page = 0;
+        while (true) {
+          const { data: rosterData } = await supabase
+            .from('view_guild_roster')
+            .select('*')
+            .range(page * 1000, (page + 1) * 1000 - 1);
+          if (!rosterData || rosterData.length === 0) break;
+          allRoster.push(...rosterData);
+          page++;
+        }
+
+        const vocStats = {};
+        const lvlStats = { '1-499': 0, '500-999': 0, '1000-1499': 0, '1500-1999': 0, '2000+': 0 };
+
+        allRoster.forEach(m => {
+          const voc = m.vocation || 'N/A';
+          if (!vocStats[voc]) vocStats[voc] = { name: voc, members: 0, total_xp: 0 };
+          vocStats[voc].members += 1;
+          vocStats[voc].total_xp += m.xp_gained_24h || 0;
+
+          if (m.level < 500) lvlStats['1-499']++;
+          else if (m.level < 1000) lvlStats['500-999']++;
+          else if (m.level < 1500) lvlStats['1000-1499']++;
+          else if (m.level < 2000) lvlStats['1500-1999']++;
+          else lvlStats['2000+']++;
+
+          if (m.level >= 1500 && (!m.xp_gained_24h || m.xp_gained_24h === 0)) {
+            bRisk.push(m);
+          }
+        });
+
+        const vocColors = {
+          'Elite Knight': '#3B82F6', 'Elder Druid': '#10B981', 'Master Sorcerer': '#EF4444', 'Royal Paladin': '#F59E0B'
+        };
+
+        vData = Object.values(vocStats)
+          .filter(v => v.name !== 'None' && v.name !== 'N/A')
+          .map(v => ({ ...v, color: vocColors[v.name] || '#6B7280' }))
+          .sort((a, b) => b.total_xp - a.total_xp);
+
+        lData = Object.entries(lvlStats).map(([name, count]) => ({ name, count }));
+        
+        // Pareto Logic
+        const sortedByXp = [...allRoster].sort((a,b) => (b.xp_gained_24h||0) - (a.xp_gained_24h||0));
+        let top50Xp = 0;
+        let restXp = 0;
+        sortedByXp.forEach((m, i) => {
+            if (i < 50) top50Xp += (m.xp_gained_24h||0);
+            else restXp += (m.xp_gained_24h||0);
+        });
+        setParetoData([
+           { name: 'Top 50 Carregadores', value: top50Xp, fill: '#F59E0B' },
+           { name: 'Resto da Guilda', value: restXp, fill: '#374151' }
+        ]);
+
+        // Muro das Lamentacoes (Deaths)
+        const deadPlayers = allRoster
+            .filter(r => r.xp_gained_24h < 0)
+            .sort((a,b) => a.xp_gained_24h - b.xp_gained_24h)
+            .slice(0, 5);
+        setDeaths(deadPlayers);
+
+        // Quadrante Magico (Scatter)
+        const qData = allRoster
+            .filter(r => r.xp_gained_24h > 0)
+            .map(r => ({
+               name: r.name,
+               level: r.level,
+               xp: Math.round(r.xp_gained_24h / 1000000), // In Millions
+               z: 1
+            }));
+        setMagicQuadrant(qData);
+
+        // Censo de Estilo de Vida
+        let hardcore = 0;
+        let operarios = 0;
+        let casuais = 0;
+        let turistas = 0;
+        allRoster.forEach(r => {
+           if (r.xp_gained_24h > 50000000) hardcore++;
+           else if (r.xp_gained_24h > 10000000) operarios++;
+           else if (r.xp_gained_24h > 0) casuais++;
+           else turistas++;
+        });
+        setLifestyle([
+           { name: 'Grinders (50M+)', value: hardcore, fill: '#F59E0B' },
+           { name: 'Operários (10M+)', value: operarios, fill: '#3B82F6' },
+           { name: 'Casuais (>0)', value: casuais, fill: '#10B981' },
+           { name: 'Inativos (0)', value: turistas, fill: '#374151' }
+        ]);
+
+        setVocationData(vData);
+        setLevelData(lData);
+        setBurnoutRisk(bRisk.sort((a, b) => b.level - a.level).slice(0, 15));
+      } catch (e) {
+        console.error("BI Fetch Error:", e);
+      }
+
+// Fetch parties for Respawn Tier List and SupplyDemand
       const { data: partiesData } = await supabase
         .from('parties_planilhadas')
         .select('hunt_name, slot_start, slot_end, delta_xp, members')
@@ -163,109 +267,7 @@ export default function GlobalTracker() {
         setSupplyDemand(Object.entries(hoursPerVoc).map(([voc, hrs]) => ({ name: voc, hours: Math.round(hrs) })));
       }
 
-      // Fetch FULL Roster for BI
-      let vData = [];
-      let lData = [];
-      let bRisk = [];
-      try {
-        let allRoster = [];
-        let page = 0;
-        while (true) {
-          const { data: rosterData } = await supabase
-            .from('view_guild_roster')
-            .select('*')
-            .range(page * 1000, (page + 1) * 1000 - 1);
-          if (!rosterData || rosterData.length === 0) break;
-          allRoster.push(...rosterData);
-          page++;
-        }
-
-        const vocStats = {};
-        const lvlStats = { '1-499': 0, '500-999': 0, '1000-1499': 0, '1500-1999': 0, '2000+': 0 };
-
-        allRoster.forEach(m => {
-          const voc = m.vocation || 'N/A';
-          if (!vocStats[voc]) vocStats[voc] = { name: voc, members: 0, total_xp: 0 };
-          vocStats[voc].members += 1;
-          vocStats[voc].total_xp += m.xp_gained_24h || 0;
-
-          if (m.level < 500) lvlStats['1-499']++;
-          else if (m.level < 1000) lvlStats['500-999']++;
-          else if (m.level < 1500) lvlStats['1000-1499']++;
-          else if (m.level < 2000) lvlStats['1500-1999']++;
-          else lvlStats['2000+']++;
-
-          if (m.level >= 1500 && (!m.xp_gained_24h || m.xp_gained_24h === 0)) {
-            bRisk.push(m);
-          }
-        });
-
-        const vocColors = {
-          'Elite Knight': '#3B82F6', 'Elder Druid': '#10B981', 'Master Sorcerer': '#EF4444', 'Royal Paladin': '#F59E0B'
-        };
-
-        vData = Object.values(vocStats)
-          .filter(v => v.name !== 'None' && v.name !== 'N/A')
-          .map(v => ({ ...v, color: vocColors[v.name] || '#6B7280' }))
-          .sort((a, b) => b.total_xp - a.total_xp);
-
-        lData = Object.entries(lvlStats).map(([name, count]) => ({ name, count }));
-        
-        // Pareto Logic
-        const sortedByXp = [...allRoster].sort((a,b) => (b.xp_gained_24h||0) - (a.xp_gained_24h||0));
-        let top50Xp = 0;
-        let restXp = 0;
-        sortedByXp.forEach((m, i) => {
-            if (i < 50) top50Xp += (m.xp_gained_24h||0);
-            else restXp += (m.xp_gained_24h||0);
-        });
-        setParetoData([
-           { name: 'Top 50 Carregadores', value: top50Xp, fill: '#F59E0B' },
-           { name: 'Resto da Guilda', value: restXp, fill: '#374151' }
-        ]);
-
-        // Muro das Lamentacoes (Deaths)
-        const deadPlayers = allRoster
-            .filter(r => r.xp_gained_24h < 0)
-            .sort((a,b) => a.xp_gained_24h - b.xp_gained_24h)
-            .slice(0, 5);
-        setDeaths(deadPlayers);
-
-        // Quadrante Magico (Scatter)
-        const qData = allRoster
-            .filter(r => r.xp_gained_24h > 0)
-            .map(r => ({
-               name: r.name,
-               level: r.level,
-               xp: Math.round(r.xp_gained_24h / 1000000), // In Millions
-               z: 1
-            }));
-        setMagicQuadrant(qData);
-
-        // Censo de Estilo de Vida
-        let hardcore = 0;
-        let operarios = 0;
-        let casuais = 0;
-        let turistas = 0;
-        allRoster.forEach(r => {
-           if (r.xp_gained_24h > 50000000) hardcore++;
-           else if (r.xp_gained_24h > 10000000) operarios++;
-           else if (r.xp_gained_24h > 0) casuais++;
-           else turistas++;
-        });
-        setLifestyle([
-           { name: 'Grinders (50M+)', value: hardcore, fill: '#F59E0B' },
-           { name: 'Operários (10M+)', value: operarios, fill: '#3B82F6' },
-           { name: 'Casuais (>0)', value: casuais, fill: '#10B981' },
-           { name: 'Inativos (0)', value: turistas, fill: '#374151' }
-        ]);
-
-        setVocationData(vData);
-        setLevelData(lData);
-        setBurnoutRisk(bRisk.sort((a, b) => b.level - a.level).slice(0, 15));
-      } catch (e) {
-        console.error("BI Fetch Error:", e);
-      }
+      
       
       // Generate AI Insights
       const newInsights = [];
