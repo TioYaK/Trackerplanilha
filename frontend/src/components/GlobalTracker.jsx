@@ -28,7 +28,8 @@ export default function GlobalTracker() {
   useEffect(() => {
     const fetchCensus = async () => {
       setLoading(true);
-      // Fetch current census
+      try {
+        // Fetch current census
       const { data: cData } = await supabase.from('view_macro_census').select('*').single();
       if (cData) setCensus(cData);
       
@@ -59,8 +60,8 @@ export default function GlobalTracker() {
       let vData = [];
       let lData = [];
       let bRisk = [];
+      let allRoster = [];
       try {
-        let allRoster = [];
         let page = 0;
         while (true) {
           const { data: rosterData } = await supabase
@@ -174,6 +175,8 @@ export default function GlobalTracker() {
         
         partiesData.forEach(p => {
           if (!p.delta_xp || p.delta_xp === '0') return;
+          if (!p.slot_start || !p.slot_end || typeof p.slot_start !== 'string' || typeof p.slot_end !== 'string') return;
+          
           const [sh, sm] = p.slot_start.split(':').map(Number);
           const [eh, em] = p.slot_end.split(':').map(Number);
           const startMins = sh * 60 + sm;
@@ -292,7 +295,11 @@ export default function GlobalTracker() {
       }
 
       setInsights(newInsights);
-      setLoading(false);
+      } catch (err) {
+        console.error("GlobalTracker Master Error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchCensus();
   }, []);
