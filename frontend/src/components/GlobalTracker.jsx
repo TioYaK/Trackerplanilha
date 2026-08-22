@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users } from 'lucide-react';
 
 export default function GlobalTracker() {
   const [census, setCensus] = useState({ total_members: 0, active_members: 0 });
@@ -12,6 +12,8 @@ export default function GlobalTracker() {
   const [vocationData, setVocationData] = useState([]);
   const [levelData, setLevelData] = useState([]);
   const [burnoutRisk, setBurnoutRisk] = useState([]);
+  const [respawnTierList, setRespawnTierList] = useState([]);
+  const [insights, setInsights] = useState([]);
   
   const [loading, setLoading] = useState(true);
 
@@ -19,10 +21,8 @@ export default function GlobalTracker() {
     const fetchCensus = async () => {
       setLoading(true);
       // Fetch current census
-      const { data, error } = await supabase.from('view_macro_census').select('*').single();
-      if (data && !error) {
-        setCensus(data);
-      }
+      const { data: cData } = await supabase.from('view_macro_census').select('*').single();
+      if (cData) setCensus(cData);
       
       // Fetch hunters 24h
       const { count: huntersCount } = await supabase
@@ -31,28 +31,65 @@ export default function GlobalTracker() {
       if (huntersCount) setHunters(huntersCount);
       
       // Fetch historical daily data
-      const { data: dailyData, error: dailyError } = await supabase
+      let bData = [];
+      const { data: dailyData } = await supabase
         .from('view_macro_daily')
         .select('*')
         .order('day_date', { ascending: true });
         
-      if (dailyData && !dailyError) {
-        const formattedData = dailyData.map(d => {
+      if (dailyData) {
+        bData = dailyData.map(d => {
           const date = new Date(d.day_date);
           date.setUTCDate(date.getUTCDate() + 1);
           const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-          return {
-            day: days[date.getDay()],
-            logadas: d.logadas,
-            cacando: d.cacando
-          };
+          return { day: days[date.getDay()], logadas: d.logadas, cacando: d.cacando };
         });
-        setBarData(formattedData);
-      } else {
-        setBarData([]);
+        setBarData(bData);
       }
-      
+
+      // Fetch parties for Respawn Tier List
+      const { data: partiesData } = await supabase
+        .from('parties_planilhadas')
+        .select('hunt_name, slot_start, slot_end, delta_xp')
+        .not('delta_xp', 'is', null);
+
+      let rTier = [];
+      if (partiesData) {
+        const huntStats = {};
+        partiesData.forEach(p => {
+          if (!p.delta_xp || p.delta_xp === '0') return;
+          const [sh, sm] = p.slot_start.split(':').map(Number);
+          const [eh, em] = p.slot_end.split(':').map(Number);
+          const startMins = sh * 60 + sm;
+          let endMins = eh * 60 + em;
+          if (endMins <= 600 && startMins >= 1000) endMins += 1440; // cross midnight logic
+          const durationHours = Math.max(0.1, (endMins - startMins) / 60);
+
+          let xpVal = 0;
+          const str = p.delta_xp.toString().toUpperCase().replace(/,/g, '.');
+          if (str.endsWith('M')) xpVal = parseFloat(str) * 1000000;
+          else if (str.endsWith('K')) xpVal = parseFloat(str) * 1000;
+          else xpVal = parseFloat(str) || 0;
+
+          if (xpVal > 0) {
+            const h = p.hunt_name || 'Desconhecido';
+            if (!huntStats[h]) huntStats[h] = { name: h, totalXp: 0, totalHours: 0 };
+            huntStats[h].totalXp += xpVal;
+            huntStats[h].totalHours += durationHours;
+          }
+        });
+
+        rTier = Object.values(huntStats)
+          .map(h => ({ name: h.name, xph: h.totalXp / h.totalHours }))
+          .sort((a, b) => b.xph - a.xph)
+          .slice(0, 5); // Top 5
+        setRespawnTierList(rTier);
+      }
+
       // Fetch FULL Roster for BI
+      let vData = [];
+      let lData = [];
+      let bRisk = [];
       try {
         let allRoster = [];
         let page = 0;
@@ -66,52 +103,67 @@ export default function GlobalTracker() {
           page++;
         }
 
-        // BI Aggregations
         const vocStats = {};
         const lvlStats = { '1-499': 0, '500-999': 0, '1000-1499': 0, '1500-1999': 0, '2000+': 0 };
-        const burnout = [];
 
         allRoster.forEach(m => {
-          // Vocation
           const voc = m.vocation || 'N/A';
           if (!vocStats[voc]) vocStats[voc] = { name: voc, members: 0, total_xp: 0 };
           vocStats[voc].members += 1;
           vocStats[voc].total_xp += m.xp_gained_24h || 0;
 
-          // Level
           if (m.level < 500) lvlStats['1-499']++;
           else if (m.level < 1000) lvlStats['500-999']++;
           else if (m.level < 1500) lvlStats['1000-1499']++;
           else if (m.level < 2000) lvlStats['1500-1999']++;
           else lvlStats['2000+']++;
 
-          // Burnout (Level 1500+ with 0 XP)
           if (m.level >= 1500 && (!m.xp_gained_24h || m.xp_gained_24h === 0)) {
-            burnout.push(m);
+            bRisk.push(m);
           }
         });
 
-        // Resolve colors for Vocations
         const vocColors = {
-          'Elite Knight': '#3B82F6', // Blue
-          'Elder Druid': '#10B981', // Green
-          'Master Sorcerer': '#EF4444', // Red
-          'Royal Paladin': '#F59E0B', // Yellow
+          'Elite Knight': '#3B82F6', 'Elder Druid': '#10B981', 'Master Sorcerer': '#EF4444', 'Royal Paladin': '#F59E0B'
         };
 
-        const finalVocData = Object.values(vocStats)
+        vData = Object.values(vocStats)
           .filter(v => v.name !== 'None' && v.name !== 'N/A')
           .map(v => ({ ...v, color: vocColors[v.name] || '#6B7280' }))
           .sort((a, b) => b.total_xp - a.total_xp);
 
-        setVocationData(finalVocData);
-        setLevelData(Object.entries(lvlStats).map(([name, count]) => ({ name, count })));
-        setBurnoutRisk(burnout.sort((a, b) => b.level - a.level).slice(0, 15)); // Top 15 sleeping giants
-
+        lData = Object.entries(lvlStats).map(([name, count]) => ({ name, count }));
+        
+        setVocationData(vData);
+        setLevelData(lData);
+        setBurnoutRisk(bRisk.sort((a, b) => b.level - a.level).slice(0, 15));
       } catch (e) {
         console.error("BI Fetch Error:", e);
       }
       
+      // Generate AI Insights
+      const newInsights = [];
+      if (bRisk.length > 5) {
+        newInsights.push({ type: 'danger', icon: <TrendingDown size={18} className="text-red-400"/>, text: `Alerta Vermelho: Temos ${bRisk.length} jogadores Level 1500+ ociosos hoje. Risco crítico de evasão ou inatividade.` });
+      } else if (bRisk.length > 0) {
+        newInsights.push({ type: 'warning', icon: <Users size={18} className="text-yellow-400"/>, text: `Atenção moderada: ${bRisk.length} high-levels ociosos hoje. Fique de olho na retenção.` });
+      } else {
+        newInsights.push({ type: 'success', icon: <TrendingUp size={18} className="text-green-400"/>, text: `Nenhum jogador Level 1500+ inativo nas últimas 24h. A guilda está operando em força máxima militar!` });
+      }
+
+      if (rTier.length > 0) {
+        newInsights.push({ type: 'info', icon: <Target size={18} className="text-blue-400"/>, text: `A mina de ouro atual é "${rTier[0].name}", gerando impressionantes ${(rTier[0].xph / 1000000).toFixed(1)}M XP/hora para a guilda.` });
+      }
+
+      if (vData.length > 1) {
+        const topVoc = vData[0];
+        const bottomVoc = vData[vData.length - 1];
+        if (topVoc.total_xp > bottomVoc.total_xp * 2 && bottomVoc.total_xp > 0) {
+          newInsights.push({ type: 'danger', icon: <AlertCircle size={18} className="text-red-400"/>, text: `Desbalanceamento de classes: ${topVoc.name}s estão gerando ${Math.round(topVoc.total_xp/bottomVoc.total_xp)}x mais XP que os ${bottomVoc.name}s.` });
+        }
+      }
+
+      setInsights(newInsights);
       setLoading(false);
     };
     fetchCensus();
@@ -137,6 +189,24 @@ export default function GlobalTracker() {
         </div>
       ) : (
         <div className="space-y-8">
+          
+          {/* AI Insights Panel */}
+          {insights.length > 0 && (
+            <div className="bg-black/40 border border-purple-500/50 rounded-lg p-6 shadow-[0_0_20px_rgba(168,85,247,0.15)]">
+              <h3 className="text-xl font-bold text-purple-400 mb-4 flex items-center">
+                <Brain className="mr-2" size={24} /> Relatório do Analista Chefe
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {insights.map((ins, i) => (
+                  <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-start">
+                    <div className="mt-1 mr-3 shrink-0">{ins.icon}</div>
+                    <p className="text-sm text-gray-300 leading-relaxed">{ins.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Top Row: Basic Engagement */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Gráfico 1: Ativos vs Inativos */}
@@ -279,6 +349,35 @@ export default function GlobalTracker() {
             </div>
 
           </div>
+
+          {/* Bottom Row 2: Respawn Tier List */}
+          {respawnTierList.length > 0 && (
+            <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl">
+              <h3 className="text-xl font-bold text-white mb-2 flex items-center">
+                <Target className="mr-2 text-yellow-500" size={24} />
+                A Mina de Ouro (Tier List de Respawns)
+              </h3>
+              <p className="text-sm text-gray-400 mb-6">Média real de XP/hora gerada pela guilda em cada área de caça.</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {respawnTierList.map((tier, index) => (
+                  <div key={index} className="bg-black/30 border border-white/5 rounded-lg p-4 relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 opacity-5 text-yellow-500"><Target size={100} /></div>
+                    <div className="flex items-center mb-2">
+                      <span className={`text-lg font-black mr-2 ${index === 0 ? 'text-yellow-400' : index === 1 ? 'text-gray-300' : index === 2 ? 'text-amber-600' : 'text-gray-500'}`}>
+                        #{index + 1}
+                      </span>
+                      <span className="font-bold text-white truncate z-10">{tier.name}</span>
+                    </div>
+                    <div className="z-10 relative">
+                      <p className="text-2xl font-black text-green-400">{(tier.xph / 1000000).toFixed(1)}M <span className="text-xs text-gray-500 font-normal">/h</span></p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>
