@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 export default function GlobalTracker() {
   const [census, setCensus] = useState({ total_members: 0, active_members: 0 });
   const [barData, setBarData] = useState([]);
+  const [hunters, setHunters] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,6 +17,12 @@ export default function GlobalTracker() {
         setCensus(data);
       }
       
+      // Fetch hunters 24h
+      const { count: huntersCount } = await supabase
+        .from('view_top_rushers_24h')
+        .select('*', { count: 'exact', head: true });
+      if (huntersCount) setHunters(huntersCount);
+      
       // Fetch historical daily data
       const { data: dailyData, error: dailyError } = await supabase
         .from('view_macro_daily')
@@ -25,6 +32,8 @@ export default function GlobalTracker() {
       if (dailyData && !dailyError) {
         const formattedData = dailyData.map(d => {
           const date = new Date(d.day_date);
+          // Adiciona 1 dia para corrigir o fuso horário (já que a data vem como YYYY-MM-DD UTC)
+          date.setUTCDate(date.getUTCDate() + 1);
           const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
           return {
             day: days[date.getDay()],
@@ -91,10 +100,14 @@ export default function GlobalTracker() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 flex justify-between text-center px-8 border-t border-tibia-border pt-4">
+            <div className="mt-4 grid grid-cols-4 gap-2 text-center px-4 border-t border-tibia-border pt-4">
               <div>
                 <p className="text-2xl font-bold text-green-400">{pieData[0].value}</p>
-                <p className="text-xs text-gray-400">Ativos</p>
+                <p className="text-xs text-gray-400">Ativos (7d)</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-blue-400">{hunters}</p>
+                <p className="text-xs text-blue-300">Caçaram (24h)</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-gray-400">{pieData[1].value}</p>
