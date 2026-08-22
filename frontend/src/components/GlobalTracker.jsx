@@ -22,6 +22,7 @@ export default function GlobalTracker() {
   const [deaths, setDeaths] = useState([]);
   const [magicQuadrant, setMagicQuadrant] = useState([]);
   const [lifestyle, setLifestyle] = useState([]);
+  const [topSolos, setTopSolos] = useState([]);
   
   const [loading, setLoading] = useState(true);
 
@@ -249,11 +250,15 @@ export default function GlobalTracker() {
         let loners = 0;
         let closed = 0;
         let commun = 0;
+        let soloHunters = [];
         
         allRoster.forEach(r => {
            if (r.xp_gained_24h > 0) {
              const mates = playerMates[r.name] ? playerMates[r.name].size : 0;
-             if (mates === 0) loners++;
+             if (mates === 0) {
+                 loners++;
+                 soloHunters.push(r);
+             }
              else if (mates <= 3) closed++;
              else commun++;
            }
@@ -266,6 +271,8 @@ export default function GlobalTracker() {
              { name: 'Comunitários', value: commun, fill: '#10B981' }
            ]);
         }
+        
+        setTopSolos(soloHunters.sort((a,b) => b.xp_gained_24h - a.xp_gained_24h).slice(0, 5));
         
         setSupplyDemand(Object.entries(hoursPerVoc).map(([voc, hrs]) => ({ name: voc, hours: Math.round(hrs) })));
       }
@@ -682,7 +689,7 @@ export default function GlobalTracker() {
         {/* Bottom Row 5: Extreme Analytics */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
           
-          {/* Muro das Lamentacoes (Deaths) */}
+          {/* Muro das Lamentações */}
           <div className="bg-tibia-card border border-gray-900 rounded-lg p-6 shadow-xl lg:col-span-1">
             <h3 className="text-xl font-bold text-gray-500 mb-2 flex items-center">
               <TrendingDown className="mr-2 text-red-600" size={24} />
@@ -764,6 +771,28 @@ export default function GlobalTracker() {
             </div>
           </div>
 
+        </div>
+
+        {/* Bottom Row 6: Lobos Solitários */}
+        <div className="mt-8 bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl">
+            <h3 className="text-xl font-bold text-white mb-2 flex items-center">
+              <Users className="mr-2 text-yellow-500" size={24} />
+              Os Lobos Solitários (Mundo Aberto / Solo)
+            </h3>
+            <p className="text-xs text-gray-400 mb-6">Membros que ganharam rios de XP sem pisar em NENHUMA hunt planilhada hoje. O verdadeiro motor independente da guilda.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              {topSolos.length > 0 ? topSolos.map((solo, i) => (
+                <div key={i} className="bg-black/40 p-4 rounded-lg border border-gray-800 flex flex-col justify-center items-center text-center">
+                  <div className="w-10 h-10 bg-yellow-500/20 text-yellow-500 rounded-full flex items-center justify-center font-bold text-lg mb-2">#{i + 1}</div>
+                  <span className="font-bold text-white block mb-1 truncate w-full">{solo.name}</span>
+                  <span className="text-green-400 font-black text-sm block">+{(solo.xp_gained_24h / 1000000).toFixed(1)}M XP</span>
+                  <span className="text-xs text-gray-500 block mt-1">Lvl {solo.level} - {solo.vocation}</span>
+                </div>
+              )) : (
+                <div className="text-center text-gray-500 col-span-5 py-4">Nenhum jogador atuando puramente solo ou off-planilha hoje.</div>
+              )}
+            </div>
         </div>
 
       </div>
