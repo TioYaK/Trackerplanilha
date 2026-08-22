@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export default function PartyDashboard({ party, onPlayerClick }) {
   const [membersData, setMembersData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actualHuntTime, setActualHuntTime] = useState(null);
 
   useEffect(() => {
     const fetchPartyData = async () => {
@@ -49,6 +50,40 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
         processedMembers.sort((a, b) => b.totalXpGained - a.totalXpGained);
         setMembersData(processedMembers);
+
+        // Calculate Actual Hunt Time based on XP telemetry
+        let huntStart = null;
+        let huntEnd = null;
+        
+        const [sh, sm] = (party.slot_start || '00:00').split(':').map(Number);
+        const [eh, em] = (party.slot_end || '23:59').split(':').map(Number);
+        const startMins = sh * 60 + sm;
+        let endMins = eh * 60 + em;
+        if (endMins < startMins) endMins += 1440; // Cross midnight
+
+        logs.forEach(log => {
+          const dxp = parseInt(log.delta_xp || 0, 10);
+          if (dxp > 0) {
+            const date = new Date(log.recorded_at);
+            let logMins = date.getHours() * 60 + date.getMinutes();
+            if (endMins > 1440 && logMins < 600) logMins += 1440;
+
+            if (logMins >= startMins - 60 && logMins <= endMins + 60) {
+                if (!huntStart || date < huntStart) huntStart = date;
+                if (!huntEnd || date > huntEnd) huntEnd = date;
+            }
+          }
+        });
+
+        if (huntStart && huntEnd) {
+            setActualHuntTime({ 
+               start: huntStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
+               end: huntEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+            });
+        } else {
+            setActualHuntTime(null);
+        }
+
       }
       setLoading(false);
     };
@@ -87,24 +122,34 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           <span className="text-gray-300">👑 Líder: {party.leader_name}</span>
           <span className="text-blue-400"><Clock size={14} className="inline mr-1" /> {party.slot_start} - {party.slot_end}</span>
         </div>
-        <div className="mt-6 flex gap-8">
-          <div>
-            <p className="text-xs text-gray-500 uppercase font-bold">Status do Slot</p>
-            <p className={`text-lg font-bold flex items-center ${statusColors[currentStatus].split(' ')[2]}`}>
-              {currentStatus === 'EFFICIENT' && <TrendingUp size={20} className="mr-2" />}
-              {currentStatus === 'SUBOPTIMAL' && <Clock size={20} className="mr-2" />}
-              {currentStatus === 'GHOST_SLOT' && <AlertTriangle size={20} className="mr-2" />}
-              {currentStatus === 'EFFICIENT' ? 'Caçando Ativamente' :
-               currentStatus === 'SUBOPTIMAL' ? 'Ociosidade Parcial' :
-               currentStatus === 'GHOST_SLOT' ? 'Slot Abandonado (Ghost)' : 'Aguardando Slot'}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 uppercase font-bold">ΔXP/h Registrado</p>
-            <p className="text-lg font-bold text-white">{party.delta_xp || '0'}</p>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-bold">Status do Slot</p>
+              <p className={`text-lg font-bold flex items-center ${statusColors[currentStatus].split(' ')[2]}`}>
+                {currentStatus === 'EFFICIENT' && <TrendingUp size={20} className="mr-2" />}
+                {currentStatus === 'SUBOPTIMAL' && <Clock size={20} className="mr-2" />}
+                {currentStatus === 'GHOST_SLOT' && <AlertTriangle size={20} className="mr-2" />}
+                {currentStatus === 'EFFICIENT' ? 'Caçando Ativamente' :
+                 currentStatus === 'SUBOPTIMAL' ? 'Ociosidade Parcial' :
+                 currentStatus === 'GHOST_SLOT' ? 'Slot Abandonado (Ghost)' : 'Aguardando Slot'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-bold">Horário Real (Telemetria)</p>
+              <p className="text-lg font-bold text-white flex items-center">
+                 {actualHuntTime ? (
+                     <><Clock size={16} className="text-blue-400 mr-2" /> {actualHuntTime.start} - {actualHuntTime.end}</>
+                 ) : (
+                     <span className="text-gray-500 text-sm italic">Não detectado</span>
+                 )}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-bold">ΔXP/h Registrado</p>
+              <p className="text-lg font-bold text-white">{party.delta_xp || '0'}</p>
+            </div>
           </div>
         </div>
-      </div>
 
       {loading ? (
         <div className="flex justify-center items-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tibia-primary"></div></div>
