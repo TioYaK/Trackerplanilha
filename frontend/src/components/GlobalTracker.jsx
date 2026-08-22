@@ -14,6 +14,8 @@ export default function GlobalTracker() {
   const [burnoutRisk, setBurnoutRisk] = useState([]);
   const [respawnTierList, setRespawnTierList] = useState([]);
   const [insights, setInsights] = useState([]);
+  const [paretoData, setParetoData] = useState([]);
+  const [supplyDemand, setSupplyDemand] = useState([]);
   
   const [loading, setLoading] = useState(true);
 
@@ -47,15 +49,17 @@ export default function GlobalTracker() {
         setBarData(bData);
       }
 
-      // Fetch parties for Respawn Tier List
+      // Fetch parties for Respawn Tier List and SupplyDemand
       const { data: partiesData } = await supabase
         .from('parties_planilhadas')
-        .select('hunt_name, slot_start, slot_end, delta_xp')
+        .select('hunt_name, slot_start, slot_end, delta_xp, members')
         .not('delta_xp', 'is', null);
 
       let rTier = [];
       if (partiesData) {
         const huntStats = {};
+        const hoursPerVoc = { 'Elite Knight': 0, 'Elder Druid': 0, 'Master Sorcerer': 0, 'Royal Paladin': 0 };
+        
         partiesData.forEach(p => {
           if (!p.delta_xp || p.delta_xp === '0') return;
           const [sh, sm] = p.slot_start.split(':').map(Number);
@@ -64,6 +68,16 @@ export default function GlobalTracker() {
           let endMins = eh * 60 + em;
           if (endMins <= 600 && startMins >= 1000) endMins += 1440; // cross midnight logic
           const durationHours = Math.max(0.1, (endMins - startMins) / 60);
+
+          // Supply Demand logic
+          if (p.members && Array.isArray(p.members)) {
+            p.members.forEach(mName => {
+               const player = allRoster.find(r => r.name === mName);
+               if (player && hoursPerVoc[player.vocation] !== undefined) {
+                  hoursPerVoc[player.vocation] += durationHours;
+               }
+            });
+          }
 
           let xpVal = 0;
           const str = p.delta_xp.toString().toUpperCase().replace(/,/g, '.');
@@ -84,6 +98,8 @@ export default function GlobalTracker() {
           .sort((a, b) => b.xph - a.xph)
           .slice(0, 5); // Top 5
         setRespawnTierList(rTier);
+        
+        setSupplyDemand(Object.entries(hoursPerVoc).map(([voc, hrs]) => ({ name: voc, hours: Math.round(hrs) })));
       }
 
       // Fetch FULL Roster for BI
@@ -134,6 +150,19 @@ export default function GlobalTracker() {
 
         lData = Object.entries(lvlStats).map(([name, count]) => ({ name, count }));
         
+        // Pareto Logic
+        const sortedByXp = [...allRoster].sort((a,b) => (b.xp_gained_24h||0) - (a.xp_gained_24h||0));
+        let top50Xp = 0;
+        let restXp = 0;
+        sortedByXp.forEach((m, i) => {
+            if (i < 50) top50Xp += (m.xp_gained_24h||0);
+            else restXp += (m.xp_gained_24h||0);
+        });
+        setParetoData([
+           { name: 'Top 50 Carregadores', value: top50Xp, fill: '#F59E0B' },
+           { name: 'Resto da Guilda', value: restXp, fill: '#374151' }
+        ]);
+
         setVocationData(vData);
         setLevelData(lData);
         setBurnoutRisk(bRisk.sort((a, b) => b.level - a.level).slice(0, 15));
@@ -378,8 +407,77 @@ export default function GlobalTracker() {
             </div>
           )}
 
+        {/* Bottom Row 3: Pareto e Gargalo */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+          
+          {/* Pareto Pie Chart */}
+          {paretoData.length > 0 && (
+            <div className="bg-tibia-card border border-yellow-900/50 rounded-lg p-6 shadow-xl">
+              <h3 className="text-xl font-bold text-yellow-500 mb-2 flex items-center">
+                <Brain className="mr-2" size={24} />
+                A Lei de Pareto (Top 50 vs Resto)
+              </h3>
+              <p className="text-sm text-gray-400 mb-6">Comparação do volume de XP gerado entre os 50 maiores rushadores e o resto de toda a guilda.</p>
+              
+              <div className="h-64 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={paretoData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {paretoData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value) => `${(value / 1000000).toFixed(1)}M XP`}
+                      contentStyle={{ backgroundColor: '#111', border: '1px solid #333' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Supply & Demand (Gargalo de Vocação) */}
+          {supplyDemand.length > 0 && (
+            <div className="bg-tibia-card border border-blue-900/50 rounded-lg p-6 shadow-xl">
+              <h3 className="text-xl font-bold text-blue-400 mb-2 flex items-center">
+                <Users className="mr-2" size={24} />
+                Gargalo de Vocações (Demanda nas Hunts)
+              </h3>
+              <p className="text-sm text-gray-400 mb-6">Total de horas que cada classe passou caçando nas planilhas. Identifique qual classe está em falta ou sobrando.</p>
+              
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={supplyDemand} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={false} />
+                    <XAxis type="number" stroke="#666" tick={{ fill: '#888', fontSize: 10 }} />
+                    <YAxis dataKey="name" type="category" stroke="#666" tick={{ fill: '#888', fontSize: 10 }} width={100} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#111', border: '1px solid #333' }}
+                      itemStyle={{ color: '#60a5fa' }}
+                      formatter={(value) => [`${value} horas`, 'Tempo Caçando']}
+                    />
+                    <Bar dataKey="hours" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
         </div>
-      )}
-    </div>
-  );
+
+      </div>
+    )}
+  </div>
+);
 }
