@@ -1,13 +1,14 @@
 import React from 'react';
-import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings, Swords, Crosshair, Lock, Unlock, Landmark, ShoppingBag, Calculator } from 'lucide-react';
+import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings, Swords, Crosshair, Lock, Unlock, Landmark, ShoppingBag, Calculator, BrainCircuit } from 'lucide-react';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdmin }) {
   const navItems = [
-    { id: 'live', label: 'Monitor ao Vivo', icon: <Activity size={18} /> },
-    { id: 'roster', label: 'Roster da Guilda', icon: <Users size={18} /> },
-    { id: 'radar', label: 'Radar de Caçadores', icon: <Crosshair size={18} /> },
-    { id: 'planilha', label: 'Respawns', icon: <CalendarDays size={18} /> },
+    { id: 'live', label: 'Monitoramento ao Vivo', icon: <Activity size={18} /> },
+    { id: 'planilha', label: 'Painel de Agendamento', icon: <CalendarDays size={18} /> },
+    { id: 'radar', label: 'Radar do Servidor', icon: <Crosshair size={18} /> },
+    { id: 'roster', label: 'Exército da Guilda', icon: <Users size={18} /> },
     { id: 'tracker', label: 'Censo Macro', icon: <LayoutDashboard size={18} /> },
+    { id: 'extreme', label: 'Extreme BI', icon: <BrainCircuit size={18} /> },
     { id: 'analytics', label: 'Rankings & Tribunal', icon: <TrendingDown size={18} /> },
     { id: 'bank', label: 'Guild Bank', icon: <Landmark size={18} /> },
     { id: 'market', label: 'Mercado Interno', icon: <ShoppingBag size={18} /> },

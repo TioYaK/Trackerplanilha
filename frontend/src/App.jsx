@@ -11,6 +11,8 @@ import ReportExport from './components/ReportExport';
 import Rankings from './components/Rankings';
 import GuildBank from './views/GuildBank';
 import GuildMarket from './views/GuildMarket';
+import LootTracker from './views/LootTracker';
+import ExtremeAnalytics from './views/ExtremeAnalytics';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('live');
@@ -54,6 +56,7 @@ export default function App() {
       case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
       case 'radar': return <RadarHunters onPlayerClick={handlePlayerClick} />;
       case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
+      case 'extreme': return <ExtremeAnalytics />;
       case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
       case 'bank': return <GuildBank isAdmin={isAdmin} />;
       case 'market': return <GuildMarket isAdmin={isAdmin} />;
