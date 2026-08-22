@@ -165,7 +165,12 @@ export default function PlanilhaManager({ isAdmin }) {
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Local Exato (Respawn)</label>
-              <input required type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.hunt_name} onChange={e => setFormData({...formData, hunt_name: e.target.value})} placeholder="Ex: Lions, Falcons" />
+              <input required list="hunt-options" type="text" className="w-full bg-tibia-bg border border-tibia-border rounded p-2 text-white" value={formData.hunt_name} onChange={e => setFormData({...formData, hunt_name: e.target.value})} placeholder="Ex: Sanguine - Darklight" />
+              <datalist id="hunt-options">
+                {[...new Set(parties.map(p => p.hunt_name).filter(Boolean))].map(hunt => (
+                  <option key={hunt} value={hunt} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Início (HH:MM)</label>
@@ -195,46 +200,69 @@ export default function PlanilhaManager({ isAdmin }) {
         </div>
       )}
 
-      <div className="bg-tibia-card border border-tibia-border rounded-lg overflow-hidden">
-        <table className="w-full text-left text-sm text-gray-300">
-          <thead className="bg-black/40 text-gray-400 uppercase font-semibold">
-            <tr>
-              <th className="px-6 py-4">Equipe</th>
-              <th className="px-6 py-4">Área</th>
-              <th className="px-6 py-4">Respawn</th>
-              <th className="px-6 py-4">Horário</th>
-              <th className="px-6 py-4">Líder</th>
-              <th className="px-6 py-4">Integrantes</th>
-              {isAdmin && <th className="px-6 py-4 text-right">Ações</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-tibia-border/50">
-            {loading ? <tr><td colSpan={isAdmin ? 7 : 6} className="text-center py-4">Carregando...</td></tr> : null}
-            {!loading && parties.map(p => (
-              <tr key={p.id} className={`hover:bg-white/5 ${editingId === p.id ? 'bg-blue-900/20' : ''}`}>
-                <td className="px-6 py-4 font-medium text-white">{p.party_name}</td>
-                <td className="px-6 py-4 font-bold text-tibia-highlight">{p.respawn_category}</td>
-                <td className="px-6 py-4 text-orange-300">{p.hunt_name || 'Desconhecido'}</td>
-                <td className="px-6 py-4 text-blue-400">{p.slot_start.substring(0,5)} - {p.slot_end.substring(0,5)}</td>
-                <td className="px-6 py-4 text-white font-medium">{p.leader_name}</td>
-                <td className="px-6 py-4 text-gray-400 text-xs">
-                  {p.members && p.members.length > 0 ? p.members.join(', ') : 'Solo'}
-                </td>
-                {isAdmin && (
-                  <td className="px-6 py-4 text-right flex justify-end space-x-2">
-                    <button onClick={() => handleEdit(p)} className="text-blue-400 hover:text-blue-300 p-2 hover:bg-blue-500/10 rounded transition" title="Editar">
-                      <Edit size={18} />
-                    </button>
-                    <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-400 p-2 hover:bg-red-500/10 rounded transition" title="Remover">
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {!loading && parties.length === 0 && <tr><td colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-gray-500">Nenhuma party cadastrada.</td></tr>}
-          </tbody>
-        </table>
+      <div className="space-y-8">
+        {loading ? (
+          <div className="text-center py-8 text-gray-500">Carregando agendamentos...</div>
+        ) : parties.length === 0 ? (
+          <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 flex justify-center items-center text-gray-500 text-sm">
+            Nenhuma party cadastrada.
+          </div>
+        ) : (
+          Object.entries(
+            parties.reduce((acc, p) => {
+              const key = p.hunt_name || 'Desconhecido';
+              if (!acc[key]) acc[key] = [];
+              acc[key].push(p);
+              return acc;
+            }, {})
+          )
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([huntName, huntParties]) => (
+            <div key={huntName} className="bg-tibia-card border border-tibia-border rounded-lg overflow-hidden shadow-lg">
+              <div className="bg-black/60 px-6 py-4 border-b border-tibia-border flex justify-between items-center">
+                <h4 className="text-xl font-bold text-tibia-highlight">{huntName}</h4>
+                <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded border border-white/10">{huntParties[0].respawn_category}</span>
+              </div>
+              <table className="w-full text-left text-sm text-gray-300">
+                <thead className="bg-black/20 text-gray-400 uppercase font-semibold">
+                  <tr>
+                    <th className="px-6 py-4">Horário</th>
+                    <th className="px-6 py-4">Equipe</th>
+                    <th className="px-6 py-4">Líder</th>
+                    <th className="px-6 py-4">Integrantes</th>
+                    {isAdmin && <th className="px-6 py-4 text-right">Ações</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-tibia-border/50">
+                  {huntParties
+                    .sort((a, b) => a.slot_start.localeCompare(b.slot_start))
+                    .map(p => (
+                    <tr key={p.id} className={`hover:bg-white/5 ${editingId === p.id ? 'bg-blue-900/20' : ''}`}>
+                      <td className="px-6 py-4 text-blue-400 font-medium">
+                        {p.slot_start.substring(0,5)} - {p.slot_end.substring(0,5)}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-white">{p.party_name}</td>
+                      <td className="px-6 py-4 text-yellow-500 font-medium">{p.leader_name}</td>
+                      <td className="px-6 py-4 text-gray-400 text-xs">
+                        {p.members && p.members.length > 0 ? p.members.join(', ') : 'Solo'}
+                      </td>
+                      {isAdmin && (
+                        <td className="px-6 py-4 text-right flex justify-end space-x-2">
+                          <button onClick={() => handleEdit(p)} className="text-blue-400 hover:text-blue-300 p-2 hover:bg-blue-500/10 rounded transition" title="Editar">
+                            <Edit size={18} />
+                          </button>
+                          <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-400 p-2 hover:bg-red-500/10 rounded transition" title="Remover">
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
