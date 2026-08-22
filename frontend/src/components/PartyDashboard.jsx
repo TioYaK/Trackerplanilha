@@ -17,12 +17,21 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       setLoading(true);
 
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { data: logs } = await supabase
-        .from('telemetry_logs')
-        .select('character_name, delta_xp, recorded_at, level')
-        .in('character_name', party.members)
-        .gte('recorded_at', twentyFourHoursAgo)
-        .order('recorded_at', { ascending: true });
+        let logs = [];
+        let page = 0;
+        while(true) {
+            const { data } = await supabase
+              .from('telemetry_logs')
+              .select('character_name, delta_xp, recorded_at, level')
+              .in('character_name', party.members)
+              .gte('recorded_at', twentyFourHoursAgo)
+              .order('recorded_at', { ascending: true })
+              .range(page*1000, (page+1)*1000-1);
+            if (!data || data.length === 0) break;
+            logs.push(...data);
+            if (data.length < 1000) break;
+            page++;
+        }
 
       if (logs) {
         const memberStats = {};

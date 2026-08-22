@@ -33,13 +33,21 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       
     if (memberData) setPlayerInfo(memberData);
 
-    // Fetch 14-day bounds for Prediction and Heatmap
-    const { data: boundsData } = await supabase
-      .from('telemetry_logs')
-      .select('recorded_at, xp_total')
-      .eq('character_name', playerName)
-      .gte('recorded_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
-      .order('recorded_at', { ascending: true });
+    let boundsData = [];
+    let pageBounds = 0;
+      while(true) {
+          const { data } = await supabase
+            .from('telemetry_logs')
+            .select('recorded_at, xp_total')
+            .eq('character_name', playerName)
+            .gte('recorded_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+            .order('recorded_at', { ascending: true })
+            .range(pageBounds*1000, (pageBounds+1)*1000-1);
+          if (!data || data.length === 0) break;
+          boundsData.push(...data);
+          if (data.length < 1000) break;
+          pageBounds++;
+      }
 
     if (memberData && boundsData && boundsData.length > 0) {
       // Heatmap Logic (14 days)
@@ -130,10 +138,19 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     if (strikesData) setStrikes(strikesData);
 
     // Fetch frequent squad (Panelinhas)
-    const { data: squadData } = await supabase
-      .from('parties_planilhadas')
-      .select('members')
-      .contains('members', JSON.stringify([playerName]));
+    let squadData = [];
+    let pageSquad = 0;
+    while(true) {
+        const { data } = await supabase
+          .from('parties_planilhadas')
+          .select('members')
+          .contains('members', JSON.stringify([playerName]))
+          .range(pageSquad*1000, (pageSquad+1)*1000-1);
+        if (!data || data.length === 0) break;
+        squadData.push(...data);
+        if (data.length < 1000) break;
+        pageSquad++;
+    }
 
       if (squadData) {
         const mates = {};
