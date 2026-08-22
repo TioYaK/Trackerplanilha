@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
 } from 'recharts';
 import { Gavel, AlertOctagon, Ghost, Activity, Clock } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -18,6 +18,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
   const [prediction, setPrediction] = useState(null);
   const [heatmap, setHeatmap] = useState([]);
   const [playerInfo, setPlayerInfo] = useState(null);
+  const [routine, setRoutine] = useState([]);
 
   const fetchData = async () => {
     if (!playerName) return;
@@ -134,25 +135,68 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       .select('members')
       .contains('members', JSON.stringify([playerName]));
 
-    if (squadData) {
-      const mates = {};
-      squadData.forEach(p => {
-        if (!p.members) return;
-        p.members.forEach(m => {
-          if (m !== playerName) {
-            mates[m] = (mates[m] || 0) + 1;
-          }
+      if (squadData) {
+        const mates = {};
+        squadData.forEach(p => {
+          if (!p.members) return;
+          p.members.forEach(m => {
+            if (m !== playerName) {
+              mates[m] = (mates[m] || 0) + 1;
+            }
+          });
         });
-      });
-      const rankedMates = Object.entries(mates)
-        .sort((a,b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }))
-        .slice(0, 3);
-      setFrequentSquad(rankedMates);
-    }
+        const rankedMates = Object.entries(mates)
+          .sort((a,b) => b[1] - a[1])
+          .map(([name, count]) => ({ name, count }))
+          .slice(0, 3);
+        setFrequentSquad(rankedMates);
+      }
 
-    setLoading(false);
-  };
+      // Fetch 7-day routine data
+      let allLogs = [];
+      let page = 0;
+      while(true) {
+        const { data: logs } = await supabase
+          .from('telemetry_logs')
+          .select('recorded_at, delta_xp')
+          .eq('character_name', playerName)
+          .gte('recorded_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+          .range(page * 1000, (page + 1) * 1000 - 1);
+          
+        if (!logs || logs.length === 0) break;
+        allLogs.push(...logs);
+        if (logs.length < 1000) break;
+        page++;
+      }
+
+      if (allLogs.length > 0) {
+        const hourMap = new Array(24).fill(0);
+        allLogs.forEach(l => {
+          if (!l.delta_xp || l.delta_xp === '0') return;
+          // Clean string like "10.5M" or "500K" if it happens to be formatted, otherwise parse int
+          let xp = 0;
+          if (typeof l.delta_xp === 'string') {
+            if (l.delta_xp.includes('M')) xp = parseFloat(l.delta_xp) * 1000000;
+            else if (l.delta_xp.includes('K')) xp = parseFloat(l.delta_xp) * 1000;
+            else xp = parseInt(l.delta_xp, 10);
+          } else {
+            xp = l.delta_xp;
+          }
+          if (isNaN(xp)) xp = 0;
+          
+          const d = new Date(l.recorded_at);
+          hourMap[d.getHours()] += xp;
+        });
+
+        const routineData = hourMap.map((xp, index) => ({
+          hour: `${index.toString().padStart(2, '0')}:00`,
+          xp: xp
+        }));
+        setRoutine(routineData);
+      }
+
+      setLoading(false);
+    };
 
   useEffect(() => {
     fetchData();
@@ -331,6 +375,34 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Radar de Rotina (Horários Ativos) */}
+      {routine.length > 0 && routine.some(r => r.xp > 0) && (
+        <div className="bg-tibia-card p-6 rounded-lg border border-blue-900/50 shadow-xl mt-8">
+          <h3 className="text-xl font-bold text-blue-400 mb-2 flex items-center">
+            <Clock className="mr-2" size={24} />
+            Radar de Rotina (Horário Ativo)
+          </h3>
+          <p className="text-xs text-gray-400 mb-6">Distribuição da XP gerada por horário do dia (Últimos 7 dias).</p>
+          
+          <div className="h-48 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={routine} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                <XAxis dataKey="hour" stroke="#666" tick={{ fill: '#888', fontSize: 10 }} />
+                <YAxis hide />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: '4px' }}
+                  itemStyle={{ color: '#60a5fa' }}
+                  formatter={(value) => [`${(value / 1000000).toFixed(1)}M XP`, 'Gerado']}
+                  labelStyle={{ color: '#aaa', marginBottom: '4px' }}
+                />
+                <Bar dataKey="xp" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
