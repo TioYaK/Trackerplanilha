@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
+import { AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users, DollarSign, Clock, Network } from 'lucide-react';
 
 export default function GlobalTracker() {
   const [census, setCensus] = useState({ total_members: 0, active_members: 0 });
@@ -16,6 +16,9 @@ export default function GlobalTracker() {
   const [insights, setInsights] = useState([]);
   const [paretoData, setParetoData] = useState([]);
   const [supplyDemand, setSupplyDemand] = useState([]);
+  const [wastedXp, setWastedXp] = useState([]);
+  const [primeTime, setPrimeTime] = useState([]);
+  const [socialRadar, setSocialRadar] = useState([]);
   
   const [loading, setLoading] = useState(true);
 
@@ -59,6 +62,8 @@ export default function GlobalTracker() {
       if (partiesData) {
         const huntStats = {};
         const hoursPerVoc = { 'Elite Knight': 0, 'Elder Druid': 0, 'Master Sorcerer': 0, 'Royal Paladin': 0 };
+        const globalHours = new Array(24).fill(0);
+        const playerMates = {};
         
         partiesData.forEach(p => {
           if (!p.delta_xp || p.delta_xp === '0') return;
@@ -69,13 +74,29 @@ export default function GlobalTracker() {
           if (endMins <= 600 && startMins >= 1000) endMins += 1440; // cross midnight logic
           const durationHours = Math.max(0.1, (endMins - startMins) / 60);
 
-          // Supply Demand logic
+          // Prime Time logic
+          const startH = sh;
+          let endH = eh;
+          if (endH < startH && endH <= 10) endH += 24;
+          for (let h = startH; h <= endH; h++) {
+             const actualH = h >= 24 ? h - 24 : h;
+             globalHours[actualH] += 1;
+          }
+
+          // Supply Demand & Social Radar logic
           if (p.members && Array.isArray(p.members)) {
             p.members.forEach(mName => {
+               // Supply Demand
                const player = allRoster.find(r => r.name === mName);
                if (player && hoursPerVoc[player.vocation] !== undefined) {
                   hoursPerVoc[player.vocation] += durationHours;
                }
+
+               // Social Radar
+               if (!playerMates[mName]) playerMates[mName] = new Set();
+               p.members.forEach(otherM => {
+                  if (otherM !== mName) playerMates[mName].add(otherM);
+               });
             });
           }
 
@@ -93,11 +114,48 @@ export default function GlobalTracker() {
           }
         });
 
-        rTier = Object.values(huntStats)
+        const pTimeData = globalHours.map((val, i) => ({
+          hour: `${i.toString().padStart(2, '0')}:00`,
+          parties: val
+        }));
+        setPrimeTime(pTimeData);
+
+        const hVals = Object.values(huntStats);
+        rTier = hVals
           .map(h => ({ name: h.name, xph: h.totalXp / h.totalHours }))
           .sort((a, b) => b.xph - a.xph)
           .slice(0, 5); // Top 5
         setRespawnTierList(rTier);
+
+        // Wasted XP calculation
+        const wasted = hVals.map(h => {
+           const xph = h.totalXp / h.totalHours;
+           const idleHours = Math.max(0, 24 - h.totalHours);
+           return { name: h.name, missedXp: idleHours * xph };
+        }).sort((a,b) => b.missedXp - a.missedXp).slice(0, 5);
+        setWastedXp(wasted);
+
+        // Social Radar Calculation
+        let loners = 0;
+        let closed = 0;
+        let commun = 0;
+        
+        allRoster.forEach(r => {
+           if (r.xp_gained_24h > 0) {
+             const mates = playerMates[r.name] ? playerMates[r.name].size : 0;
+             if (mates === 0) loners++;
+             else if (mates <= 3) closed++;
+             else commun++;
+           }
+        });
+
+        if (loners > 0 || closed > 0 || commun > 0) {
+           setSocialRadar([
+             { name: 'Lobos Solitários', value: loners, fill: '#6B7280' },
+             { name: 'Panelinhas', value: closed, fill: '#F87171' },
+             { name: 'Comunitários', value: commun, fill: '#10B981' }
+           ]);
+        }
         
         setSupplyDemand(Object.entries(hoursPerVoc).map(([voc, hrs]) => ({ name: voc, hours: Math.round(hrs) })));
       }
@@ -474,7 +532,104 @@ export default function GlobalTracker() {
             </div>
           )}
 
+        {/* Close Bottom Row 3 */}
         </div>
+
+        {/* Bottom Row 4: Data Science Advanced */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+          
+          {/* Custo de Oportunidade (Wasted XP) */}
+          {wastedXp.length > 0 && (
+            <div className="bg-tibia-card border border-red-900/50 rounded-lg p-6 shadow-xl lg:col-span-1">
+              <h3 className="text-xl font-bold text-red-500 mb-2 flex items-center">
+                <DollarSign className="mr-2" size={24} />
+                Custo de Oportunidade
+              </h3>
+              <p className="text-xs text-gray-400 mb-6">Dinheiro na mesa: XP que a guilda perdeu por deixar respawns Top Tier vazios ontem.</p>
+              
+              <div className="space-y-4">
+                {wastedXp.map((w, i) => (
+                  <div key={i} className="bg-black/30 p-3 rounded border border-red-900/30">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-bold text-white">{w.name}</span>
+                      <span className="text-sm font-black text-red-400">-{ (w.missedXp / 1000000).toFixed(1) }M XP</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Prime Time (Area Chart) */}
+          {primeTime.length > 0 && (
+            <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl lg:col-span-2">
+              <h3 className="text-xl font-bold text-white mb-2 flex items-center">
+                <Clock className="mr-2 text-tibia-primary" size={24} />
+                Horário Nobre Global (Prime Time)
+              </h3>
+              <p className="text-xs text-gray-400 mb-6">Densidade de PTs simultâneas por horário do dia. Descubra quando o servidor "acorda" e quando ele "dorme".</p>
+              
+              <div className="h-48 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={primeTime} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorParties" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="hour" stroke="#666" tick={{ fill: '#888', fontSize: 10 }} />
+                    <YAxis stroke="#666" tick={{ fill: '#888', fontSize: 10 }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#111', border: '1px solid #333' }}
+                      itemStyle={{ color: '#10B981' }}
+                      formatter={(value) => [`${value} PTs Caçando`, 'Simultâneos']}
+                    />
+                    <Area type="monotone" dataKey="parties" stroke="#10B981" fillOpacity={1} fill="url(#colorParties)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Social Radar */}
+        {socialRadar.length > 0 && (
+          <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl mt-8">
+            <h3 className="text-xl font-bold text-white mb-2 flex items-center">
+              <Network className="mr-2 text-purple-400" size={24} />
+              Radar Social (Índice de Isolamento)
+            </h3>
+            <p className="text-xs text-gray-400 mb-6">Classificação da saúde social da guilda cruzando quem caça com quem. Lobos Solitários não interagem, Panelinhas são grupos fechados (risco de quitarem juntos), Comunitários unem o clã.</p>
+            
+            <div className="h-64 flex flex-col items-center justify-center relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={socialRadar}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={70}
+                    outerRadius={110}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {socialRadar.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value) => [`${value} Jogadores`, 'Total']}
+                    contentStyle={{ backgroundColor: '#111', border: '1px solid #333' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
       </div>
     )}
