@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import HeaderMetrics from '../components/HeaderMetrics';
 import RespawnCard from '../components/RespawnCard';
+import GlobalAuditFeed from '../components/GlobalAuditFeed';
 import { supabase } from '../lib/supabase';
 import { RefreshCw } from 'lucide-react';
 
@@ -105,6 +106,9 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick }) {
             ))}
         </div>
       )}
+
+      {/* Histórico Global de Atividades / Logs */}
+      <GlobalAuditFeed />
     </div>
   );
 }
