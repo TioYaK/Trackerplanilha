@@ -265,7 +265,7 @@ export default function LootTracker({ isAdmin }) {
               {ranking.map((player, idx) => (
                 <div key={idx} className="flex justify-between items-center bg-black/60 p-4 rounded-lg border border-yellow-900/30">
                   <div className="flex items-center">
-                    <span className={\`w-8 h-8 flex items-center justify-center font-bold rounded-full mr-4 \${idx === 0 ? 'bg-yellow-500 text-black' : idx === 1 ? 'bg-gray-400 text-black' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-gray-800 text-gray-400'}\`}>
+                    <span className={`w-8 h-8 flex items-center justify-center font-bold rounded-full mr-4 ${idx === 0 ? 'bg-yellow-500 text-black' : idx === 1 ? 'bg-gray-400 text-black' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-gray-800 text-gray-400'}`}>
                         {idx + 1}
                     </span>
                     <span className="font-bold text-white text-lg">{player.name}</span>
