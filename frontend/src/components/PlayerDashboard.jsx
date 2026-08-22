@@ -15,10 +15,58 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
   const [showStrikeModal, setShowStrikeModal] = useState(false);
   const [strikeForm, setStrikeForm] = useState({ reason: '', days: 3 });
   const [frequentSquad, setFrequentSquad] = useState([]);
+  const [prediction, setPrediction] = useState(null);
 
   const fetchData = async () => {
     if (!playerName) return;
     setLoading(true);
+
+    // Fetch Player Level from guild_members
+    const { data: memberData } = await supabase
+      .from('guild_members')
+      .select('level')
+      .eq('name', playerName)
+      .single();
+
+    // Fetch 7-day bounds for Prediction
+    const { data: boundsData } = await supabase
+      .from('telemetry_logs')
+      .select('recorded_at, xp_total')
+      .eq('character_name', playerName)
+      .gte('recorded_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .order('recorded_at', { ascending: true });
+
+    if (memberData && boundsData && boundsData.length > 0) {
+      const oldest = boundsData[0];
+      const newest = boundsData[boundsData.length - 1];
+      const currentXP = newest.xp_total;
+      const xpGained7d = currentXP - oldest.xp_total;
+      
+      const msPassed = new Date(newest.recorded_at) - new Date(oldest.recorded_at);
+      const daysPassed = Math.max(1, msPassed / (1000 * 60 * 60 * 24)); // avoid div by 0
+      
+      const avgXpPerDay = Math.floor(xpGained7d / daysPassed);
+      
+      const currentLevel = memberData.level;
+      let nextMilestone = Math.ceil((currentLevel + 1) / 100) * 100;
+      if (nextMilestone === currentLevel) nextMilestone += 100; // prevent predicting current level if exactly on a multiple of 100
+      
+      const getTibiaXPForLevel = (l) => Math.floor((50 / 3) * (Math.pow(l, 3) - 6 * Math.pow(l, 2) + 17 * l - 12));
+      
+      const xpRequiredForNext = getTibiaXPForLevel(currentLevel + 1) - currentXP;
+      const xpRequiredForMilestone = getTibiaXPForLevel(nextMilestone) - currentXP;
+      
+      let daysToNext = avgXpPerDay > 0 ? (xpRequiredForNext / avgXpPerDay) : null;
+      let daysToMilestone = avgXpPerDay > 0 ? (xpRequiredForMilestone / avgXpPerDay) : null;
+      
+      setPrediction({
+        currentLevel,
+        nextMilestone,
+        avgXpPerDay,
+        daysToNext,
+        daysToMilestone
+      });
+    }
 
     // Fetch telemetry from last 24h
     const { data: teleData } = await supabase
@@ -154,6 +202,40 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
           </div>
         )}
       </div>
+
+      {/* Máquina do Tempo (Previsão) */}
+      {prediction && (
+        <div className="bg-tibia-card p-4 rounded-lg border border-purple-900/50 flex flex-col md:flex-row items-center justify-between shadow-xl">
+          <div className="flex items-center mb-4 md:mb-0">
+            <div className="bg-purple-900/30 p-3 rounded-full mr-4 border border-purple-500/50">
+              <Clock className="text-purple-400" size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400 font-bold mb-1">A Máquina do Tempo (Previsão de Level)</p>
+              <p className="text-xs text-gray-500">
+                Baseado na média de <span className="text-purple-400 font-bold">{(prediction.avgXpPerDay / 1000000).toFixed(1)}M XP/dia</span> (últimos 7 dias)
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex gap-4">
+            <div className="text-center bg-black/40 px-4 py-2 rounded border border-white/5 min-w-[120px]">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Level {prediction.currentLevel + 1}</p>
+              <p className="text-lg font-bold text-white">
+                {prediction.daysToNext !== null ? (
+                  prediction.daysToNext < 1 ? 'Em horas!' : `~${Math.ceil(prediction.daysToNext)} dias`
+                ) : 'Hibernando'}
+              </p>
+            </div>
+            <div className="text-center bg-purple-900/10 px-4 py-2 rounded border border-purple-900/30 min-w-[120px]">
+              <p className="text-[10px] text-purple-400 uppercase tracking-wider mb-1">Milestone {prediction.nextMilestone}</p>
+              <p className="text-lg font-bold text-purple-300">
+                {prediction.daysToMilestone !== null ? `~${Math.ceil(prediction.daysToMilestone)} dias` : 'Estagnado'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabela de Strikes */}
       {strikes.length > 0 && (
