@@ -8,12 +8,23 @@ export const runAuditSlots = async () => {
   console.log(`[AUDIT] Iniciando auditoria dos Respawns Planilhados...`);
 
   try {
-    // 1. Busca todas as parties planilhadas para hoje
-    const { data: parties, error: partiesError } = await supabase
-      .from('parties_planilhadas')
-      .select('*');
+    // 1. Busca todas as parties planilhadas recentes (últimas 24h)
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    let parties = [];
+    let page = 0;
+    while(true) {
+        const { data, error } = await supabase
+          .from('parties_planilhadas')
+          .select('*')
+          .gte('created_at', twentyFourHoursAgo)
+          .range(page*1000, (page+1)*1000-1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        parties.push(...data);
+        if (data.length < 1000) break;
+        page++;
+    }
 
-    if (partiesError) throw partiesError;
     if (!parties || parties.length === 0) {
       console.log(`[AUDIT] Nenhuma party cadastrada na planilha no momento.`);
       return;

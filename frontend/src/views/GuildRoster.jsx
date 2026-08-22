@@ -57,7 +57,11 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
     let strikesData = [];
     let page = 0;
     while(true) {
-      const { data } = await supabase.from('player_strikes').select('*').range(page*1000, (page+1)*1000-1);
+      const { data } = await supabase
+          .from('player_strikes')
+          .select('*')
+          .gte('expires_at', new Date().toISOString())
+          .range(page*1000, (page+1)*1000-1);
       if (!data || data.length === 0) break;
       strikesData.push(...data);
       if (data.length < 1000) break;

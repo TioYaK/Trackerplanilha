@@ -56,12 +56,21 @@ export default function Rankings({ isAdmin }) {
       if (maxXP > 0) setTopParty(bestParty);
     }
 
-    // 3. Tribunal (Strikes Ativos)
-    const { data: strikesData } = await supabase
-      .from('player_strikes')
-      .select('*')
-      .gte('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false });
+      // 3. Tribunal (Strikes Ativos)
+      let strikesData = [];
+      let sPage = 0;
+      while(true) {
+          const { data } = await supabase
+            .from('player_strikes')
+            .select('*')
+            .gte('expires_at', new Date().toISOString())
+            .order('created_at', { ascending: false })
+            .range(sPage*1000, (sPage+1)*1000-1);
+          if (!data || data.length === 0) break;
+          strikesData.push(...data);
+          if (data.length < 1000) break;
+          sPage++;
+      }
 
     if (strikesData) setActiveStrikes(strikesData);
 
