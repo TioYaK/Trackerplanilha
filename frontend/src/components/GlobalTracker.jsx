@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users, DollarSign, Clock, Network } from 'lucide-react';
 
 export default function GlobalTracker() {
@@ -19,6 +19,9 @@ export default function GlobalTracker() {
   const [wastedXp, setWastedXp] = useState([]);
   const [primeTime, setPrimeTime] = useState([]);
   const [socialRadar, setSocialRadar] = useState([]);
+  const [deaths, setDeaths] = useState([]);
+  const [magicQuadrant, setMagicQuadrant] = useState([]);
+  const [lifestyle, setLifestyle] = useState([]);
   
   const [loading, setLoading] = useState(true);
 
@@ -219,6 +222,42 @@ export default function GlobalTracker() {
         setParetoData([
            { name: 'Top 50 Carregadores', value: top50Xp, fill: '#F59E0B' },
            { name: 'Resto da Guilda', value: restXp, fill: '#374151' }
+        ]);
+
+        // Muro das Lamentacoes (Deaths)
+        const deadPlayers = allRoster
+            .filter(r => r.xp_gained_24h < 0)
+            .sort((a,b) => a.xp_gained_24h - b.xp_gained_24h)
+            .slice(0, 5);
+        setDeaths(deadPlayers);
+
+        // Quadrante Magico (Scatter)
+        const qData = allRoster
+            .filter(r => r.xp_gained_24h > 0)
+            .map(r => ({
+               name: r.name,
+               level: r.level,
+               xp: Math.round(r.xp_gained_24h / 1000000), // In Millions
+               z: 1
+            }));
+        setMagicQuadrant(qData);
+
+        // Censo de Estilo de Vida
+        let hardcore = 0;
+        let operarios = 0;
+        let casuais = 0;
+        let turistas = 0;
+        allRoster.forEach(r => {
+           if (r.xp_gained_24h > 50000000) hardcore++;
+           else if (r.xp_gained_24h > 10000000) operarios++;
+           else if (r.xp_gained_24h > 0) casuais++;
+           else turistas++;
+        });
+        setLifestyle([
+           { name: 'Grinders (50M+)', value: hardcore, fill: '#F59E0B' },
+           { name: 'Operários (10M+)', value: operarios, fill: '#3B82F6' },
+           { name: 'Casuais (>0)', value: casuais, fill: '#10B981' },
+           { name: 'Inativos (0)', value: turistas, fill: '#374151' }
         ]);
 
         setVocationData(vData);
@@ -630,6 +669,93 @@ export default function GlobalTracker() {
             </div>
           </div>
         )}
+
+        {/* Bottom Row 5: Extreme Analytics */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+          
+          {/* Muro das Lamentacoes (Deaths) */}
+          <div className="bg-tibia-card border border-gray-900 rounded-lg p-6 shadow-xl lg:col-span-1">
+            <h3 className="text-xl font-bold text-gray-500 mb-2 flex items-center">
+              <TrendingDown className="mr-2 text-red-600" size={24} />
+              Muro das Lamentações
+            </h3>
+            <p className="text-xs text-gray-400 mb-6">Taxa de Mortalidade: Membros que perderam XP nas últimas 24h (Mortes).</p>
+            
+            <div className="space-y-4">
+              {deaths.length > 0 ? deaths.map((d, i) => (
+                <div key={i} className="bg-black/50 p-3 rounded border border-gray-800">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-bold text-gray-300">{d.name}</span>
+                    <span className="text-sm font-black text-red-600">{(d.xp_gained_24h / 1000000).toFixed(1)}M XP</span>
+                  </div>
+                  <div className="text-xs text-gray-600 text-right">Lvl {d.level} - {d.vocation}</div>
+                </div>
+              )) : (
+                <div className="text-center py-8 text-gray-600">
+                  Nenhuma morte drástica registrada hoje!
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quadrante Mágico */}
+          <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl lg:col-span-1">
+            <h3 className="text-xl font-bold text-white mb-2 flex items-center">
+              <Target className="mr-2 text-blue-400" size={24} />
+              O Quadrante Mágico
+            </h3>
+            <p className="text-xs text-gray-400 mb-6">Dispersão de Eficiência (XP) vs Level. Ache as Promessas (Alto XP, Baixo Lvl) e os Aposentados (Baixo XP, Alto Lvl).</p>
+            
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis type="number" dataKey="level" name="Level" stroke="#666" tick={{ fill: '#888', fontSize: 10 }} domain={['dataMin - 100', 'dataMax + 100']} />
+                  <YAxis type="number" dataKey="xp" name="XP (M)" stroke="#666" tick={{ fill: '#888', fontSize: 10 }} />
+                  <ZAxis type="number" range={[50, 50]} />
+                  <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#111', border: '1px solid #333' }} itemStyle={{ color: '#fff' }} />
+                  <Scatter name="Jogadores" data={magicQuadrant} fill="#3b82f6" opacity={0.6} />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Censo de Estilo de Vida */}
+          <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl lg:col-span-1">
+            <h3 className="text-xl font-bold text-white mb-2 flex items-center">
+              <Users className="mr-2 text-green-400" size={24} />
+              Censo de Esforço
+            </h3>
+            <p className="text-xs text-gray-400 mb-6">Classificação da base ativa: Hardcore Grinders (50M+), Operários (10M+), Casuais ou Inativos.</p>
+            
+            <div className="h-48 flex items-center justify-center relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={lifestyle}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={80}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {lifestyle.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value) => [`${value} Jogadores`, 'Total']}
+                    contentStyle={{ backgroundColor: '#111', border: '1px solid #333' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '10px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+        </div>
 
       </div>
     )}
