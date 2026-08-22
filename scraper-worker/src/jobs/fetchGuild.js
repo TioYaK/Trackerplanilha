@@ -42,6 +42,30 @@ export const runFetchGuild = async () => {
     }
 
     console.log(`[JOB] Sucesso! ${insertedCount} membros processados e atualizados.`);
+
+    // --- PURGE MEMBERS WHO LEFT THE GUILD ---
+    try {
+      const activeNames = Array.from(uniqueMembersMap.keys());
+      const { data: dbMembers } = await supabase.from('guild_members').select('name');
+      if (dbMembers) {
+        const dbNames = dbMembers.map(m => m.name);
+        const activeNamesSet = new Set(activeNames);
+        const leftGuildNames = dbNames.filter(name => !activeNamesSet.has(name));
+        
+        if (leftGuildNames.length > 0) {
+          console.log(`[JOB] Limpando ${leftGuildNames.length} membros que sairam da guilda...`);
+          // Delete in chunks of 100
+          for (let i = 0; i < leftGuildNames.length; i += 100) {
+            const chunk = leftGuildNames.slice(i, i + 100);
+            await supabase.from('guild_members').delete().in('name', chunk);
+          }
+          console.log('[JOB] Limpeza concluida com sucesso!');
+        }
+      }
+    } catch (purgeError) {
+      console.error('[JOB] Erro ao limpar membros inativos:', purgeError);
+    }
+
   } catch (error) {
     console.error(`[JOB] Erro na task FETCH_GUILD:`, error.message);
   } finally {
