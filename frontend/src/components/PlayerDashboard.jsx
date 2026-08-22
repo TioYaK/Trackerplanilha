@@ -16,6 +16,8 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
   const [strikeForm, setStrikeForm] = useState({ reason: '', days: 3 });
   const [frequentSquad, setFrequentSquad] = useState([]);
   const [prediction, setPrediction] = useState(null);
+  const [heatmap, setHeatmap] = useState([]);
+  const [playerInfo, setPlayerInfo] = useState(null);
 
   const fetchData = async () => {
     if (!playerName) return;
@@ -24,32 +26,59 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     // Fetch Player Level from guild_members
     const { data: memberData } = await supabase
       .from('guild_members')
-      .select('level')
+      .select('level, vocation, is_online')
       .eq('name', playerName)
       .single();
+      
+    if (memberData) setPlayerInfo(memberData);
 
-    // Fetch 7-day bounds for Prediction
+    // Fetch 14-day bounds for Prediction and Heatmap
     const { data: boundsData } = await supabase
       .from('telemetry_logs')
       .select('recorded_at, xp_total')
       .eq('character_name', playerName)
-      .gte('recorded_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .gte('recorded_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
       .order('recorded_at', { ascending: true });
 
     if (memberData && boundsData && boundsData.length > 0) {
+      // Heatmap Logic (14 days)
+      const dailyMap = {};
+      boundsData.forEach(log => {
+         const day = log.recorded_at.split('T')[0];
+         if (!dailyMap[day]) {
+            dailyMap[day] = { min: log.xp_total, max: log.xp_total };
+         } else {
+            if (log.xp_total < dailyMap[day].min) dailyMap[day].min = log.xp_total;
+            if (log.xp_total > dailyMap[day].max) dailyMap[day].max = log.xp_total;
+         }
+      });
+      
+      const hData = [];
+      for (let i = 13; i >= 0; i--) {
+         const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+         const dayStr = d.toISOString().split('T')[0];
+         let xpMade = 0;
+         if (dailyMap[dayStr]) {
+            xpMade = dailyMap[dayStr].max - dailyMap[dayStr].min;
+         }
+         hData.push({ date: dayStr, xp: xpMade });
+      }
+      setHeatmap(hData);
+
+      // Prediction Logic (using bounds, which is now 14 days)
       const oldest = boundsData[0];
       const newest = boundsData[boundsData.length - 1];
       const currentXP = newest.xp_total;
-      const xpGained7d = currentXP - oldest.xp_total;
+      const xpGained14d = currentXP - oldest.xp_total;
       
       const msPassed = new Date(newest.recorded_at) - new Date(oldest.recorded_at);
       const daysPassed = Math.max(1, msPassed / (1000 * 60 * 60 * 24)); // avoid div by 0
       
-      const avgXpPerDay = Math.floor(xpGained7d / daysPassed);
+      const avgXpPerDay = Math.floor(xpGained14d / daysPassed);
       
       const currentLevel = memberData.level;
       let nextMilestone = Math.ceil((currentLevel + 1) / 100) * 100;
-      if (nextMilestone === currentLevel) nextMilestone += 100; // prevent predicting current level if exactly on a multiple of 100
+      if (nextMilestone === currentLevel) nextMilestone += 100;
       
       const getTibiaXPForLevel = (l) => Math.floor((50 / 3) * (Math.pow(l, 3) - 6 * Math.pow(l, 2) + 17 * l - 12));
       
@@ -155,8 +184,57 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
   return (
     <div className="space-y-6">
       
+      {/* Player Header */}
+      <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl flex flex-col md:flex-row justify-between items-center animate-fade-in relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+          <Activity size={100} />
+        </div>
+        
+        <div className="flex items-center mb-4 md:mb-0 z-10">
+          <div className="mr-6">
+            <h3 className="text-3xl font-black text-white">{playerName}</h3>
+            {playerInfo && (
+              <div className="flex flex-wrap items-center gap-3 mt-2">
+                <span className="bg-blue-900/50 text-blue-400 px-3 py-1 rounded text-sm font-bold border border-blue-500/30">
+                  Lvl {playerInfo.level}
+                </span>
+                <span className="bg-gray-800 text-gray-300 px-3 py-1 rounded text-sm border border-gray-600 font-medium">
+                  {playerInfo.vocation}
+                </span>
+                {playerInfo.is_online ? (
+                  <span className="flex items-center text-green-400 font-bold text-sm bg-green-900/20 px-3 py-1 rounded border border-green-500/30">
+                    <span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span> Online
+                  </span>
+                ) : (
+                  <span className="flex items-center text-gray-500 font-medium text-sm bg-gray-900/50 px-3 py-1 rounded border border-gray-700">
+                    <span className="w-2 h-2 rounded-full bg-gray-600 mr-2"></span> Offline
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Action Button */}
+        <div className="z-10 w-full md:w-auto">
+          {isAdmin ? (
+            <button 
+              onClick={() => setShowStrikeModal(true)}
+              className="w-full md:w-auto py-3 px-6 bg-red-600 hover:bg-red-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
+            >
+              <AlertOctagon className="mr-2" size={20} />
+              Aplicar Strike
+            </button>
+          ) : (
+            <div className="bg-black/50 px-4 py-2 rounded text-gray-500 text-sm border border-white/5">
+              Somente Admins punem.
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Cards de Topo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Strikes Card */}
         <div className="bg-tibia-card p-4 rounded-lg border border-red-900/50 flex items-center justify-between">
           <div>
@@ -173,39 +251,22 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
             {frequentSquad.length > 0 ? (
               <ul className="text-xs space-y-1">
                 {frequentSquad.map(s => (
-                  <li key={s.name} className="flex justify-between text-gray-300">
-                    <span className="truncate pr-2">{s.name}</span>
-                    <span className="text-blue-400 font-bold">{s.count} pts</span>
+                  <li key={s.name} className="flex justify-between border-b border-white/5 pb-1 last:border-0 last:pb-0">
+                    <span className="text-gray-300">{s.name}</span>
+                    <span className="text-blue-400 font-bold">{s.count} hunts</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-gray-500">Caça solo ou não planilhou recentemente.</p>
+              <p className="text-xs text-gray-500 italic">Lobo solitário (Nenhuma party frequente)</p>
             )}
           </div>
         </div>
-
-        {/* Action Button */}
-        {isAdmin ? (
-          <div className="bg-tibia-card p-4 rounded-lg border border-tibia-border flex justify-center items-center">
-            <button 
-              onClick={() => setShowStrikeModal(true)}
-              className="w-full h-full py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
-            >
-              <AlertOctagon className="mr-2" size={20} />
-              Aplicar Strike
-            </button>
-          </div>
-        ) : (
-          <div className="bg-tibia-card p-4 rounded-lg border border-tibia-border flex justify-center items-center text-gray-600 text-sm">
-            Somente Admins podem aplicar punições.
-          </div>
-        )}
       </div>
 
       {/* Máquina do Tempo (Previsão) */}
       {prediction && (
-        <div className="bg-tibia-card p-4 rounded-lg border border-purple-900/50 flex flex-col md:flex-row items-center justify-between shadow-xl">
+        <div className="bg-tibia-card p-4 rounded-lg border border-purple-900/50 flex flex-col md:flex-row items-center justify-between shadow-xl mt-8">
           <div className="flex items-center mb-4 md:mb-0">
             <div className="bg-purple-900/30 p-3 rounded-full mr-4 border border-purple-500/50">
               <Clock className="text-purple-400" size={24} />
@@ -213,7 +274,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
             <div>
               <p className="text-sm text-gray-400 font-bold mb-1">A Máquina do Tempo (Previsão de Level)</p>
               <p className="text-xs text-gray-500">
-                Baseado na média de <span className="text-purple-400 font-bold">{(prediction.avgXpPerDay / 1000000).toFixed(1)}M XP/dia</span> (últimos 7 dias)
+                Baseado na média de <span className="text-purple-400 font-bold">{(prediction.avgXpPerDay / 1000000).toFixed(1)}M XP/dia</span> (últimos 14 dias)
               </p>
             </div>
           </div>
@@ -233,6 +294,43 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
                 {prediction.daysToMilestone !== null ? `~${Math.ceil(prediction.daysToMilestone)} dias` : 'Estagnado'}
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Calendário do Vício (Heatmap) */}
+      {heatmap.length > 0 && (
+        <div className="bg-tibia-card p-6 rounded-lg border border-green-900/50 shadow-xl mt-8">
+          <h3 className="text-xl font-bold text-green-400 mb-2 flex items-center">
+            <Activity className="mr-2" size={24} />
+            Calendário do Vício (Últimos 14 dias)
+          </h3>
+          <p className="text-xs text-gray-400 mb-6">Dias com maior intensidade de caça ganham cores mais vivas.</p>
+          
+          <div className="flex flex-wrap gap-2">
+            {heatmap.map((day, i) => {
+              const d = new Date(day.date);
+              const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+              const dayName = days[d.getDay() + 1 > 6 ? 0 : d.getDay() + 1]; // timezone compensation
+              
+              let bgColor = 'bg-gray-800 border-gray-700';
+              if (day.xp > 100000000) bgColor = 'bg-green-400 border-green-300 shadow-[0_0_10px_rgba(74,222,128,0.5)]'; // > 100M
+              else if (day.xp > 50000000) bgColor = 'bg-green-600 border-green-500'; // > 50M
+              else if (day.xp > 10000000) bgColor = 'bg-green-800 border-green-700'; // > 10M
+              else if (day.xp > 0) bgColor = 'bg-green-900 border-green-800'; // > 0
+              
+              return (
+                <div key={day.date} className="flex flex-col items-center group relative cursor-help">
+                  <div className={`w-8 h-8 rounded border ${bgColor} transition-transform transform hover:scale-110 mb-1`}></div>
+                  <span className="text-[10px] text-gray-500">{dayName}</span>
+                  
+                  {/* Tooltip */}
+                  <div className="absolute bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-black border border-white/10 text-white text-xs py-1 px-2 rounded whitespace-nowrap z-10 pointer-events-none">
+                    {day.date}: {day.xp > 0 ? `+${(day.xp / 1000000).toFixed(1)}M XP` : '0 XP'}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

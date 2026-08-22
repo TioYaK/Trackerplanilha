@@ -9,6 +9,7 @@ import PlayerDashboard from './components/PlayerDashboard';
 import PartyDashboard from './components/PartyDashboard';
 import ReportExport from './components/ReportExport';
 import Rankings from './components/Rankings';
+import GuildBank from './views/GuildBank';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('live');
@@ -26,7 +27,7 @@ export default function App() {
       setIsAdmin(false);
     } else {
       const pwd = prompt('Digite a senha de Administrador:');
-      if (pwd === 'admin123') { // Senha super secreta para MVP
+      if (pwd === 'admin123') { 
         localStorage.setItem('auroria_admin', 'true');
         setIsAdmin(true);
         alert('Modo Administrador ativado com sucesso!');
@@ -49,10 +50,11 @@ export default function App() {
   const renderView = () => {
     switch(currentView) {
       case 'live': return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
-      case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} />;
+      case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
       case 'radar': return <RadarHunters onPlayerClick={handlePlayerClick} />;
       case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
       case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
+      case 'bank': return <GuildBank isAdmin={isAdmin} />;
       case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
       case 'players': 
         return (
