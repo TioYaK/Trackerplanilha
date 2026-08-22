@@ -11,9 +11,10 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
   const [telemetry, setTelemetry] = useState([]);
   const [strikes, setStrikes] = useState([]);
   const [stats, setStats] = useState({ ghostSlots: 0, totalHours: 0 });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showStrikeModal, setShowStrikeModal] = useState(false);
   const [strikeForm, setStrikeForm] = useState({ reason: '', days: 3 });
+  const [frequentSquad, setFrequentSquad] = useState([]);
 
   const fetchData = async () => {
     if (!playerName) return;
@@ -28,7 +29,6 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       .order('recorded_at', { ascending: true });
 
     if (teleData) {
-      // Process for chart
       let accumulatedXP = 0;
       const chartData = teleData.map(log => {
         accumulatedXP += parseInt(log.delta_xp || 0, 10);
@@ -41,7 +41,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       setTelemetry(chartData);
     }
 
-    // Fetch active strikes
+    // Fetch strikes
     const { data: strikesData } = await supabase
       .from('player_strikes')
       .select('*')
@@ -50,6 +50,29 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       .order('created_at', { ascending: false });
 
     if (strikesData) setStrikes(strikesData);
+
+    // Fetch frequent squad (Panelinhas)
+    const { data: squadData } = await supabase
+      .from('parties_planilhadas')
+      .select('members')
+      .contains('members', JSON.stringify([playerName]));
+
+    if (squadData) {
+      const mates = {};
+      squadData.forEach(p => {
+        if (!p.members) return;
+        p.members.forEach(m => {
+          if (m !== playerName) {
+            mates[m] = (mates[m] || 0) + 1;
+          }
+        });
+      });
+      const rankedMates = Object.entries(mates)
+        .sort((a,b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count }))
+        .slice(0, 3);
+      setFrequentSquad(rankedMates);
+    }
 
     setLoading(false);
   };
@@ -86,6 +109,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       
       {/* Cards de Topo */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Strikes Card */}
         <div className="bg-tibia-card p-4 rounded-lg border border-red-900/50 flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-400">Strikes Ativos</p>
@@ -93,6 +117,27 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
           </div>
           <Gavel className="text-red-500 opacity-50" size={32} />
         </div>
+
+        {/* Panelinhas Card */}
+        <div className="bg-tibia-card p-4 rounded-lg border border-blue-900/50 flex items-center justify-between col-span-1">
+          <div className="w-full">
+            <p className="text-sm text-gray-400 mb-2 font-bold">Squad Frequente ("Panelinha")</p>
+            {frequentSquad.length > 0 ? (
+              <ul className="text-xs space-y-1">
+                {frequentSquad.map(s => (
+                  <li key={s.name} className="flex justify-between text-gray-300">
+                    <span className="truncate pr-2">{s.name}</span>
+                    <span className="text-blue-400 font-bold">{s.count} pts</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-gray-500">Caça solo ou não planilhou recentemente.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Action Button */}
         {isAdmin ? (
           <div className="bg-tibia-card p-4 rounded-lg border border-tibia-border flex justify-center items-center">
             <button 
