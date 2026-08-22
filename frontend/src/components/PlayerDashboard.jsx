@@ -217,6 +217,9 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
 
   useEffect(() => {
     fetchData();
+    
+    const interval = setInterval(fetchData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [playerName]);
 
   const handleApplyStrike = async (e) => {

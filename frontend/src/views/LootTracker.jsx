@@ -17,15 +17,29 @@ export default function LootTracker({ isAdmin }) {
 
   const fetchHistory = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('guild_hunts_history')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error && error.code === '42P01') {
-      setNeedsSetup(true);
-    } else if (data) {
-      setHuntsHistory(data);
+    let allData = [];
+    let page = 0;
+    while(true) {
+        const { data, error } = await supabase
+          .from('guild_hunts_history')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(page*1000, (page+1)*1000-1);
+          
+        if (error && error.code === '42P01') {
+          setNeedsSetup(true);
+          setLoading(false);
+          return;
+        }
+        
+        if (!data || data.length === 0) break;
+        allData.push(...data);
+        if (data.length < 1000) break;
+        page++;
+    }
+    
+    if (allData) {
+      setHuntsHistory(allData);
     }
     setLoading(false);
   };

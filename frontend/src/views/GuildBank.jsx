@@ -24,10 +24,19 @@ export default function GuildBank({ isAdmin }) {
     }
 
     // Fetch payments for selected month
-    const { data: pData } = await supabase
-      .from('guild_bank_payments')
-      .select('*')
-      .eq('payment_month', selectedMonth);
+    let pData = [];
+    let pPage = 0;
+    while(true) {
+        const { data } = await supabase
+          .from('guild_bank_payments')
+          .select('*')
+          .eq('payment_month', selectedMonth)
+          .range(pPage*1000, (pPage+1)*1000-1);
+        if (!data || data.length === 0) break;
+        pData.push(...data);
+        if (data.length < 1000) break;
+        pPage++;
+    }
       
     if (pData) setPayments(pData);
 

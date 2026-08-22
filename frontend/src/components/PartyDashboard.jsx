@@ -104,7 +104,11 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       }
       setLoading(false);
     };
+
     fetchPartyData();
+    
+    const interval = setInterval(fetchPartyData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [party]);
 
   if (!party) return <div>Nenhuma party selecionada.</div>;

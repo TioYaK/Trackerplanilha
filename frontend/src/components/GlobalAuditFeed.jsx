@@ -44,7 +44,7 @@ export default function GlobalAuditFeed() {
         }
 
         // 3. Fetch Parties
-        const { data: parties } = await supabase.from('parties_planilhadas').select('*').order('id', { ascending: false }).limit(20);
+        const { data: parties } = await supabase.from('parties_planilhadas').select('*').order('created_at', { ascending: false }).limit(20);
         if (parties) {
           parties.forEach(p => {
             // we don't have created_at on parties, so we approximate or just show it if we have a timestamp
