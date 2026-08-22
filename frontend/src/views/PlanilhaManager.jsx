@@ -242,6 +242,13 @@ export default function PlanilhaManager({ isAdmin }) {
                         return adjustedH * 60 + m;
                       };
 
+                      const formatMinutes = (m) => {
+                        let h = Math.floor(m / 60);
+                        let min = m % 60;
+                        if (h >= 24) h -= 24;
+                        return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+                      };
+
                       const sortedParties = [...huntParties].sort((a, b) => 
                         getNormalizedMinutes(a.slot_start) - getNormalizedMinutes(b.slot_start)
                       );
@@ -250,16 +257,28 @@ export default function PlanilhaManager({ isAdmin }) {
                       const ssStartMinutes = 10 * 60; // 10:00
                       const ssEndMinutes = 34 * 60; // 10:00 next day (24+10)
 
+                      const addGaps = (startMin, endMin, baseId) => {
+                        let curr = startMin;
+                        let count = 0;
+                        while (curr < endMin) {
+                          let next = curr + 240; // 4h blocks
+                          if (next > endMin) next = endMin;
+                          rowsWithGaps.push({
+                            isGap: true,
+                            id: `${baseId}-${count}`,
+                            slot_start: formatMinutes(curr),
+                            slot_end: formatMinutes(next)
+                          });
+                          curr = next;
+                          count++;
+                        }
+                      };
+
                       // Gap before the very first party
                       if (sortedParties.length > 0) {
                         const firstStart = getNormalizedMinutes(sortedParties[0].slot_start);
                         if (firstStart > ssStartMinutes) {
-                          rowsWithGaps.push({
-                            isGap: true,
-                            id: 'gap-start',
-                            slot_start: '10:00',
-                            slot_end: sortedParties[0].slot_start
-                          });
+                          addGaps(ssStartMinutes, firstStart, 'gap-start');
                         }
                       }
 
@@ -271,12 +290,7 @@ export default function PlanilhaManager({ isAdmin }) {
                           const currStart = getNormalizedMinutes(p.slot_start);
                           
                           if (currStart > prevEnd) {
-                            rowsWithGaps.push({
-                              isGap: true,
-                              id: `gap-${p.id}`,
-                              slot_start: prev.slot_end,
-                              slot_end: p.slot_start
-                            });
+                            addGaps(prevEnd, currStart, `gap-${p.id}`);
                           }
                         }
                         rowsWithGaps.push({ isGap: false, ...p });
@@ -287,21 +301,10 @@ export default function PlanilhaManager({ isAdmin }) {
                         const lastParty = sortedParties[sortedParties.length - 1];
                         const lastEnd = getNormalizedMinutes(lastParty.slot_end);
                         if (lastEnd < ssEndMinutes) {
-                          rowsWithGaps.push({
-                            isGap: true,
-                            id: 'gap-end',
-                            slot_start: lastParty.slot_end,
-                            slot_end: '10:00'
-                          });
+                          addGaps(lastEnd, ssEndMinutes, 'gap-end');
                         }
                       } else {
-                        // Se a hunt não tiver parties (tecnicamente não acontece, mas por segurança)
-                        rowsWithGaps.push({
-                          isGap: true,
-                          id: 'gap-all',
-                          slot_start: '10:00',
-                          slot_end: '10:00'
-                        });
+                        addGaps(ssStartMinutes, ssEndMinutes, 'gap-all');
                       }
 
                       return rowsWithGaps.map(p => {
