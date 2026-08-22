@@ -76,10 +76,18 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         });
 
         if (huntStart && huntEnd) {
-            setActualHuntTime({ 
-               start: huntStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
-               end: huntEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-            });
+            const diffMins = (huntEnd - huntStart) / (1000 * 60);
+            if (diffMins < 5) {
+                // Was just a single ping or very short
+                setActualHuntTime({ 
+                    single: huntStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                });
+            } else {
+                setActualHuntTime({ 
+                   start: huntStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
+                   end: huntEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+                });
+            }
         } else {
             setActualHuntTime(null);
         }
@@ -138,7 +146,11 @@ export default function PartyDashboard({ party, onPlayerClick }) {
               <p className="text-xs text-gray-500 uppercase font-bold">Horário Real (Telemetria)</p>
               <p className="text-lg font-bold text-white flex items-center">
                  {actualHuntTime ? (
-                     <><Clock size={16} className="text-blue-400 mr-2" /> {actualHuntTime.start} - {actualHuntTime.end}</>
+                     actualHuntTime.single ? (
+                         <><Clock size={16} className="text-blue-400 mr-2" /> {actualHuntTime.single} (Pico Isolado)</>
+                     ) : (
+                         <><Clock size={16} className="text-blue-400 mr-2" /> {actualHuntTime.start} - {actualHuntTime.end}</>
+                     )
                  ) : (
                      <span className="text-gray-500 text-sm italic">Não detectado</span>
                  )}
