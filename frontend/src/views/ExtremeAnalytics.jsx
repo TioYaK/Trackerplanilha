@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar, ZAxis, Legend } from 'recharts';
-import { BrainCircuit, HeartCrack, Flame, LineChart as LineChartIcon, Activity } from 'lucide-react';
+import { BrainCircuit, HeartCrack, Flame, LineChart as LineChartIcon, Activity, Trophy } from 'lucide-react';
 
 export default function ExtremeAnalytics() {
   const [loading, setLoading] = useState(true);
