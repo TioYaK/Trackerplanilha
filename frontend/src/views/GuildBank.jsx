@@ -88,6 +88,31 @@ CREATE TABLE IF NOT EXISTS guild_bank_payments (
 );
   `;
 
+  const handleSyncTS3 = async () => {
+    if (!isAdmin) return;
+    if (!window.confirm('Isto enviará um comando para o Robô Xerife se conectar ao seu TeamSpeak local (via ClientQuery) e sincronizar o cargo "FBot Bank". O TS3 precisa estar aberto e o ClientQuery ativado. Deseja continuar?')) return;
+    
+    // Insere tarefa na task_queue
+    const { error } = await supabase.from('task_queue').insert([{
+      task_type: 'SYNC_BANK_TS3',
+      status: 'PENDING'
+    }]);
+    
+    if (error) {
+      alert('Erro ao enviar comando: ' + error.message);
+    } else {
+      alert('Comando enviado! Se o worker estiver rodando no seu PC, a sincronização acontecerá em alguns segundos.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-full py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500"></div>
+      </div>
+    );
+  }
+
   if (needsSetup) {
     return (
       <div className="p-8 max-w-4xl mx-auto w-full text-center animate-fade-in">
