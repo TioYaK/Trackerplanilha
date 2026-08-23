@@ -74,17 +74,21 @@ const fetchTask = async () => {
   }
 };
 
-const completeTask = async (taskId) => {
-  // Para manter o worker em loop infinito, voltamos a tarefa para PENDING.
-  // Assim ele sempre fica atualizando a guild, onlines, highscores e audit slots continuamente.
-  await supabase
-    .from('task_queue')
-    .update({ status: 'PENDING', locked_at: null, worker_id: null })
-    .eq('id', taskId);
+const completeTask = async (task) => {
+  if (task.task_type === 'SYNC_BANK_TS3') {
+    // Deleta a tarefa pra não ficar em loop eterno (já que foi iniciada pelo clique no site)
+    await supabase.from('task_queue').delete().eq('id', task.id);
+  } else {
+    // Para manter o worker em loop infinito para as outras tarefas core (guild, highscores)
+    await supabase
+      .from('task_queue')
+      .update({ status: 'PENDING', locked_at: null, worker_id: null })
+      .eq('id', task.id);
+  }
 };
 
-const requeueTask = async (taskId) => {
-  await completeTask(taskId);
+const requeueTask = async (task) => {
+  await completeTask(task);
 };
 
 const processTask = async (task) => {
@@ -113,7 +117,7 @@ const processTask = async (task) => {
     }
 
     // Após terminar, completa a tarefa
-    await requeueTask(task.id);
+    await requeueTask(task);
   } catch (error) {
     console.error(`[WORKER] Falha na tarefa ${task.id}:`, error.message);
     // Volta pra fila em caso de erro, mas sem worker (timeout)
@@ -138,3 +142,15 @@ const loop = async () => {
 
 // Iniciar Loop
 loop();
+
+// ==========================================
+// TAREFAS AGENDADAS INDEPENDENTES DA FILA
+// ==========================================
+
+// Sincroniza o Banco FBot (TS3) a cada 30 minutos cravados!
+// Indepedente da fila do Supabase, garantindo que usuários que logam em 
+// horários bizarros não fiquem de fora.
+setInterval(async () => {
+  console.log('[CRON] Rodando Sincronização Automática do TS3 (30 min)...');
+  await runBankSync();
+}, 30 * 60 * 1000);
