@@ -132,10 +132,11 @@ CREATE TABLE IF NOT EXISTS guild_bank_payments (
     );
   }
 
-  const filteredRoster = roster.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Limita a exibição a 100 membros simultâneos para evitar que o React trave o PC renderizando 1000 linhas
+  const filteredRoster = roster.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 100);
   const paidCount = payments.length;
   const totalCount = roster.length;
-  const tcTotal = paidCount * 100; // Assuming 100 TC
+  const tcTotal = paidCount * 250;
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
