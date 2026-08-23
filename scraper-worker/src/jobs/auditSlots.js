@@ -30,13 +30,21 @@ export const runAuditSlots = async () => {
       return;
     }
 
-    // Pega o horário atual (hora e minuto)
+    // Pega o horário atual (hora e minuto) no fuso do Brasil (BRT)
     const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
+    
+    // Converte para o fuso horário de Brasília (onde os jogadores agendam as parties)
+    const brtTime = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(now);
+    
+    const [currentHour, currentMinute] = brtTime.split(':').map(Number);
     const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
 
-    console.log(`[AUDIT] Horário atual do servidor: ${currentTimeStr}`);
+    console.log(`[AUDIT] Horário atual (BRT - Brasília): ${currentTimeStr}`);
 
     // Para cada party, vamos validar o status
     for (const party of parties) {

@@ -19,6 +19,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
   const [heatmap, setHeatmap] = useState([]);
   const [playerInfo, setPlayerInfo] = useState(null);
   const [routine, setRoutine] = useState([]);
+  const [levelHistory, setLevelHistory] = useState([]);
 
   const fetchData = async () => {
     if (!playerName) return;
@@ -38,7 +39,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       while(true) {
           const { data } = await supabase
             .from('telemetry_logs')
-            .select('recorded_at, xp_total')
+            .select('recorded_at, xp_total, level')
             .eq('character_name', playerName)
             .gte('recorded_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
             .order('recorded_at', { ascending: true })
@@ -50,6 +51,23 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       }
 
     if (memberData && boundsData && boundsData.length > 0) {
+      // History of Level Up / Down
+      let lvlHist = [];
+      let prevLevel = null;
+      boundsData.forEach(log => {
+          if (prevLevel !== null && log.level !== prevLevel) {
+              lvlHist.push({
+                  type: log.level > prevLevel ? 'UP' : 'DOWN',
+                  from: prevLevel,
+                  to: log.level,
+                  date: log.recorded_at
+              });
+          }
+          prevLevel = log.level;
+      });
+      lvlHist.reverse();
+      setLevelHistory(lvlHist);
+
       // Heatmap Logic (14 days)
       const dailyMap = {};
       boundsData.forEach(log => {
@@ -298,7 +316,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       </div>
 
       {/* Cards de Topo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Strikes Card */}
         <div className="bg-tibia-card p-4 rounded-lg border border-red-900/50 flex items-center justify-between">
           <div>
@@ -323,6 +341,29 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
               </ul>
             ) : (
               <p className="text-xs text-gray-500 italic">Lobo solitário (Nenhuma party frequente)</p>
+            )}
+          </div>
+        </div>
+
+        {/* Level History Card */}
+        <div className="bg-tibia-card p-4 rounded-lg border border-yellow-900/50 flex items-center justify-between col-span-1">
+          <div className="w-full">
+            <p className="text-sm text-gray-400 mb-2 font-bold">Histórico de Nível (14 dias)</p>
+            {levelHistory.length > 0 ? (
+              <ul className="text-xs space-y-1 max-h-24 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600">
+                {levelHistory.map((h, idx) => (
+                  <li key={idx} className="flex justify-between border-b border-white/5 pb-1 last:border-0 last:pb-0">
+                    <span className="text-gray-400">{format(new Date(h.date), "dd/MM HH:mm")}</span>
+                    {h.type === 'UP' ? (
+                      <span className="text-green-400 font-bold">Lvl {h.from} -> {h.to}</span>
+                    ) : (
+                      <span className="text-red-500 font-bold">Lvl {h.from} -> {h.to} (Morte)</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-gray-500 italic">Nenhuma mudança de level registrada.</p>
             )}
           </div>
         </div>
