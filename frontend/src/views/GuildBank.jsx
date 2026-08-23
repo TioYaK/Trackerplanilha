@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Landmark, Check, X, Search, ShieldAlert, Banknote } from 'lucide-react';
+import { Landmark, Check, X, Search, ShieldAlert, Banknote, Headphones } from 'lucide-react';
 
 export default function GuildBank({ isAdmin }) {
   const [loading, setLoading] = useState(true);
@@ -120,6 +120,15 @@ CREATE TABLE IF NOT EXISTS guild_bank_payments (
           <p className="text-gray-400 font-sans">Gerencie o pagamento da mensalidade (TC) de cada membro para fundos de guerra.</p>
         </div>
         <div className="flex items-center">
+          {isAdmin && (
+            <button 
+              onClick={handleSyncTS3}
+              className="mr-6 bg-black/50 border border-blue-900/50 hover:bg-blue-900/30 text-blue-400 px-4 py-2 rounded flex items-center font-bold transition-colors"
+            >
+               <Headphones size={18} className="mr-2" />
+               Sync TeamSpeak
+            </button>
+          )}
           <span className="text-gray-400 mr-2 font-bold">Mês Base:</span>
           <input 
             type="month" 

@@ -3,6 +3,7 @@ import { runFetchGuild } from './jobs/fetchGuild.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
 import { runAuditSlots } from './jobs/auditSlots.js';
+import { runBankSync } from './jobs/syncBankTS3.js';
 import { exec } from 'child_process';
 
 const WORKER_ID = `worker-${Math.random().toString(36).substring(2, 9)}`;
@@ -103,6 +104,9 @@ const processTask = async (task) => {
         break;
       case 'AUDIT_SLOTS':
         await runAuditSlots();
+        break;
+      case 'SYNC_BANK_TS3':
+        await runBankSync();
         break;
       default:
         console.log(`[WORKER] Tipo de tarefa desconhecido: ${task.task_type}`);
