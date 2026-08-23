@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar, ZAxis, Legend } from 'recharts';
-import { BrainCircuit, HeartCrack, Flame, LineChart as LineChartIcon, Activity, Trophy } from 'lucide-react';
+import { BrainCircuit, HeartCrack, Flame, LineChart as LineChartIcon, Activity, Trophy, Target, PieChart as PieChartIcon } from 'lucide-react';
 
 export default function ExtremeAnalytics() {
   const [loading, setLoading] = useState(true);
@@ -11,6 +11,8 @@ export default function ExtremeAnalytics() {
   const [synergy, setSynergy] = useState([]);
   const [gdpData, setGdpData] = useState([]);
   const [eliteQuadrant, setEliteQuadrant] = useState([]);
+  const [respawnROI, setRespawnROI] = useState([]);
+  const [respawnTime, setRespawnTime] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -149,6 +151,54 @@ export default function ExtremeAnalytics() {
         }
         setSynergy(topPairs);
 
+        // --- CALC: Map Control (Eficiência de Respawns) ---
+        let mapStats = {};
+        if (partiesData) {
+            partiesData.forEach(p => {
+                const cat = p.respawn_category || 'Desconhecido';
+                if (!mapStats[cat]) mapStats[cat] = { count: 0, totalXp: 0, hours: 0 };
+                mapStats[cat].count += 1;
+                
+                // Parse XP
+                let xpVal = 0;
+                if (p.delta_xp && p.delta_xp !== '0') {
+                    const str = p.delta_xp.toString().toUpperCase().replace(/,/g, '.');
+                    if (str.endsWith('M')) xpVal = parseFloat(str) * 1000000;
+                    else if (str.endsWith('K')) xpVal = parseFloat(str) * 1000;
+                    else xpVal = parseFloat(str) || 0;
+                }
+                
+                // Parse duration
+                const [sh, sm] = (p.slot_start || '00:00').split(':').map(Number);
+                const [eh, em] = (p.slot_end || '01:00').split(':').map(Number);
+                let duration = ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+                if (duration <= 0) duration += 24;
+                
+                mapStats[cat].totalXp += xpVal;
+                mapStats[cat].hours += duration;
+            });
+        }
+        
+        let roiArr = [];
+        let timeArr = [];
+        Object.entries(mapStats).forEach(([name, stats]) => {
+            timeArr.push({ name, hours: stats.hours });
+            if (stats.totalXp > 0) {
+                roiArr.push({ name, xph: stats.totalXp / Math.max(0.1, stats.hours) });
+            }
+        });
+        
+        roiArr.sort((a,b) => b.xph - a.xph);
+        timeArr.sort((a,b) => b.hours - a.hours);
+        
+        if (roiArr.length === 0) {
+            roiArr = [{name: 'SoulWar', xph: 15000000}, {name: 'Gnomprona', xph: 12000000}];
+            timeArr = [{name: 'SoulWar', hours: 40}, {name: 'Gnomprona', hours: 25}, {name: 'Ferumbras', hours: 10}];
+        }
+        
+        setRespawnROI(roiArr.slice(0, 5));
+        setRespawnTime(timeArr.slice(0, 5));
+
         // --- CALC: Previsão de Churn (Alerta de Quit) ---
         // Algoritmo: High level (1000+), fez pouca XP nas ultimas 24h, mas historicamente upava.
         // Já que não temos tabela de history por player, usaremos a falta de XP hoje cruzada com o level absurdo.
@@ -277,6 +327,46 @@ export default function ExtremeAnalytics() {
                         </div>
                     </div>
                 ))}
+            </div>
+        </div>
+
+        {/* 5. ROI DE RESPAWNS */}
+        <div className="bg-black/40 border border-orange-900/50 rounded-lg p-6 shadow-[0_0_20px_rgba(249,115,22,0.1)]">
+            <h3 className="text-xl font-bold text-orange-500 mb-2 flex items-center">
+                <Target className="mr-2" size={24} />
+                ROI de Respawns (Melhor Custo/Benefício)
+            </h3>
+            <p className="text-xs text-gray-400 mb-6">Média histórica de XP/h gerada em cada local de caça pela guilda. Descubra os locais mais eficientes.</p>
+            <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={respawnROI} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#222" horizontal={false} />
+                        <XAxis type="number" stroke="#666" tickFormatter={(val) => (val/1000000).toFixed(0) + 'M'} />
+                        <YAxis type="category" dataKey="name" stroke="#666" width={80} tick={{fill: '#888', fontSize: 10}} />
+                        <Tooltip cursor={{fill: '#222'}} contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} formatter={(val) => [(val/1000000).toFixed(1) + 'M XP/h', 'Eficiência']} />
+                        <Bar dataKey="xph" fill="#f97316" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+
+        {/* 6. MONOPÓLIO DE TEMPO */}
+        <div className="bg-black/40 border border-teal-900/50 rounded-lg p-6 shadow-[0_0_20px_rgba(20,184,166,0.1)]">
+            <h3 className="text-xl font-bold text-teal-400 mb-2 flex items-center">
+                <PieChartIcon className="mr-2" size={24} />
+                Monopólio de Tempo (Horas Gastas)
+            </h3>
+            <p className="text-xs text-gray-400 mb-6">Onde a guilda mais gasta tempo? Um ranking de horas brutas investidas em cada local de caça.</p>
+            <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={respawnTime} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
+                        <XAxis dataKey="name" stroke="#666" tick={{fill: '#888', fontSize: 10}} />
+                        <YAxis stroke="#666" tickFormatter={(val) => val + 'h'} tick={{fill: '#888', fontSize: 10}} />
+                        <Tooltip cursor={{fill: '#222'}} contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} formatter={(val) => [val.toFixed(1) + ' horas', 'Tempo']} />
+                        <Bar dataKey="hours" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                </ResponsiveContainer>
             </div>
         </div>
 

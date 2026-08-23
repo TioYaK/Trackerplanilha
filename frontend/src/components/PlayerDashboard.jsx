@@ -355,9 +355,9 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
                   <li key={idx} className="flex justify-between border-b border-white/5 pb-1 last:border-0 last:pb-0">
                     <span className="text-gray-400">{format(new Date(h.date), "dd/MM HH:mm")}</span>
                     {h.type === 'UP' ? (
-                      <span className="text-green-400 font-bold">Lvl {h.from} -> {h.to}</span>
+                      <span className="text-green-400 font-bold">Lvl {h.from} &rarr; {h.to}</span>
                     ) : (
-                      <span className="text-red-500 font-bold">Lvl {h.from} -> {h.to} (Morte)</span>
+                      <span className="text-red-500 font-bold">Lvl {h.from} &rarr; {h.to} (Morte)</span>
                     )}
                   </li>
                 ))}
