@@ -2,19 +2,18 @@ import net from 'net';
 
 function parseTS3String(str) {
     if (!str) return '';
-    return str.replace(/\\s/g, ' ').replace(/\\p/g, '|').replace(/\\//g, '/').replace(/\\c/g, ':');
+    return str.split('\\s').join(' ')
+              .split('\\p').join('|')
+              .split('\\/').join('/')
+              .split('\\c').join(':');
 }
 
 function extractName(desc) {
     if (!desc) return 'Sem Descrição';
     const cleanDesc = parseTS3String(desc);
     
-    // Tenta pegar Auroria ou MA
-    let match = cleanDesc.match(/Auroria:\s*([^|]+)/i) || cleanDesc.match(/MA:\s*([^|]+)/i);
-    if (match) return match[1].trim();
-    
-    // Fallback para Main
-    match = cleanDesc.match(/Main:\s*([^|]+)/i);
+    // O usuário confirmou: Sempre extrair o Main
+    const match = cleanDesc.match(/Main:\s*([^|]+)/i);
     if (match) return match[1].trim();
     
     return 'Não Identificado';
@@ -109,22 +108,47 @@ export const runBankSync = async () => {
                 TS_Nome: nickname,
                 Grupos: groups.join(','),
                 Char_Extraido: extractedName,
-                Tem_FBot_Bank: groups.includes('232') ? 'SIM' : 'NÃO', // TODO: Ajustaremos o ID do cargo depois
+                Tem_FBot_Bank: groups.includes('292') ? 'SIM' : 'NÃO',
                 Descricao_Original: parseTS3String(desc).substring(0, 40) + '...'
             });
         }
 
         ts3.close();
 
-        console.log('\n======================================================');
-        console.log('[TS3_SYNC] MODO DE TESTE (NADA INJETADO NO SUPABASE AINDA)');
-        console.log('Resultados da extração (Regex):');
-        console.table(testResults);
-        console.log('======================================================\n');
-        console.log('Se os nomes estiverem corretos na coluna "Char_Extraido", eu posso ativar o Update pro Banco de Dados!');
+        // Filtra quem tem o cargo
+        const paidUsers = testResults.filter(u => u.Tem_FBot_Bank === 'SIM' && u.Char_Extraido !== 'Não Identificado' && u.Char_Extraido !== 'Sem Descrição');
+        
+        console.log(`\n[TS3_SYNC] Sincronizando ${paidUsers.length} pagantes com o Banco de Dados...`);
+        
+        const currentMonth = new Date().toISOString().slice(0, 7); // "2026-08"
+
+        // 1. Apaga todos os registros desse mês que foram inseridos pelo TS3 (pra não apagar os manuais)
+        await supabase.from('guild_bank_payments')
+            .delete()
+            .eq('payment_month', currentMonth)
+            .eq('admin_name', 'TS3_Sync');
+
+        // 2. Insere a galera nova
+        if (paidUsers.length > 0) {
+            const inserts = paidUsers.map(u => ({
+                character_name: u.Char_Extraido,
+                payment_month: currentMonth,
+                amount: 250, // O user disse que é 250rc
+                admin_name: 'TS3_Sync'
+            }));
+
+            const { error } = await supabase.from('guild_bank_payments').insert(inserts);
+            if (error) {
+                console.error('[TS3_SYNC] Erro ao inserir no Supabase:', error.message);
+            } else {
+                console.log(`[TS3_SYNC] Sucesso! ${inserts.length} pagamentos do FBot Bank inseridos/atualizados.`);
+            }
+        } else {
+            console.log('[TS3_SYNC] Ninguém encontrado com a tag.');
+        }
 
     } catch (err) {
-        console.error('[TS3_SYNC] Erro Crítico:', err.message);
+        console.error('[TS3_SYNC] Erro Crítico:', err.stack);
         ts3.close();
     }
 };
