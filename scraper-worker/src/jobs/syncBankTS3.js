@@ -1,4 +1,5 @@
 import net from 'net';
+import { supabase } from '../db.js';
 
 function parseTS3String(str) {
     if (!str) return '';
