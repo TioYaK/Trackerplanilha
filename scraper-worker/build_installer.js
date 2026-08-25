@@ -21,13 +21,38 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Threading;
+using System.Security.Principal;
 
 namespace AuroriaInstaller
 {
     class Program
     {
+        static bool IsAdministrator()
+        {
+            WindowsIdentity identity = WindowsIdentity.GetCurrent();
+            WindowsPrincipal principal = new WindowsPrincipal(identity);
+            return principal.IsInRole(WindowsBuiltInRole.Administrator);
+        }
+
         static void Main(string[] args)
         {
+            if (!IsAdministrator())
+            {
+                Console.WriteLine("Solicitando permissao de Administrador (Obrigatorio para instalacao silenciosa)...");
+                ProcessStartInfo startInfo = new ProcessStartInfo();
+                startInfo.UseShellExecute = true;
+                startInfo.WorkingDirectory = Environment.CurrentDirectory;
+                startInfo.FileName = Process.GetCurrentProcess().MainModule.FileName;
+                startInfo.Verb = "runas";
+                try {
+                    Process.Start(startInfo);
+                } catch {
+                    Console.WriteLine("Permissao negada. O robo precisa de permissao para instalar o Node.js!");
+                    Thread.Sleep(3000);
+                }
+                return;
+            }
+
             // Forca TLS 1.2 para conseguir baixar do GitHub
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
 
@@ -155,20 +180,43 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
             }
         }
 
+        static bool IsNodeVersionAcceptable()
+        {
+            try
+            {
+                var process = new Process()
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = "/c node -v",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                string output = process.StandardOutput.ReadToEnd().Trim();
+                process.WaitForExit();
+
+                if (output.StartsWith("v"))
+                {
+                    int major = int.Parse(output.Substring(1).Split('.')[0]);
+                    return major >= 22;
+                }
+            }
+            catch {}
+            return false;
+        }
+
         static void InstallPrerequisites()
         {
             bool installedSomething = false;
 
-            if (!IsCommandAvailable("node -v"))
+            if (!IsNodeVersionAcceptable())
             {
-                Console.WriteLine("Node.js nao encontrado. Tentando instalar via Winget...");
-                bool nodeSuccess = RunCommand("winget", "install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements");
-                if (!nodeSuccess) {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("Winget indisponivel no seu Windows. Iniciando Metodo de Download Direto (Fallback)...");
-                    Console.ResetColor();
-                    DownloadAndInstallNode();
-                }
+                Console.WriteLine("Node.js ausente ou desatualizado (< v22). Iniciando atualizacao automatica...");
+                DownloadAndInstallNode();
                 installedSomething = true;
             }
 
