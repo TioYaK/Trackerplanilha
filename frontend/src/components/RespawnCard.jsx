@@ -7,12 +7,14 @@ export default function RespawnCard({ party, onPlayerClick, onPartyClick }) {
   const statusColors = {
     EFFICIENT: 'border-green-500 bg-green-500/10',
     SUBOPTIMAL: 'border-yellow-500 bg-yellow-500/10',
+    FALTA_1: 'border-orange-500 bg-orange-500/10',
+    FALTA_2: 'border-orange-600 bg-orange-600/10',
     GHOST_SLOT: 'border-red-500 bg-red-500/10',
     DEFAULT: 'border-tibia-border bg-tibia-card'
   };
 
   const currentStatus = party.status || 'DEFAULT';
-  const colorClass = statusColors[currentStatus];
+  const colorClass = statusColors[currentStatus] || statusColors.DEFAULT;
 
   return (
     <div className={`p-5 rounded-lg border-2 ${colorClass} transition-all hover:scale-[1.01]`}>
@@ -24,7 +26,7 @@ export default function RespawnCard({ party, onPlayerClick, onPartyClick }) {
           >
             {party.party_name}
           </h3>
-          <p className="text-sm text-tibia-highlight font-medium mt-1">📍 Local: <span className="text-orange-300">{party.hunt_name || 'Desconhecido'}</span></p>
+          <p className="text-sm text-tibia-highlight font-medium mt-1">⚔️ Local: <span className="text-orange-300">{party.hunt_name || 'Desconhecido'}</span></p>
           <p className="text-sm text-gray-400 mt-1">Líder: <span className="cursor-pointer hover:text-tibia-primary hover:underline" onClick={() => onPlayerClick && onPlayerClick(party.leader_name)}>{party.leader_name}</span></p>
         </div>
         <div className="flex flex-col items-end">
@@ -54,20 +56,24 @@ export default function RespawnCard({ party, onPlayerClick, onPartyClick }) {
         <div className="flex items-center text-sm">
           {currentStatus === 'EFFICIENT' && <TrendingUp size={16} className="text-green-400 mr-2" />}
           {currentStatus === 'SUBOPTIMAL' && <Clock size={16} className="text-yellow-400 mr-2" />}
+          {(currentStatus === 'FALTA_1' || currentStatus === 'FALTA_2') && <AlertTriangle size={16} className="text-orange-400 mr-2" />}
           {currentStatus === 'GHOST_SLOT' && <AlertTriangle size={16} className="text-red-400 mr-2" />}
           
           <span className={
             currentStatus === 'EFFICIENT' ? 'text-green-400' :
             currentStatus === 'SUBOPTIMAL' ? 'text-yellow-400' :
+            (currentStatus === 'FALTA_1' || currentStatus === 'FALTA_2') ? 'text-orange-400' :
             currentStatus === 'GHOST_SLOT' ? 'text-red-400' : 'text-gray-400'
           }>
             {currentStatus === 'EFFICIENT' ? 'Caçando Ativamente' :
              currentStatus === 'SUBOPTIMAL' ? 'Ociosidade Parcial' :
+             currentStatus === 'FALTA_1' ? 'Falta (1/3)' :
+             currentStatus === 'FALTA_2' ? 'Falta (2/3)' :
              currentStatus === 'GHOST_SLOT' ? 'Slot Fantasma (Abandono)' : 'Aguardando Slot'}
           </span>
         </div>
         <div className="text-sm font-semibold text-gray-300">
-          ΔXP/h: <span className="text-white">{party.delta_xp || 0}</span>
+          🔥XP/h: <span className="text-white">{party.delta_xp || 0}</span>
         </div>
       </div>
     </div>

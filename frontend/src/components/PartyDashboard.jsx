@@ -116,10 +116,13 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   const statusColors = {
     EFFICIENT: 'border-green-500 bg-green-500/10 text-green-400',
     SUBOPTIMAL: 'border-yellow-500 bg-yellow-500/10 text-yellow-400',
+    FALTA_1: 'border-orange-500 bg-orange-500/10 text-orange-400',
+    FALTA_2: 'border-orange-600 bg-orange-600/10 text-orange-500',
     GHOST_SLOT: 'border-red-500 bg-red-500/10 text-red-400',
     DEFAULT: 'border-tibia-border bg-tibia-card text-gray-400'
   };
   const currentStatus = party.status || 'DEFAULT';
+  const colorClass = statusColors[currentStatus] || statusColors.DEFAULT;
 
   const chartData = membersData.map(m => ({ name: m.name.split(' ')[0], xp: m.totalXpGained }));
   const formatXpAxis = (tick) => {
@@ -146,12 +149,15 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <p className="text-xs text-gray-500 uppercase font-bold">Status do Slot</p>
-              <p className={`text-lg font-bold flex items-center ${statusColors[currentStatus].split(' ')[2]}`}>
+              <p className={`text-lg font-bold flex items-center ${statusColors[currentStatus]?.split(' ')[2] || ''}`}>
                 {currentStatus === 'EFFICIENT' && <TrendingUp size={20} className="mr-2" />}
                 {currentStatus === 'SUBOPTIMAL' && <Clock size={20} className="mr-2" />}
-                {currentStatus === 'GHOST_SLOT' && <AlertTriangle size={20} className="mr-2" />}
+                {(currentStatus === 'FALTA_1' || currentStatus === 'FALTA_2') && <AlertTriangle size={20} className="mr-2 text-orange-400" />}
+                {currentStatus === 'GHOST_SLOT' && <AlertTriangle size={20} className="mr-2 text-red-400" />}
                 {currentStatus === 'EFFICIENT' ? 'Caçando Ativamente' :
                  currentStatus === 'SUBOPTIMAL' ? 'Ociosidade Parcial' :
+                 currentStatus === 'FALTA_1' ? 'Falta (1/3)' :
+                 currentStatus === 'FALTA_2' ? 'Falta (2/3)' :
                  currentStatus === 'GHOST_SLOT' ? 'Slot Abandonado (Ghost)' : 'Aguardando Slot'}
               </p>
             </div>
