@@ -92,6 +92,7 @@ const requeueTask = async (task) => {
 
 const processTask = async (task) => {
   console.log(`[WORKER] Processando tarefa ${task.task_type} (ID: ${task.id})`);
+  const startTime = Date.now();
   
   // Timeout Global de 4.5 minutos (270 segundos). 
   // Isso blinda o worker contra travamentos infinitos do Puppeteer.
@@ -124,6 +125,16 @@ const processTask = async (task) => {
   try {
     // Roda a tarefa competindo com o Timeout
     await Promise.race([executeTask(), timeoutPromise]);
+
+    const duration = Date.now() - startTime;
+    console.log(`[WORKER] Tarefa ${task.task_type} concluída em ${duration}ms`);
+    
+    // Registra o histórico da tarefa no banco
+    await supabase.from('task_history').insert({
+      worker_id: WORKER_ID,
+      task_type: task.task_type,
+      duration_ms: duration
+    }).catch(e => { /* Ignora se a tabela ainda nao existir */ });
 
     // Após terminar, completa a tarefa
     await requeueTask(task);

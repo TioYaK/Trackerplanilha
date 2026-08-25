@@ -29,6 +29,11 @@ export const runFetchOnlines = async () => {
 
     console.log(`[JOB] Encontrados ${onlinePlayers.length} jogadores online.`);
 
+    // Registra o historico para o Heatmap de atividade
+    await supabase.from('online_history').insert({
+      online_count: onlinePlayers.length
+    });
+
     // 1. Resetar flag is_online de todo mundo no telemetry_logs mais recente? 
     // Na verdade, a tabela telemetry_logs é de série temporal, então onlines não modificam o log passado,
     // mas sim servem para cruzar. Podemos criar um novo log para os online
