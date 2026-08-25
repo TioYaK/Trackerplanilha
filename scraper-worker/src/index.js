@@ -150,6 +150,17 @@ const loop = async () => {
 // ==========================================
 const WORKER_VERSION = '1.0.1';
 const WORKER_STARTED = new Date().toISOString();
+let WORKER_LOCATION = 'Desconhecida';
+
+// Fetch location on startup
+fetch('https://ipinfo.io/json')
+  .then(res => res.json())
+  .then(data => {
+    if (data && data.city) {
+      WORKER_LOCATION = `${data.city}, ${data.region} (${data.country})`;
+    }
+  })
+  .catch(() => { /* ignora erro de localizacao */ });
 
 setInterval(async () => {
   try {
@@ -157,7 +168,8 @@ setInterval(async () => {
       worker_id: WORKER_ID,
       last_ping: new Date().toISOString(),
       started_at: WORKER_STARTED,
-      version: WORKER_VERSION
+      version: WORKER_VERSION,
+      location: WORKER_LOCATION
     });
   } catch (err) {
     // ignorar erro silenciosamente para não floodar logs

@@ -133,7 +133,7 @@ export default function WorkerAnalyticsModal({ isOpen, onClose }) {
                               Uptime: começou {formatDistanceToNow(new Date(worker.started_at), { addSuffix: true, locale: ptBR })}
                             </p>
                             <p className="text-sm text-gray-500 mt-1">
-                              Versão: {worker.version || 'Desconhecida'}
+                              Versão: {worker.version || 'Desconhecida'} | Localização: {worker.location || 'Desconhecida'}
                             </p>
                           </div>
                           
