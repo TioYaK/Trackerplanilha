@@ -141,3 +141,33 @@ setInterval(async () => {
   console.log('[CRON] Rodando Sincronização Automática do TS3 (30 min)...');
   await runBankSync();
 }, 30 * 60 * 1000);
+
+// ==========================================
+// SERVIDOR ADMIN LOCAL (Reset de Senha)
+// ==========================================
+import express from 'express';
+import cors from 'cors';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.post('/admin/reset-password', async (req, res) => {
+    try {
+        const { userId, newPassword } = req.body;
+        
+        // Usa o service_role_key que jo esto no db.js (supabase) para forar o reset
+        const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+            password: newPassword
+        });
+        
+        if (error) throw error;
+        res.json({ success: true, message: 'Senha resetada com sucesso!' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.listen(3001, () => {
+    console.log('[API_ADMIN] Servidor local escutando na porta 3001 para comandos do Admin Panel.');
+});

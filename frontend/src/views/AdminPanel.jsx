@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { CheckCircle2, XCircle, ShieldAlert, Users, LayoutDashboard, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle2, XCircle, ShieldAlert, Users, LayoutDashboard, Eye, EyeOff, Key } from 'lucide-react';
 
 export default function AdminPanel({ currentVisibleTabs }) {
   const [users, setUsers] = useState([]);
   const [tabs, setTabs] = useState(currentVisibleTabs || []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(null);
 
   const allAvailableTabs = [
     { id: 'live', label: 'Monitoramento ao Vivo' },
@@ -46,6 +47,29 @@ export default function AdminPanel({ currentVisibleTabs }) {
   const updateUserRole = async (id, role) => {
     await supabase.from('profiles').update({ role }).eq('id', id);
     fetchUsers();
+  };
+
+  const handleResetPassword = async (userId) => {
+    const newPwd = prompt("Digite a nova senha para este usuário:");
+    if (!newPwd) return;
+
+    setResetting(userId);
+    try {
+      const res = await fetch('http://localhost:3001/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, newPassword: newPwd })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Erro na API Local');
+      
+      alert('Senha alterada com sucesso via Worker Local!');
+    } catch (err) {
+      alert(`Falha! Certifique-se que o seu Worker (Painel Preto) está aberto rodando no fundo.\n\nErro: ${err.message}`);
+    } finally {
+      setResetting(null);
+    }
   };
 
   const toggleTab = async (tabId) => {
@@ -115,6 +139,15 @@ export default function AdminPanel({ currentVisibleTabs }) {
                       </select>
                     </td>
                     <td className="p-3 text-right space-x-2">
+                      <button 
+                        onClick={() => handleResetPassword(u.id)} 
+                        className="bg-blue-800 hover:bg-blue-700 text-white p-1.5 rounded" 
+                        title="Resetar Senha"
+                        disabled={resetting === u.id}
+                      >
+                        {resetting === u.id ? <span className="animate-pulse">...</span> : <Key size={16} />}
+                      </button>
+
                       {u.status !== 'active' && (
                         <button onClick={() => updateUserStatus(u.id, 'active')} className="bg-green-800 hover:bg-green-700 text-white p-1.5 rounded" title="Aprovar">
                           <CheckCircle2 size={16} />
