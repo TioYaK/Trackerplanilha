@@ -1,55 +1,114 @@
-import React from 'react';
-import { Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, Settings, Swords, Crosshair, Lock, Unlock, Landmark, ShoppingBag, Calculator, BrainCircuit } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, 
+  Swords, Crosshair, Lock, Unlock, Landmark, ShoppingBag, 
+  Calculator, BrainCircuit, ChevronDown, Menu, X
+} from 'lucide-react';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdmin }) {
-  const navItems = [
-    { id: 'live', label: 'Monitoramento ao Vivo', icon: <Activity size={18} /> },
-    { id: 'planilha', label: 'Painel de Agendamento', icon: <CalendarDays size={18} /> },
-    { id: 'radar', label: 'Radar do Servidor', icon: <Crosshair size={18} /> },
-    { id: 'roster', label: 'Exército da Guilda', icon: <Users size={18} /> },
-    { id: 'tracker', label: 'Censo Macro', icon: <LayoutDashboard size={18} /> },
-    { id: 'extreme', label: 'Extreme BI', icon: <BrainCircuit size={18} /> },
-    { id: 'analytics', label: 'Rankings & Tribunal', icon: <TrendingDown size={18} /> },
-    { id: 'bank', label: 'Guild Bank', icon: <Landmark size={18} /> },
-    { id: 'market', label: 'Mercado Interno', icon: <ShoppingBag size={18} /> },
-    { id: 'loot', label: 'Loot Split', icon: <Calculator size={18} /> },
-    { id: 'contribute', label: 'Ajude a Guilda', icon: <Swords size={18} /> },
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Mapeamento original de views e ícones para facilitar o uso no menu
+  const viewsData = {
+    live: { label: 'Monitoramento ao Vivo', icon: <Activity size={16} /> },
+    radar: { label: 'Radar do Servidor', icon: <Crosshair size={16} /> },
+    roster: { label: 'Exército da Guilda', icon: <Users size={16} /> },
+    planilha: { label: 'Painel de Agendamento', icon: <CalendarDays size={16} /> },
+    contribute: { label: 'Ajude a Guilda', icon: <Swords size={16} /> },
+    bank: { label: 'Guild Bank', icon: <Landmark size={16} /> },
+    market: { label: 'Mercado Interno', icon: <ShoppingBag size={16} /> },
+    loot: { label: 'Loot Split', icon: <Calculator size={16} /> },
+    tracker: { label: 'Censo Macro', icon: <LayoutDashboard size={16} /> },
+    extreme: { label: 'Extreme BI', icon: <BrainCircuit size={16} /> },
+    analytics: { label: 'Rankings & Tribunal', icon: <TrendingDown size={16} /> },
+  };
+
+  // Agrupamento para os Dropdowns
+  const menuGroups = [
+    {
+      title: 'Combate & Radar',
+      icon: <Crosshair size={18} />,
+      items: ['live', 'radar']
+    },
+    {
+      title: 'Recursos Humanos',
+      icon: <Users size={18} />,
+      items: ['roster', 'planilha', 'contribute']
+    },
+    {
+      title: 'Economia',
+      icon: <Landmark size={18} />,
+      items: ['bank', 'market', 'loot']
+    },
+    {
+      title: 'Inteligência',
+      icon: <BrainCircuit size={18} />,
+      items: ['tracker', 'extreme', 'analytics']
+    }
   ];
+
+  // Identifica a qual grupo a aba atual pertence para manter ele "Aceso"
+  const getActiveGroupIndex = () => {
+    return menuGroups.findIndex(g => g.items.includes(currentView));
+  };
+  const activeGroup = getActiveGroupIndex();
 
   return (
     <div className="bg-tibia-wood border-b-4 border-tibia-primary shadow-lg sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 flex justify-between items-center h-16">
+      <div className="max-w-[1400px] mx-auto px-4 flex justify-between items-center h-16">
         
         {/* Logo Section */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 shrink-0">
           <img src="/logo.jpg" alt="BattleStorm Logo" className="w-10 h-10 rounded-full border-2 border-tibia-highlight shadow-tibia-glow" />
-          <div>
-            <h1 className="text-2xl font-medieval text-tibia-highlight tracking-wider shadow-black drop-shadow-md">
+          <div className="hidden sm:block">
+            <h1 className="text-xl lg:text-2xl font-medieval text-tibia-highlight tracking-wider shadow-black drop-shadow-md">
               BattleStorm <span className="text-white">Tracker</span>
             </h1>
           </div>
         </div>
 
         {/* Desktop Menu */}
-        <nav className="hidden lg:flex space-x-1">
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setCurrentView(item.id)}
-              className={`flex items-center space-x-2 px-3 py-2 rounded font-medieval transition-all duration-300 ${
-                currentView === item.id 
-                  ? 'bg-tibia-primary text-black font-bold shadow-tibia-glow' 
-                  : 'text-tibia-primary hover:text-tibia-highlight hover:bg-black/30'
-              }`}
-            >
-              {item.icon}
-              <span className="text-md tracking-wide">{item.label}</span>
-            </button>
+        <nav className="hidden lg:flex items-center space-x-2 xl:space-x-4">
+          {menuGroups.map((group, index) => (
+            <div key={index} className="relative group">
+              {/* Categoria Pai */}
+              <button className={`flex items-center space-x-2 px-3 py-2 rounded font-medieval transition-all duration-300 ${
+                activeGroup === index 
+                  ? 'text-white border-b-2 border-tibia-highlight' 
+                  : 'text-tibia-primary hover:text-white'
+              }`}>
+                {group.icon}
+                <span className="text-md tracking-wide">{group.title}</span>
+                <ChevronDown size={14} className="group-hover:rotate-180 transition-transform duration-300" />
+              </button>
+
+              {/* Menu Dropdown Escondido */}
+              <div className="absolute left-0 mt-2 w-56 bg-black/95 border border-tibia-border rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 transform translate-y-2 group-hover:translate-y-0">
+                <div className="py-2">
+                  {group.items.map(itemId => (
+                    <button
+                      key={itemId}
+                      onClick={() => setCurrentView(itemId)}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-3 font-sans text-sm transition-colors ${
+                        currentView === itemId 
+                          ? 'bg-tibia-primary/20 text-tibia-highlight border-l-2 border-tibia-highlight' 
+                          : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <span className={`${currentView === itemId ? 'text-tibia-highlight' : 'text-gray-400'}`}>
+                        {viewsData[itemId].icon}
+                      </span>
+                      <span>{viewsData[itemId].label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           ))}
         </nav>
 
         {/* Right Icons */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3">
           <button 
             onClick={toggleAdmin}
             className={`flex items-center px-3 py-1.5 rounded transition-colors border ${
@@ -59,12 +118,55 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdm
             }`}
             title={isAdmin ? "Desativar Modo Admin" : "Ativar Modo Admin"}
           >
-            {isAdmin ? <Unlock size={16} className="mr-2" /> : <Lock size={16} className="mr-2" />}
-            <span className="text-xs font-bold uppercase">{isAdmin ? 'Admin ON' : 'Admin OFF'}</span>
+            {isAdmin ? <Unlock size={16} className="mr-0 sm:mr-2" /> : <Lock size={16} className="mr-0 sm:mr-2" />}
+            <span className="text-xs font-bold uppercase hidden sm:inline">{isAdmin ? 'Admin ON' : 'Admin OFF'}</span>
+          </button>
+
+          {/* Botão Menu Mobile */}
+          <button 
+            className="lg:hidden p-2 text-tibia-primary hover:text-white"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
 
       </div>
+
+      {/* Mobile Menu Dropdown */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden absolute top-16 left-0 w-full bg-black/95 border-b-2 border-tibia-border max-h-[80vh] overflow-y-auto z-50">
+          <div className="p-4 space-y-6">
+            {menuGroups.map((group, index) => (
+              <div key={index}>
+                <h3 className="flex items-center space-x-2 font-medieval text-tibia-highlight text-lg mb-2 pb-2 border-b border-tibia-border/50">
+                  {group.icon}
+                  <span>{group.title}</span>
+                </h3>
+                <div className="space-y-1">
+                  {group.items.map(itemId => (
+                    <button
+                      key={itemId}
+                      onClick={() => {
+                        setCurrentView(itemId);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded font-sans text-sm transition-colors ${
+                        currentView === itemId 
+                          ? 'bg-tibia-primary/30 text-white font-bold' 
+                          : 'text-gray-300 hover:bg-white/10'
+                      }`}
+                    >
+                      {viewsData[itemId].icon}
+                      <span>{viewsData[itemId].label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
