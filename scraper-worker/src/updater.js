@@ -10,8 +10,8 @@ export const checkForUpdates = async () => {
     // Se não estiver rodando como EXE compilado, usa o Git Pull clássico
     if (!process.pkg) {
         return new Promise((resolve) => {
-            exec('git pull --autostash', (error, stdout) => {
-                if (stdout && !stdout.includes('Already up to date')) {
+            exec('git pull --autostash && npm install', (error, stdout) => {
+                if (stdout && (!stdout.includes('Already up to date') || stdout.includes('added'))) {
                     console.log('[UPDATER] Nova atualização do Git! Reiniciando...');
                     process.exit(0);
                 } else {
