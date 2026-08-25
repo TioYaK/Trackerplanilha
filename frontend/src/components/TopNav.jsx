@@ -150,12 +150,12 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
         </nav>
 
         {/* Worker Modal */}
-        <WorkerAnalyticsModal isOpen={workerModalOpen} onClose={() => setWorkerModalOpen(false)} />
+        {/* Removed Modal */}
 
         {/* Right Icons */}
         <div className="flex items-center space-x-3">
           {isAdmin && (
-            <button onClick={() => setWorkerModalOpen(true)} className="flex items-center px-3 py-1.5 rounded border bg-green-900/20 hover:bg-green-900/40 text-green-400 border-green-900/50 cursor-pointer transition-colors" title="Ver Worker Analytics">
+            <button onClick={() => setCurrentView('admin_dashboard')} className="flex items-center px-3 py-1.5 rounded border bg-green-900/20 hover:bg-green-900/40 text-green-400 border-green-900/50 cursor-pointer transition-colors" title="Ver Central de Inteligência">
               <Server size={16} className="mr-0 sm:mr-2" />
               <span className="text-xs font-bold uppercase hidden sm:inline">{workerCount} WORKERS</span>
             </button>
