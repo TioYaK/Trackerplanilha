@@ -13,6 +13,7 @@ import GuildBank from './views/GuildBank';
 import GuildMarket from './views/GuildMarket';
 import LootTracker from './views/LootTracker';
 import ExtremeAnalytics from './views/ExtremeAnalytics';
+import Contribute from './views/Contribute';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('live');
@@ -62,6 +63,7 @@ export default function App() {
       case 'market': return <GuildMarket isAdmin={isAdmin} />;
       case 'loot': return <LootTracker isAdmin={isAdmin} />;
       case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
+      case 'contribute': return <Contribute />;
       case 'players': 
         return (
           <div className="p-8 max-w-7xl mx-auto w-full">

@@ -13,6 +13,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdm
     { id: 'bank', label: 'Guild Bank', icon: <Landmark size={18} /> },
     { id: 'market', label: 'Mercado Interno', icon: <ShoppingBag size={18} /> },
     { id: 'loot', label: 'Loot Split', icon: <Calculator size={18} /> },
+    { id: 'contribute', label: 'Ajude a Guilda', icon: <Swords size={18} /> },
   ];
 
   return (
