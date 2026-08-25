@@ -26,13 +26,63 @@ export default function OnboardingScreen() {
     e.preventDefault();
     setError('');
 
-    if (!makers.Auroria.trim()) {
+    const auroriaMakersList = makers.Auroria.split(',').map(m => m.trim()).filter(m => m);
+
+    if (auroriaMakersList.length === 0) {
       setError('Você precisa registrar pelo menos 1 maker no servidor Auroria (obrigatório).');
       return;
     }
 
     setLoading(true);
     try {
+      // 1. Busca todos os perfis para garantir que ninguém mais tem esses chars
+      const { data: allProfiles, error: profErr } = await supabase
+        .from('profiles')
+        .select('id, main_character, makers');
+      if (profErr) throw profErr;
+
+      // Validação de cada char de Auroria
+      for (const makerName of auroriaMakersList) {
+        
+        // A. Verificar Duplicidade (Global)
+        for (const p of allProfiles) {
+          if (p.id === user.id) continue;
+          
+          // Checa se já é o Main de alguém
+          if (p.main_character?.toLowerCase() === makerName.toLowerCase()) {
+            throw new Error(`O personagem "${makerName}" já está registrado como Main de outro jogador.`);
+          }
+          
+          // Checa se já é o Maker de alguém
+          const pMakers = p.makers || {};
+          for (const srv of Object.keys(pMakers)) {
+            const list = typeof pMakers[srv] === 'string' ? pMakers[srv].split(',') : [];
+            const isClaimed = list.some(m => m.trim().toLowerCase() === makerName.toLowerCase());
+            if (isClaimed) {
+              throw new Error(`O personagem "${makerName}" já está registrado como Maker do jogador ${p.main_character}.`);
+            }
+          }
+        }
+
+        // B. Verificar Existência na Guilda e Level 300+
+        const { data: guildData, error: guildErr } = await supabase
+          .from('view_guild_roster')
+          .select('name, level')
+          .ilike('name', makerName)
+          .limit(1);
+
+        if (guildErr) throw guildErr;
+        
+        if (!guildData || guildData.length === 0) {
+          throw new Error(`O personagem "${makerName}" não foi encontrado na guilda.`);
+        }
+        
+        if (guildData[0].level < 300) {
+          throw new Error(`O personagem "${makerName}" está no nível ${guildData[0].level}. É obrigatório ser Nível 300+.`);
+        }
+      }
+
+      // Tudo Validado! Salvar no banco...
       const { error: updateErr } = await supabase
         .from('profiles')
         .update({
