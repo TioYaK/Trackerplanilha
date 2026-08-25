@@ -136,7 +136,7 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
                 bool nodeSuccess = RunCommand("winget", "install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements");
                 if (!nodeSuccess) {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("\n[ERRO] O sistema 'winget' nao esta instalado neste computador!");
+                    Console.WriteLine("\\n[ERRO] O sistema 'winget' nao esta instalado neste computador!");
                     Console.WriteLine("Por favor, baixe e instale o Node.js manualmente em: https://nodejs.org/");
                     Console.WriteLine("Apos instalar o Node.js e o Git, abra este programa novamente.");
                     Console.WriteLine("Pressione ENTER para fechar...");
@@ -152,7 +152,7 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
                 bool gitSuccess = RunCommand("winget", "install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements");
                 if (!gitSuccess) {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("\n[ERRO] O sistema 'winget' nao esta instalado neste computador!");
+                    Console.WriteLine("\\n[ERRO] O sistema 'winget' nao esta instalado neste computador!");
                     Console.WriteLine("Por favor, baixe e instale o Git manualmente em: https://git-scm.com/downloads");
                     Console.WriteLine("Apos instalar o Node.js e o Git, abra este programa novamente.");
                     Console.WriteLine("Pressione ENTER para fechar...");
