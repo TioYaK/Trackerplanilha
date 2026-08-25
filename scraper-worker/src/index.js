@@ -138,8 +138,8 @@ const loop = async () => {
     setTimeout(loop, 1000); // Se achou tarefa, tenta achar outra logo em seguida
   } else {
     emptyCycles++;
-    // Se ficou ocioso por 12 ciclos (aprox 1 minuto), checa atualização no GitHub
-    if (emptyCycles % 12 === 0) {
+    // Se ficou ocioso por 3 ciclos (aprox 15 segundos), checa atualização no GitHub
+    if (emptyCycles % 3 === 0) {
         await checkForUpdates();
     }
     setTimeout(loop, POLL_INTERVAL); // Se não achou, dorme
