@@ -116,7 +116,7 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
 
         static void DownloadAndInstallNode()
         {
-            string msiUrl = "https://nodejs.org/dist/v20.11.0/node-v20.11.0-x64.msi";
+            string msiUrl = "https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi";
             string msiPath = Path.Combine(Path.GetTempPath(), "node_installer.msi");
             Console.WriteLine("   -> Baixando instalador do Node.js (Aguarde alguns minutos)...");
             using (var client = new WebClient())
