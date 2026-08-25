@@ -60,7 +60,7 @@ export default function Contribute() {
             </li>
             <li className="flex items-start gap-3">
               <CheckCircle2 className="text-tibia-primary shrink-0 mt-0.5" size={20} />
-              <span>O seu robô já estará vivo no fundo. Se quiser que ele pare, basta reiniciar o PC ou desativar na Inicialização do Windows.</span>
+              <span>O seu robô já estará vivo no fundo e vai ligar automaticamente toda vez que você ligar o computador para ajudar a guilda!</span>
             </li>
           </ul>
 
