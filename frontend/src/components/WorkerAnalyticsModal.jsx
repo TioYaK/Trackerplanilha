@@ -132,9 +132,17 @@ export default function WorkerAnalyticsModal({ isOpen, onClose }) {
                               <Activity size={14} className="mr-1" />
                               Uptime: começou {formatDistanceToNow(new Date(worker.started_at), { addSuffix: true, locale: ptBR })}
                             </p>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="text-sm text-gray-500 mt-2">
                               Versão: {worker.version || 'Desconhecida'} | Localização: {worker.location || 'Desconhecida'}
                             </p>
+                            {worker.metadata && (
+                              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-400 bg-black/30 p-2 rounded border border-tibia-border/50">
+                                <div><strong className="text-gray-300">💻 OS:</strong> {worker.metadata.os}</div>
+                                <div><strong className="text-gray-300">🟢 Node:</strong> {worker.metadata.node_version}</div>
+                                <div className="sm:col-span-2"><strong className="text-gray-300">🧠 CPU:</strong> {worker.metadata.cpu} ({worker.metadata.cores} Cores)</div>
+                                <div><strong className="text-gray-300">🐏 RAM:</strong> {worker.metadata.ram}</div>
+                              </div>
+                            )}
                           </div>
                           
                           {/* Task */}

@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 import { supabase } from './db.js';
+import os from 'os';
 import { runFetchGuild } from './jobs/fetchGuild.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
@@ -145,12 +146,22 @@ const loop = async () => {
   }
 };
 
+
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
 const WORKER_VERSION = '1.0.1';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
+
+// Coleta de hardware inofensiva
+const WORKER_METADATA = {
+  cpu: os.cpus()[0]?.model?.trim() || 'Processador Desconhecido',
+  cores: os.cpus().length,
+  ram: Math.round(os.totalmem() / (1024 * 1024 * 1024)) + ' GB',
+  os: `${os.type()} ${os.release()}`,
+  node_version: process.version
+};
 
 // Fetch location on startup
 fetch('https://ipinfo.io/json')
@@ -169,7 +180,8 @@ setInterval(async () => {
       last_ping: new Date().toISOString(),
       started_at: WORKER_STARTED,
       version: WORKER_VERSION,
-      location: WORKER_LOCATION
+      location: WORKER_LOCATION,
+      metadata: WORKER_METADATA
     });
   } catch (err) {
     // ignorar erro silenciosamente para não floodar logs
