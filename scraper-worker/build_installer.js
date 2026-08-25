@@ -105,21 +105,44 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
             Console.ReadKey();
         }
 
+        static void RefreshEnvironment()
+        {
+            try
+            {
+                Console.WriteLine("Atualizando variaveis de ambiente do Windows...");
+                string machinePath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Machine) ?? "";
+                string userPath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User) ?? "";
+                Environment.SetEnvironmentVariable("Path", machinePath + ";" + userPath, EnvironmentVariableTarget.Process);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Aviso ao atualizar PATH: " + ex.Message);
+            }
+        }
+
         static void InstallPrerequisites()
         {
+            bool installedSomething = false;
+
             if (!IsCommandAvailable("node -v"))
             {
                 Console.WriteLine("Node.js nao encontrado. Instalando silenciosamente via Winget...");
                 RunCommand("winget", "install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements");
-                
-                // Recarrega as variaveis de ambiente na sessao atual (simples)
-                Console.WriteLine("Node.js instalado. (Talvez seja necessario reiniciar o instalador se falhar na proxima etapa)");
+                installedSomething = true;
             }
 
             if (!IsCommandAvailable("git --version"))
             {
                 Console.WriteLine("Git nao encontrado. Instalando silenciosamente via Winget...");
                 RunCommand("winget", "install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements");
+                installedSomething = true;
+            }
+
+            if (installedSomething)
+            {
+                RefreshEnvironment();
+                // Pequeno delay para garantir que o SO registrou
+                Thread.Sleep(2000); 
             }
         }
 
