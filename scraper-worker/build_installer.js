@@ -28,6 +28,9 @@ namespace AuroriaInstaller
     {
         static void Main(string[] args)
         {
+            // Forca TLS 1.2 para conseguir baixar do GitHub
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+
             Console.Title = "Auroria Worker - Instalador e Gerenciador";
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("======================================================");
@@ -111,6 +114,32 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
             Console.ReadKey();
         }
 
+        static void DownloadAndInstallNode()
+        {
+            string msiUrl = "https://nodejs.org/dist/v20.11.0/node-v20.11.0-x64.msi";
+            string msiPath = Path.Combine(Path.GetTempPath(), "node_installer.msi");
+            Console.WriteLine("   -> Baixando instalador do Node.js (Aguarde alguns minutos)...");
+            using (var client = new WebClient())
+            {
+                client.DownloadFile(msiUrl, msiPath);
+            }
+            Console.WriteLine("   -> Executando instalacao do Node.js silenciosamente...");
+            RunCommand("msiexec.exe", "/i \\"" + msiPath + "\\" /qn /norestart");
+        }
+
+        static void DownloadAndInstallGit()
+        {
+            string exeUrl = "https://github.com/git-for-windows/git/releases/download/v2.43.0.windows.1/Git-2.43.0-64-bit.exe";
+            string exePath = Path.Combine(Path.GetTempPath(), "git_installer.exe");
+            Console.WriteLine("   -> Baixando instalador do Git (Aguarde alguns minutos)...");
+            using (var client = new WebClient())
+            {
+                client.DownloadFile(exeUrl, exePath);
+            }
+            Console.WriteLine("   -> Executando instalacao do Git silenciosamente...");
+            RunCommand(exePath, "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL /SP-");
+        }
+
         static void RefreshEnvironment()
         {
             try
@@ -132,32 +161,26 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
 
             if (!IsCommandAvailable("node -v"))
             {
-                Console.WriteLine("Node.js nao encontrado. Instalando silenciosamente via Winget...");
+                Console.WriteLine("Node.js nao encontrado. Tentando instalar via Winget...");
                 bool nodeSuccess = RunCommand("winget", "install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements");
                 if (!nodeSuccess) {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("\\n[ERRO] O sistema 'winget' nao esta instalado neste computador!");
-                    Console.WriteLine("Por favor, baixe e instale o Node.js manualmente em: https://nodejs.org/");
-                    Console.WriteLine("Apos instalar o Node.js e o Git, abra este programa novamente.");
-                    Console.WriteLine("Pressione ENTER para fechar...");
-                    Console.ReadLine();
-                    Environment.Exit(1);
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Winget indisponivel no seu Windows. Iniciando Metodo de Download Direto (Fallback)...");
+                    Console.ResetColor();
+                    DownloadAndInstallNode();
                 }
                 installedSomething = true;
             }
 
             if (!IsCommandAvailable("git --version"))
             {
-                Console.WriteLine("Git nao encontrado. Instalando silenciosamente via Winget...");
+                Console.WriteLine("Git nao encontrado. Tentando instalar via Winget...");
                 bool gitSuccess = RunCommand("winget", "install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements");
                 if (!gitSuccess) {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("\\n[ERRO] O sistema 'winget' nao esta instalado neste computador!");
-                    Console.WriteLine("Por favor, baixe e instale o Git manualmente em: https://git-scm.com/downloads");
-                    Console.WriteLine("Apos instalar o Node.js e o Git, abra este programa novamente.");
-                    Console.WriteLine("Pressione ENTER para fechar...");
-                    Console.ReadLine();
-                    Environment.Exit(1);
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Winget indisponivel no seu Windows. Iniciando Metodo de Download Direto (Fallback)...");
+                    Console.ResetColor();
+                    DownloadAndInstallGit();
                 }
                 installedSomething = true;
             }
