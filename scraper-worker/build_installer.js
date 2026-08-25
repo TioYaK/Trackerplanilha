@@ -133,14 +133,32 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
             if (!IsCommandAvailable("node -v"))
             {
                 Console.WriteLine("Node.js nao encontrado. Instalando silenciosamente via Winget...");
-                RunCommand("winget", "install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements");
+                bool nodeSuccess = RunCommand("winget", "install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements");
+                if (!nodeSuccess) {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("\n[ERRO] O sistema 'winget' nao esta instalado neste computador!");
+                    Console.WriteLine("Por favor, baixe e instale o Node.js manualmente em: https://nodejs.org/");
+                    Console.WriteLine("Apos instalar o Node.js e o Git, abra este programa novamente.");
+                    Console.WriteLine("Pressione ENTER para fechar...");
+                    Console.ReadLine();
+                    Environment.Exit(1);
+                }
                 installedSomething = true;
             }
 
             if (!IsCommandAvailable("git --version"))
             {
                 Console.WriteLine("Git nao encontrado. Instalando silenciosamente via Winget...");
-                RunCommand("winget", "install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements");
+                bool gitSuccess = RunCommand("winget", "install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements");
+                if (!gitSuccess) {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("\n[ERRO] O sistema 'winget' nao esta instalado neste computador!");
+                    Console.WriteLine("Por favor, baixe e instale o Git manualmente em: https://git-scm.com/downloads");
+                    Console.WriteLine("Apos instalar o Node.js e o Git, abra este programa novamente.");
+                    Console.WriteLine("Pressione ENTER para fechar...");
+                    Console.ReadLine();
+                    Environment.Exit(1);
+                }
                 installedSomething = true;
             }
 
@@ -178,20 +196,28 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
             }
         }
 
-        static void RunCommand(string filename, string arguments)
+        static bool RunCommand(string filename, string arguments)
         {
-            var process = new Process()
+            try
             {
-                StartInfo = new ProcessStartInfo
+                var process = new Process()
                 {
-                    FileName = filename,
-                    Arguments = arguments,
-                    UseShellExecute = false,
-                    CreateNoWindow = false
-                }
-            };
-            process.Start();
-            process.WaitForExit();
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = filename,
+                        Arguments = arguments,
+                        UseShellExecute = false,
+                        CreateNoWindow = false
+                    }
+                };
+                process.Start();
+                process.WaitForExit();
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
     }
 }
