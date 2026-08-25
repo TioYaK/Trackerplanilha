@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { 
   Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, 
   Swords, Crosshair, Lock, Unlock, Landmark, ShoppingBag, 
-  Calculator, BrainCircuit, ChevronDown, Menu, X
+  Calculator, BrainCircuit, ChevronDown, Menu, X, LogOut
 } from 'lucide-react';
+import { useAuth } from './AuthContext';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTabs }) {
+  const { logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Mapeamento original de views e ícones para facilitar o uso no menu
@@ -133,6 +135,15 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
               <span className="text-xs font-bold uppercase hidden sm:inline">Admin</span>
             </div>
           )}
+
+          <button 
+            onClick={logout}
+            className="flex items-center px-3 py-1.5 rounded transition-colors border bg-black/30 text-gray-500 border-gray-800 hover:text-white hover:bg-black/50"
+            title="Sair do Sistema"
+          >
+            <LogOut size={16} className="mr-0 sm:mr-2" />
+            <span className="text-xs font-bold uppercase hidden sm:inline">Sair</span>
+          </button>
 
           {/* Botão Menu Mobile */}
           <button 
