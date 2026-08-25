@@ -97,7 +97,7 @@ WshShell.Run ""cmd.exe /c cd /d """"{0}"""" && loop.bat"", 0, False
             {
                 FileName = "cscript.exe",
                 Arguments = string.Format("\\"{0}\\"", vbsPath),
-                UseShellExecute = true,
+                UseShellExecute = false,
                 CreateNoWindow = true
             });
 
