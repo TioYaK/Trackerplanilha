@@ -126,13 +126,13 @@ loop();
 // TAREFAS AGENDADAS INDEPENDENTES DA FILA
 // ==========================================
 
-// Sincroniza o Banco FBot (TS3) a cada 30 minutos cravados!
+// Sincroniza o Banco FBot (TS3) a cada 5 minutos cravados!
 // Indepedente da fila do Supabase, garantindo que usuários que logam em 
 // horários bizarros não fiquem de fora.
 setInterval(async () => {
-  console.log('[CRON] Rodando Sincronização Automática do TS3 (30 min)...');
+  console.log('[CRON] Rodando Sincronização Automática do TS3 (5 min)...');
   await runBankSync();
-}, 30 * 60 * 1000);
+}, 5 * 60 * 1000);
 
 // ==========================================
 
