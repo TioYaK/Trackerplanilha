@@ -17,6 +17,7 @@ import Contribute from './views/Contribute';
 import AuthScreen from './views/AuthScreen';
 import AdminPanel from './views/AdminPanel';
 import AdminDashboard from './views/AdminDashboard';
+import OnboardingScreen from './views/OnboardingScreen';
 import { useAuth } from './components/AuthContext';
 import { LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
@@ -68,6 +69,11 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  // Se o usuário foi aprovado, mas ainda não preencheu os makers
+  if (profile?.status === 'active' && !profile.onboarding_completed) {
+    return <OnboardingScreen />;
   }
 
   const handlePlayerClick = (playerName) => {
