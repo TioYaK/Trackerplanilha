@@ -15,27 +15,36 @@ import LootTracker from './views/LootTracker';
 import ExtremeAnalytics from './views/ExtremeAnalytics';
 import Contribute from './views/Contribute';
 import AuthScreen from './views/AuthScreen';
+import AdminPanel from './views/AdminPanel';
 import { useAuth } from './components/AuthContext';
 import { LogOut } from 'lucide-react';
+import { supabase } from './lib/supabase';
 
 export default function App() {
   const { user, profile, logout } = useAuth();
   const [currentView, setCurrentView] = useState('live');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedParty, setSelectedParty] = useState(null);
-
+  const [visibleTabs, setVisibleTabs] = useState(null); 
   const isAdmin = profile?.role === 'admin';
 
-  // Toggle Admin (Apenas para exibir ou esconder painéis se ele for admin de verdade)
-  // Como o RLS / Supabase backend vai ser a real proteção, isso é apenas UI
-  const [adminMode, setAdminMode] = useState(false);
-  const toggleAdmin = () => {
-    if (!isAdmin) {
-      alert('Você não tem permissão de Administrador.');
-      return;
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data, error } = await supabase.from('app_settings').select('visible_tabs').eq('id', 1).single();
+        if (data?.visible_tabs) {
+          setVisibleTabs(data.visible_tabs);
+        } else {
+          setVisibleTabs(['live', 'radar', 'roster', 'planilha', 'contribute', 'bank', 'market', 'loot', 'tracker', 'extreme', 'analytics']);
+        }
+      } catch (err) {
+        setVisibleTabs(['live', 'radar', 'roster', 'planilha', 'contribute', 'bank', 'market', 'loot', 'tracker', 'extreme', 'analytics']);
+      }
+    };
+    if (user && profile?.status === 'active') {
+      fetchSettings();
     }
-    setAdminMode(!adminMode);
-  };
+  }, [user, profile]);
 
   if (!user) {
     return <AuthScreen />;
@@ -73,16 +82,17 @@ export default function App() {
   const renderView = () => {
     switch(currentView) {
       case 'live': return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
-      case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={adminMode} />;
+      case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
       case 'radar': return <RadarHunters onPlayerClick={handlePlayerClick} />;
       case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
       case 'extreme': return <ExtremeAnalytics />;
-      case 'planilha': return <PlanilhaManager isAdmin={adminMode} />;
-      case 'bank': return <GuildBank isAdmin={adminMode} />;
-      case 'market': return <GuildMarket isAdmin={adminMode} />;
-      case 'loot': return <LootTracker isAdmin={adminMode} />;
+      case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
+      case 'bank': return <GuildBank isAdmin={isAdmin} />;
+      case 'market': return <GuildMarket isAdmin={isAdmin} />;
+      case 'loot': return <LootTracker isAdmin={isAdmin} />;
       case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
       case 'contribute': return <Contribute />;
+      case 'admin': return isAdmin ? <AdminPanel /> : null;
       case 'players': 
         return (
           <div className="p-8 max-w-7xl mx-auto w-full">
@@ -97,13 +107,15 @@ export default function App() {
     }
   };
 
+  if (visibleTabs === null && isAdmin === false) return null; // loading
+
   return (
-    <div className="min-h-screen bg-tibia-bg text-gray-200 font-sans" style={{ backgroundImage: 'radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%)' }}>
+    <div className="min-h-screen bg-tibia-bg bg-tibia-pattern">
       <TopNav 
         currentView={currentView} 
         setCurrentView={setCurrentView} 
-        isAdmin={adminMode}
-        toggleAdmin={toggleAdmin}
+        isAdmin={isAdmin}
+        visibleTabs={visibleTabs || []}
       />
       <main className="w-full">
         {renderView()}

@@ -5,7 +5,7 @@ import {
   Calculator, BrainCircuit, ChevronDown, Menu, X
 } from 'lucide-react';
 
-export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdmin }) {
+export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTabs }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Mapeamento original de views e ícones para facilitar o uso no menu
@@ -21,10 +21,11 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdm
     tracker: { label: 'Censo Macro', icon: <LayoutDashboard size={16} /> },
     extreme: { label: 'Extreme BI', icon: <BrainCircuit size={16} /> },
     analytics: { label: 'Rankings & Tribunal', icon: <TrendingDown size={16} /> },
+    admin: { label: 'Painel Admin', icon: <Lock size={16} /> },
   };
 
   // Agrupamento para os Dropdowns
-  const menuGroups = [
+  let menuGroups = [
     {
       title: 'Combate & Radar',
       icon: <Crosshair size={18} />,
@@ -46,6 +47,23 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdm
       items: ['tracker', 'extreme', 'analytics']
     }
   ];
+
+  // Filtra as abas baseado no visibleTabs (Admin vê tudo)
+  if (!isAdmin && visibleTabs) {
+    menuGroups = menuGroups.map(group => ({
+      ...group,
+      items: group.items.filter(item => visibleTabs.includes(item))
+    })).filter(group => group.items.length > 0);
+  }
+
+  // Se for admin, adicionamos o Painel Admin ao final
+  if (isAdmin) {
+    menuGroups.push({
+      title: 'Administração',
+      icon: <Lock size={18} />,
+      items: ['admin']
+    });
+  }
 
   // Identifica a qual grupo a aba atual pertence para manter ele "Aceso"
   const getActiveGroupIndex = () => {
@@ -109,18 +127,12 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, toggleAdm
 
         {/* Right Icons */}
         <div className="flex items-center space-x-3">
-          <button 
-            onClick={toggleAdmin}
-            className={`flex items-center px-3 py-1.5 rounded transition-colors border ${
-              isAdmin 
-                ? 'bg-red-900/40 text-red-400 border-red-900/50 hover:bg-red-900/60' 
-                : 'bg-black/30 text-gray-500 border-gray-800 hover:text-white'
-            }`}
-            title={isAdmin ? "Desativar Modo Admin" : "Ativar Modo Admin"}
-          >
-            {isAdmin ? <Unlock size={16} className="mr-0 sm:mr-2" /> : <Lock size={16} className="mr-0 sm:mr-2" />}
-            <span className="text-xs font-bold uppercase hidden sm:inline">{isAdmin ? 'Admin ON' : 'Admin OFF'}</span>
-          </button>
+          {isAdmin && (
+            <div className="flex items-center px-3 py-1.5 rounded border bg-red-900/40 text-red-400 border-red-900/50 cursor-default" title="Modo Administrador Ativo">
+              <Unlock size={16} className="mr-0 sm:mr-2" />
+              <span className="text-xs font-bold uppercase hidden sm:inline">Admin</span>
+            </div>
+          )}
 
           {/* Botão Menu Mobile */}
           <button 

@@ -18,4 +18,17 @@ ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
 -- CREATE POLICY "Usuários podem ver o próprio perfil" ON public.profiles FOR SELECT USING (auth.uid() = id);
 -- CREATE POLICY "Admins podem ver todos" ON public.profiles FOR SELECT USING (auth.uid() IN (SELECT id FROM profiles WHERE role = 'admin'));
 
--- 3. Atualizar o seu usuário para admin (Opcional, você pode fazer isso depois pelo site quando criarmos o painel)
+-- 3. Criação da tabela de configurações (Para ligar/desligar abas)
+CREATE TABLE IF NOT EXISTS public.app_settings (
+    id INT PRIMARY KEY,
+    visible_tabs JSONB DEFAULT '["live", "planilha", "radar", "roster", "tracker", "extreme", "analytics", "bank", "market", "loot", "contribute"]'::jsonb
+);
+
+-- Insere a configuração padrão se não existir
+INSERT INTO public.app_settings (id, visible_tabs) 
+VALUES (1, '["live", "planilha", "radar", "roster", "tracker", "extreme", "analytics", "bank", "market", "loot", "contribute"]'::jsonb) 
+ON CONFLICT (id) DO NOTHING;
+
+-- Desabilita RLS para leitura/escrita fácil pelo front
+ALTER TABLE public.app_settings DISABLE ROW LEVEL SECURITY;
+
