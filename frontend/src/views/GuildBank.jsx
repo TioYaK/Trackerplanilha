@@ -90,18 +90,20 @@ CREATE TABLE IF NOT EXISTS guild_bank_payments (
 
   const handleSyncTS3 = async () => {
     if (!isAdmin) return;
-    if (!window.confirm('Isto enviará um comando para o Robô Xerife se conectar ao seu TeamSpeak local (via ClientQuery) e sincronizar o cargo "FBot Bank". O TS3 precisa estar aberto e o ClientQuery ativado. Deseja continuar?')) return;
+    if (!window.confirm('Isto enviará um comando para o Robô Xerife se conectar ao seu TeamSpeak local (via ClientQuery) e sincronizar o cargo "FBot Bank". O TS3 precisa estar aberto e o ClientQuery ativado no SEU PC. Deseja continuar?')) return;
     
-    // Insere tarefa na task_queue
-    const { error } = await supabase.from('task_queue').insert([{
-      task_type: 'SYNC_BANK_TS3',
-      status: 'PENDING'
-    }]);
-    
-    if (error) {
-      alert('Erro ao enviar comando: ' + error.message);
-    } else {
-      alert('Comando enviado! Se o worker estiver rodando no seu PC, a sincronização acontecerá em alguns segundos.');
+    try {
+      const res = await fetch('http://localhost:3001/admin/force-ts3', {
+        method: 'POST'
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Erro na API Local');
+      
+      alert('TeamSpeak sincronizado com sucesso pelo seu Worker Local!');
+      fetchData(); // Recarrega a tela
+    } catch (err) {
+      alert(`Falha ao sincronizar o TS3!\n\nVerifique se o SEU Worker (Painel Preto) está aberto rodando no fundo.\n\nErro: ${err.message}`);
     }
   };
 

@@ -20,32 +20,15 @@ const fetchTask = async () => {
     // Busca a próxima tarefa PENDING ou IN_PROGRESS presa há muito tempo
     const timeLimit = new Date();
     timeLimit.setMinutes(timeLimit.getMinutes() - LOCK_TIMEOUT_MINUTES);
-    const orCondition = `status.eq.PENDING,and(status.eq.IN_PROGRESS,locked_at.lt.${timeLimit.toISOString()})`;
 
-    // 1. Tenta buscar primeiro tarefas VIP que furam a fila (TS3)
-    let { data: tasks, error } = await supabase
+    const { data: tasks, error } = await supabase
       .from('task_queue')
       .select('*')
-      .eq('task_type', 'SYNC_BANK_TS3')
-      .or(orCondition)
+      .or(`status.eq.PENDING,and(status.eq.IN_PROGRESS,locked_at.lt.${timeLimit.toISOString()})`)
       .order('updated_at', { ascending: true })
       .limit(1);
 
     if (error) throw error;
-
-    // 2. Se não tem tarefa VIP, busca a mais velha normal
-    if (!tasks || tasks.length === 0) {
-      const res = await supabase
-        .from('task_queue')
-        .select('*')
-        .or(orCondition)
-        .order('updated_at', { ascending: true })
-        .limit(1);
-      
-      if (res.error) throw res.error;
-      tasks = res.data;
-    }
-
     if (!tasks || tasks.length === 0) return null;
 
     const task = tasks[0];
@@ -75,16 +58,11 @@ const fetchTask = async () => {
 };
 
 const completeTask = async (task) => {
-  if (task.task_type === 'SYNC_BANK_TS3') {
-    // Deleta a tarefa pra não ficar em loop eterno (já que foi iniciada pelo clique no site)
-    await supabase.from('task_queue').delete().eq('id', task.id);
-  } else {
-    // Para manter o worker em loop infinito para as outras tarefas core (guild, highscores)
-    await supabase
-      .from('task_queue')
-      .update({ status: 'PENDING', locked_at: null, worker_id: null })
-      .eq('id', task.id);
-  }
+  // Para manter o worker em loop infinito para as outras tarefas core (guild, highscores)
+  await supabase
+    .from('task_queue')
+    .update({ status: 'PENDING', locked_at: null, worker_id: null })
+    .eq('id', task.id);
 };
 
 const requeueTask = async (task) => {
@@ -108,9 +86,6 @@ const processTask = async (task) => {
         break;
       case 'AUDIT_SLOTS':
         await runAuditSlots();
-        break;
-      case 'SYNC_BANK_TS3':
-        await runBankSync();
         break;
       default:
         console.log(`[WORKER] Tipo de tarefa desconhecido: ${task.task_type}`);
@@ -161,3 +136,28 @@ setInterval(async () => {
 
 // ==========================================
 
+
+// ==========================================
+// SERVIDOR ADMIN LOCAL (Forcar TS3 Sync)
+// ==========================================
+import express from 'express';
+import cors from 'cors';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.post('/admin/force-ts3', async (req, res) => {
+    try {
+        console.log('[API_ADMIN] Recebido comando manual para forcar TS3 Sync!');
+        // Roda o sync
+        await runBankSync();
+        res.json({ success: true, message: 'TS3 Sincronizado com sucesso!' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.listen(3001, () => {
+    console.log('[API_ADMIN] Servidor local escutando na porta 3001 para comandos (TS3).');
+});
