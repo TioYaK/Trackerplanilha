@@ -7,6 +7,31 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   const [membersData, setMembersData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actualHuntTime, setActualHuntTime] = useState(null);
+  const [historyRange, setHistoryRange] = useState('week'); // 'week' ou 'month'
+  const [historyChartData, setHistoryChartData] = useState([]);
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      const formatXp = (raw) => {
+        if (raw >= 1000000) return (raw / 1000000).toFixed(1) + 'M';
+        if (raw >= 1000) return (raw / 1000).toFixed(1) + 'k';
+        return raw;
+      };
+      return (
+        <div className="bg-gray-900 border border-tibia-border p-3 rounded shadow-lg text-sm">
+          <p className="font-bold text-tibia-primary mb-2">{label}</p>
+          <p className="text-gray-300">XP Gained: <span className="text-white font-bold">{formatXp(data.totalXp)}</span></p>
+          {data.singlePing ? (
+             <p className="text-blue-400 mt-1"><Clock size={12} className="inline mr-1" /> Ping Isolado: {data.start}</p>
+          ) : (
+             <p className="text-blue-400 mt-1"><Clock size={12} className="inline mr-1" /> Entrada: {data.start} | Saída: {data.end}</p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
 
   useEffect(() => {
     const fetchPartyData = async () => {
@@ -16,17 +41,20 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       }
       setLoading(true);
 
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        let logs = [];
-        let page = 0;
-        while(true) {
-            const { data } = await supabase
-              .from('telemetry_logs')
-              .select('character_name, delta_xp, recorded_at, level')
-              .in('character_name', party.members)
-              .gte('recorded_at', twentyFourHoursAgo)
-              .order('recorded_at', { ascending: true })
-              .range(page*1000, (page+1)*1000-1);
+      const daysToFetch = historyRange === 'week' ? 7 : 30;
+      const historyStartDate = new Date(Date.now() - daysToFetch * 24 * 60 * 60 * 1000).toISOString();
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
+
+      let logs = [];
+      let page = 0;
+      while(true) {
+          const { data } = await supabase
+            .from('telemetry_logs')
+            .select('character_name, delta_xp, recorded_at, level')
+            .in('character_name', party.members)
+            .gte('recorded_at', historyStartDate)
+            .order('recorded_at', { ascending: true })
+            .range(page*1000, (page+1)*1000-1);
             if (!data || data.length === 0) break;
             logs.push(...data);
             if (data.length < 1000) break;
@@ -39,13 +67,56 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           memberStats[m] = { name: m, totalXpGained: 0, level: '?', lastSeen: null };
         });
 
+        // Agrupamento para o Gráfico de Histórico
+        const historyMap = {};
+        const [sh, sm] = (party.slot_start || '00:00').split(':').map(Number);
+        const [eh, em] = (party.slot_end || '23:59').split(':').map(Number);
+        const startMins = sh * 60 + sm;
+        let endMins = eh * 60 + em;
+        if (endMins < startMins) endMins += 1440; // Cross midnight
+
         logs.forEach(log => {
-          if (memberStats[log.character_name]) {
-            memberStats[log.character_name].totalXpGained += parseInt(log.delta_xp || 0, 10);
+          const date = new Date(log.recorded_at);
+          const dxp = parseInt(log.delta_xp || 0, 10);
+          
+          // 24h Table Logic
+          if (date.getTime() >= twentyFourHoursAgo && memberStats[log.character_name]) {
+            memberStats[log.character_name].totalXpGained += dxp;
             memberStats[log.character_name].level = log.level;
-            memberStats[log.character_name].lastSeen = new Date(log.recorded_at);
+            memberStats[log.character_name].lastSeen = date;
+          }
+
+          // Historical Chart Logic
+          let logMins = date.getHours() * 60 + date.getMinutes();
+          if (endMins > 1440 && logMins < 600) logMins += 1440;
+          
+          if (logMins >= startMins - 60 && logMins <= endMins + 60 && dxp > 0) {
+              const dayStr = date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+              
+              if (!historyMap[dayStr]) {
+                  historyMap[dayStr] = { day: dayStr, totalXp: 0, start: date, end: date, rawDate: date };
+              }
+              historyMap[dayStr].totalXp += dxp;
+              if (date < historyMap[dayStr].start) historyMap[dayStr].start = date;
+              if (date > historyMap[dayStr].end) historyMap[dayStr].end = date;
           }
         });
+
+        // Converte historyMap para array
+        const chartDataArr = Object.values(historyMap)
+          .sort((a, b) => a.rawDate - b.rawDate)
+          .map(h => {
+             const diffMins = (h.end - h.start) / (1000 * 60);
+             const formatTime = (d) => d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+             return {
+                 day: h.day,
+                 totalXp: h.totalXp,
+                 start: formatTime(h.start),
+                 end: formatTime(h.end),
+                 singlePing: diffMins < 5
+             };
+          });
+        setHistoryChartData(chartDataArr);
 
         const processedMembers = Object.values(memberStats).map(m => {
           const raw = m.totalXpGained;
@@ -60,42 +131,17 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         processedMembers.sort((a, b) => b.totalXpGained - a.totalXpGained);
         setMembersData(processedMembers);
 
-        // Calculate Actual Hunt Time based on XP telemetry
-        let huntStart = null;
-        let huntEnd = null;
-        
-        const [sh, sm] = (party.slot_start || '00:00').split(':').map(Number);
-        const [eh, em] = (party.slot_end || '23:59').split(':').map(Number);
-        const startMins = sh * 60 + sm;
-        let endMins = eh * 60 + em;
-        if (endMins < startMins) endMins += 1440; // Cross midnight
-
-        logs.forEach(log => {
-          const dxp = parseInt(log.delta_xp || 0, 10);
-          if (dxp > 0) {
-            const date = new Date(log.recorded_at);
-            let logMins = date.getHours() * 60 + date.getMinutes();
-            if (endMins > 1440 && logMins < 600) logMins += 1440;
-
-            if (logMins >= startMins - 60 && logMins <= endMins + 60) {
-                if (!huntStart || date < huntStart) huntStart = date;
-                if (!huntEnd || date > huntEnd) huntEnd = date;
-            }
-          }
-        });
-
-        if (huntStart && huntEnd) {
-            const diffMins = (huntEnd - huntStart) / (1000 * 60);
-            if (diffMins < 5) {
-                // Was just a single ping or very short
-                setActualHuntTime({ 
-                    single: huntStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                });
+        // Atualiza a Horário Real 
+        if (chartDataArr.length > 0) {
+            const lastHunt = chartDataArr[chartDataArr.length - 1];
+            if (Date.now() - historyMap[lastHunt.day].rawDate.getTime() < 24 * 60 * 60 * 1000) {
+               if (lastHunt.singlePing) {
+                   setActualHuntTime({ single: lastHunt.start });
+               } else {
+                   setActualHuntTime({ start: lastHunt.start, end: lastHunt.end });
+               }
             } else {
-                setActualHuntTime({ 
-                   start: huntStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
-                   end: huntEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-                });
+               setActualHuntTime(null);
             }
         } else {
             setActualHuntTime(null);
@@ -109,7 +155,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
     
     const interval = setInterval(fetchPartyData, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [party]);
+  }, [party, historyRange]);
 
   if (!party) return <div>Nenhuma party selecionada.</div>;
 
@@ -228,6 +274,37 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             </div>
             <p className="text-xs text-gray-500 mt-4 italic text-center">Membros inativos com XP zerada podem estar offline, em outro servidor ou mochilando.</p>
           </div>
+          
+          {/* Gráfico Histórico Semanal/Mensal */}
+          <div className="lg:col-span-3 bg-tibia-card border border-tibia-border rounded-lg shadow-xl overflow-hidden mt-8">
+            <div className="p-4 bg-black/40 border-b border-tibia-border flex justify-between items-center">
+               <h3 className="font-bold text-white">Histórico de Sessões</h3>
+               <select 
+                  value={historyRange} 
+                  onChange={(e) => setHistoryRange(e.target.value)}
+                  className="bg-black/50 border border-tibia-border text-gray-300 px-3 py-1 rounded outline-none text-sm cursor-pointer"
+               >
+                  <option value="week">Últimos 7 dias</option>
+                  <option value="month">Últimos 30 dias</option>
+               </select>
+            </div>
+            <div className="p-4" style={{ height: 300 }}>
+              {historyChartData.length === 0 ? (
+                 <div className="w-full h-full flex items-center justify-center text-gray-500 italic">Nenhum registro de caça neste período.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={historyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="day" stroke="#888" tick={{fill: '#888', fontSize: 12}} />
+                    <YAxis stroke="#888" tickFormatter={formatXpAxis} tick={{fill: '#888', fontSize: 12}} width={60} />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
+                    <Bar dataKey="totalXp" fill="#b9935a" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
         </div>
       )}
     </div>
