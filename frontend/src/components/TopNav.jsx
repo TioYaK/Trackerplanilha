@@ -7,11 +7,13 @@ import {
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
 import { useEffect } from 'react';
+import WorkerAnalyticsModal from './WorkerAnalyticsModal';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTabs }) {
   const { logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [workerCount, setWorkerCount] = useState(0);
+  const [workerModalOpen, setWorkerModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -147,13 +149,16 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
           ))}
         </nav>
 
+        {/* Worker Modal */}
+        <WorkerAnalyticsModal isOpen={workerModalOpen} onClose={() => setWorkerModalOpen(false)} />
+
         {/* Right Icons */}
         <div className="flex items-center space-x-3">
           {isAdmin && (
-            <div className="flex items-center px-3 py-1.5 rounded border bg-green-900/20 text-green-400 border-green-900/50 cursor-default" title="Workers Ativos">
+            <button onClick={() => setWorkerModalOpen(true)} className="flex items-center px-3 py-1.5 rounded border bg-green-900/20 hover:bg-green-900/40 text-green-400 border-green-900/50 cursor-pointer transition-colors" title="Ver Worker Analytics">
               <Server size={16} className="mr-0 sm:mr-2" />
               <span className="text-xs font-bold uppercase hidden sm:inline">{workerCount} WORKERS</span>
-            </div>
+            </button>
           )}
 
           {isAdmin && (
