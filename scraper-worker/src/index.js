@@ -3,6 +3,7 @@ import path from 'path';
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 import { supabase } from './db.js';
 import os from 'os';
+import fs from 'fs';
 import { runFetchGuild } from './jobs/fetchGuild.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
@@ -11,7 +12,19 @@ import { runBankSync } from './jobs/syncBankTS3.js';
 import { checkForUpdates } from './updater.js';
 import { closeBrowser } from './lib/rubinotScraper.js';
 
-const WORKER_ID = `worker-${Math.random().toString(36).substring(2, 9)}`;
+// ==========================================
+// ID PERSISTENTE DO WORKER
+// ==========================================
+const ID_FILE = path.join(process.cwd(), 'worker_id.txt');
+let WORKER_ID;
+
+if (fs.existsSync(ID_FILE)) {
+  WORKER_ID = fs.readFileSync(ID_FILE, 'utf8').trim();
+} else {
+  WORKER_ID = `worker-${Math.random().toString(36).substring(2, 9)}`;
+  fs.writeFileSync(ID_FILE, WORKER_ID);
+}
+
 const POLL_INTERVAL = 5000; // 5 segundos
 const LOCK_TIMEOUT_MINUTES = 5;
 
