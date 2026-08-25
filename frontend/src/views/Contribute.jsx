@@ -68,12 +68,21 @@ export default function Contribute() {
             <a 
               href="/download/AuroriaWorker_Instalador.exe" 
               download
-              className="flex items-center gap-3 bg-gradient-to-b from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white font-medieval text-xl py-4 px-8 rounded-lg shadow-tibia-glow transform transition-all hover:scale-105 border border-green-400"
+              className="flex items-center gap-3 bg-gradient-to-b from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white font-medieval text-xl py-4 px-8 rounded-lg shadow-tibia-glow transform transition-all hover:scale-105 border border-green-400 w-full justify-center max-w-sm"
             >
               <Download size={24} />
-              Baixar Auroria Worker
+              Baixar Instalador
             </a>
-            <p className="mt-4 text-xs text-gray-500 font-sans">
+            
+            <a 
+              href="/download/Desinstalador_Worker.bat" 
+              download
+              className="mt-4 flex items-center gap-2 text-gray-500 hover:text-red-400 transition-colors font-sans text-sm underline"
+            >
+              Precisa parar? Baixe o Desinstalador
+            </a>
+
+            <p className="mt-6 text-xs text-gray-500 font-sans text-center">
               Requisitos: Windows 10/11. (Tamanho: ~9KB)
             </p>
           </div>
