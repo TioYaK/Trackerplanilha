@@ -90,53 +90,44 @@ const requeueTask = async (task) => {
   await completeTask(task);
 };
 
+// ==========================================
+// ESTATÍSTICAS E HEARTBEAT
+// ==========================================
+let sessionStats = {}; // { 'FETCH_GUILD': { count: 0, duration: 0 } }
+
 const processTask = async (task) => {
   console.log(`[WORKER] Processando tarefa ${task.task_type} (ID: ${task.id})`);
   const startTime = Date.now();
   
-  // Timeout Global de 4.5 minutos (270 segundos). 
-  // Isso blinda o worker contra travamentos infinitos do Puppeteer.
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => {
-      reject(new Error('CRITICAL_TIMEOUT'));
-    }, 4.5 * 60 * 1000);
+    setTimeout(() => { reject(new Error('CRITICAL_TIMEOUT')); }, 4.5 * 60 * 1000);
   });
 
   const executeTask = async () => {
     switch (task.task_type) {
-      case 'FETCH_GUILD':
-        await runFetchGuild();
-        break;
-      case 'FETCH_ONLINES':
-        await runFetchOnlines();
-        break;
-      case 'FETCH_HIGHSCORE':
+      case 'FETCH_GUILD': await runFetchGuild(); break;
+      case 'FETCH_ONLINES': await runFetchOnlines(); break;
+      case 'FETCH_HIGHSCORE': 
         await runFetchHighscores(task.page_number || 1);
         await runAuditSlots();
         break;
-      case 'AUDIT_SLOTS':
-        await runAuditSlots();
-        break;
-      default:
-        console.log(`[WORKER] Tipo de tarefa desconhecido: ${task.task_type}`);
+      case 'AUDIT_SLOTS': await runAuditSlots(); break;
+      default: console.log(`[WORKER] Tipo desconhecido: ${task.task_type}`);
     }
   };
 
   try {
-    // Roda a tarefa competindo com o Timeout
     await Promise.race([executeTask(), timeoutPromise]);
-
     const duration = Date.now() - startTime;
     console.log(`[WORKER] Tarefa ${task.task_type} concluída em ${duration}ms`);
     
-    // Registra o histórico da tarefa no banco
-    await supabase.from('task_history').insert({
-      worker_id: WORKER_ID,
-      task_type: task.task_type,
-      duration_ms: duration
-    }).catch(e => { /* Ignora se a tabela ainda nao existir */ });
+    // Aggrega os stats localmente (Economiza banco de dados)
+    if (!sessionStats[task.task_type]) {
+      sessionStats[task.task_type] = { count: 0, duration: 0 };
+    }
+    sessionStats[task.task_type].count += 1;
+    sessionStats[task.task_type].duration += duration;
 
-    // Após terminar, completa a tarefa
     await requeueTask(task);
   } catch (error) {
     console.error(`[WORKER] Falha na tarefa ${task.id}:`, error.message);
@@ -209,6 +200,7 @@ fetch('https://ipinfo.io/json')
 
 setInterval(async () => {
   try {
+    // 1. Envia Heartbeat
     await supabase.from('worker_heartbeats').upsert({
       worker_id: WORKER_ID,
       last_ping: new Date().toISOString(),
@@ -217,10 +209,25 @@ setInterval(async () => {
       location: WORKER_LOCATION,
       metadata: WORKER_METADATA
     });
+
+    // 2. Faz o flush dos relatórios agregados de tarefas (Economiza Linhas)
+    const statsToFlush = { ...sessionStats };
+    sessionStats = {}; // Reseta o local
+    
+    for (const [type, data] of Object.entries(statsToFlush)) {
+      if (data.count > 0) {
+        await supabase.from('task_history').insert({
+          worker_id: WORKER_ID,
+          task_type: type,
+          task_count: data.count,
+          duration_ms: data.duration
+        }).catch(() => {});
+      }
+    }
   } catch (err) {
-    // ignorar erro silenciosamente para não floodar logs
+    // ignorar
   }
-}, 30 * 1000); // Envia heartbeat a cada 30 segundos
+}, 10 * 60 * 1000); // 10 minutos
 
 // Iniciar Loop
 loop();

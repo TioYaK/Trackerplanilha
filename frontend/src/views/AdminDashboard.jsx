@@ -57,38 +57,40 @@ export default function AdminDashboard() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 10000); // Poll every 10s
+    const interval = setInterval(fetchData, 30 * 60 * 1000); // 30 minutos
     return () => clearInterval(interval);
   }, []);
 
   const now = new Date();
-  const twoMinsAgo = new Date(now.getTime() - 2 * 60 * 1000);
-  const activeWorkers = workers.filter(w => new Date(w.last_ping) > twoMinsAgo);
+  const cutoffLimit = new Date(now.getTime() - 12 * 60 * 1000); // 12 minutos
+  const activeWorkers = workers.filter(w => new Date(w.last_ping) > cutoffLimit);
 
   // --- Process Data for Charts ---
 
   // 1. Online History Chart
-  // We want to group closely related points or just show them directly
   const chartData = onlineHistory.map(row => ({
     time: format(new Date(row.timestamp), 'dd/MM HH:mm'),
     timestamp: new Date(row.timestamp).getTime(),
     players: row.online_count
-  })).filter((_, i, arr) => i % Math.ceil(arr.length / 50) === 0 || i === arr.length -1); // Downsample for performance if too many
+  })).filter((_, i, arr) => i % Math.ceil(arr.length / 50) === 0 || i === arr.length -1);
 
   // 2. Worker Performance (Task History)
   const workerPerf = {};
+  let totalTasks = 0;
   taskHistory.forEach(th => {
     if (!workerPerf[th.worker_id]) {
       workerPerf[th.worker_id] = { name: th.worker_id, count: 0, totalTime: 0 };
     }
-    workerPerf[th.worker_id].count += 1;
+    const c = th.task_count || 1;
+    workerPerf[th.worker_id].count += c;
     workerPerf[th.worker_id].totalTime += th.duration_ms;
+    totalTasks += c;
   });
 
   const perfData = Object.values(workerPerf).map(w => ({
     name: w.name.substring(0, 10) + '...',
     tarefas: w.count,
-    avg_speed: (w.totalTime / w.count / 1000).toFixed(1) // in seconds
+    avg_speed: (w.totalTime / w.count / 1000).toFixed(1)
   }));
 
   // Render components
@@ -186,7 +188,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-400 font-bold uppercase">Total Raspado (24h)</p>
-                    <p className="text-3xl font-bold text-white">{taskHistory.length}</p>
+                    <p className="text-3xl font-bold text-white">{totalTasks}</p>
                   </div>
                 </div>
               </div>
@@ -218,7 +220,7 @@ export default function AdminDashboard() {
                 <h3 className="text-xl font-bold text-gray-300 mb-4 border-b border-tibia-border/50 pb-2">Tropa de Raspagem</h3>
                 <div className="grid grid-cols-1 gap-4">
                   {workers.map(worker => {
-                    const isActive = new Date(worker.last_ping) > twoMinsAgo;
+                    const isActive = new Date(worker.last_ping) > cutoffLimit;
                     const currentTask = tasks.find(t => t.worker_id === worker.worker_id);
                     
                     return (

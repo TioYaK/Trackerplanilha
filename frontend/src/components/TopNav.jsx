@@ -19,16 +19,16 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     if (!isAdmin) return;
     const fetchWorkers = async () => {
       try {
-        const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+        const cutoffLimit = new Date(Date.now() - 12 * 60 * 1000).toISOString();
         const { count } = await supabase
           .from('worker_heartbeats')
           .select('*', { count: 'exact', head: true })
-          .gte('last_ping', twoMinsAgo);
+          .gte('last_ping', cutoffLimit);
         setWorkerCount(count || 0);
       } catch (e) {}
     };
     fetchWorkers();
-    const interval = setInterval(fetchWorkers, 30000);
+    const interval = setInterval(fetchWorkers, 10 * 60 * 1000); // 10 minutos
     return () => clearInterval(interval);
   }, [isAdmin]);
 
