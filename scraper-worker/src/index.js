@@ -119,6 +119,25 @@ const loop = async () => {
   }
 };
 
+// ==========================================
+// HEARTBEAT DO WORKER
+// ==========================================
+const WORKER_VERSION = '1.0.1';
+const WORKER_STARTED = new Date().toISOString();
+
+setInterval(async () => {
+  try {
+    await supabase.from('worker_heartbeats').upsert({
+      worker_id: WORKER_ID,
+      last_ping: new Date().toISOString(),
+      started_at: WORKER_STARTED,
+      version: WORKER_VERSION
+    });
+  } catch (err) {
+    // ignorar erro silenciosamente para não floodar logs
+  }
+}, 30 * 1000); // Envia heartbeat a cada 30 segundos
+
 // Iniciar Loop
 loop();
 

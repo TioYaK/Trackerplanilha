@@ -2,13 +2,33 @@ import React, { useState } from 'react';
 import { 
   Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, 
   Swords, Crosshair, Lock, Unlock, Landmark, ShoppingBag, 
-  Calculator, BrainCircuit, ChevronDown, Menu, X, LogOut
+  Calculator, BrainCircuit, ChevronDown, Menu, X, LogOut, Server
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { supabase } from '../lib/supabase';
+import { useEffect } from 'react';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTabs }) {
   const { logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [workerCount, setWorkerCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const fetchWorkers = async () => {
+      try {
+        const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+        const { count } = await supabase
+          .from('worker_heartbeats')
+          .select('*', { count: 'exact', head: true })
+          .gte('last_ping', twoMinsAgo);
+        setWorkerCount(count || 0);
+      } catch (e) {}
+    };
+    fetchWorkers();
+    const interval = setInterval(fetchWorkers, 30000);
+    return () => clearInterval(interval);
+  }, [isAdmin]);
 
   // Mapeamento original de views e ícones para facilitar o uso no menu
   const viewsData = {
@@ -129,6 +149,13 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
 
         {/* Right Icons */}
         <div className="flex items-center space-x-3">
+          {isAdmin && (
+            <div className="flex items-center px-3 py-1.5 rounded border bg-green-900/20 text-green-400 border-green-900/50 cursor-default" title="Workers Ativos">
+              <Server size={16} className="mr-0 sm:mr-2" />
+              <span className="text-xs font-bold uppercase hidden sm:inline">{workerCount} WORKERS</span>
+            </div>
+          )}
+
           {isAdmin && (
             <div className="flex items-center px-3 py-1.5 rounded border bg-red-900/40 text-red-400 border-red-900/50 cursor-default" title="Modo Administrador Ativo">
               <Unlock size={16} className="mr-0 sm:mr-2" />
