@@ -7,7 +7,6 @@ import {
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
 import { useEffect } from 'react';
-import WorkerAnalyticsModal from './WorkerAnalyticsModal';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTabs }) {
   const { logout } = useAuth();
