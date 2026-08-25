@@ -42,6 +42,12 @@ namespace AuroriaInstaller
             InstallPrerequisites();
 
             // 2. Cria a pasta do projeto e baixa o codigo fonte
+            if (Directory.Exists(workDir) && !Directory.Exists(Path.Combine(workDir, ".git")))
+            {
+                Console.WriteLine("Limpando instalacao corrompida anterior...");
+                try { Directory.Delete(workDir, true); } catch {}
+            }
+
             if (!Directory.Exists(workDir))
             {
                 Directory.CreateDirectory(workDir);
