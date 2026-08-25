@@ -8,10 +8,11 @@ import { runFetchHighscores } from './jobs/fetchHighscores.js';
 import { runAuditSlots } from './jobs/auditSlots.js';
 import { runBankSync } from './jobs/syncBankTS3.js';
 import { checkForUpdates } from './updater.js';
+import { closeBrowser } from './lib/rubinotScraper.js';
 
 const WORKER_ID = `worker-${Math.random().toString(36).substring(2, 9)}`;
 const POLL_INTERVAL = 5000; // 5 segundos
-const LOCK_TIMEOUT_MINUTES = 3;
+const LOCK_TIMEOUT_MINUTES = 5;
 
 console.log(`[WORKER] Iniciando worker ID: ${WORKER_ID}`);
 
@@ -34,7 +35,7 @@ const fetchTask = async () => {
     const task = tasks[0];
 
     // Tenta aplicar o lock (usamos match para garantir que ninguém pegou no meio tempo)
-    const { data: updatedTask, error: updateError } = await supabase
+    let query = supabase
       .from('task_queue')
       .update({
         status: 'IN_PROGRESS',
@@ -42,9 +43,15 @@ const fetchTask = async () => {
         locked_at: new Date().toISOString(),
       })
       .eq('id', task.id)
-      .eq('status', task.status) // Concorrência otimista
-      .select()
-      .single();
+      .eq('status', task.status); // Concorrência otimista primária
+      
+    // Se a task for IN_PROGRESS, o locked_at DEVE ser igual ao que consultamos
+    // isso evita que dois workers roubem a MESMA task presa simultaneamente.
+    if (task.status === 'IN_PROGRESS' && task.locked_at) {
+        query = query.eq('locked_at', task.locked_at);
+    }
+
+    const { data: updatedTask, error: updateError } = await query.select().single();
 
     if (updateError || !updatedTask) {
       return null; // Outro worker pegou
@@ -72,7 +79,15 @@ const requeueTask = async (task) => {
 const processTask = async (task) => {
   console.log(`[WORKER] Processando tarefa ${task.task_type} (ID: ${task.id})`);
   
-  try {
+  // Timeout Global de 4.5 minutos (270 segundos). 
+  // Isso blinda o worker contra travamentos infinitos do Puppeteer.
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error('CRITICAL_TIMEOUT'));
+    }, 4.5 * 60 * 1000);
+  });
+
+  const executeTask = async () => {
     switch (task.task_type) {
       case 'FETCH_GUILD':
         await runFetchGuild();
@@ -90,13 +105,24 @@ const processTask = async (task) => {
       default:
         console.log(`[WORKER] Tipo de tarefa desconhecido: ${task.task_type}`);
     }
+  };
+
+  try {
+    // Roda a tarefa competindo com o Timeout
+    await Promise.race([executeTask(), timeoutPromise]);
 
     // Após terminar, completa a tarefa
     await requeueTask(task);
   } catch (error) {
     console.error(`[WORKER] Falha na tarefa ${task.id}:`, error.message);
-    // Volta pra fila em caso de erro, mas sem worker (timeout)
-    await supabase.from('task_queue').update({ status: 'PENDING' }).eq('id', task.id);
+    
+    if (error.message === 'CRITICAL_TIMEOUT') {
+      console.warn('[WORKER] Tarefa excedeu o tempo limite (Travou)! Forçando fechamento do browser e reiniciando estado...');
+      try { await closeBrowser(); } catch (e) { /* ignore */ }
+    }
+
+    // Volta pra fila em caso de erro, removendo o worker atual do lock
+    await supabase.from('task_queue').update({ status: 'PENDING', worker_id: null, locked_at: null }).eq('id', task.id);
   }
 };
 
