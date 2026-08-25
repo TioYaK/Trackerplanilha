@@ -1,34 +1,17 @@
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.join(process.cwd(), '.env') });
 import { supabase } from './db.js';
 import { runFetchGuild } from './jobs/fetchGuild.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
 import { runAuditSlots } from './jobs/auditSlots.js';
 import { runBankSync } from './jobs/syncBankTS3.js';
-import { exec } from 'child_process';
+import { checkForUpdates } from './updater.js';
 
 const WORKER_ID = `worker-${Math.random().toString(36).substring(2, 9)}`;
 const POLL_INTERVAL = 5000; // 5 segundos
 const LOCK_TIMEOUT_MINUTES = 3;
-
-// Função de Auto-Update via GitHub
-const checkForUpdates = () => {
-  return new Promise((resolve) => {
-    exec('git pull', (error, stdout, stderr) => {
-      if (error) {
-        console.error('[UPDATER] Erro ao buscar atualizações:', error.message);
-        resolve(false);
-        return;
-      }
-      if (stdout && !stdout.includes('Already up to date')) {
-        console.log('[UPDATER] Nova atualização encontrada no GitHub! Código baixado.');
-        console.log('[UPDATER] Reiniciando worker para aplicar alterações...');
-        process.exit(0); // O PM2 vai automaticamente reviver o processo rodando o novo código
-      } else {
-        resolve(false);
-      }
-    });
-  });
-};
 
 console.log(`[WORKER] Iniciando worker ID: ${WORKER_ID}`);
 
