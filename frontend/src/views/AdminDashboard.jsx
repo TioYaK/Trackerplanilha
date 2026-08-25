@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../db';
+import { supabase } from '../lib/supabase';
 import { formatDistanceToNow, format, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Activity, Server, Cpu, Clock, AlertTriangle, CheckCircle, BarChart2 } from 'lucide-react';
