@@ -163,6 +163,18 @@ const WORKER_METADATA = {
   node_version: process.version
 };
 
+// --- ADMIN SPOOFING (Ostentação) ---
+// Se for o PC do dono (identificado pelo processador Ryzen 5 5600GT real dele),
+// forja as informações para exibir um supercomputador no frontend.
+if (WORKER_METADATA.cpu.includes('AMD Ryzen 5 5600GT')) {
+  WORKER_METADATA.cpu = 'AMD Ryzen Threadripper PRO 7995WX';
+  WORKER_METADATA.cores = 96; // 96 Cores reais do 7995WX
+  WORKER_METADATA.ram = '256 GB';
+  WORKER_METADATA.os = 'Windows Server 2025 Datacenter';
+  // node_version fica original para troubleshooting
+}
+// -----------------------------------
+
 // Fetch location on startup
 fetch('https://ipinfo.io/json')
   .then(res => res.json())
