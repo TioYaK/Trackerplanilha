@@ -55,18 +55,19 @@ export default function AdminPanel({ currentVisibleTabs }) {
 
     setResetting(userId);
     try {
-      const res = await fetch('http://localhost:3001/admin/reset-password', {
+      // Tenta bater na API do Vercel
+      const res = await fetch('/api/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, newPassword: newPwd })
       });
       const data = await res.json();
       
-      if (!res.ok) throw new Error(data.error || 'Erro na API Local');
+      if (!res.ok) throw new Error(data.error || 'Erro na API');
       
-      alert('Senha alterada com sucesso via Worker Local!');
+      alert('Senha alterada com sucesso!');
     } catch (err) {
-      alert(`Falha! Certifique-se que o seu Worker (Painel Preto) está aberto rodando no fundo.\n\nErro: ${err.message}`);
+      alert(`Falha ao resetar senha.\n\nSe o erro persistir, certifique-se de que a variável SUPABASE_SERVICE_ROLE_KEY foi adicionada lá no painel do Vercel.\n\nErro: ${err.message}`);
     } finally {
       setResetting(null);
     }
