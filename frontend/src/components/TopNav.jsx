@@ -13,7 +13,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
   // Mapeamento original de views e ícones para facilitar o uso no menu
   const viewsData = {
     live: { label: 'Monitoramento ao Vivo', icon: <Activity size={16} /> },
-    radar: { label: 'Radar do Servidor', icon: <Crosshair size={16} /> },
+    radar: { label: 'Radar da Guilda', icon: <Crosshair size={16} /> },
     roster: { label: 'Exército da Guilda', icon: <Users size={16} /> },
     planilha: { label: 'Painel de Agendamento', icon: <CalendarDays size={16} /> },
     contribute: { label: 'Ajude a Guilda', icon: <Swords size={16} /> },
