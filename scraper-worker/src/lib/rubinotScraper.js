@@ -135,6 +135,7 @@ async function getHighscorePage() {
     await initBrowser();
     if (!highscoresPage || highscoresPage.isClosed()) {
         highscoresPage = await globalBrowser.newPage();
+        await blockHeavyAssets(highscoresPage);
         await highscoresPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
     }
     return highscoresPage;
@@ -331,6 +332,7 @@ async function scrapeRubinotCharacterPage(characterName) {
     let tempPage = null;
     try {
         tempPage = await globalBrowser.newPage();
+        await blockHeavyAssets(tempPage);
         await tempPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
         const url = `https://rubinot-eve.otservices.space/characters/${encodeURIComponent(characterName)}`;
@@ -756,6 +758,7 @@ async function scrapePlayer(playerName) {
     try {
         await initBrowser();
         tempPage = await globalBrowser.newPage();
+        await blockHeavyAssets(tempPage);
         await tempPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
         await tempPage.goto('https://rubinot.com.br/characters', { waitUntil: 'networkidle2', timeout: 30000 });
