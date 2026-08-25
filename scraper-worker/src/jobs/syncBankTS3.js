@@ -123,29 +123,33 @@ export const runBankSync = async () => {
         
         const currentMonth = new Date().toISOString().slice(0, 7); // "2026-08"
 
-        // 1. Apaga todos os registros desse mês que foram inseridos pelo TS3 (pra não apagar os manuais)
-        await supabase.from('guild_bank_payments')
-            .delete()
+        // 1. Busca os pagamentos que o robô já registrou este mês
+        const { data: existing } = await supabase.from('guild_bank_payments')
+            .select('character_name')
             .eq('payment_month', currentMonth)
             .eq('admin_name', 'TS3_Sync');
 
-        // 2. Insere a galera nova
-        if (paidUsers.length > 0) {
-            const inserts = paidUsers.map(u => ({
+        const existingNames = new Set(existing?.map(e => e.character_name) || []);
+
+        // 2. Filtra apenas os usuários do TS que AINDA NÃO estão no banco
+        const inserts = paidUsers
+            .filter(u => !existingNames.has(u.Char_Extraido))
+            .map(u => ({
                 character_name: u.Char_Extraido,
                 payment_month: currentMonth,
                 amount: 250, // O user disse que é 250rc
                 admin_name: 'TS3_Sync'
             }));
 
+        if (inserts.length > 0) {
             const { error } = await supabase.from('guild_bank_payments').insert(inserts);
             if (error) {
                 console.error('[TS3_SYNC] Erro ao inserir no Supabase:', error.message);
             } else {
-                console.log(`[TS3_SYNC] Sucesso! ${inserts.length} pagamentos do FBot Bank inseridos/atualizados.`);
+                console.log(`[TS3_SYNC] Sucesso! ${inserts.length} NOVOS pagamentos do FBot Bank inseridos.`);
             }
         } else {
-            console.log('[TS3_SYNC] Ninguém encontrado com a tag.');
+            console.log(`[TS3_SYNC] Nenhum NOVO pagamento detectado. Todos os ${paidUsers.length} online já estavam computados no banco.`);
         }
 
     } catch (err) {
