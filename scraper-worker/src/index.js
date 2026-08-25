@@ -20,15 +20,32 @@ const fetchTask = async () => {
     // Busca a próxima tarefa PENDING ou IN_PROGRESS presa há muito tempo
     const timeLimit = new Date();
     timeLimit.setMinutes(timeLimit.getMinutes() - LOCK_TIMEOUT_MINUTES);
+    const orCondition = `status.eq.PENDING,and(status.eq.IN_PROGRESS,locked_at.lt.${timeLimit.toISOString()})`;
 
-    const { data: tasks, error } = await supabase
+    // 1. Tenta buscar primeiro tarefas VIP que furam a fila (TS3)
+    let { data: tasks, error } = await supabase
       .from('task_queue')
       .select('*')
-      .or(`status.eq.PENDING,and(status.eq.IN_PROGRESS,locked_at.lt.${timeLimit.toISOString()})`)
+      .eq('task_type', 'SYNC_BANK_TS3')
+      .or(orCondition)
       .order('updated_at', { ascending: true })
       .limit(1);
 
     if (error) throw error;
+
+    // 2. Se não tem tarefa VIP, busca a mais velha normal
+    if (!tasks || tasks.length === 0) {
+      const res = await supabase
+        .from('task_queue')
+        .select('*')
+        .or(orCondition)
+        .order('updated_at', { ascending: true })
+        .limit(1);
+      
+      if (res.error) throw res.error;
+      tasks = res.data;
+    }
+
     if (!tasks || tasks.length === 0) return null;
 
     const task = tasks[0];
@@ -143,3 +160,4 @@ setInterval(async () => {
 }, 30 * 60 * 1000);
 
 // ==========================================
+
