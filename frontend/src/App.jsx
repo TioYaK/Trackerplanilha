@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TopNav from './components/TopNav';
 import LiveDashboard from './views/LiveDashboard';
 import GlobalTracker from './components/GlobalTracker';
