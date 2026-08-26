@@ -2,6 +2,14 @@
 title Desinstalador - Tracker Planilhado
 color 0C
 
+:: Tenta escalar para Administrador automaticamente para matar processos fantasmas blindados
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo Solicitando privilegios de Administrador para limpeza profunda...
+    powershell -Command "Start-Process '%~dpnx0' -Verb RunAs"
+    exit /b
+)
+
 echo ========================================================
 echo     DESINSTALADOR DO WORKER - BATTLESTORM TRACKER
 echo ========================================================
