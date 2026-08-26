@@ -159,7 +159,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.0.2';
+const WORKER_VERSION = '1.0.3';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -227,7 +227,7 @@ const loop = async () => {
   }
 };
 
-setInterval(async () => {
+const sendHeartbeat = async () => {
   try {
     // 1. Envia Heartbeat
     await supabase.from('worker_heartbeats').upsert({
@@ -239,7 +239,7 @@ setInterval(async () => {
       metadata: WORKER_METADATA
     });
 
-    // 2. Faz o flush dos relatórios agregados de tarefas (Economiza Linhas)
+    // 2. Faz o flush dos relatórios agregados de tarefas
     const statsToFlush = { ...sessionStats };
     sessionStats = {}; // Reseta o local
     
@@ -256,7 +256,14 @@ setInterval(async () => {
   } catch (err) {
     // ignorar
   }
-}, 10 * 60 * 1000); // 10 minutos
+};
+
+// Manda o PRIMEIRO ping exato 1 minuto após ligar
+setTimeout(() => {
+  sendHeartbeat();
+  // Depois do primeiro, mantém a rotina de 10 em 10 minutos
+  setInterval(sendHeartbeat, 10 * 60 * 1000);
+}, 60 * 1000);
 
 // Iniciar Loop
 loop();
