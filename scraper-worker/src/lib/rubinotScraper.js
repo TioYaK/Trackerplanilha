@@ -732,18 +732,16 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20, vocation = 
 
                 let clicked = false;
                 try {
-                    clicked = await page.evaluate((nextNum) => {
+                    clicked = await page.evaluate(() => {
                         const buttons = Array.from(document.querySelectorAll('button, a'));
-                        
-                        // Highscores pagination is just numbers: 1, 2, 3, 4...
-                        let nextBtn = buttons.find(b => b.textContent.trim() === String(nextNum));
+                        const nextBtn = buttons.find(b => b.title === 'Próxima Página' || b.innerHTML.includes('chevron-right'));
                         
                         if (nextBtn && !nextBtn.disabled) { 
                             nextBtn.click(); 
                             return true; 
                         }
                         return false;
-                    }, pageNum + 1);
+                    });
                 } catch (e) {
                     if (e.message.includes('Target closed') || e.message.includes('Session closed')) break;
                     throw e;

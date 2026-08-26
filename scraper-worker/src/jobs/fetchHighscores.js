@@ -14,9 +14,9 @@ export const runFetchHighscores = async () => {
 
     for (const voc of vocations) {
         console.log(`[JOB] Coletando Highscores -> Vocação: ${voc || 'Geral'}`);
-        // Limita a 10 páginas por vocação (500 players) para economizar tempo, 
-        // totalizando até 3000 players varridos.
-        const vocPlayers = await scrapeHighscores('Auroria', null, 10, voc); 
+        // Varre as 20 páginas (Top 1000) por vocação.
+        // Totalizando até 6000 players varridos.
+        const vocPlayers = await scrapeHighscores('Auroria', null, 20, voc); 
         if (vocPlayers) {
             vocPlayers.forEach(p => playersMap.set(p.name, p));
         }
