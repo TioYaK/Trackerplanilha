@@ -2,11 +2,13 @@ import { supabase } from '../db.js';
 import { scrapeHighscores } from '../lib/rubinotScraper.js';
 import 'dotenv/config';
 
+// Cache global em memória para evitar consultas caras ao banco (Disk IO)
+const globalLastXpMap = new Map();
+
 export const runFetchHighscores = async () => {
   try {
     console.log('[JOB] Fetching Highscores (Auroria)...');
     
-    // Scrape up to 500 pages (25.000 players) specifically on the 'Auroria' server
     const players = await scrapeHighscores('Auroria', null, 500); 
     
     if (!players || players.length === 0) {
@@ -14,7 +16,7 @@ export const runFetchHighscores = async () => {
       return;
     }
 
-    // Buscamos quem está na nossa guilda
+    // Buscamos quem estǭ na nossa guilda
     let allGuildMembers = [];
     let from = 0;
     const step = 1000;
@@ -37,33 +39,44 @@ export const runFetchHighscores = async () => {
     const logsToInsert = [];
     const names = players.filter(p => memberNames.has(p.name.toLowerCase())).map(p => p.name);
     
-    // Calcula Delta XP (Chunking para evitar limites de URL e limite de 1000 rows)
-    const lastXpMap = {};
+    // Descobre nomes que não estão no cache
+    const missingNames = names.filter(n => !globalLastXpMap.has(n));
+    
+    // Busca apenas o histórico recente para os que faltam (Redução drástica de Disk IO)
     const chunkSize = 50;
-    for (let i = 0; i < names.length; i += chunkSize) {
-      const chunk = names.slice(i, i + chunkSize);
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
+    for (let i = 0; i < missingNames.length; i += chunkSize) {
+      const chunk = missingNames.slice(i, i + chunkSize);
       const { data: lastLogs } = await supabase
         .from('telemetry_logs')
         .select('character_name, xp_total')
         .in('character_name', chunk)
+        .gte('recorded_at', yesterday)
         .order('recorded_at', { ascending: false });
         
       if (lastLogs) {
         lastLogs.forEach(row => {
-          if (!lastXpMap[row.character_name]) lastXpMap[row.character_name] = parseInt(row.xp_total, 10);
+          if (!globalLastXpMap.has(row.character_name)) {
+            globalLastXpMap.set(row.character_name, parseInt(row.xp_total, 10));
+          }
         });
       }
     }
     
     for (const player of players) {
       if (memberNames.has(player.name.toLowerCase())) {
-        const lastXp = lastXpMap[player.name] || player.experience;
+        const lastXp = globalLastXpMap.get(player.name) || player.experience;
+        
+        // Atualiza o cache para o próximo ciclo
+        globalLastXpMap.set(player.name, player.experience);
+        
         logsToInsert.push({
           character_name: player.name,
           level: player.level,
           xp_total: player.experience,
           delta_xp: player.experience - lastXp,
-          is_online: false // Será atualizado por telemetry fetchGuild
+          is_online: false
         });
       }
     }
