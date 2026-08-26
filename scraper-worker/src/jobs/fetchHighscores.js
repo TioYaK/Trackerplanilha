@@ -5,24 +5,15 @@ import 'dotenv/config';
 // Cache global em memória para evitar consultas caras ao banco (Disk IO)
 const globalLastXpMap = new Map();
 
-export const runFetchHighscores = async () => {
+export const runFetchHighscores = async (vocationStr) => {
   try {
-    console.log('[JOB] Fetching Highscores (Auroria) multiplicando alcance por vocação...');
+    const voc = vocationStr === 'ALL' ? null : 
+                vocationStr.charAt(0).toUpperCase() + vocationStr.slice(1).toLowerCase();
+                
+    console.log(`[JOB] Fetching Highscores (Auroria) -> Vocação: ${voc || 'Geral'}`);
     
-    const vocations = [null, 'Knight', 'Druid', 'Sorcerer', 'Paladin', 'Monk'];
-    const playersMap = new Map();
-
-    for (const voc of vocations) {
-        console.log(`[JOB] Coletando Highscores -> Vocação: ${voc || 'Geral'}`);
-        // Varre as 20 páginas (Top 1000) por vocação.
-        // Totalizando até 6000 players varridos.
-        const vocPlayers = await scrapeHighscores('Auroria', null, 20, voc); 
-        if (vocPlayers) {
-            vocPlayers.forEach(p => playersMap.set(p.name, p));
-        }
-    }
-
-    const players = Array.from(playersMap.values());
+    // Varre as 20 páginas (Top 1000) da vocação específica.
+    const players = await scrapeHighscores('Auroria', null, 20, voc); 
     
     if (!players || players.length === 0) {
       console.log(`[JOB] Nenhum highscore encontrado.`);

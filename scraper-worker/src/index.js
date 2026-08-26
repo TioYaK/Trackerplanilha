@@ -86,7 +86,7 @@ const fetchTask = async () => {
 const completeTask = async (task) => {
   // Define o Cooldown com base no tipo da tarefa!
   let cooldownMinutes = 1;
-  if (task.task_type === 'FETCH_HIGHSCORE') cooldownMinutes = 10;
+  if (task.task_type.startsWith('FETCH_HIGHSCORE')) cooldownMinutes = 10;
   if (task.task_type === 'FETCH_ONLINES') cooldownMinutes = 2;
   
   const nextRun = new Date();
@@ -118,15 +118,16 @@ const processTask = async (task) => {
   });
 
   const executeTask = async () => {
-    switch (task.task_type) {
-      case 'FETCH_GUILD': await runFetchGuild(); break;
-      case 'FETCH_ONLINES': await runFetchOnlines(); break;
-      case 'FETCH_HIGHSCORE': 
-        await runFetchHighscores(task.page_number || 1);
+    if (task.task_type === 'FETCH_GUILD') await runFetchGuild();
+    else if (task.task_type === 'FETCH_ONLINES') await runFetchOnlines();
+    else if (task.task_type === 'AUDIT_SLOTS') await runAuditSlots();
+    else if (task.task_type.startsWith('FETCH_HIGHSCORE')) {
+        const parts = task.task_type.split('_');
+        const vocStr = parts.length > 2 ? parts[2] : 'ALL';
+        await runFetchHighscores(vocStr);
         await runAuditSlots();
-        break;
-      case 'AUDIT_SLOTS': await runAuditSlots(); break;
-      default: console.log(`[WORKER] Tipo desconhecido: ${task.task_type}`);
+    } else {
+        console.log(`[WORKER] Tipo desconhecido: ${task.task_type}`);
     }
   };
 
@@ -159,7 +160,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.0.8';
+const WORKER_VERSION = '1.0.9';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
