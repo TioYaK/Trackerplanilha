@@ -19,6 +19,8 @@ echo [1/3] Encerrando processos do Worker...
 wmic process where "name='cscript.exe' and commandline like '%%StartAuroriaWorker.vbs%%'" call terminate >nul 2>&1
 wmic process where "name='cmd.exe' and commandline like '%%loop.bat%%'" call terminate >nul 2>&1
 wmic process where "name='node.exe' and commandline like '%%src/index.js%%'" call terminate >nul 2>&1
+:: Mata processos do Chrome invisiveis que podem ter ficado orfaos (Puppeteer)
+wmic process where "name='chrome.exe' and commandline like '%%--remote-debugging-port%%'" call terminate >nul 2>&1
 
 echo [2/3] Removendo o auto-iniciar do Windows...
 del /F /Q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\StartAuroriaWorker.vbs" >nul 2>&1
