@@ -36,9 +36,9 @@ export const runFetchOnlines = async () => {
 
     // Atualiza status online dos Hunteds
     const { data: huntedList } = await supabase.from('hunted_list').select('id, name, is_online');
+    const onlineSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
+
     if (huntedList && huntedList.length > 0) {
-      const onlineSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
-      
       for (const hunted of huntedList) {
         const isCurrentlyOnline = onlineSet.has(hunted.name.toLowerCase());
         
@@ -52,6 +52,30 @@ export const runFetchOnlines = async () => {
             .update({ is_online: false })
             .eq('id', hunted.id);
         }
+      }
+    }
+
+    // --- CARIMBO DE ATIVIDADE PARA QUEM ESTÁ ONLINE ---
+    // A ideia genial do dono: Se o cara está online no site, ele está ativo!
+    const { data: guildMembers } = await supabase.from('guild_members').select('name');
+    if (guildMembers && guildMembers.length > 0) {
+      const activeGuildNames = guildMembers
+        .filter(m => onlineSet.has(m.name.toLowerCase()))
+        .map(m => m.name);
+
+      if (activeGuildNames.length > 0) {
+        const now = new Date().toISOString();
+        let updatedCount = 0;
+        // Divide em chunks de 100 para não estourar a URL
+        for (let i = 0; i < activeGuildNames.length; i += 100) {
+          const chunk = activeGuildNames.slice(i, i + 100);
+          const { error: updateErr } = await supabase
+            .from('guild_members')
+            .update({ last_xp_date: now })
+            .in('name', chunk);
+          if (!updateErr) updatedCount += chunk.length;
+        }
+        console.log(`[JOB] Carimbo de Atividade (Online) aplicado para ${updatedCount} membros da guilda.`);
       }
     }
 

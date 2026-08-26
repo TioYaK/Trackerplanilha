@@ -159,7 +159,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.0.4';
+const WORKER_VERSION = '1.0.5';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
