@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const [tasks, setTasks] = useState([]);
   const [onlineHistory, setOnlineHistory] = useState([]);
   const [taskHistory, setTaskHistory] = useState([]);
+  const [dbSize, setDbSize] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,10 +47,14 @@ export default function AdminDashboard() {
           .select('*')
           .gte('completed_at', oneDayAgo);
 
+        // Fetch DB Size
+        const { data: sizeData } = await supabase.rpc('get_db_size');
+
         setWorkers(heartbeats || []);
         setTasks(activeTasks || []);
         setOnlineHistory(history || []);
         setTaskHistory(tHistory || []);
+        if (sizeData) setDbSize(Number(sizeData));
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
       }
@@ -189,6 +194,28 @@ export default function AdminDashboard() {
                   <div>
                     <p className="text-sm text-gray-400 font-bold uppercase">Total Raspado (24h)</p>
                     <p className="text-3xl font-bold text-white">{totalTasks}</p>
+                  </div>
+                </div>
+                
+                {/* Storage Alert Box */}
+                <div className="bg-black/30 border border-tibia-border p-4 rounded flex items-center relative overflow-hidden">
+                  <div className="bg-orange-500/20 p-3 rounded-full mr-4 border border-orange-500/30 relative z-10">
+                    <AlertTriangle className="text-orange-400" size={24} />
+                  </div>
+                  <div className="flex-1 relative z-10">
+                    <p className="text-sm text-gray-400 font-bold uppercase">Uso do Disco (500MB)</p>
+                    {dbSize === null ? (
+                       <p className="text-sm font-bold text-gray-500 mt-1">Carregando...</p>
+                    ) : (
+                       <>
+                         <p className="text-2xl font-bold text-white mb-1">
+                           {(dbSize / 1024 / 1024).toFixed(1)} MB <span className="text-sm text-gray-500 font-normal">({((dbSize / 524288000) * 100).toFixed(1)}%)</span>
+                         </p>
+                         <div className="w-full bg-gray-800 rounded-full h-2">
+                           <div className={`h-2 rounded-full ${dbSize > 400000000 ? 'bg-red-500' : 'bg-orange-400'}`} style={{ width: `${Math.min(100, (dbSize / 524288000) * 100)}%` }}></div>
+                         </div>
+                       </>
+                    )}
                   </div>
                 </div>
               </div>

@@ -54,9 +54,18 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick }) {
   useEffect(() => {
     fetchParties();
     
-    // Auto-refresh a cada 5 minutos
-    const interval = setInterval(fetchParties, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    // Assinatura Real-time para atualização automática sem polling (Item 3)
+    const channel = supabase
+      .channel('live_dashboard_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parties_planilhadas' }, payload => {
+        console.log('Realtime Update:', payload);
+        fetchParties();
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
