@@ -74,6 +74,11 @@ namespace AuroriaInstaller
             {
                 Console.WriteLine("Limpando instalacao corrompida anterior...");
                 try { Directory.Delete(workDir, true); } catch {}
+                
+                // Fallback de seguranca caso o Windows esteja travando a pasta
+                if (Directory.Exists(workDir)) {
+                    workDir = workDir + "_" + DateTime.Now.Ticks.ToString();
+                }
             }
 
             if (!Directory.Exists(workDir))
