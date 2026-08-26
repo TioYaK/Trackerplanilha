@@ -97,6 +97,22 @@ export const runFetchHighscores = async () => {
         insertedCount += chunk.length;
       }
     }
+    
+    // --- ATUALIZA O LAST_XP_DATE DOS ATIVOS ---
+    const activeNames = logsToInsert.filter(log => log.delta_xp > 0).map(log => log.character_name);
+    if (activeNames.length > 0) {
+      const now = new Date().toISOString();
+      let updatedCount = 0;
+      for (let i = 0; i < activeNames.length; i += 100) {
+        const chunk = activeNames.slice(i, i + 100);
+        const { error: updateErr } = await supabase
+          .from('guild_members')
+          .update({ last_xp_date: now })
+          .in('name', chunk);
+        if (!updateErr) updatedCount += chunk.length;
+      }
+      console.log(`[JOB] Carimbo de Atividade (last_xp_date) atualizado para ${updatedCount} membros.`);
+    }
 
     console.log(`[JOB] Inseridos ${insertedCount} logs de telemetria baseados nos Highscores.`);
   } catch (error) {
