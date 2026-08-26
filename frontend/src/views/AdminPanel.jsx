@@ -103,11 +103,12 @@ export default function AdminPanel({ currentVisibleTabs }) {
             <table className="w-full text-left font-sans text-sm text-gray-300">
               <thead className="bg-black/50 text-tibia-primary">
                 <tr>
-                  <th className="p-3">Nome Real</th>
-                  <th className="p-3">Main Character</th>
-                  <th className="p-3">TS3 / E-mail</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Permissão</th>
+                  <th className="p-3 text-left">Membro</th>
+                  <th className="p-3 text-left">Main Character</th>
+                  <th className="p-3 text-left">Makers</th>
+                  <th className="p-3 text-left">Contatos</th>
+                  <th className="p-3 text-left">Status</th>
+                  <th className="p-3 text-left">Permissão</th>
                   <th className="p-3 text-right">Ações</th>
                 </tr>
               </thead>
@@ -116,6 +117,21 @@ export default function AdminPanel({ currentVisibleTabs }) {
                   <tr key={u.id} className="border-b border-tibia-border hover:bg-white/5 transition-colors">
                     <td className="p-3">{u.name}</td>
                     <td className="p-3 font-bold text-tibia-highlight">{u.main_character}</td>
+                    <td className="p-3">
+                      <div className="text-xs text-gray-300 max-w-[200px] break-words">
+                        {u.makers ? (
+                          Object.entries(u.makers).map(([srv, chars]) => (
+                            chars && chars.trim().length > 0 && (
+                              <div key={srv} className="mb-1">
+                                <strong className="text-tibia-highlight">{srv}:</strong> {chars}
+                              </div>
+                            )
+                          ))
+                        ) : (
+                          <span className="text-gray-500">Nenhum</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-3">
                       <div>{u.ts3_nickname}</div>
                       <div className="text-xs text-gray-500">{u.email}</div>

@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
-import { 
-  Activity, LayoutDashboard, CalendarDays, Users, TrendingDown, 
-  Swords, Crosshair, Lock, Unlock, Landmark, ShoppingBag, 
-  Calculator, BrainCircuit, ChevronDown, Menu, X, LogOut, Server
-} from 'lucide-react';
-import { useAuth } from './AuthContext';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import { 
+  Crosshair, Users, Landmark, BrainCircuit, Shield, 
+  Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
+  Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays
+} from 'lucide-react';
+import ProfileModal from './ProfileModal';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTabs }) {
   const { logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [workerCount, setWorkerCount] = useState(0);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [workerModalOpen, setWorkerModalOpen] = useState(false);
 
   useEffect(() => {
@@ -168,6 +169,15 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
           )}
 
           <button 
+            onClick={() => setProfileModalOpen(true)}
+            className="flex items-center px-3 py-1.5 rounded transition-colors border bg-blue-900/30 text-blue-400 border-blue-800 hover:text-white hover:bg-blue-900/50"
+            title="Meu Perfil"
+          >
+            <User size={16} className="mr-0 sm:mr-2" />
+            <span className="text-xs font-bold uppercase hidden sm:inline">Perfil</span>
+          </button>
+
+          <button 
             onClick={logout}
             className="flex items-center px-3 py-1.5 rounded transition-colors border bg-black/30 text-gray-500 border-gray-800 hover:text-white hover:bg-black/50"
             title="Sair do Sistema"
@@ -186,6 +196,8 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
         </div>
 
       </div>
+
+      {profileModalOpen && <ProfileModal onClose={() => setProfileModalOpen(false)} />}
 
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
