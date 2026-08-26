@@ -598,18 +598,18 @@ async function scrapeGuild(guildName, maxPages = 50) {
 }
 
 // ─── scrapeHighscores ─────────────────────────────────────────────────────────
-async function scrapeHighscores(world, onPageScraped, maxPages = 20) {
-    const key = `highscores_${(world || 'all').toLowerCase().replace(/\s+/g, '_')}`;
+async function scrapeHighscores(world, onPageScraped, maxPages = 20, vocation = null) {
+    const key = `highscores_${(world || 'all').toLowerCase().replace(/\s+/g, '_')}_${(vocation || 'all').toLowerCase().replace(/\s+/g, '_')}`;
     const cached = readCache(key);
     if (cached) {
-        console.log(`[Scraper] ⚡ Cache de Highscores (${world || 'Global'})`);
+        console.log(`[Scraper] 📦 Cache de Highscores (${world || 'Global'} - ${vocation || 'Todas'})`);
         if (onPageScraped) {
             for (let i = 0; i < cached.length; i += 50) onPageScraped(cached.slice(i, i + 50));
         }
         return cached;
     }
 
-    console.log(`[Scraper] Scraping Highscores para: ${world}...`);
+    console.log(`[Scraper] Scraping Highscores para: ${world} (${vocation || 'Todas as Vocações'})...`);
     const allPlayers = [];
     let pageNum = 1;
     let keepGoing = true;
@@ -636,6 +636,35 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20) {
                 } catch (e) {
                     if (!e.message.includes('Target closed') && !e.message.includes('Session closed')) {
                         console.warn(`[Scraper] Erro ao selecionar mundo: ${e.message}`);
+                    }
+                }
+            }
+        }
+
+        if (vocation) {
+            const vocOptionValue = await page.evaluate((vocName) => {
+                const selects = document.querySelectorAll('select');
+                if (selects.length > 1) {
+                    const opt = Array.from(selects[1].querySelectorAll('option'))
+                        .find(o => o.textContent.trim().toLowerCase() === vocName.toLowerCase());
+                    return opt ? opt.value : null;
+                }
+                return null;
+            }, vocation);
+
+            if (vocOptionValue) {
+                try {
+                    await page.evaluate((val) => {
+                        const selects = document.querySelectorAll('select');
+                        if (selects.length > 1) {
+                            selects[1].value = val;
+                            selects[1].dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }, vocOptionValue);
+                    await new Promise(r => setTimeout(r, 2000));
+                } catch (e) {
+                    if (!e.message.includes('Target closed') && !e.message.includes('Session closed')) {
+                        console.warn(`[Scraper] Erro ao selecionar vocação: ${e.message}`);
                     }
                 }
             }

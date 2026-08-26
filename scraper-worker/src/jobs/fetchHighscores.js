@@ -7,9 +7,22 @@ const globalLastXpMap = new Map();
 
 export const runFetchHighscores = async () => {
   try {
-    console.log('[JOB] Fetching Highscores (Auroria)...');
+    console.log('[JOB] Fetching Highscores (Auroria) multiplicando alcance por vocação...');
     
-    const players = await scrapeHighscores('Auroria', null, 500); 
+    const vocations = [null, 'Knight', 'Druid', 'Sorcerer', 'Paladin', 'Monk'];
+    const playersMap = new Map();
+
+    for (const voc of vocations) {
+        console.log(`[JOB] Coletando Highscores -> Vocação: ${voc || 'Geral'}`);
+        // Limita a 10 páginas por vocação (500 players) para economizar tempo, 
+        // totalizando até 3000 players varridos.
+        const vocPlayers = await scrapeHighscores('Auroria', null, 10, voc); 
+        if (vocPlayers) {
+            vocPlayers.forEach(p => playersMap.set(p.name, p));
+        }
+    }
+
+    const players = Array.from(playersMap.values());
     
     if (!players || players.length === 0) {
       console.log(`[JOB] Nenhum highscore encontrado.`);
