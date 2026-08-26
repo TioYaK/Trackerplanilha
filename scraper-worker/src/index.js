@@ -198,7 +198,7 @@ let emptyCycles = 0;
 const loop = async () => {
   try {
     // 1. CHECAGEM DE VERSÃO (KILL-SWITCH)
-    const { data: settings } = await supabase.from('app_settings').select('min_worker_version').eq('id', 1).single();
+    const { data: settings } = await supabase.from('worker_config').select('min_worker_version').eq('id', 1).single();
     if (settings && settings.min_worker_version) {
       const minVersion = settings.min_worker_version;
       if (WORKER_VERSION !== minVersion && WORKER_VERSION < minVersion) {
