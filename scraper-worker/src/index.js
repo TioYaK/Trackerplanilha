@@ -156,30 +156,10 @@ const processTask = async (task) => {
   }
 };
 
-// Temporizador para não fazer git pull todo segundo, a cada 1 hora ou a cada ciclo vazio longo
-let emptyCycles = 0;
-
-const loop = async () => {
-  const task = await fetchTask();
-  if (task) {
-    emptyCycles = 0;
-    await processTask(task);
-    setTimeout(loop, 1000); // Se achou tarefa, tenta achar outra logo em seguida
-  } else {
-    emptyCycles++;
-    // Se ficou ocioso por 3 ciclos (aprox 15 segundos), checa atualização no GitHub
-    if (emptyCycles % 3 === 0) {
-        await checkForUpdates();
-    }
-    setTimeout(loop, POLL_INTERVAL); // Se não achou, dorme
-  }
-};
-
-
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.0.1';
+const WORKER_VERSION = '1.0.2';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -211,6 +191,41 @@ fetch('https://ipinfo.io/json')
     }
   })
   .catch(() => { /* ignora erro de localizacao */ });
+
+// Temporizador para não fazer git pull todo segundo
+let emptyCycles = 0;
+
+const loop = async () => {
+  try {
+    // 1. CHECAGEM DE VERSÃO (KILL-SWITCH)
+    const { data: settings } = await supabase.from('app_settings').select('min_worker_version').eq('id', 1).single();
+    if (settings && settings.min_worker_version) {
+      const minVersion = settings.min_worker_version;
+      if (WORKER_VERSION !== minVersion && WORKER_VERSION < minVersion) {
+        console.error(`[KILL-SWITCH] Versão obsoleta detectada! Sua versão: ${WORKER_VERSION}. Requerida: ${minVersion}`);
+        console.log(`[KILL-SWITCH] Forçando atualização automática...`);
+        await checkForUpdates();
+        console.log(`[KILL-SWITCH] Reiniciando Worker...`);
+        process.exit(0); // O script .bat vai reiniciar o processo
+      }
+    }
+  } catch (err) {
+    // Se a tabela ainda não existir ou falhar, ignora e continua
+  }
+
+  const task = await fetchTask();
+  if (task) {
+    emptyCycles = 0;
+    await processTask(task);
+    setTimeout(loop, 1000); 
+  } else {
+    emptyCycles++;
+    if (emptyCycles % 3 === 0) {
+        await checkForUpdates();
+    }
+    setTimeout(loop, POLL_INTERVAL);
+  }
+};
 
 setInterval(async () => {
   try {
