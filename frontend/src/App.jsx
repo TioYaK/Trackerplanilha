@@ -90,7 +90,7 @@ export default function App() {
     switch(currentView) {
       case 'live': return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
       case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
-      case 'radar': return <RadarHunters onPlayerClick={handlePlayerClick} />;
+      case 'radar': return <RadarHunters isAdmin={isAdmin} />;
       case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
       case 'extreme': return <ExtremeAnalytics />;
       case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;

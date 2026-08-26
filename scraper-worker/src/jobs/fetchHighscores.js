@@ -14,7 +14,7 @@ export const runFetchHighscores = async () => {
       return;
     }
 
-    // Buscamos quem está na nossa guilda (Paginação para suportar > 1000 membros)
+    // Buscamos quem está na nossa guilda
     let allGuildMembers = [];
     let from = 0;
     const step = 1000;
@@ -25,6 +25,13 @@ export const runFetchHighscores = async () => {
       if (data.length < step) break;
       from += step;
     }
+
+    // Buscamos os Hunteds
+    const { data: huntedData } = await supabase.from('hunted_list').select('name');
+    if (huntedData) {
+      allGuildMembers.push(...huntedData);
+    }
+
     const memberNames = new Set(allGuildMembers.map(m => m.name.toLowerCase()));
 
     const logsToInsert = [];

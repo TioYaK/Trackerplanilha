@@ -34,15 +34,26 @@ export const runFetchOnlines = async () => {
       online_count: onlinePlayers.length
     });
 
-    // 1. Resetar flag is_online de todo mundo no telemetry_logs mais recente? 
-    // Na verdade, a tabela telemetry_logs é de série temporal, então onlines não modificam o log passado,
-    // mas sim servem para cruzar. Podemos criar um novo log para os online
-    // O mais comum é atualizar uma view temporária ou cruzar na hora do highscore.
-    
-    // Para simplificar, vamos atualizar a flag na tabela guild_members para o Dashboard mostrar quem está logado AGORA.
-    // Primeiro zera todo mundo:
-    /* await supabase.from('guild_members').update({ is_online: false }).neq('id', '00000000-0000-0000-0000-000000000000'); */ 
-    // Opcional, dependendo da necessidade de ver quem tá online na guilda.
+    // Atualiza status online dos Hunteds
+    const { data: huntedList } = await supabase.from('hunted_list').select('id, name, is_online');
+    if (huntedList && huntedList.length > 0) {
+      const onlineSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
+      
+      for (const hunted of huntedList) {
+        const isCurrentlyOnline = onlineSet.has(hunted.name.toLowerCase());
+        
+        // Se o status mudou ou se ele acabou de ser visto online
+        if (isCurrentlyOnline) {
+          await supabase.from('hunted_list')
+            .update({ is_online: true, last_seen: new Date().toISOString() })
+            .eq('id', hunted.id);
+        } else if (hunted.is_online) {
+          await supabase.from('hunted_list')
+            .update({ is_online: false })
+            .eq('id', hunted.id);
+        }
+      }
+    }
 
   } catch (error) {
     console.error("[JOB] Erro na task FETCH_ONLINES:", error.message);

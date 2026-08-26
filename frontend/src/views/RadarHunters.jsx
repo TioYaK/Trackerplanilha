@@ -1,250 +1,232 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Target, TrendingUp, Clock, AlertTriangle, Activity, AlertCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { ShieldAlert, Crosshair, UserPlus, Clock, Trash2, Skull } from 'lucide-react';
 
-export default function RadarHunters({ onPlayerClick }) {
-  const [tab, setTab] = useState('realtime'); // 'realtime' or '24h'
-  
-  // 24h State
-  const [hunters24h, setHunters24h] = useState([]);
-  const [loading24h, setLoading24h] = useState(true);
-
-  // Realtime State
-  const [realtimeHunters, setRealtimeHunters] = useState([]);
-  const [loadingRealtime, setLoadingRealtime] = useState(true);
-
-  // Fetch 24h
-  const fetchHunters24h = async () => {
-    setLoading24h(true);
-    const { data, error } = await supabase
-      .from('view_recent_hunters')
-      .select('*')
-      .limit(100);
-    if (data && !error) setHunters24h(data);
-    setLoading24h(false);
-  };
-
-  // Fetch Realtime
-  const fetchRealtime = async () => {
-    setLoadingRealtime(true);
-    try {
-      const { data: guildMembers } = await supabase.from('guild_members').select('name, vocation, level');
-      if (!guildMembers || guildMembers.length === 0) return;
-
-      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-      let logs = [];
-      let page = 0;
-      const membersList = guildMembers.map(m => m.name);
-      
-      while(true) {
-        const { data } = await supabase
-          .from('telemetry_logs')
-          .select('character_name, delta_xp, recorded_at, level')
-          .in('character_name', membersList)
-          .gte('recorded_at', twoHoursAgo)
-          .order('recorded_at', { ascending: true })
-          .range(page * 1000, (page + 1) * 1000 - 1);
-          
-        if (!data || data.length === 0) break;
-        logs.push(...data);
-        if (data.length < 1000) break;
-        page++;
-      }
-
-      const now = Date.now();
-      const thirtyMinsAgo = now - 30 * 60 * 1000;
-      const oneHourAgo = now - 60 * 60 * 1000;
-
-      const memberStats = {};
-      guildMembers.forEach(m => {
-        memberStats[m.name] = { ...m, xpLastHour: 0, isHunting: false, huntStart: null };
-      });
-
-      logs.forEach(log => {
-        const dxp = parseInt(log.delta_xp || 0, 10);
-        if (dxp > 0 && memberStats[log.character_name]) {
-           const m = memberStats[log.character_name];
-           const logDate = new Date(log.recorded_at).getTime();
-           
-           if (logDate >= oneHourAgo) m.xpLastHour += dxp;
-           if (logDate >= thirtyMinsAgo) m.isHunting = true;
-           if (!m.huntStart || logDate < m.huntStart) m.huntStart = logDate;
-        }
-      });
-
-      const activeHunters = Object.values(memberStats)
-         .filter(m => m.isHunting)
-         .sort((a, b) => b.xpLastHour - a.xpLastHour);
-
-      setRealtimeHunters(activeHunters);
-    } catch (err) {
-      console.error(err);
-    }
-    setLoadingRealtime(false);
-  };
+export default function RadarHunters({ isAdmin }) {
+  const [huntedList, setHuntedList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newName, setNewName] = useState('');
+  const [newReason, setNewReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchHunters24h();
-    fetchRealtime();
-    const interval = setInterval(fetchRealtime, 5 * 60 * 1000);
+    fetchHunted();
+    const interval = setInterval(fetchHunted, 30000); // Poll a cada 30s
     return () => clearInterval(interval);
   }, []);
 
-  const formatXP = (xp) => {
-    if (xp >= 1000000) return (xp / 1000000).toFixed(1) + 'M';
-    if (xp >= 1000) return (xp / 1000).toFixed(1) + 'k';
-    return xp;
+  const fetchHunted = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hunted_list')
+        .select('*')
+        .order('is_online', { ascending: false })
+        .order('name');
+      
+      if (error) throw error;
+      setHuntedList(data || []);
+    } catch (e) {
+      console.error('Erro ao buscar hunteds:', e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getVocationColor = (voc) => {
-    if (!voc) return 'text-gray-400';
-    const v = voc.toLowerCase();
-    if (v.includes('knight')) return 'text-blue-400';
-    if (v.includes('paladin')) return 'text-yellow-400';
-    if (v.includes('druid')) return 'text-green-400';
-    if (v.includes('sorcerer')) return 'text-red-400';
-    return 'text-gray-400';
+  const addHunted = async (e) => {
+    e.preventDefault();
+    if (!newName.trim() || !isAdmin) return;
+    
+    setSubmitting(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      const { error } = await supabase.from('hunted_list').insert({
+        name: newName.trim(),
+        reason: newReason.trim() || 'Inimigo da Guilda',
+        added_by: userData?.user?.email || 'Admin',
+      });
+
+      if (error) {
+        if (error.code === '23505') alert('Esse personagem jǭ estǭ na lista!');
+        else alert('Erro ao adicionar: ' + error.message);
+      } else {
+        setNewName('');
+        setNewReason('');
+        fetchHunted();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const removeHunted = async (id) => {
+    if (!isAdmin || !window.confirm('Tem certeza que deseja perdoar esse inimigo?')) return;
+    
+    try {
+      await supabase.from('hunted_list').delete().eq('id', id);
+      fetchHunted();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8 text-center text-tibia-primary font-medieval">Carregando Radar...</div>;
+  }
+
+  const onlineCount = huntedList.filter(h => h.is_online).length;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
-      <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full animate-fade-in">
+      <div className="flex items-center gap-4 mb-8 border-b border-red-900/30 pb-4">
+        <Crosshair className="text-red-500 w-10 h-10" />
         <div>
-          <h2 className="text-5xl font-medieval text-gradient-gold mb-2 flex items-center">
-             <Target className="mr-3 text-tibia-highlight" size={40} />
-             Radar da Guilda
-          </h2>
-          <p className="text-gray-400 font-sans">Acompanhe quem está ativo e upando no servidor.</p>
+          <h2 className="text-4xl font-medieval text-red-500 tracking-wider">Radar de Hunteds</h2>
+          <p className="text-gray-400 font-sans mt-1">
+            Monitoramento em tempo real de inimigos e membros de guildas rivais.
+          </p>
         </div>
       </div>
 
-      <div className="flex space-x-4 mb-6">
-        <button 
-          onClick={() => setTab('realtime')}
-          className={`px-6 py-2 rounded font-bold transition-colors ${tab === 'realtime' ? 'bg-tibia-primary text-black' : 'bg-black/50 text-gray-400 hover:text-white border border-tibia-border'}`}
-        >
-          <Activity size={16} className="inline mr-2" />
-          Caçando Agora
-        </button>
-        <button 
-          onClick={() => setTab('24h')}
-          className={`px-6 py-2 rounded font-bold transition-colors ${tab === '24h' ? 'bg-tibia-primary text-black' : 'bg-black/50 text-gray-400 hover:text-white border border-tibia-border'}`}
-        >
-          <TrendingUp size={16} className="inline mr-2" />
-          Top 24 Horas
-        </button>
-      </div>
-
-      {tab === 'realtime' && (
-        <div className="animate-fade-in">
-            {loadingRealtime ? (
-                <div className="flex justify-center items-center py-20">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tibia-primary"></div>
-                </div>
-            ) : realtimeHunters.length === 0 ? (
-                <div className="bg-tibia-card border border-tibia-border rounded-lg p-10 flex flex-col items-center justify-center text-gray-500">
-                    <AlertCircle size={48} className="mb-4 opacity-50" />
-                    <p className="text-xl font-bold">Nenhum membro da guilda caçando no momento.</p>
-                    <p className="text-sm mt-2">O radar detecta ganhos de XP automaticamente a cada 5 minutos.</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {realtimeHunters.map((h, i) => {
-                    const durationMins = h.huntStart ? Math.floor((Date.now() - h.huntStart) / 60000) : 0;
-                    return (
-                    <div key={i} onClick={() => onPlayerClick && onPlayerClick(h.name)} className="cursor-pointer bg-tibia-card border border-tibia-border rounded-lg p-5 shadow-lg relative overflow-hidden group hover:border-tibia-primary transition-colors">
-                        <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <Activity size={80} />
-                        </div>
-                        
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="text-xl font-bold text-white truncate max-w-[200px]" title={h.name}>{h.name}</h3>
-                                <p className={`text-sm font-semibold ${getVocationColor(h.vocation)}`}>{h.vocation || 'Unknown'} - Lvl {h.level}</p>
-                            </div>
-                            <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded border border-green-500/30 flex items-center animate-pulse">
-                                Ativo
-                            </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mt-6">
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-bold">XP/h Atual</p>
-                                <p className="text-lg font-bold text-tibia-highlight">+{formatXP(h.xpLastHour)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-bold">Duração</p>
-                                <p className="text-lg font-bold text-gray-300 flex items-center">
-                                    <Clock size={16} className="mr-1" />
-                                    {durationMins > 0 ? `${durationMins}m` : 'Agora'}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    )
-                })}
-                </div>
-            )}
-        </div>
-      )}
-
-      {tab === '24h' && (
-        <div className="animate-fade-in bg-tibia-card border border-tibia-border rounded-lg overflow-hidden shadow-xl">
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-            <table className="w-full text-left text-sm text-gray-300">
-                <thead className="bg-black/40 text-gray-400 uppercase font-semibold sticky top-0 z-10">
-                <tr>
-                    <th className="px-6 py-4">Jogador</th>
-                    <th className="px-6 py-4">Level</th>
-                    <th className="px-6 py-4 text-green-400">XP Ganhos (24h)</th>
-                    <th className="px-6 py-4">Última Caçada</th>
-                </tr>
-                </thead>
-                <tbody className="divide-y divide-tibia-border/50">
-                {loading24h ? (
-                    <tr>
-                    <td colSpan="4" className="text-center py-12">
-                        <div className="flex justify-center items-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tibia-primary"></div>
-                        </div>
-                    </td>
-                    </tr>
-                ) : hunters24h.length === 0 ? (
-                    <tr>
-                    <td colSpan="4" className="text-center py-12 text-gray-500">
-                        <AlertTriangle className="mx-auto mb-2 opacity-50" size={32} />
-                        Nenhum ganho de XP registrado na guilda nas últimas 24 horas.
-                    </td>
-                    </tr>
-                ) : (
-                    hunters24h.map(h => (
-                    <tr key={h.character_name} className="hover:bg-white/5 transition-colors">
-                        <td 
-                        className="px-6 py-4 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline"
-                        onClick={() => onPlayerClick && onPlayerClick(h.character_name)}
-                        >
-                        {h.character_name}
-                        </td>
-                        <td className="px-6 py-4">
-                        <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20">Lvl {h.level}</span>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-green-400">
-                        +{formatXP(h.xp_gained)}
-                        </td>
-                        <td className="px-6 py-4 text-gray-400 flex items-center">
-                        <Clock size={14} className="mr-2 opacity-50" />
-                        {formatDistanceToNow(new Date(h.last_hunt), { addSuffix: true, locale: ptBR })}
-                        </td>
-                    </tr>
-                    ))
-                )}
-                </tbody>
-            </table>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Painel Esquerdo: Resumo & Add (Admin) */}
+        <div className="space-y-6">
+          <div className="bg-black/60 border border-red-900/50 rounded-lg p-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Skull size={100} />
             </div>
+            <h3 className="text-2xl font-medieval text-white mb-2 relative z-10">Status do Radar</h3>
+            <div className="flex items-baseline gap-2 relative z-10">
+              <span className="text-5xl font-bold text-red-500">{onlineCount}</span>
+              <span className="text-gray-400 font-sans">inimigos online agora</span>
+            </div>
+            <div className="mt-4 text-sm text-gray-500">
+              Total rastreados: {huntedList.length}
+            </div>
+          </div>
+
+          {isAdmin && (
+            <form onSubmit={addHunted} className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl">
+              <h3 className="text-xl font-medieval text-tibia-highlight mb-4 flex items-center gap-2">
+                <UserPlus size={20} className="text-yellow-500" />
+                Adicionar Alvo
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider">Nome do Personagem</label>
+                  <input
+                    type="text"
+                    required
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="w-full bg-black/50 border border-tibia-primary/30 rounded p-2 text-white focus:border-red-500 focus:outline-none transition-colors"
+                    placeholder="Ex: Kenshin"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider">Motivo (Opcional)</label>
+                  <input
+                    type="text"
+                    value={newReason}
+                    onChange={(e) => setNewReason(e.target.value)}
+                    className="w-full bg-black/50 border border-tibia-primary/30 rounded p-2 text-white focus:border-red-500 focus:outline-none transition-colors"
+                    placeholder="Ex: Deu KS no evento"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full bg-red-900/40 hover:bg-red-800 border border-red-700 text-white font-medieval py-2 rounded transition-colors disabled:opacity-50"
+                >
+                  {submitting ? 'Adicionando...' : 'Marcar como Hunted'}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
-      )}
+
+        {/* Painel Direito: Lista de Hunteds */}
+        <div className="lg:col-span-2">
+          <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl overflow-hidden">
+            <div className="p-4 bg-black/40 border-b border-tibia-border flex items-center gap-3">
+              <ShieldAlert className="text-red-500" />
+              <h3 className="text-xl font-medieval text-white">Lista Negra</h3>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-black/60 text-tibia-primary text-xs uppercase tracking-wider font-sans">
+                    <th className="p-4 border-b border-tibia-border/50">Status</th>
+                    <th className="p-4 border-b border-tibia-border/50">Nome</th>
+                    <th className="p-4 border-b border-tibia-border/50">Motivo</th>
+                    <th className="p-4 border-b border-tibia-border/50">Visto por Ǫltimo</th>
+                    {isAdmin && <th className="p-4 border-b border-tibia-border/50 text-right">Aes</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-tibia-border/30">
+                  {huntedList.map((hunted) => (
+                    <tr key={hunted.id} className="hover:bg-white/5 transition-colors group">
+                      <td className="p-4">
+                        {hunted.is_online ? (
+                          <span className="flex items-center gap-2 text-red-400 font-bold text-sm bg-red-900/20 px-2 py-1 rounded border border-red-900/50 w-max">
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                            ONLINE
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2 text-gray-500 text-sm font-semibold">
+                            <span className="w-2 h-2 rounded-full bg-gray-600"></span>
+                            Offline
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 font-bold text-gray-200">
+                        {hunted.name}
+                      </td>
+                      <td className="p-4 text-sm text-gray-400">
+                        {hunted.reason}
+                      </td>
+                      <td className="p-4 text-xs text-gray-500">
+                        {hunted.last_seen ? (
+                          <div className="flex items-center gap-1">
+                            <Clock size={12} />
+                            {new Date(hunted.last_seen).toLocaleString('pt-BR')}
+                          </div>
+                        ) : (
+                          'Nunca visto'
+                        )}
+                      </td>
+                      {isAdmin && (
+                        <td className="p-4 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => removeHunted(hunted.id)}
+                            className="text-gray-500 hover:text-red-400 transition-colors"
+                            title="Remover do Radar"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  
+                  {huntedList.length === 0 && (
+                    <tr>
+                      <td colSpan={isAdmin ? 5 : 4} className="p-8 text-center text-gray-500 font-sans">
+                        Nenhum inimigo cadastrado no radar.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
