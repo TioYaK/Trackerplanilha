@@ -131,6 +131,17 @@ async function getGuildPage() {
     return guildPage;
 }
 
+async function blockHeavyAssets(page) {
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+        if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) {
+            req.abort();
+        } else {
+            req.continue();
+        }
+    });
+}
+
 async function getHighscorePage() {
     await initBrowser();
     if (!highscoresPage || highscoresPage.isClosed()) {
