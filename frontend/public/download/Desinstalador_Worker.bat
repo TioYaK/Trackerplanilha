@@ -36,8 +36,7 @@ del /F /Q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\StartAuroriaW
 echo [3/3] Apagando arquivos e pasta do Tracker...
 :: Tenta matar qualquer travamento remanescente antes de apagar a pasta
 powershell -Command "Start-Sleep -Seconds 2"
-rmdir /S /Q "%APPDATA%\AuroriaWorker" >nul 2>&1
-rmdir /S /Q "%APPDATA%\AuroriaWorker_*" >nul 2>&1
+powershell -Command "Remove-Item -Recurse -Force \"$env:APPDATA\AuroriaWorker*\" -ErrorAction SilentlyContinue" >nul 2>&1
 
 echo.
 echo ========================================================
