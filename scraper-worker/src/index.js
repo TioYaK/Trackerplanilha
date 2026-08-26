@@ -32,15 +32,20 @@ console.log(`[WORKER] Iniciando worker ID: ${WORKER_ID}`);
 
 const fetchTask = async () => {
   try {
-    // Busca a próxima tarefa PENDING ou IN_PROGRESS presa há muito tempo
-    const timeLimit = new Date();
-    timeLimit.setMinutes(timeLimit.getMinutes() - LOCK_TIMEOUT_MINUTES);
+    const now = new Date().toISOString();
+    // Limite para considerar que um worker travou/crashou e devolver a tarefa
+    const crashLimit = new Date();
+    crashLimit.setMinutes(crashLimit.getMinutes() - LOCK_TIMEOUT_MINUTES);
+
+    // Condição 1: PENDING e (locked_at é null ou já passou do tempo de cooldown)
+    // Condição 2: IN_PROGRESS e locked_at é muito antigo (worker crashou)
+    const orQuery = `and(status.eq.PENDING,or(locked_at.is.null,locked_at.lte.${now})),and(status.eq.IN_PROGRESS,locked_at.lte.${crashLimit.toISOString()})`;
 
     const { data: tasks, error } = await supabase
       .from('task_queue')
       .select('*')
-      .or(`status.eq.PENDING,and(status.eq.IN_PROGRESS,locked_at.lt.${timeLimit.toISOString()})`)
-      .order('updated_at', { ascending: true })
+      .or(orQuery)
+      .order('locked_at', { ascending: true, nullsFirst: true }) // Prioriza os que estão na fila a mais tempo
       .limit(1);
 
     if (error) throw error;
@@ -48,7 +53,7 @@ const fetchTask = async () => {
 
     const task = tasks[0];
 
-    // Tenta aplicar o lock (usamos match para garantir que ninguém pegou no meio tempo)
+    // Tenta aplicar o lock (concorrência otimista)
     let query = supabase
       .from('task_queue')
       .update({
@@ -57,11 +62,11 @@ const fetchTask = async () => {
         locked_at: new Date().toISOString(),
       })
       .eq('id', task.id)
-      .eq('status', task.status); // Concorrência otimista primária
+      .eq('status', task.status);
       
-    // Se a task for IN_PROGRESS, o locked_at DEVE ser igual ao que consultamos
-    // isso evita que dois workers roubem a MESMA task presa simultaneamente.
     if (task.status === 'IN_PROGRESS' && task.locked_at) {
+        query = query.eq('locked_at', task.locked_at);
+    } else if (task.status === 'PENDING' && task.locked_at) {
         query = query.eq('locked_at', task.locked_at);
     }
 
@@ -79,10 +84,19 @@ const fetchTask = async () => {
 };
 
 const completeTask = async (task) => {
-  // Para manter o worker em loop infinito para as outras tarefas core (guild, highscores)
+  // Define o Cooldown com base no tipo da tarefa!
+  let cooldownMinutes = 1;
+  if (task.task_type === 'FETCH_HIGHSCORE') cooldownMinutes = 10;
+  if (task.task_type === 'FETCH_ONLINES') cooldownMinutes = 2;
+  
+  const nextRun = new Date();
+  nextRun.setMinutes(nextRun.getMinutes() + cooldownMinutes);
+
+  console.log(`[WORKER] Tarefa concluída. Próxima execução de ${task.task_type} será em ${cooldownMinutes} minutos.`);
+
   await supabase
     .from('task_queue')
-    .update({ status: 'PENDING', locked_at: null, worker_id: null })
+    .update({ status: 'PENDING', locked_at: nextRun.toISOString(), worker_id: null })
     .eq('id', task.id);
 };
 
