@@ -12,6 +12,10 @@ import { runFetchRivals } from './jobs/fetchRivals.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
 import { runAuditSlots } from './jobs/auditSlots.js';
+import { runFetchRivals } from './jobs/fetchRivals.js';
+import { runFetchDeaths } from './jobs/fetchDeaths.js';
+import { runFetchKillstats } from './jobs/fetchKillstats.js';
+import { runFetchTransfers } from './jobs/fetchTransfers.js';
 import { runBankSync } from './jobs/syncBankTS3.js';
 import { checkForUpdates } from './updater.js';
 import { closeBrowser } from './lib/rubinotScraper.js';
@@ -154,6 +158,14 @@ const processTask = async (task) => {
           const parts = task.task_type.split('_');
           const vocStr = parts.length > 2 ? parts[2] : 'ALL';
           await runFetchHighscores(vocStr);
+        } else if (task.task_type === 'FETCH_RIVALS') {
+          await runFetchRivals();
+        } else if (task.task_type === 'FETCH_DEATHS') {
+          await runFetchDeaths();
+        } else if (task.task_type === 'FETCH_KILLSTATS') {
+          await runFetchKillstats();
+        } else if (task.task_type === 'FETCH_TRANSFERS') {
+          await runFetchTransfers();
         } else {
           console.log(`[WORKER] ⚠ Tipo desconhecido: ${task.task_type}`);
         }

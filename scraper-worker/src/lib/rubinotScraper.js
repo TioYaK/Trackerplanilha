@@ -993,6 +993,26 @@ async function scrapeOnlines(world = 'Auroria') {
     }
 }
 
+// ─── API FETCH (Next.js bypass) ───────────────────────────────────────────────
+async function fetchRubinotApi(endpoint) {
+    let page = null;
+    try {
+        await initBrowser();
+        page = await globalBrowser.newPage();
+        await page.goto('https://rubinot.com.br/deaths');
+        const data = await page.evaluate(async (url) => {
+            const res = await fetch(url);
+            return await res.json();
+        }, endpoint);
+        return data;
+    } catch (e) {
+        console.error('[Scraper API] Erro ao buscar', endpoint, e);
+        return null;
+    } finally {
+        if (page) await page.close().catch(() => {});
+    }
+}
+
 export {
     scrapeGuild,
     scrapeHighscores,
@@ -1001,5 +1021,6 @@ export {
     fetchRubinotEveCharacter,
     scrapeRubinotCharacterPage,
     closeBrowser,
-    scrapeOnlines
+    scrapeOnlines,
+    fetchRubinotApi
 };
