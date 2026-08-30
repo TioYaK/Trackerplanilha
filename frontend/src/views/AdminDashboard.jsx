@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatDistanceToNow, format, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Activity, Server, Cpu, Clock, AlertTriangle, CheckCircle, BarChart2 } from 'lucide-react';
+import { Activity, Server, Cpu, Clock, AlertTriangle, CheckCircle, BarChart2, RefreshCw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 export default function AdminDashboard() {
@@ -62,7 +62,7 @@ export default function AdminDashboard() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 30 * 60 * 1000); // 30 minutos
+    const interval = setInterval(fetchData, 30 * 1000); // 30 segundos para tempo real
     return () => clearInterval(interval);
   }, []);
 
@@ -244,10 +244,42 @@ export default function AdminDashboard() {
 
               {/* Workers List */}
               <div className="bg-tibia-card border border-tibia-border p-6 rounded-lg shadow-lg">
-                <h3 className="text-xl font-bold text-gray-300 mb-4 border-b border-tibia-border/50 pb-2">Tropa de Raspagem</h3>
+                <div className="flex justify-between items-center mb-4 border-b border-tibia-border/50 pb-2">
+                  <h3 className="text-xl font-bold text-gray-300">Tropa de Raspagem</h3>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={async () => {
+                        try {
+                           await supabase.from('task_queue').insert({ task_type: 'UPDATE_WORKERS', status: 'PENDING', locked_at: new Date(Date.now() - 1000).toISOString() });
+                           alert('Comando de Auto-Update (Git Pull) enviado para a fila! Um worker vai pegar em alguns segundos e reiniciar.');
+                        } catch (e) {
+                           alert('Erro ao enviar update.');
+                        }
+                      }}
+                      className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors flex items-center"
+                    >
+                      <RefreshCw size={14} className="mr-2" />
+                      Forçar Auto-Update Geral
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        try {
+                           await supabase.from('task_queue').update({ status: 'PENDING', locked_at: new Date(Date.now() - 1000).toISOString() }).in('task_type', ['FETCH_ONLINES', 'FETCH_GUILD']);
+                           alert('Ordem de sincronização enviada para todos os workers ativos!');
+                        } catch (e) {
+                           alert('Erro ao forçar sincronização.');
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors flex items-center"
+                    >
+                      <RefreshCw size={14} className="mr-2" />
+                      Forçar Sincronização Agora
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 gap-4">
-                  {workers.map(worker => {
-                    const isActive = new Date(worker.last_ping) > cutoffLimit;
+                  {activeWorkers.map(worker => {
+                    const isActive = true; // since they are all active
                     const currentTask = tasks.find(t => t.worker_id === worker.worker_id);
                     
                     return (
@@ -301,7 +333,7 @@ export default function AdminDashboard() {
                       </div>
                     )
                   })}
-                  {workers.length === 0 && <div className="text-center py-8 text-gray-500">Nenhum worker registrado.</div>}
+                  {activeWorkers.length === 0 && <div className="text-center py-8 text-gray-500">Nenhum worker ativo no momento.</div>}
                 </div>
               </div>
             </div>

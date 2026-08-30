@@ -15,6 +15,8 @@ export default function RadarHunters({ isAdmin }) {
     return () => clearInterval(interval);
   }, []);
 
+  const [xpData, setXpData] = useState({});
+
   const fetchHunted = async () => {
     try {
       const { data, error } = await supabase
@@ -25,6 +27,31 @@ export default function RadarHunters({ isAdmin }) {
       
       if (error) throw error;
       setHuntedList(data || []);
+
+      if (data && data.length > 0) {
+         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+         const names = data.filter(h => h.is_online).map(h => h.name);
+         if (names.length > 0) {
+            let allLogs = [];
+            for (let i = 0; i < names.length; i += 100) {
+              const chunk = names.slice(i, i + 100);
+              const { data: logs } = await supabase
+                .from('telemetry_logs')
+                .select('character_name, delta_xp')
+                .in('character_name', chunk)
+                .gte('recorded_at', oneHourAgo);
+              if (logs) allLogs.push(...logs);
+            }
+            
+            const xpMap = {};
+            allLogs.forEach(log => {
+               if (log.delta_xp > 0) {
+                  xpMap[log.character_name] = (xpMap[log.character_name] || 0) + Number(log.delta_xp);
+               }
+            });
+            setXpData(xpMap);
+         }
+      }
     } catch (e) {
       console.error('Erro ao buscar hunteds:', e.message);
     } finally {
@@ -164,11 +191,15 @@ export default function RadarHunters({ isAdmin }) {
                     <th className="p-4 border-b border-tibia-border/50">Nome</th>
                     <th className="p-4 border-b border-tibia-border/50">Motivo</th>
                     <th className="p-4 border-b border-tibia-border/50">Visto por Ǫltimo</th>
+                    <th className="p-4 border-b border-tibia-border/50">Atividade (1h)</th>
                     {isAdmin && <th className="p-4 border-b border-tibia-border/50 text-right">Aes</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-tibia-border/30">
-                  {huntedList.map((hunted) => (
+                  {huntedList.map((hunted) => {
+                    const huntedXp = xpData[hunted.name] || 0;
+                    const isHunting = huntedXp > 0;
+                    return (
                     <tr key={hunted.id} className="hover:bg-white/5 transition-colors group">
                       <td className="p-4">
                         {hunted.is_online ? (
@@ -199,6 +230,15 @@ export default function RadarHunters({ isAdmin }) {
                           'Nunca visto'
                         )}
                       </td>
+                      <td className="p-4">
+                        {isHunting ? (
+                           <span className="text-orange-400 font-bold text-sm bg-orange-900/20 px-2 py-1 rounded border border-orange-900/50 flex items-center w-max gap-1">
+                              ⚔️ Upa Ativamente ({(huntedXp / 1000).toFixed(0)}k XP)
+                           </span>
+                        ) : (
+                           <span className="text-gray-600 text-xs italic">Sem XP recente</span>
+                        )}
+                      </td>
                       {isAdmin && (
                         <td className="p-4 text-right opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
@@ -211,11 +251,12 @@ export default function RadarHunters({ isAdmin }) {
                         </td>
                       )}
                     </tr>
-                  ))}
+                    );
+                  })}
                   
                   {huntedList.length === 0 && (
                     <tr>
-                      <td colSpan={isAdmin ? 5 : 4} className="p-8 text-center text-gray-500 font-sans">
+                      <td colSpan={isAdmin ? 6 : 5} className="p-8 text-center text-gray-500 font-sans">
                         Nenhum inimigo cadastrado no radar.
                       </td>
                     </tr>

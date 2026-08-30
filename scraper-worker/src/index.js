@@ -1,10 +1,14 @@
 import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.join(process.cwd(), '.env') });
+
+import express from 'express';
+import cors from 'cors';
 import { supabase } from './db.js';
 import os from 'os';
 import fs from 'fs';
 import { runFetchGuild } from './jobs/fetchGuild.js';
+import { runFetchRivals } from './jobs/fetchRivals.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
 import { runAuditSlots } from './jobs/auditSlots.js';
@@ -25,27 +29,30 @@ if (fs.existsSync(ID_FILE)) {
   fs.writeFileSync(ID_FILE, WORKER_ID);
 }
 
-const POLL_INTERVAL = 5000; // 5 segundos
+const POLL_INTERVAL = 5000;       // 5 segundos entre ciclos vazios
 const LOCK_TIMEOUT_MINUTES = 5;
+const UPDATE_CHECK_INTERVAL = 10 * 60 * 1000; // Mínimo 10 min entre git pulls
 
-console.log(`[WORKER] Iniciando worker ID: ${WORKER_ID}`);
+console.log(`\n${'='.repeat(60)}`);
+console.log(`[WORKER] 🚀 Iniciando Worker ID: ${WORKER_ID}`);
+console.log(`${'='.repeat(60)}\n`);
 
+// ==========================================
+// SISTEMA DE TAREFAS
+// ==========================================
 const fetchTask = async () => {
   try {
     const now = new Date().toISOString();
-    // Limite para considerar que um worker travou/crashou e devolver a tarefa
     const crashLimit = new Date();
     crashLimit.setMinutes(crashLimit.getMinutes() - LOCK_TIMEOUT_MINUTES);
 
-    // Condição 1: PENDING e (locked_at é null ou já passou do tempo de cooldown)
-    // Condição 2: IN_PROGRESS e locked_at é muito antigo (worker crashou)
     const orQuery = `and(status.eq.PENDING,or(locked_at.is.null,locked_at.lte.${now})),and(status.eq.IN_PROGRESS,locked_at.lte.${crashLimit.toISOString()})`;
 
     const { data: tasks, error } = await supabase
       .from('task_queue')
       .select('*')
       .or(orQuery)
-      .order('locked_at', { ascending: true, nullsFirst: true }) // Prioriza os que estão na fila a mais tempo
+      .order('locked_at', { ascending: true, nullsFirst: true })
       .limit(1);
 
     if (error) throw error;
@@ -63,11 +70,9 @@ const fetchTask = async () => {
       })
       .eq('id', task.id)
       .eq('status', task.status);
-      
-    if (task.status === 'IN_PROGRESS' && task.locked_at) {
-        query = query.eq('locked_at', task.locked_at);
-    } else if (task.status === 'PENDING' && task.locked_at) {
-        query = query.eq('locked_at', task.locked_at);
+
+    if (task.locked_at) {
+      query = query.eq('locked_at', task.locked_at);
     }
 
     const { data: updatedTask, error: updateError } = await query.select().single();
@@ -84,15 +89,21 @@ const fetchTask = async () => {
 };
 
 const completeTask = async (task) => {
-  // Define o Cooldown com base no tipo da tarefa!
-  let cooldownMinutes = 1;
+  // Cooldown por tipo de tarefa
+  const cooldowns = {
+    FETCH_GUILD: 5,
+    FETCH_RIVALS: 5,
+    FETCH_ONLINES: 2,
+    AUDIT_SLOTS: 5,
+  };
+
+  let cooldownMinutes = cooldowns[task.task_type] ?? 1;
   if (task.task_type.startsWith('FETCH_HIGHSCORE')) cooldownMinutes = 10;
-  if (task.task_type === 'FETCH_ONLINES') cooldownMinutes = 2;
-  
+
   const nextRun = new Date();
   nextRun.setMinutes(nextRun.getMinutes() + cooldownMinutes);
 
-  console.log(`[WORKER] Tarefa concluída. Próxima execução de ${task.task_type} será em ${cooldownMinutes} minutos.`);
+  console.log(`[WORKER] ✔ ${task.task_type} concluída. Próxima execução em ${cooldownMinutes}min.`);
 
   await supabase
     .from('task_queue')
@@ -107,36 +118,54 @@ const requeueTask = async (task) => {
 // ==========================================
 // ESTATÍSTICAS E HEARTBEAT
 // ==========================================
-let sessionStats = {}; // { 'FETCH_GUILD': { count: 0, duration: 0 } }
+let sessionStats = {};
 
 const processTask = async (task) => {
-  console.log(`[WORKER] Processando tarefa ${task.task_type} (ID: ${task.id})`);
+  const ts = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  console.log(`\n[WORKER] ▶ [${ts}] Processando: ${task.task_type} (ID: ${task.id})`);
   const startTime = Date.now();
-  
+
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => { reject(new Error('CRITICAL_TIMEOUT')); }, 4.5 * 60 * 1000);
   });
 
   const executeTask = async () => {
-    if (task.task_type === 'FETCH_GUILD') await runFetchGuild();
-    else if (task.task_type === 'FETCH_ONLINES') await runFetchOnlines();
-    else if (task.task_type === 'AUDIT_SLOTS') await runAuditSlots();
-    else if (task.task_type.startsWith('FETCH_HIGHSCORE')) {
-        const parts = task.task_type.split('_');
-        const vocStr = parts.length > 2 ? parts[2] : 'ALL';
-        await runFetchHighscores(vocStr);
+    switch (task.task_type) {
+      case 'FETCH_GUILD':
+        await runFetchGuild();
+        break;
+      case 'FETCH_ONLINES':
+        await runFetchOnlines();
+        break;
+      case 'FETCH_RIVALS':
+        await runFetchRivals();
+        break;
+      case 'AUDIT_SLOTS':
         await runAuditSlots();
-    } else {
-        console.log(`[WORKER] Tipo desconhecido: ${task.task_type}`);
+        break;
+      case 'UPDATE_WORKERS':
+        console.log('[WORKER] 🔄 Comando de Forçar Atualização recebido!');
+        await checkForUpdates();
+        console.log('[WORKER] Atualizado com sucesso. Reiniciando...');
+        process.exit(0);
+        break;
+      default:
+        if (task.task_type.startsWith('FETCH_HIGHSCORE')) {
+          const parts = task.task_type.split('_');
+          const vocStr = parts.length > 2 ? parts[2] : 'ALL';
+          await runFetchHighscores(vocStr);
+        } else {
+          console.log(`[WORKER] ⚠ Tipo desconhecido: ${task.task_type}`);
+        }
+        break;
     }
   };
 
   try {
     await Promise.race([executeTask(), timeoutPromise]);
     const duration = Date.now() - startTime;
-    console.log(`[WORKER] Tarefa ${task.task_type} concluída em ${duration}ms`);
-    
-    // Aggrega os stats localmente (Economiza banco de dados)
+    console.log(`[WORKER] ✅ ${task.task_type} concluída em ${(duration / 1000).toFixed(1)}s`);
+
     if (!sessionStats[task.task_type]) {
       sessionStats[task.task_type] = { count: 0, duration: 0 };
     }
@@ -145,43 +174,43 @@ const processTask = async (task) => {
 
     await requeueTask(task);
   } catch (error) {
-    console.error(`[WORKER] Falha na tarefa ${task.id}:`, error.message);
-    
-    if (error.message === 'CRITICAL_TIMEOUT') {
-      console.warn('[WORKER] Tarefa excedeu o tempo limite (Travou)! Forçando fechamento do browser e reiniciando estado...');
-      try { await closeBrowser(); } catch (e) { /* ignore */ }
-    }
+    console.error(`[WORKER] ❌ Falha na tarefa ${task.task_type}:`, error.message);
 
-    // Volta pra fila em caso de erro, removendo o worker atual do lock
-    await supabase.from('task_queue').update({ status: 'PENDING', worker_id: null, locked_at: null }).eq('id', task.id);
+    if (error.message === 'CRITICAL_TIMEOUT' || error.message.includes('Cloudflare')) {
+      console.warn('[WORKER] ⏰ Timeout crítico/Cloudflare! Pausando ESTE WORKER por 24 horas para evitar ban de IP...');
+      try { await closeBrowser(); } catch (e) { /* ignore */ }
+      
+      // Bane o worker localmente por 24 horas
+      localBanUntil = Date.now() + 24 * 60 * 60 * 1000;
+      
+      // Devolve a task para a fila imediatamente para que OUTRO worker assuma
+      await supabase
+        .from('task_queue')
+        .update({ status: 'PENDING', worker_id: null, locked_at: new Date().toISOString() })
+        .eq('id', task.id);
+    } else {
+      await supabase
+        .from('task_queue')
+        .update({ status: 'PENDING', worker_id: null, locked_at: null })
+        .eq('id', task.id);
+    }
   }
 };
 
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.0.9';
+const WORKER_VERSION = '1.1.0';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
-// Coleta de hardware inofensiva
 const WORKER_METADATA = {
   cpu: os.cpus()[0]?.model?.trim() || 'Processador Desconhecido',
   cores: os.cpus().length,
   ram: Math.round(os.totalmem() / (1024 * 1024 * 1024)) + ' GB',
   os: `${os.type()} ${os.release()}`,
-  node_version: process.version
+  node_version: process.version,
 };
-
-// --- ADMIN SPOOFING (Ostentação) ---
-// Se for o PC do dono (identificado pelo processador Ryzen 5 5600GT real dele),
-// forja as informações para exibir um supercomputador no frontend.
-if (WORKER_METADATA.cpu.includes('AMD Ryzen 5 5600GT')) {
-  WORKER_METADATA.cpu = 'AMD Ryzen Threadripper PRO 7995WX';
-  WORKER_METADATA.cores = 96;
-  WORKER_METADATA.ram = '256 GB';
-}
-// -----------------------------------
 
 // Fetch location on startup
 fetch('https://ipinfo.io/json')
@@ -191,23 +220,36 @@ fetch('https://ipinfo.io/json')
       WORKER_LOCATION = `${data.city}, ${data.region} (${data.country})`;
     }
   })
-  .catch(() => { /* ignora erro de localizacao */ });
+  .catch(() => { /* ignora erro de localização */ });
 
-// Temporizador para não fazer git pull todo segundo
+// ==========================================
+// CONTROLE DO UPDATE CHECKER
+// ==========================================
+let lastUpdateCheck = 0;
 let emptyCycles = 0;
+let localBanUntil = null;
 
 const loop = async () => {
+  if (localBanUntil && Date.now() < localBanUntil) {
+    console.log(`[WORKER] 🔴 Suspenso devido a bloqueio/timeout. Retorna em: ${new Date(localBanUntil).toLocaleString()}`);
+    setTimeout(loop, 60000); // Tenta novamente em 1 minuto (só pra avisar e continuar dormindo)
+    return;
+  }
+
   try {
-    // 1. CHECAGEM DE VERSÃO (KILL-SWITCH)
-    const { data: settings } = await supabase.from('worker_config').select('min_worker_version').eq('id', 1).single();
-    if (settings && settings.min_worker_version) {
+    // CHECAGEM DE VERSÃO (KILL-SWITCH)
+    const { data: settings } = await supabase
+      .from('worker_config')
+      .select('min_worker_version')
+      .eq('id', 1)
+      .single();
+
+    if (settings?.min_worker_version) {
       const minVersion = settings.min_worker_version;
       if (WORKER_VERSION !== minVersion && WORKER_VERSION < minVersion) {
-        console.error(`[KILL-SWITCH] Versão obsoleta detectada! Sua versão: ${WORKER_VERSION}. Requerida: ${minVersion}`);
-        console.log(`[KILL-SWITCH] Forçando atualização automática...`);
+        console.error(`[KILL-SWITCH] Versão obsoleta! Sua: ${WORKER_VERSION} | Requerida: ${minVersion}`);
         await checkForUpdates();
-        console.log(`[KILL-SWITCH] Reiniciando Worker...`);
-        process.exit(0); // O script .bat vai reiniciar o processo
+        process.exit(0);
       }
     }
   } catch (err) {
@@ -218,51 +260,55 @@ const loop = async () => {
   if (task) {
     emptyCycles = 0;
     await processTask(task);
-    setTimeout(loop, 1000); 
+    setTimeout(loop, 1000);
   } else {
     emptyCycles++;
-    if (emptyCycles % 3 === 0) {
-        await checkForUpdates();
+
+    // FIX: Checa updates no máximo 1x a cada 10 minutos (não a cada 15 segundos)
+    const now = Date.now();
+    if (now - lastUpdateCheck > UPDATE_CHECK_INTERVAL) {
+      lastUpdateCheck = now;
+      await checkForUpdates();
     }
+
     setTimeout(loop, POLL_INTERVAL);
   }
 };
 
 const sendHeartbeat = async () => {
   try {
-    // 1. Envia Heartbeat
     await supabase.from('worker_heartbeats').upsert({
       worker_id: WORKER_ID,
       last_ping: new Date().toISOString(),
       started_at: WORKER_STARTED,
       version: WORKER_VERSION,
       location: WORKER_LOCATION,
-      metadata: WORKER_METADATA
+      metadata: WORKER_METADATA,
     });
 
-    // 2. Faz o flush dos relatórios agregados de tarefas
     const statsToFlush = { ...sessionStats };
-    sessionStats = {}; // Reseta o local
-    
+    sessionStats = {};
+
     for (const [type, data] of Object.entries(statsToFlush)) {
       if (data.count > 0) {
         await supabase.from('task_history').insert({
           worker_id: WORKER_ID,
           task_type: type,
           task_count: data.count,
-          duration_ms: data.duration
+          duration_ms: data.duration,
         }).catch(() => {});
       }
     }
+
+    console.log(`[HEARTBEAT] ♥ Ping enviado. Workers online: verificar dashboard.`);
   } catch (err) {
-    // ignorar
+    // ignorar falha de heartbeat
   }
 };
 
-// Manda o PRIMEIRO ping exato 1 minuto após ligar
+// Primeiro heartbeat após 1 minuto, depois a cada 10 minutos
 setTimeout(() => {
   sendHeartbeat();
-  // Depois do primeiro, mantém a rotina de 10 em 10 minutos
   setInterval(sendHeartbeat, 10 * 60 * 1000);
 }, 60 * 1000);
 
@@ -272,39 +318,57 @@ loop();
 // ==========================================
 // TAREFAS AGENDADAS INDEPENDENTES DA FILA
 // ==========================================
-
-// Sincroniza o Banco FBot (TS3) a cada 5 minutos cravados!
-// Indepedente da fila do Supabase, garantindo que usuários que logam em 
-// horários bizarros não fiquem de fora.
+// Sincroniza o Banco FBot (TS3) a cada 5 minutos cravados
 setInterval(async () => {
-  console.log('[CRON] Rodando Sincronização Automática do TS3 (5 min)...');
+  console.log('\n[CRON] ⏰ Sincronização Automática do TS3 (5 min)...');
   await runBankSync();
 }, 5 * 60 * 1000);
 
 // ==========================================
-
-
+// SERVIDOR ADMIN LOCAL (Forçar TS3 Sync)
 // ==========================================
-// SERVIDOR ADMIN LOCAL (Forcar TS3 Sync)
-// ==========================================
-import express from 'express';
-import cors from 'cors';
-
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 app.post('/admin/force-ts3', async (req, res) => {
-    try {
-        console.log('[API_ADMIN] Recebido comando manual para forcar TS3 Sync!');
-        // Roda o sync
-        await runBankSync();
-        res.json({ success: true, message: 'TS3 Sincronizado com sucesso!' });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
+  try {
+    console.log('[API_ADMIN] Comando manual recebido: forçar TS3 Sync!');
+    await runBankSync();
+    res.json({ success: true, message: 'TS3 Sincronizado com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.listen(3001, () => {
-    console.log('[API_ADMIN] Servidor local escutando na porta 3001 para comandos (TS3).');
+  console.log('[API_ADMIN] Servidor local na porta 3001 (comandos admin).');
 });
+
+// ==========================================
+// GATILHO DE ATUALIZAÇÃO EM TEMPO REAL (REALTIME)
+// ==========================================
+supabase
+  .channel('worker_sync')
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'task_queue' }, (payload) => {
+    if (payload.new.status === 'PENDING' && payload.new.locked_at) {
+       const lockTime = new Date(payload.new.locked_at).getTime();
+       if (lockTime <= Date.now()) {
+          console.log('\n[REALTIME] ⚡ Comando de Sincronização Forçada Recebido! Fila acelerada...');
+          if (!localBanUntil || Date.now() > localBanUntil) {
+            // Invoca o worker imediatamente
+            fetchTask().then(task => {
+               if (task) {
+                  emptyCycles = 0;
+                  processTask(task);
+               }
+            });
+          }
+       }
+    }
+  })
+  .subscribe((status) => {
+    if (status === 'SUBSCRIBED') {
+      console.log('[REALTIME] 📡 Inscrito para receber comandos de Sincronização em Tempo Real.');
+    }
+  });

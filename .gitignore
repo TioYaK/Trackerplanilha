@@ -2,3 +2,33 @@ node_modules/
 .env
 dist/
 .DS_Store
+
+# Arquivos temporários e de debug
+temp.jsx
+temp_debug.jsx
+patch_dashboard.js
+output_tracker.txt
+*.tmp
+*.bak
+
+# Arquivos de teste do scraper (grandes e desnecessários no repositório)
+scraper-worker/test*.html
+scraper-worker/test*.cjs
+scraper-worker/test*.js
+scraper-worker/test.sed
+scraper-worker/ts3_clients.txt
+scraper-worker/ts3_dump.txt
+scraper-worker/online.html
+scraper-worker/*.html
+
+# Build artifacts do worker
+scraper-worker/dist/
+scraper-worker/pkg_build/
+*.exe
+
+# Worker runtime
+scraper-worker/worker_id.txt
+
+# Logs
+*.log
+logs/

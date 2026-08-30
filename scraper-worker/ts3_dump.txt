@@ -1,6 +1,0 @@
-TS3 Client
-Welcome to the TeamSpeak 3 ClientQuery interface, type "help" for a list of commands and "help <command>" for information on a specific command.
-Use the "auth" command to authenticate yourself. See "help auth" for details.
-selected schandlerid=1
-error id=0 msg=ok
-

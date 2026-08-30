@@ -1,33 +1,18 @@
-import { fetchPage } from '../utils/scraper.js';
+import { scrapeOnlines } from '../lib/rubinotScraper.js';
 import { supabase } from '../db.js';
 
 export const runFetchOnlines = async () => {
-  const path = '/?subtopic=whoisonline';
   console.log(`[JOB] Fetching online players...`);
 
   try {
-    const $ = await fetchPage(path);
-    const onlinePlayers = [];
+    const onlinePlayers = await scrapeOnlines('Auroria');
+    
+    if (onlinePlayers.length === 0) {
+      console.log('[JOB] Nenhum jogador online ou erro ao buscar.');
+      return;
+    }
 
-    // Seletores genéricos para listas de jogadores online
-    $('table tr').each((i, row) => {
-      if (i === 0) return; // Pula cabeçalho
-      
-      const tds = $(row).find('td');
-      // Nome e Level costumam ficar nas primeiras colunas
-      if (tds.length >= 2) {
-        const name = $(tds[0]).text().trim();
-        const levelText = $(tds[1]).text().trim();
-        const level = parseInt(levelText, 10);
-        
-        // Remove lixos ou títulos (como "Gamemasters")
-        if (name && !isNaN(level)) {
-          onlinePlayers.push(name);
-        }
-      }
-    });
-
-    console.log(`[JOB] Encontrados ${onlinePlayers.length} jogadores online.`);
+    console.log(`[JOB] Iniciando processamento de ${onlinePlayers.length} jogadores online.`);
 
     // Registra o historico para o Heatmap de atividade
     await supabase.from('online_history').insert({
@@ -76,6 +61,8 @@ export const runFetchOnlines = async () => {
           if (!updateErr) updatedCount += chunk.length;
         }
         console.log(`[JOB] Carimbo de Atividade (Online) aplicado para ${updatedCount} membros da guilda.`);
+      } else {
+        console.log(`[JOB] Nenhum membro da guilda está online no momento.`);
       }
     }
 

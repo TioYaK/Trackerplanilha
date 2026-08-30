@@ -86,6 +86,31 @@ export default function AdminPanel({ currentVisibleTabs }) {
     window.location.reload();
   };
 
+  const handleRemoveUserAvatar = async (userId, userName) => {
+    if (!confirm(`Tem certeza que deseja remover a foto de perfil de "${userName}"?`)) return;
+    try {
+      const { error } = await supabase.from('profiles').update({ avatar_url: null }).eq('id', userId);
+      if (error) throw error;
+      fetchUsers();
+    } catch (err) {
+      alert(`Erro ao remover foto: ${err.message}`);
+    }
+  };
+
+  const handleToggleAvatarBlock = async (userId, currentBlocked, userName) => {
+    const nextState = !currentBlocked;
+    const actionDesc = nextState ? 'BLOQUEAR o upload de avatar' : 'DESBLOQUEAR o upload de avatar';
+    if (!confirm(`Deseja realmente ${actionDesc} para o membro "${userName}"?`)) return;
+
+    try {
+      const { error } = await supabase.from('profiles').update({ avatar_blocked: nextState }).eq('id', userId);
+      if (error) throw error;
+      fetchUsers();
+    } catch (err) {
+      alert(`Erro ao alterar permissão de avatar: ${err.message}`);
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in space-y-12">
       
@@ -93,7 +118,7 @@ export default function AdminPanel({ currentVisibleTabs }) {
       <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl p-6">
         <h2 className="text-2xl font-medieval text-tibia-highlight mb-6 flex items-center gap-2 border-b border-tibia-border pb-4">
           <Users className="text-tibia-primary" />
-          Aprovação de Membros
+          Aprovação e Gestão de Membros
         </h2>
         
         {loading ? (
@@ -103,19 +128,53 @@ export default function AdminPanel({ currentVisibleTabs }) {
             <table className="w-full text-left font-sans text-sm text-gray-300">
               <thead className="bg-black/50 text-tibia-primary">
                 <tr>
+                  <th className="p-3 text-left">Foto</th>
                   <th className="p-3 text-left">Membro</th>
                   <th className="p-3 text-left">Main Character</th>
                   <th className="p-3 text-left">Makers</th>
                   <th className="p-3 text-left">Contatos</th>
                   <th className="p-3 text-left">Status</th>
                   <th className="p-3 text-left">Permissão</th>
-                  <th className="p-3 text-right">Ações</th>
+                  <th className="p-3 text-right">Ações & Moderação</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map(u => (
                   <tr key={u.id} className="border-b border-tibia-border hover:bg-white/5 transition-colors">
-                    <td className="p-3">{u.name}</td>
+                    {/* Foto / Avatar */}
+                    <td className="p-3">
+                      <div className="relative group w-10 h-10">
+                        {u.avatar_url ? (
+                          <img 
+                            src={u.avatar_url} 
+                            alt={u.main_character} 
+                            className="w-10 h-10 rounded-full object-cover border border-tibia-highlight bg-black/60 shadow" 
+                            onError={(e) => { e.target.src = 'https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/none.png'; }}
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-black/50 border border-gray-700 flex items-center justify-center text-xs text-gray-500 font-bold uppercase">
+                            {u.name?.substring(0, 2) || '??'}
+                          </div>
+                        )}
+                        {u.avatar_blocked && (
+                          <span 
+                            className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full p-0.5 shadow border border-black" 
+                            title="Upload de avatar proibido"
+                          >
+                            <ShieldAlert size={12} />
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    <td className="p-3">
+                      <div className="font-bold text-white">{u.name}</div>
+                      {u.avatar_blocked && (
+                        <span className="text-[10px] text-red-400 font-semibold bg-red-950/80 px-1.5 py-0.5 rounded border border-red-800/50 inline-block mt-0.5">
+                          Avatar Banido
+                        </span>
+                      )}
+                    </td>
                     <td className="p-3 font-bold text-tibia-highlight">{u.main_character}</td>
                     <td className="p-3">
                       <div className="text-xs text-gray-300 max-w-[200px] break-words">
@@ -155,32 +214,60 @@ export default function AdminPanel({ currentVisibleTabs }) {
                         <option value="admin">Administrador</option>
                       </select>
                     </td>
-                    <td className="p-3 text-right space-x-2">
-                      <button 
-                        onClick={() => handleResetPassword(u.id)} 
-                        className="bg-blue-800 hover:bg-blue-700 text-white p-1.5 rounded" 
-                        title="Resetar Senha"
-                        disabled={resetting === u.id}
-                      >
-                        {resetting === u.id ? <span className="animate-pulse">...</span> : <Key size={16} />}
-                      </button>
+                    <td className="p-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        {/* Botão Remover Foto */}
+                        {u.avatar_url && (
+                          <button
+                            onClick={() => handleRemoveUserAvatar(u.id, u.main_character || u.name)}
+                            className="bg-red-950/80 hover:bg-red-900 text-red-300 hover:text-white border border-red-800/80 p-1.5 rounded transition-colors"
+                            title="Remover Foto de Perfil"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
 
-                      {u.status !== 'active' && (
-                        <button onClick={() => updateUserStatus(u.id, 'active')} className="bg-green-800 hover:bg-green-700 text-white p-1.5 rounded" title="Aprovar">
-                          <CheckCircle2 size={16} />
+                        {/* Botão Bloquear / Desbloquear Avatar */}
+                        <button
+                          onClick={() => handleToggleAvatarBlock(u.id, u.avatar_blocked, u.main_character || u.name)}
+                          className={`p-1.5 rounded border transition-colors ${
+                            u.avatar_blocked 
+                              ? 'bg-amber-900/60 hover:bg-amber-800 text-amber-300 border-amber-600' 
+                              : 'bg-black/60 hover:bg-red-950 text-gray-400 hover:text-red-400 border-gray-700'
+                          }`}
+                          title={u.avatar_blocked ? "Desbloquear Upload de Avatar" : "Proibir/Bloquear Upload de Avatar"}
+                        >
+                          <ShieldAlert size={15} />
                         </button>
-                      )}
-                      {u.status !== 'rejected' && (
-                        <button onClick={() => updateUserStatus(u.id, 'rejected')} className="bg-red-800 hover:bg-red-700 text-white p-1.5 rounded" title="Rejeitar">
-                          <XCircle size={16} />
+
+                        {/* Resetar Senha */}
+                        <button 
+                          onClick={() => handleResetPassword(u.id)} 
+                          className="bg-blue-800 hover:bg-blue-700 text-white p-1.5 rounded transition-colors" 
+                          title="Resetar Senha"
+                          disabled={resetting === u.id}
+                        >
+                          {resetting === u.id ? <span className="animate-pulse">...</span> : <Key size={15} />}
                         </button>
-                      )}
+
+                        {/* Aprovar / Rejeitar */}
+                        {u.status !== 'active' && (
+                          <button onClick={() => updateUserStatus(u.id, 'active')} className="bg-green-800 hover:bg-green-700 text-white p-1.5 rounded transition-colors" title="Aprovar">
+                            <CheckCircle2 size={15} />
+                          </button>
+                        )}
+                        {u.status !== 'rejected' && (
+                          <button onClick={() => updateUserStatus(u.id, 'rejected')} className="bg-red-800 hover:bg-red-700 text-white p-1.5 rounded transition-colors" title="Rejeitar">
+                            <XCircle size={15} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="p-4 text-center text-gray-500">Nenhum usuário registrado ainda.</td>
+                    <td colSpan="8" className="p-4 text-center text-gray-500">Nenhum usuário registrado ainda.</td>
                   </tr>
                 )}
               </tbody>

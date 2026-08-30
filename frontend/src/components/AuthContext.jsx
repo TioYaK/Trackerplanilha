@@ -91,13 +91,20 @@ export const AuthProvider = ({ children }) => {
     return authData.user;
   };
 
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchProfile(user.id);
+    }
+  };
+
   const value = {
     user,
     profile,
     loading,
     login,
     logout,
-    register
+    register,
+    refreshProfile
   };
 
   return (

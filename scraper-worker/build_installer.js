@@ -103,8 +103,11 @@ GUILD_NAME=${guildName}
             File.WriteAllText(envPath, envContent.Trim());
 
             // 4. Instala dependencias
+            Console.WriteLine("[3/3] Instala dependencias");
             Console.WriteLine("[3/3] Instalando modulos do robo (isso pode levar 1 minuto)...");
-            RunCommand("cmd.exe", string.Format("/c cd /d \\"{0}\\" && npm install", Path.Combine(workDir, "scraper-worker")));
+            string npmPath = @"C:\Program Files\nodejs\npm.cmd";
+            if (!File.Exists(npmPath)) npmPath = "npm";
+            RunCommand("cmd.exe", string.Format("/c cd /d \\\"{0}\\\" && \\\"{1}\\\" install", Path.Combine(workDir, "scraper-worker"), npmPath));
 
             // 5. Instala o script invisivel no Windows Startup
             Console.WriteLine("\\nConfigurando Auto-Boot invisivel do Windows...");
@@ -114,7 +117,9 @@ GUILD_NAME=${guildName}
             
             // Cria um BAT de loop infinito para que o auto-updater (process.exit) reviva automaticamente
             string loopBatPath = Path.Combine(workerPath, "loop.bat");
-            File.WriteAllText(loopBatPath, ":loop\\nnode src/index.js\\ngoto loop");
+            string nodePath = @"C:\Program Files\nodejs\node.exe";
+            if (!File.Exists(nodePath)) nodePath = "node";
+            File.WriteAllText(loopBatPath, string.Format(":loop\\n\\\"{0}\\\" src/index.js\\ngoto loop", nodePath));
 
             string vbsContent = string.Format(@"
 Set WshShell = CreateObject(""WScript.Shell"")

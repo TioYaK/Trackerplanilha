@@ -22,27 +22,34 @@ import { useAuth } from './components/AuthContext';
 import { LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
+// Tabs padrão visíveis quando não há configuração no banco
+const DEFAULT_VISIBLE_TABS = [
+  'live', 'radar', 'roster', 'planilha', 'contribute',
+  'bank', 'market', 'loot', 'tracker', 'extreme', 'analytics',
+];
+
 export default function App() {
   const { user, profile, logout } = useAuth();
   const [currentView, setCurrentView] = useState('live');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedParty, setSelectedParty] = useState(null);
-  const [visibleTabs, setVisibleTabs] = useState(null); 
+  const [visibleTabs, setVisibleTabs] = useState(null);
   const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const { data, error } = await supabase.from('app_settings').select('visible_tabs').eq('id', 1).single();
-        if (data?.visible_tabs) {
-          setVisibleTabs(data.visible_tabs);
-        } else {
-          setVisibleTabs(['live', 'radar', 'roster', 'planilha', 'contribute', 'bank', 'market', 'loot', 'tracker', 'extreme', 'analytics']);
-        }
+        const { data } = await supabase
+          .from('app_settings')
+          .select('visible_tabs')
+          .eq('id', 1)
+          .single();
+        setVisibleTabs(data?.visible_tabs ?? DEFAULT_VISIBLE_TABS);
       } catch (err) {
-        setVisibleTabs(['live', 'radar', 'roster', 'planilha', 'contribute', 'bank', 'market', 'loot', 'tracker', 'extreme', 'analytics']);
+        setVisibleTabs(DEFAULT_VISIBLE_TABS);
       }
     };
+
     if (user && profile?.status === 'active') {
       fetchSettings();
     }
@@ -60,7 +67,7 @@ export default function App() {
           <p className="text-gray-300 font-sans mb-6">
             Sua conta (Main: {profile.main_character}) foi registrada com sucesso, mas você precisa aguardar um Administrador aprovar o seu acesso.
           </p>
-          <button 
+          <button
             onClick={logout}
             className="bg-red-900/50 hover:bg-red-900 border border-red-500 text-white px-4 py-2 rounded flex items-center justify-center gap-2 w-full transition-colors"
           >
@@ -71,7 +78,6 @@ export default function App() {
     );
   }
 
-  // Se o usuário foi aprovado, mas ainda não preencheu os makers
   if (profile?.status === 'active' && !profile.onboarding_completed) {
     return <OnboardingScreen />;
   }
@@ -87,21 +93,22 @@ export default function App() {
   };
 
   const renderView = () => {
-    switch(currentView) {
-      case 'live': return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
-      case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
-      case 'radar': return <RadarHunters isAdmin={isAdmin} />;
+    switch (currentView) {
+      case 'live':    return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
+      case 'roster':  return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
+      case 'radar':   return <RadarHunters isAdmin={isAdmin} />;
       case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
       case 'extreme': return <ExtremeAnalytics />;
       case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
-      case 'bank': return <GuildBank isAdmin={isAdmin} />;
-      case 'market': return <GuildMarket isAdmin={isAdmin} />;
-      case 'loot': return <LootTracker isAdmin={isAdmin} />;
-      case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
+      case 'bank':    return <GuildBank isAdmin={isAdmin} />;
+      case 'market':  return <GuildMarket isAdmin={isAdmin} />;
+      case 'loot':    return <LootTracker isAdmin={isAdmin} />;
+      case 'party':   return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
       case 'contribute': return <Contribute />;
-      case 'admin': return isAdmin ? <AdminPanel /> : null;
+      case 'admin':   return isAdmin ? <AdminPanel /> : null;
       case 'admin_dashboard': return <AdminDashboard />;
-      case 'players': 
+      case 'analytics': return <Rankings isAdmin={isAdmin} />;
+      case 'players':
         return (
           <div className="p-8 max-w-7xl mx-auto w-full">
             <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Investigação de Membro</h2>
@@ -109,21 +116,22 @@ export default function App() {
             <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} />
           </div>
         );
-      case 'analytics':
-        return <Rankings isAdmin={isAdmin} />;
       default: return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
     }
   };
 
-  if (visibleTabs === null && isAdmin === false) return null; // loading
+  // FIX: antes `isAdmin === false` impedia que admins vissem o loading.
+  // Agora: mostra loading apenas se visibleTabs ainda não carregou e NÃO é admin.
+  // Admins veem tudo de qualquer jeito, então podem renderizar sem esperar.
+  if (visibleTabs === null && !isAdmin) return null;
 
   return (
     <div className="min-h-screen bg-tibia-bg bg-tibia-pattern">
-      <TopNav 
-        currentView={currentView} 
-        setCurrentView={setCurrentView} 
+      <TopNav
+        currentView={currentView}
+        setCurrentView={setCurrentView}
         isAdmin={isAdmin}
-        visibleTabs={visibleTabs || []}
+        visibleTabs={visibleTabs ?? DEFAULT_VISIBLE_TABS}
       />
       <main className="w-full">
         {renderView()}

@@ -7,8 +7,14 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     ts3_nickname TEXT,
     role TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin')),
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'rejected')),
+    avatar_url TEXT,
+    avatar_blocked BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Migração para tabelas já existentes:
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_blocked BOOLEAN DEFAULT false;
 
 -- 2. Permissões
 -- Desabilitamos o RLS por enquanto para o frontend conseguir inserir os cadastros usando a Anon Key

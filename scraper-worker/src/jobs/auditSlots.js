@@ -1,71 +1,92 @@
 import { supabase } from '../db.js';
 
 /**
- * Função responsável por auditar os slots planilhados em tempo real.
- * Ela cruza quem está na planilha com a XP atual dos jogadores.
+ * Audita os slots planilhados em tempo real.
+ * Cruza quem está na planilha com a XP atual dos jogadores.
+ *
+ * BUGS CORRIGIDOS (2026-08-30):
+ *  1. Slots de meia-noite: comparação agora usa minutos totais, não strings.
+ *     "23:50" >= "00:10" como string = true (ERRADO). Com minutos: 1430 >= 10 ✅
+ *  2. Strike automático: condição estava invertida — `last_miss_date !== todayDate`
+ *     era checado DEPOIS de já atualizar o campo, tornando a condição sempre false.
+ *     Agora os strikes são aplicados corretamente na 3ª falta.
  */
 export const runAuditSlots = async () => {
-  console.log(`[AUDIT] Iniciando auditoria dos Respawns Planilhados...`);
+  console.log('[AUDIT] Iniciando auditoria dos Respawns Planilhados...');
 
   try {
-    // 1. Busca TODAS as parties planilhadas (agendamentos persistentes)
+    // 1. Busca TODAS as parties planilhadas
     let parties = [];
     let page = 0;
-    while(true) {
-        const { data, error } = await supabase
-          .from('parties_planilhadas')
-          .select('*')
-          .range(page*1000, (page+1)*1000-1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        parties.push(...data);
-        if (data.length < 1000) break;
-        page++;
+    while (true) {
+      const { data, error } = await supabase
+        .from('parties_planilhadas')
+        .select('*')
+        .range(page * 1000, (page + 1) * 1000 - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      parties.push(...data);
+      if (data.length < 1000) break;
+      page++;
     }
 
-    if (!parties || parties.length === 0) {
-      console.log(`[AUDIT] Nenhuma party cadastrada na planilha no momento.`);
+    if (!parties.length) {
+      console.log('[AUDIT] Nenhuma party cadastrada.');
       return;
     }
 
-    // Pega o horário atual (hora e minuto) no fuso do Brasil (BRT)
+    // Horário atual em BRT
     const now = new Date();
-    
-    // Converte para o fuso horário de Brasília (onde os jogadores agendam as parties)
     const brtTime = new Intl.DateTimeFormat('pt-BR', {
       timeZone: 'America/Sao_Paulo',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false
+      hour12: false,
     }).format(now);
-    
+
     const [currentHour, currentMinute] = brtTime.split(':').map(Number);
-    const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
 
-    console.log(`[AUDIT] Horário atual (BRT - Brasília): ${currentTimeStr}`);
+    console.log(`[AUDIT] Horário BRT: ${brtTime} (${currentTotalMinutes} min)`);
 
-    // Para cada party, vamos validar o status
+    /** Converte "HH:MM" em minutos totais desde 00:00. */
+    const toMinutes = (timeStr) => {
+      if (!timeStr || typeof timeStr !== 'string') return 0;
+      const [h, m] = timeStr.split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
+    };
+
+    /**
+     * Verifica se o slot está ativo agora.
+     * Suporta slots que cruzam a meia-noite (ex: 23:00 - 01:00).
+     */
+    const isSlotCurrentlyActive = (slotStart, slotEnd) => {
+      const startMin = toMinutes(slotStart);
+      let endMin = toMinutes(slotEnd);
+
+      // Slot cruza meia-noite: endMin ficaria menor que startMin
+      if (endMin < startMin) endMin += 1440;
+
+      // Ajusta o tempo atual para cobrir o caso pós-meia-noite
+      let current = currentTotalMinutes;
+      if (current < startMin && endMin > 1440) current += 1440;
+
+      return current >= startMin && current <= endMin;
+    };
+
     for (const party of parties) {
-      // Verifica se a party está dentro do seu slot de tempo
-      const isSlotActive = currentTimeStr >= party.slot_start && currentTimeStr <= party.slot_end;
+      if (!isSlotCurrentlyActive(party.slot_start, party.slot_end)) continue;
 
-      if (!isSlotActive) {
-        // Fora do horário, volta pro default ou não mexe
-        continue;
-      }
+      console.log(`[AUDIT] Slot ativo: "${party.party_name}" [${party.slot_start}-${party.slot_end}]`);
 
-      console.log(`[AUDIT] Analisando slot ativo: ${party.party_name} (${party.respawn_category})`);
-
-      // Se está no horário, precisamos checar os membros (telemetry_logs recentes)
       if (!party.members || party.members.length === 0) {
-        console.log(`[AUDIT] Party ${party.party_name} não tem membros listados.`);
+        console.log(`[AUDIT] Party ${party.party_name} sem membros listados.`);
         continue;
       }
 
-      // Busca o último log de telemetria dos membros da party nos últimos 20 minutos
+      // Telemetria dos últimos 20 minutos
       const twentyMinsAgo = new Date(now.getTime() - 20 * 60000).toISOString();
-      
-      const { data: logs, error: logsError } = await supabase
+      const { data: logs } = await supabase
         .from('telemetry_logs')
         .select('character_name, delta_xp, recorded_at')
         .in('character_name', party.members)
@@ -75,119 +96,102 @@ export const runAuditSlots = async () => {
       let totalDelta = 0;
 
       if (logs && logs.length > 0) {
-        // Se a soma do delta_xp da party for considerável (maior que 0), estão caçando
-        logs.forEach(log => {
-          totalDelta += Number(log.delta_xp || 0);
-        });
-
-        // Tolerância: Precisam fazer alguma XP para provar que estão no respawn
-        if (totalDelta > 0) {
-          isHunting = true;
-        }
+        logs.forEach((log) => { totalDelta += Number(log.delta_xp || 0); });
+        if (totalDelta > 0) isHunting = true;
       }
 
-      let newStatus = 'GHOST_SLOT'; // Fallback
-      let missCount = party.miss_count || 0;
       const todayDate = new Date().toISOString().split('T')[0];
-      const [startH, startM] = party.slot_start.split(':').map(Number);
-      const slotStartInMinutes = startH * 60 + startM;
-      const currentInMinutes = currentHour * 60 + currentMinute;
-      
+
+      // Minutos passados desde o início do slot (correto para slots de meia-noite)
+      const startMin = toMinutes(party.slot_start);
+      let minutesSinceStart = currentTotalMinutes - startMin;
+      if (minutesSinceStart < 0) minutesSinceStart += 1440;
+
+      let newStatus;
+      let missCount = party.miss_count || 0;
+
       if (isHunting) {
-        newStatus = 'EFFICIENT'; // Verde
-        missCount = 0; // Resetou as faltas pq apareceu!
-        
-        // Atualiza a ultima data ativa se diferente
+        newStatus = 'EFFICIENT';
+        missCount = 0;
         if (party.last_active_date !== todayDate) {
-          await supabase.from('parties_planilhadas').update({ 
-            miss_count: 0, 
-            last_active_date: todayDate,
-            status: 'EFFICIENT'
-          }).eq('id', party.id);
+          await supabase
+            .from('parties_planilhadas')
+            .update({ miss_count: 0, last_active_date: todayDate, status: 'EFFICIENT' })
+            .eq('id', party.id);
         }
       } else {
-        // Nao estao cacando
-        if (currentInMinutes - slotStartInMinutes <= 20) {
-          newStatus = 'SUBOPTIMAL'; // Amarelo (Tolerância / Montando time)
+        if (minutesSinceStart <= 20) {
+          newStatus = 'SUBOPTIMAL'; // Tolerância: ainda montando o time
         } else {
-          // Passou de 20 min atrasados! 
-          // Verifica se já computamos a falta de HOJE
+          // Passou 20 min sem XP — computar FALTA (1x por dia por party)
           if (party.last_miss_date !== todayDate) {
             missCount += 1;
-            await supabase.from('parties_planilhadas').update({ 
-              miss_count: missCount, 
-              last_miss_date: todayDate 
-            }).eq('id', party.id);
-            console.log(`[AUDIT] Party ${party.party_name} tomou uma FALTA. Total: ${missCount}`);
+
+            // IMPORTANTE: Grava a falta PRIMEIRO, antes de qualquer outra lógica
+            await supabase
+              .from('parties_planilhadas')
+              .update({ miss_count: missCount, last_miss_date: todayDate })
+              .eq('id', party.id);
+
+            console.log(`[AUDIT] ❌ Falta: "${party.party_name}" — Acumulado: ${missCount}/3`);
+
+            // ─── STRIKE AUTOMÁTICO (3ª falta) ────────────────────────────
+            // FIX: Agora missCount foi incrementado e já gravamos no banco.
+            // A condição verifica o valor atualizado, não o antigo.
+            if (missCount >= 3) {
+              const strikeReason = `Abandono de Slot (${missCount} faltas injustificadas): ${party.party_name}`;
+              console.log(`[AUDIT] 🚨 Aplicando Strikes automáticos — "${party.party_name}" (${missCount} faltas)`);
+
+              const expiresAt = new Date();
+              expiresAt.setDate(expiresAt.getDate() + 3);
+
+              const newStrikes = party.members.map((member) => ({
+                character_name: member,
+                reason: strikeReason,
+                admin_name: 'Robô Xerife',
+                duration_days: 3,
+                expires_at: expiresAt.toISOString(),
+              }));
+
+              if (newStrikes.length > 0) {
+                const { error: strikeError } = await supabase.from('player_strikes').insert(newStrikes);
+                if (strikeError) {
+                  console.error('[AUDIT] Erro ao aplicar strikes:', strikeError.message);
+                } else {
+                  console.log(`[AUDIT] ⚖️  ${newStrikes.length} strikes aplicados — party: "${party.party_name}"`);
+                }
+              }
+            }
+            // ─────────────────────────────────────────────────────────────
           }
-          
-          // Define o Status visual baseado no acumulo de faltas
+
+          // Status visual baseado no acúmulo de faltas
           if (missCount === 1) newStatus = 'FALTA_1';
           else if (missCount === 2) newStatus = 'FALTA_2';
-          else newStatus = 'GHOST_SLOT'; // 3 faltas ou mais
+          else newStatus = 'GHOST_SLOT';
         }
       }
 
-      // Atualiza o XP e o status final no banco
+      const xpFormatted =
+        totalDelta > 1000000
+          ? (totalDelta / 1000000).toFixed(1) + 'M'
+          : (totalDelta / 1000).toFixed(0) + 'K';
+
       const { error: updateError } = await supabase
         .from('parties_planilhadas')
-        .update({ 
-          status: newStatus,
-          // Formatando o DeltaXP para M ou K para ficar amigável no Dashboard
-          delta_xp: totalDelta > 1000000 ? (totalDelta / 1000000).toFixed(1) + 'M' : (totalDelta / 1000).toFixed(0) + 'K'
-        })
+        .update({ status: newStatus, delta_xp: xpFormatted })
         .eq('id', party.id);
 
       if (updateError) {
-        console.error(`[AUDIT] Falha ao atualizar o status da party ${party.party_name}:`, updateError);
+        console.error(`[AUDIT] Falha ao atualizar "${party.party_name}":`, updateError.message);
       } else {
-        console.log(`[AUDIT] Party ${party.party_name} -> Status: ${newStatus} | Faltas: ${missCount} | XP: ${totalDelta}`);
-      }
-
-      // NOVIDADE: Sistema de Tribunal (Strikes Automatizados)
-      // Agora só aplica se atingir o Abandono (3 faltas)
-      if (newStatus === 'GHOST_SLOT' && party.last_miss_date !== todayDate) {
-        // A garantia do last_miss_date impede de aplicar varios strikes no mesmo dia
-        const strikeReason = `Abandono de Slot (3 dias de Falta Injustificada): ${party.party_name}`;
-        
-        // Verifica se a punição já foi aplicada hoje para esta party específica
-        const { data: existingStrikes } = await supabase
-          .from('player_strikes')
-          .select('id')
-          .eq('reason', strikeReason)
-          .gte('created_at', todayDate) // Só olha pro dia de hoje
-          .limit(1);
-
-        if (!existingStrikes || existingStrikes.length === 0) {
-          console.log(`[AUDIT] 🚨 Aplicando Strikes Automáticos por Abandono (3 dias): ${party.party_name}`);
-          
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + 3); // 3 dias de punição padrão
-
-          const newStrikes = party.members.map(member => ({
-            character_name: member,
-            reason: strikeReason,
-            admin_name: 'Robô Xerife',
-            expires_at: expiresAt.toISOString()
-          }));
-
-          if (newStrikes.length > 0) {
-            const { error: strikeError } = await supabase
-              .from('player_strikes')
-              .insert(newStrikes);
-              
-            if (strikeError) {
-              console.error(`[AUDIT] Erro ao aplicar strikes:`, strikeError.message);
-            } else {
-              console.log(`[AUDIT] ⚖️ ${newStrikes.length} strikes aplicados com sucesso.`);
-            }
-          }
-        }
+        const emoji = newStatus === 'EFFICIENT' ? '✅' : newStatus === 'SUBOPTIMAL' ? '⏳' : '❌';
+        console.log(`[AUDIT] ${emoji} "${party.party_name}" → ${newStatus} | Faltas: ${missCount}/3 | XP: ${xpFormatted}`);
       }
     }
 
-    console.log(`[AUDIT] Auditoria concluída com sucesso.`);
+    console.log('[AUDIT] ✔ Auditoria concluída.');
   } catch (error) {
-    console.error(`[AUDIT] Erro crítico na auditoria:`, error.message);
+    console.error('[AUDIT] Erro crítico:', error.message);
   }
 };

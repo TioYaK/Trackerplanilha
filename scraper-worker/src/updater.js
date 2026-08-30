@@ -4,7 +4,7 @@ import { exec } from 'child_process';
 import { supabase } from './db.js';
 
 // Versão atual do Worker (você deve subir isso no build_exe.js)
-export const CURRENT_VERSION = 1;
+export const CURRENT_VERSION = 2;
 
 export const checkForUpdates = async () => {
     // Se não estiver rodando como EXE compilado, usa o Git Pull clássico

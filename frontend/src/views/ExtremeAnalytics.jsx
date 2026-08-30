@@ -22,15 +22,18 @@ export default function ExtremeAnalytics() {
     setLoading(true);
 
     try {
-        // 1. Fetch Roster
-        let allRoster = [];
-        let page = 0;
-        while (true) {
-            const { data } = await supabase.from('view_guild_roster').select('*').range(page * 1000, (page + 1) * 1000 - 1);
-            if (!data || data.length === 0) break;
-            allRoster.push(...data);
-            page++;
-        }
+        const fetchRosterP = async () => {
+          let allRoster = [];
+          let page = 0;
+          while (true) {
+              const { data } = await supabase.from('view_guild_roster').select('*').range(page * 1000, (page + 1) * 1000 - 1);
+              if (!data || data.length === 0) break;
+              allRoster.push(...data);
+              if (data.length < 1000) break;
+              page++;
+          }
+          return allRoster;
+        };
 
         // Helper for pagination
         const fetchAll = async (table, filter = null) => {
@@ -48,11 +51,11 @@ export default function ExtremeAnalytics() {
           return all;
         };
 
-        // 2. Fetch Hunts History (For GDP and Elite Quadrant)
-        const huntsData = await fetchAll('guild_hunts_history');
-        
-        // 3. Fetch Parties (For Synergy and Churn)
-        const partiesData = await fetchAll('parties_planilhadas', q => q.not('delta_xp', 'is', null));
+        const [allRoster, huntsData, partiesData] = await Promise.all([
+          fetchRosterP(),
+          fetchAll('guild_hunts_history'),
+          fetchAll('parties_planilhadas', q => q.not('delta_xp', 'is', null))
+        ]);
 
         // --- CALC: PIB da Guilda (GDP) ---
         let gdpMap = {};

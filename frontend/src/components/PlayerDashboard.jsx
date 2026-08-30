@@ -18,12 +18,29 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
   const [prediction, setPrediction] = useState(null);
   const [heatmap, setHeatmap] = useState([]);
   const [playerInfo, setPlayerInfo] = useState(null);
+  const [playerAvatar, setPlayerAvatar] = useState(null);
   const [routine, setRoutine] = useState([]);
   const [levelHistory, setLevelHistory] = useState([]);
 
   const fetchData = async () => {
     if (!playerName) return;
     setLoading(true);
+
+    // Fetch Custom Avatar from profiles
+    try {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .ilike('main_character', playerName)
+        .maybeSingle();
+      if (userProfile?.avatar_url) {
+        setPlayerAvatar(userProfile.avatar_url);
+      } else {
+        setPlayerAvatar(null);
+      }
+    } catch (e) {
+      setPlayerAvatar(null);
+    }
 
     // Fetch Player Level from guild_members
     const { data: memberData } = await supabase
@@ -273,6 +290,14 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
         </div>
         
         <div className="flex items-center mb-4 md:mb-0 z-10">
+          <div className="mr-5 shrink-0">
+            <img 
+              src={playerAvatar || `https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/${(playerInfo?.vocation || 'None').toLowerCase()}.png`} 
+              alt={playerName} 
+              className="w-16 h-16 rounded-full object-cover bg-black/60 border-2 border-tibia-highlight shadow-lg"
+              onError={(e) => { e.target.src = 'https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/none.png'; }}
+            />
+          </div>
           <div className="mr-6">
             <h3 className="text-3xl font-black text-white">{playerName}</h3>
             {playerInfo && (

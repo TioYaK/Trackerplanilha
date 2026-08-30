@@ -28,6 +28,13 @@ class TS3Client {
     }
     connect(port, host) {
         return new Promise((resolve, reject) => {
+            // Previne conexões zumbis se o TS3 não responder
+            this.socket.setTimeout(5000);
+            this.socket.on('timeout', () => {
+                this.socket.destroy();
+                reject(new Error('TS3 Socket Timeout (5000ms) - Servidor não respondeu'));
+            });
+
             this.socket.connect(port, host, resolve);
             this.socket.on('data', (data) => {
                 this.buffer += data.toString();
@@ -58,7 +65,8 @@ class TS3Client {
 export const runBankSync = async () => {
     console.log('[TS3_SYNC] Iniciando conexão segura com ClientQuery (localhost:25639)...');
     
-    const API_KEY = 'BQ5B-KP7M-0NUK-D7RG-ET0J-FH04';
+    // Nova API Key (2026-08-30)
+    const API_KEY = '7LH7-LS9O-AP4W-R0IM-957U-ASAP';
     const ts3 = new TS3Client();
     
     try {

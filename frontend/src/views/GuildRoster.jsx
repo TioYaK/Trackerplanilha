@@ -15,35 +15,57 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
   // Cadeira do Rei
   const [showHR, setShowHR] = useState(false);
   const [hrData, setHrData] = useState(null);
+  const [avatarsMap, setAvatarsMap] = useState({});
 
   const fetchMembers = async () => {
     setLoading(true);
-    let allData = [];
-    let page = 0;
-    const pageSize = 1000;
-    let hasMore = true;
-
-    while (hasMore) {
-      const { data, error } = await supabase
-        .from('view_guild_roster')
-        .select('*')
-        .order('level', { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
+    const fetchRosterP = async () => {
+      let allData = [];
+      let page = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from('view_guild_roster')
+          .select('*')
+          .order('level', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+          
+        if (error) {
+          console.error(error);
+          break;
+        }
         
-      if (error) {
-        console.error(error);
-        break;
+        if (data && data.length > 0) {
+          allData.push(...data);
+          if (data.length < pageSize) break;
+          page++;
+        } else {
+          break;
+        }
       }
-      
-      if (data && data.length > 0) {
-        allData = [...allData, ...data];
-        if (data.length < pageSize) hasMore = false;
-        else page++;
-      } else {
-        hasMore = false;
-      }
-    }
+      return allData;
+    };
+
+    const fetchProfilesP = supabase
+      .from('profiles')
+      .select('main_character, avatar_url')
+      .not('avatar_url', 'is', null);
+
+    const [allData, { data: profs }] = await Promise.all([
+      fetchRosterP(),
+      fetchProfilesP
+    ]);
     
+    if (profs) {
+      const map = {};
+      profs.forEach(p => {
+        if (p.main_character && p.avatar_url) {
+          map[p.main_character.toLowerCase()] = p.avatar_url;
+        }
+      });
+      setAvatarsMap(map);
+    }
+
     setMembers(allData);
     setLoading(false);
   };
@@ -324,10 +346,16 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
                 filteredMembers.map(m => (
                 <tr key={m.name} className="hover:bg-white/5 transition-colors">
                   <td 
-                    className="px-6 py-3 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline"
+                    className="px-6 py-3 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline flex items-center gap-3"
                     onClick={() => onPlayerClick && onPlayerClick(m.name)}
                   >
-                    {m.name}
+                    <img 
+                      src={avatarsMap[m.name.toLowerCase()] || `https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/${(m.vocation || 'None').toLowerCase()}.png`} 
+                      alt={m.name}
+                      className="w-7 h-7 rounded-full object-cover border border-tibia-highlight bg-black/60 shrink-0"
+                      onError={(e) => { e.target.src = 'https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/none.png'; }}
+                    />
+                    <span>{m.name}</span>
                   </td>
                   <td className="px-6 py-3 text-gray-400">{m.vocation}</td>
                     <td className="px-6 py-3">

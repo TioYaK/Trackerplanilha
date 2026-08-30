@@ -24,20 +24,28 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick }) {
 
   const fetchParties = async () => {
     setLoading(true);
-    // Fetch áreas oficiais
-    const { data: areasData } = await supabase.from('respawn_areas').select('name').order('name');
-    if (areasData) setAreas(areasData);
+
+    const fetchAreasP = supabase.from('respawn_areas').select('name').order('name');
     
-    // Fetch parties com paginação
-    let allParties = [];
-    let page = 0;
-    while(true) {
-        const { data } = await supabase.from('parties_planilhadas').select('*').order('slot_start', { ascending: true }).range(page*1000, (page+1)*1000-1);
-        if (!data || data.length === 0) break;
-        allParties.push(...data);
-        if (data.length < 1000) break;
-        page++;
-    }
+    const fetchPartiesP = async () => {
+      let allParties = [];
+      let page = 0;
+      while(true) {
+          const { data } = await supabase.from('parties_planilhadas').select('*').order('slot_start', { ascending: true }).range(page*1000, (page+1)*1000-1);
+          if (!data || data.length === 0) break;
+          allParties.push(...data);
+          if (data.length < 1000) break;
+          page++;
+      }
+      return allParties;
+    };
+
+    const [{ data: areasData }, allParties] = await Promise.all([
+      fetchAreasP,
+      fetchPartiesP()
+    ]);
+
+    if (areasData) setAreas(areasData);
     
     if (allParties.length > 0) {
       const processedParties = allParties.map(p => ({

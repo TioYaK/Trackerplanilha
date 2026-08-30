@@ -58,8 +58,22 @@ export default function PlanilhaManager({ isAdmin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const membersArray = formData.members.split(',').map(m => m.trim()).filter(m => m);
-    
+
+    // Normaliza nomes: trim, colapsa espaços múltiplos e capitaliza cada palavra
+    const normalizeName = (raw) => {
+      return raw
+        .trim()
+        .replace(/\s+/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    };
+
+    const membersArray = formData.members
+      .split(',')
+      .map(m => normalizeName(m))
+      .filter(m => m.length > 0);
+
     let error;
     if (editingId) {
       const res = await supabase.from('parties_planilhadas').update({

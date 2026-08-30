@@ -512,11 +512,13 @@ async function scrapeGuild(guildName, maxPages = 50) {
     console.log(`[Scraper] Scraping Guild: ${guildName}...`);
     const allMembers = [];
     
-    // We must control the Puppeteer page manually to click the Next button
-    const page = await getGuildPage();
-    if (!page) return [];
-
+    let page = null;
     try {
+        await initBrowser();
+        page = await globalBrowser.newPage();
+        await blockHeavyAssets(page);
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
         const url  = `https://rubinot.com.br/guilds/${encodeURIComponent(guildName)}`;
         await safeGoto(page, url);
 
@@ -590,7 +592,7 @@ async function scrapeGuild(guildName, maxPages = 50) {
     } catch (e) {
         console.error(`[Scraper] Erro ao paginar guilda:`, e);
     } finally {
-        await page.close();
+        if (page) await page.close().catch(() => {});
     }
 
     if (allMembers.length > 0) writeCache(key, allMembers);
@@ -945,6 +947,52 @@ async function scrapeDeaths(world) {
     return allDeaths;
 }
 
+// --- scrapeOnlines ------------------------------------------------------------
+async function scrapeOnlines(world = 'Auroria') {
+    console.log(`[Scraper] Buscando jogadores online no mundo: ${world}...`);
+    let page = null;
+    try {
+        await initBrowser();
+        page = await globalBrowser.newPage();
+        await blockHeavyAssets(page);
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+
+        const html = await safeGoto(page, `https://rubinot.com.br/worlds/${encodeURIComponent(world)}`, { timeout: 30000 });
+        if (!html) {
+            await restartBrowserDueToCloudflare();
+            return [];
+        }
+
+        const onlinePlayers = await page.evaluate(() => {
+            const players = [];
+            const rows = Array.from(document.querySelectorAll('tr'));
+            for (const row of rows) {
+                const cols = Array.from(row.querySelectorAll('td'));
+                if (cols.length >= 2) {
+                    const link = cols[0].querySelector('a');
+                    if (link && link.href.includes('/characters/')) {
+                        players.push(link.innerText.trim());
+                    } else {
+                        const text = cols[0].innerText.trim();
+                        if (text && text !== 'Name' && text !== 'Nome') {
+                           players.push(text.replace(/\n/g, '').trim());
+                        }
+                    }
+                }
+            }
+            return [...new Set(players)];
+        });
+
+        console.log(`[Scraper] Encontrados ${onlinePlayers.length} jogadores online.`);
+        return onlinePlayers;
+    } catch (error) {
+        console.error('[Scraper] Erro ao buscar onlines:', error);
+        return [];
+    } finally {
+        if (page) await page.close().catch(() => {});
+    }
+}
+
 export {
     scrapeGuild,
     scrapeHighscores,
@@ -953,4 +1001,5 @@ export {
     fetchRubinotEveCharacter,
     scrapeRubinotCharacterPage,
     closeBrowser,
+    scrapeOnlines
 };

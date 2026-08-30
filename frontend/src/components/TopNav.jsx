@@ -9,7 +9,7 @@ import {
 import ProfileModal from './ProfileModal';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTabs }) {
-  const { logout } = useAuth();
+  const { logout, profile } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [workerCount, setWorkerCount] = useState(0);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -173,8 +173,19 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
             className="flex items-center px-3 py-1.5 rounded transition-colors border bg-blue-900/30 text-blue-400 border-blue-800 hover:text-white hover:bg-blue-900/50"
             title="Meu Perfil"
           >
-            <User size={16} className="mr-0 sm:mr-2" />
-            <span className="text-xs font-bold uppercase hidden sm:inline">Perfil</span>
+            {profile?.avatar_url ? (
+              <img 
+                src={profile.avatar_url} 
+                alt="Avatar" 
+                className="w-5 h-5 rounded-full object-cover border border-tibia-highlight mr-0 sm:mr-2 shrink-0 bg-black/60" 
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <User size={16} className="mr-0 sm:mr-2" />
+            )}
+            <span className="text-xs font-bold uppercase hidden sm:inline">
+              {profile?.main_character ? profile.main_character.split(' ')[0] : 'Perfil'}
+            </span>
           </button>
 
           <button 
@@ -199,6 +210,15 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
 
       {profileModalOpen && <ProfileModal onClose={() => setProfileModalOpen(false)} />}
 
+      {/* Backdrop: fecha o menu mobile ao clicar fora */}
+      {mobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 top-16 bg-black/50 z-40"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="lg:hidden absolute top-16 left-0 w-full bg-black/95 border-b-2 border-tibia-border max-h-[80vh] overflow-y-auto z-50">
@@ -218,8 +238,8 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
                         setMobileMenuOpen(false);
                       }}
                       className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded font-sans text-sm transition-colors ${
-                        currentView === itemId 
-                          ? 'bg-tibia-primary/30 text-white font-bold' 
+                        currentView === itemId
+                          ? 'bg-tibia-primary/30 text-white font-bold'
                           : 'text-gray-300 hover:bg-white/10'
                       }`}
                     >

@@ -25,6 +25,12 @@ export default function GlobalTracker() {
   const [topSolos, setTopSolos] = useState([]);
   
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null); // { message, type }
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const generateDiscordReport = () => {
     let report = `⚔️ **RELATÓRIO DIÁRIO DE GUILDA** ⚔️\n\n`;
@@ -63,152 +69,155 @@ export default function GlobalTracker() {
     report += `🚀 *Bom jogo a todos! Organizem suas PTs e não deixem os respawns vazios!*`;
 
     navigator.clipboard.writeText(report);
-    alert('Jornal da Guilda copiado! Dê Ctrl+V no Discord.');
+    showToast('📋 Jornal copiado! Cole com Ctrl+V no Discord.', 'success');
   };
 
   useEffect(() => {
     const fetchCensus = async () => {
       setLoading(true);
       try {
-        // Fetch current census
-      const { data: cData } = await supabase.from('view_macro_census').select('*').single();
-      if (cData) setCensus(cData);
-      
-      // Fetch hunters 24h
-      const { count: huntersCount } = await supabase
-        .from('view_top_rushers_24h')
-        .select('*', { count: 'exact', head: true });
-      if (huntersCount) setHunters(huntersCount);
-      
-      // Fetch historical daily data
-      let bData = [];
-      const { data: dailyData } = await supabase
-        .from('view_macro_daily')
-        .select('*')
-        .order('day_date', { ascending: true });
+        // Run all independent queries in parallel to eliminate waterfall
+        const fetchCensusP = supabase.from('view_macro_census').select('*').single();
+        const fetchHuntersP = supabase.from('view_top_rushers_24h').select('*', { count: 'exact', head: true });
+        const fetchDailyP = supabase.from('view_macro_daily').select('*').order('day_date', { ascending: true });
+        const fetchPartiesP = supabase.from('parties_planilhadas').select('hunt_name, slot_start, slot_end, delta_xp, members').not('delta_xp', 'is', null);
         
-      if (dailyData) {
-        bData = dailyData.map(d => {
-          const date = new Date(d.day_date);
-          date.setUTCDate(date.getUTCDate() + 1);
-          const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-          return { day: days[date.getDay()], logadas: d.logadas, cacando: d.cacando };
-        });
-        setBarData(bData);
-      }
-
-      // Fetch FULL Roster for BI
-      let vData = [];
-      let lData = [];
-      let bRisk = [];
-      let allRoster = [];
-      try {
-        let page = 0;
-        while (true) {
-          const { data: rosterData } = await supabase
-            .from('view_guild_roster')
-            .select('*')
-            .range(page * 1000, (page + 1) * 1000 - 1);
-          if (!rosterData || rosterData.length === 0) break;
-          allRoster.push(...rosterData);
-          page++;
-        }
-
-        const vocStats = {};
-        const lvlStats = { '1-499': 0, '500-999': 0, '1000-1499': 0, '1500-1999': 0, '2000+': 0 };
-
-        allRoster.forEach(m => {
-          const voc = m.vocation || 'N/A';
-          if (!vocStats[voc]) vocStats[voc] = { name: voc, members: 0, total_xp: 0 };
-          vocStats[voc].members += 1;
-          vocStats[voc].total_xp += m.xp_gained_24h || 0;
-
-          if (m.level < 500) lvlStats['1-499']++;
-          else if (m.level < 1000) lvlStats['500-999']++;
-          else if (m.level < 1500) lvlStats['1000-1499']++;
-          else if (m.level < 2000) lvlStats['1500-1999']++;
-          else lvlStats['2000+']++;
-
-          if (m.level >= 1500 && (!m.xp_gained_24h || m.xp_gained_24h === 0)) {
-            bRisk.push(m);
+        const fetchRosterP = async () => {
+          let allRoster = [];
+          let page = 0;
+          while (true) {
+            const { data: rosterData } = await supabase
+              .from('view_guild_roster')
+              .select('*')
+              .range(page * 1000, (page + 1) * 1000 - 1);
+            if (!rosterData || rosterData.length === 0) break;
+            allRoster.push(...rosterData);
+            if (rosterData.length < 1000) break; // optimize: if less than max page, it's the last one
+            page++;
           }
-        });
-
-        const vocColors = {
-          'Elite Knight': '#3B82F6', 'Elder Druid': '#10B981', 'Master Sorcerer': '#EF4444', 'Royal Paladin': '#F59E0B'
+          return allRoster;
         };
 
-        vData = Object.values(vocStats)
-          .filter(v => v.name !== 'None' && v.name !== 'N/A')
-          .map(v => ({ ...v, color: vocColors[v.name] || '#6B7280' }))
-          .sort((a, b) => b.total_xp - a.total_xp);
+        const [
+          { data: cData },
+          { count: huntersCount },
+          { data: dailyData },
+          { data: partiesData },
+          allRoster
+        ] = await Promise.all([
+          fetchCensusP,
+          fetchHuntersP,
+          fetchDailyP,
+          fetchPartiesP,
+          fetchRosterP()
+        ]);
 
-        lData = Object.entries(lvlStats).map(([name, count]) => ({ name, count }));
+        if (cData) setCensus(cData);
+        if (huntersCount) setHunters(huntersCount);
         
-        // Pareto Logic
-        const sortedByXp = [...allRoster].sort((a,b) => (b.xp_gained_24h||0) - (a.xp_gained_24h||0));
-        let top50Xp = 0;
-        let restXp = 0;
-        sortedByXp.forEach((m, i) => {
-            if (i < 50) top50Xp += (m.xp_gained_24h||0);
-            else restXp += (m.xp_gained_24h||0);
-        });
-        setParetoData([
-           { name: 'Top 50 Carregadores', value: top50Xp, fill: '#F59E0B' },
-           { name: 'Resto da Guilda', value: restXp, fill: '#374151' }
-        ]);
+        let bData = [];
+        if (dailyData) {
+          bData = dailyData.map(d => {
+            const date = new Date(d.day_date);
+            date.setUTCDate(date.getUTCDate() + 1);
+            const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+            return { day: days[date.getDay()], logadas: d.logadas, cacando: d.cacando };
+          });
+          setBarData(bData);
+        }
 
-        // Muro das Lamentacoes (Deaths)
-        const deadPlayers = allRoster
-            .filter(r => r.xp_gained_24h < 0)
-            .sort((a,b) => a.xp_gained_24h - b.xp_gained_24h)
-            .slice(0, 5);
-        setDeaths(deadPlayers);
+        let vData = [];
+        let lData = [];
+        let bRisk = [];
+        
+        if (allRoster && allRoster.length > 0) {
+          const vocStats = {};
+          const lvlStats = { '1-499': 0, '500-999': 0, '1000-1499': 0, '1500-1999': 0, '2000+': 0 };
 
-        // Quadrante Magico (Scatter)
-        const qData = allRoster
-            .filter(r => r.xp_gained_24h > 0)
-            .map(r => ({
-               name: r.name,
-               level: r.level,
-               xp: Math.round(r.xp_gained_24h / 1000000), // In Millions
-               z: 1
-            }));
-        setMagicQuadrant(qData);
+          allRoster.forEach(m => {
+            const voc = m.vocation || 'N/A';
+            if (!vocStats[voc]) vocStats[voc] = { name: voc, members: 0, total_xp: 0 };
+            vocStats[voc].members += 1;
+            vocStats[voc].total_xp += m.xp_gained_24h || 0;
 
-        // Censo de Estilo de Vida
-        let hardcore = 0;
-        let operarios = 0;
-        let casuais = 0;
-        let turistas = 0;
-        allRoster.forEach(r => {
-           if (r.xp_gained_24h > 50000000) hardcore++;
-           else if (r.xp_gained_24h > 10000000) operarios++;
-           else if (r.xp_gained_24h > 0) casuais++;
-           else turistas++;
-        });
-        setLifestyle([
-           { name: 'Grinders (50M+)', value: hardcore, fill: '#F59E0B' },
-           { name: 'Operários (10M+)', value: operarios, fill: '#3B82F6' },
-           { name: 'Casuais (>0)', value: casuais, fill: '#10B981' },
-           { name: 'Inativos (0)', value: turistas, fill: '#374151' }
-        ]);
+            if (m.level < 500) lvlStats['1-499']++;
+            else if (m.level < 1000) lvlStats['500-999']++;
+            else if (m.level < 1500) lvlStats['1000-1499']++;
+            else if (m.level < 2000) lvlStats['1500-1999']++;
+            else lvlStats['2000+']++;
 
-        setVocationData(vData);
-        setLevelData(lData);
-        setBurnoutRisk(bRisk.sort((a, b) => b.level - a.level).slice(0, 15));
-      } catch (e) {
-        console.error("BI Fetch Error:", e);
-      }
+            if (m.level >= 1500 && (!m.xp_gained_24h || m.xp_gained_24h === 0)) {
+              bRisk.push(m);
+            }
+          });
 
-// Fetch parties for Respawn Tier List and SupplyDemand
-      const { data: partiesData } = await supabase
-        .from('parties_planilhadas')
-        .select('hunt_name, slot_start, slot_end, delta_xp, members')
-        .not('delta_xp', 'is', null);
+          const vocColors = {
+            'Elite Knight': '#3B82F6', 'Elder Druid': '#10B981', 'Master Sorcerer': '#EF4444', 'Royal Paladin': '#F59E0B'
+          };
 
-      let rTier = [];
-      if (partiesData) {
+          vData = Object.values(vocStats)
+            .filter(v => v.name !== 'None' && v.name !== 'N/A')
+            .map(v => ({ ...v, color: vocColors[v.name] || '#6B7280' }))
+            .sort((a, b) => b.total_xp - a.total_xp);
+
+          lData = Object.entries(lvlStats).map(([name, count]) => ({ name, count }));
+          
+          // Pareto Logic
+          const sortedByXp = [...allRoster].sort((a,b) => (b.xp_gained_24h||0) - (a.xp_gained_24h||0));
+          let top50Xp = 0;
+          let restXp = 0;
+          sortedByXp.forEach((m, i) => {
+              if (i < 50) top50Xp += (m.xp_gained_24h||0);
+              else restXp += (m.xp_gained_24h||0);
+          });
+          setParetoData([
+             { name: 'Top 50 Carregadores', value: top50Xp, fill: '#F59E0B' },
+             { name: 'Resto da Guilda', value: restXp, fill: '#374151' }
+          ]);
+
+          // Muro das Lamentacoes (Deaths)
+          const deadPlayers = allRoster
+              .filter(r => r.xp_gained_24h < 0)
+              .sort((a,b) => a.xp_gained_24h - b.xp_gained_24h)
+              .slice(0, 5);
+          setDeaths(deadPlayers);
+
+          // Quadrante Magico (Scatter)
+          const qData = allRoster
+              .filter(r => r.xp_gained_24h > 0)
+              .map(r => ({
+                 name: r.name,
+                 level: r.level,
+                 xp: Math.round(r.xp_gained_24h / 1000000), // In Millions
+                 z: 1
+              }));
+          setMagicQuadrant(qData);
+
+          // Censo de Estilo de Vida
+          let hardcore = 0;
+          let operarios = 0;
+          let casuais = 0;
+          let turistas = 0;
+          allRoster.forEach(r => {
+             if (r.xp_gained_24h > 50000000) hardcore++;
+             else if (r.xp_gained_24h > 10000000) operarios++;
+             else if (r.xp_gained_24h > 0) casuais++;
+             else turistas++;
+          });
+          setLifestyle([
+             { name: 'Grinders (50M+)', value: hardcore, fill: '#F59E0B' },
+             { name: 'Operários (10M+)', value: operarios, fill: '#3B82F6' },
+             { name: 'Casuais (>0)', value: casuais, fill: '#10B981' },
+             { name: 'Inativos (0)', value: turistas, fill: '#374151' }
+          ]);
+
+          setVocationData(vData);
+          setLevelData(lData);
+          setBurnoutRisk(bRisk.sort((a, b) => b.level - a.level).slice(0, 15));
+        }
+
+        let rTier = [];
+        if (partiesData) {
         const huntStats = {};
         const hoursPerVoc = { 'Elite Knight': 0, 'Elder Druid': 0, 'Master Sorcerer': 0, 'Royal Paladin': 0 };
         const globalHours = new Array(24).fill(0);
@@ -358,6 +367,17 @@ export default function GlobalTracker() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-lg shadow-2xl border text-sm font-bold animate-fade-in transition-all ${
+          toast.type === 'success'
+            ? 'bg-green-900/90 border-green-500 text-green-200'
+            : 'bg-red-900/90 border-red-500 text-red-200'
+        }`}>
+          {toast.message}
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
         <div>
           <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Sala de Guerra (War Room)</h2>
