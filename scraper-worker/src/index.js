@@ -160,12 +160,19 @@ const processTask = async (task) => {
           await runFetchHighscores(vocStr);
         } else if (task.task_type === 'FETCH_RIVALS') {
           await runFetchRivals();
+          await resetTaskStatus(task.id, 3); // A cada 3 minutos
         } else if (task.task_type === 'FETCH_DEATHS') {
           await runFetchDeaths();
+          await resetTaskStatus(task.id, 2); // A cada 2 minutos
         } else if (task.task_type === 'FETCH_KILLSTATS') {
           await runFetchKillstats();
+          await resetTaskStatus(task.id, 15); // A cada 15 minutos (bosses demoram)
         } else if (task.task_type === 'FETCH_TRANSFERS') {
           await runFetchTransfers();
+          await resetTaskStatus(task.id, 60); // A cada 60 minutos (transfer demora)
+        } else if (task.task_type === 'AUDIT_SLOTS') {
+          await runAuditSlots();
+          await resetTaskStatus(task.id, 10); // A cada 10 minutos
         } else {
           console.log(`[WORKER] ⚠ Tipo desconhecido: ${task.task_type}`);
         }
