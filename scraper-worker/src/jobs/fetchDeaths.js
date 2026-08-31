@@ -31,8 +31,8 @@ export const runFetchDeaths = async () => {
             
             let deathTime = new Date();
             if (death.death_time || death.time || death.timestamp) {
-                const ts = death.death_time || death.time || death.timestamp;
-                deathTime = new Date(typeof ts === 'number' ? (ts > 9999999999 ? ts : ts * 1000) : ts);
+                const ts = Number(death.death_time || death.time || death.timestamp);
+                deathTime = new Date(ts > 9999999999 ? ts : ts * 1000);
             } else if (death.date) {
                 deathTime = new Date(death.date);
             }

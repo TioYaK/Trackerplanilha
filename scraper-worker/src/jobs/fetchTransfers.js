@@ -15,7 +15,7 @@ export const runFetchTransfers = async () => {
                 
                 let tDate = new Date();
                 if (t.transferred_at) {
-                    tDate = new Date(typeof t.transferred_at === 'number' ? (t.transferred_at > 9999999999 ? t.transferred_at : t.transferred_at * 1000) : t.transferred_at);
+                    tDate = new Date(Number(t.transferred_at) > 9999999999 ? Number(t.transferred_at) : Number(t.transferred_at) * 1000);
                 }
 
                 const record = {
@@ -37,7 +37,7 @@ export const runFetchTransfers = async () => {
                 
                 let tDate = new Date();
                 if (t.transferred_at) {
-                    tDate = new Date(typeof t.transferred_at === 'number' ? (t.transferred_at > 9999999999 ? t.transferred_at : t.transferred_at * 1000) : t.transferred_at);
+                    tDate = new Date(Number(t.transferred_at) > 9999999999 ? Number(t.transferred_at) : Number(t.transferred_at) * 1000);
                 }
 
                 const record = {
@@ -56,3 +56,4 @@ export const runFetchTransfers = async () => {
         console.error('[JOB] Erro crítico no FetchTransfers:', e);
     }
 };
+
