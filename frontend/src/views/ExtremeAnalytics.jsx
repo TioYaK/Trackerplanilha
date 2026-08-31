@@ -121,14 +121,17 @@ export default function ExtremeAnalytics() {
                 return (
                   <div key={t.id} className={`${bgColor} p-4 rounded-lg border ${borderColor} flex items-center justify-between`}>
                     <div>
-                      <div className="text-white font-bold">{t.character_name}</div>
+                      <div className="text-white font-bold flex items-center gap-2">
+                        {t.character_name}
+                        {t.level > 0 && <span className="text-gray-400 text-sm font-normal">Level {t.level}</span>}
+                      </div>
                       <div className="text-xs text-gray-400 mt-1 font-mono">
                         {new Date(t.transfer_date).toLocaleString()}
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
                       <span className={`font-bold flex items-center ${iconColor}`}>
-                        {isIncoming ? 'Chegou no Servidor' : 'Saiu do Servidor'}
+                        {isIncoming ? `Veio de ${t.other_world || 'Unknown'}` : `Fugiu para ${t.other_world || 'Unknown'}`}
                       </span>
                     </div>
                   </div>
