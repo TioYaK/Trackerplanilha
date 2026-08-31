@@ -19,6 +19,35 @@ export const runFetchOnlines = async () => {
       online_count: onlinePlayers.length
     });
 
+    // ─── DETECÇÃO DE MAKERS (LOGIN / LOGOUT) ───
+    const fs = await import('fs');
+    const path = await import('path');
+    const CACHE_FILE = path.join(process.cwd(), 'cache_onlines.json');
+    let previousOnlines = [];
+    if (fs.existsSync(CACHE_FILE)) {
+      try { previousOnlines = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8')); } catch(e){}
+    }
+    
+    const prevSet = new Set(previousOnlines.map(p => p.toLowerCase()));
+    const currSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
+    
+    const loggedIn = onlinePlayers.filter(p => !prevSet.has(p.toLowerCase()));
+    const loggedOut = previousOnlines.filter(p => !currSet.has(p.toLowerCase()));
+    
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(onlinePlayers));
+
+    // Salvar no banco (dividindo em chunks para nǜo estourar payload)
+    const eventsToInsert = [];
+    loggedIn.forEach(name => eventsToInsert.push({ character_name: name, event_type: 'LOGIN' }));
+    loggedOut.forEach(name => eventsToInsert.push({ character_name: name, event_type: 'LOGOUT' }));
+
+    if (eventsToInsert.length > 0) {
+      for (let i = 0; i < eventsToInsert.length; i += 500) {
+        await supabase.from('login_events').insert(eventsToInsert.slice(i, i + 500));
+      }
+      console.log(`[JOB] Rastreador de Makers: ${loggedIn.length} Logins, ${loggedOut.length} Logouts registrados.`);
+    }
+
     // Atualiza status online dos Hunteds
     const { data: huntedList } = await supabase.from('hunted_list').select('id, name, is_online');
     const onlineSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
