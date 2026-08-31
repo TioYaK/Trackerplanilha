@@ -43,7 +43,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     market: { label: 'Mercado Interno', icon: <ShoppingBag size={16} /> },
     loot: { label: 'Loot Split', icon: <Calculator size={16} /> },
     tracker: { label: 'Censo Macro', icon: <LayoutDashboard size={16} /> },
-    extreme: { label: 'Extreme BI', icon: <BrainCircuit size={16} /> },
+    extreme: { label: 'Eventos Global', icon: <BrainCircuit size={16} /> },
     analytics: { label: 'Rankings & Tribunal', icon: <TrendingDown size={16} /> },
     admin: { label: 'Painel Admin', icon: <Lock size={16} /> },
   };

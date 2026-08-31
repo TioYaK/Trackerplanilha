@@ -1,376 +1,141 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar, ZAxis, Legend } from 'recharts';
-import { BrainCircuit, HeartCrack, Flame, LineChart as LineChartIcon, Activity, Trophy, Target, PieChart as PieChartIcon } from 'lucide-react';
+import { Skull, Plane, ShieldAlert, Activity, RefreshCw } from 'lucide-react';
 
 export default function ExtremeAnalytics() {
+  const [deaths, setDeaths] = useState([]);
+  const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // States for the 4 metrics
-  const [churnRisk, setChurnRisk] = useState([]);
-  const [synergy, setSynergy] = useState([]);
-  const [gdpData, setGdpData] = useState([]);
-  const [eliteQuadrant, setEliteQuadrant] = useState([]);
-  const [respawnROI, setRespawnROI] = useState([]);
-  const [respawnTime, setRespawnTime] = useState([]);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const fetchData = async () => {
     setLoading(true);
-
     try {
-        const fetchRosterP = async () => {
-          let allRoster = [];
-          let page = 0;
-          while (true) {
-              const { data } = await supabase.from('view_guild_roster').select('*').range(page * 1000, (page + 1) * 1000 - 1);
-              if (!data || data.length === 0) break;
-              allRoster.push(...data);
-              if (data.length < 1000) break;
-              page++;
-          }
-          return allRoster;
-        };
+      // Fetch deaths
+      const { data: deathsData } = await supabase
+        .from('recent_deaths')
+        .select('*')
+        .order('death_time', { ascending: false })
+        .limit(50);
+      
+      if (deathsData) setDeaths(deathsData);
 
-        // Helper for pagination
-        const fetchAll = async (table, filter = null) => {
-          let all = [];
-          let p = 0;
-          while (true) {
-            let query = supabase.from(table).select('*').range(p * 1000, (p + 1) * 1000 - 1);
-            if (filter) query = filter(query);
-            const { data } = await query;
-            if (!data || data.length === 0) break;
-            all.push(...data);
-            if (data.length < 1000) break;
-            p++;
-          }
-          return all;
-        };
+      // Fetch transfers
+      const { data: transfersData } = await supabase
+        .from('server_transfers')
+        .select('*')
+        .order('transfer_date', { ascending: false })
+        .limit(50);
 
-        const [allRoster, huntsData, partiesData] = await Promise.all([
-          fetchRosterP(),
-          fetchAll('guild_hunts_history'),
-          fetchAll('parties_planilhadas', q => q.not('delta_xp', 'is', null))
-        ]);
-
-        // --- CALC: PIB da Guilda (GDP) ---
-        let gdpMap = {};
-        if (huntsData) {
-            huntsData.forEach(h => {
-                const date = new Date(h.created_at).toLocaleDateString();
-                if (!gdpMap[date]) gdpMap[date] = 0;
-                gdpMap[date] += Number(h.total_profit || 0);
-            });
-        }
-        // If DB is empty, mock some recent days to make the chart look cool
-        if (Object.keys(gdpMap).length === 0) {
-            const today = new Date();
-            for(let i=6; i>=0; i--) {
-                const d = new Date(today);
-                d.setDate(d.getDate() - i);
-                gdpMap[d.toLocaleDateString()] = Math.floor(Math.random() * 50000000) + 10000000;
-            }
-        }
-        const gdpArr = Object.entries(gdpMap).map(([date, profit]) => ({ date, profit: profit / 1000000 }));
-        setGdpData(gdpArr);
-
-        // --- CALC: Quadrante de Elite ---
-        let playerProfits = {};
-        if (huntsData) {
-            huntsData.forEach(h => {
-                if (h.members && Array.isArray(h.members)) {
-                    const share = h.total_profit / h.members.length;
-                    h.members.forEach(m => {
-                        if (!playerProfits[m.name]) playerProfits[m.name] = 0;
-                        playerProfits[m.name] += share;
-                    });
-                }
-            });
-        }
-        let eliteData = allRoster.filter(r => r.xp_gained_24h > 0 || playerProfits[r.name] > 0).map(r => ({
-            name: r.name,
-            xp: (r.xp_gained_24h || 0) / 1000000,
-            profit: (playerProfits[r.name] || 0) / 1000000,
-            vocation: r.vocation
-        }));
-        setEliteQuadrant(eliteData);
-
-        // --- CALC: Matriz de Sinergia ---
-        let pairStats = {}; // "A|B": { totalXp, hours }
-        if (partiesData) {
-            partiesData.forEach(p => {
-                if (!p.delta_xp || p.delta_xp === '0') return;
-                const members = p.members || [];
-                if (members.length < 2) return;
-                
-                // Parse duration
-                const [sh, sm] = (p.slot_start || '00:00').split(':').map(Number);
-                const [eh, em] = (p.slot_end || '01:00').split(':').map(Number);
-                let duration = ((eh * 60 + em) - (sh * 60 + sm)) / 60;
-                if (duration <= 0) duration += 24;
-                
-                // Parse XP
-                let xpVal = 0;
-                const str = p.delta_xp.toString().toUpperCase().replace(/,/g, '.');
-                if (str.endsWith('M')) xpVal = parseFloat(str) * 1000000;
-                else if (str.endsWith('K')) xpVal = parseFloat(str) * 1000;
-                else xpVal = parseFloat(str) || 0;
-
-                for (let i = 0; i < members.length; i++) {
-                    for (let j = i + 1; j < members.length; j++) {
-                        const pair = [members[i], members[j]].sort().join('|');
-                        if (!pairStats[pair]) pairStats[pair] = { count: 0, totalXp: 0, hours: 0 };
-                        pairStats[pair].count += 1;
-                        pairStats[pair].totalXp += xpVal;
-                        pairStats[pair].hours += duration;
-                    }
-                }
-            });
-        }
-        
-        let topPairs = Object.entries(pairStats)
-            .map(([pair, stats]) => {
-                const [p1, p2] = pair.split('|');
-                return {
-                    p1, p2,
-                    hunts: stats.count,
-                    xph: stats.totalXp / Math.max(0.1, stats.hours)
-                };
-            })
-            .filter(x => x.hunts >= 2) // Minimum 2 hunts together to prove synergy
-            .sort((a, b) => b.xph - a.xph)
-            .slice(0, 4);
-            
-        // Fallback mock if not enough data
-        if (topPairs.length === 0) {
-            topPairs = [
-                { p1: 'Tio Yak', p2: 'Guerreiro Implacavel', hunts: 5, xph: 45000000 },
-                { p1: 'Mago Bolado', p2: 'Healer Supremo', hunts: 3, xph: 38000000 }
-            ];
-        }
-        setSynergy(topPairs);
-
-        // --- CALC: Map Control (Eficiência de Respawns) ---
-        let mapStats = {};
-        if (partiesData) {
-            partiesData.forEach(p => {
-                const cat = p.respawn_category || 'Desconhecido';
-                if (!mapStats[cat]) mapStats[cat] = { count: 0, totalXp: 0, hours: 0 };
-                mapStats[cat].count += 1;
-                
-                // Parse XP
-                let xpVal = 0;
-                if (p.delta_xp && p.delta_xp !== '0') {
-                    const str = p.delta_xp.toString().toUpperCase().replace(/,/g, '.');
-                    if (str.endsWith('M')) xpVal = parseFloat(str) * 1000000;
-                    else if (str.endsWith('K')) xpVal = parseFloat(str) * 1000;
-                    else xpVal = parseFloat(str) || 0;
-                }
-                
-                // Parse duration
-                const [sh, sm] = (p.slot_start || '00:00').split(':').map(Number);
-                const [eh, em] = (p.slot_end || '01:00').split(':').map(Number);
-                let duration = ((eh * 60 + em) - (sh * 60 + sm)) / 60;
-                if (duration <= 0) duration += 24;
-                
-                mapStats[cat].totalXp += xpVal;
-                mapStats[cat].hours += duration;
-            });
-        }
-        
-        let roiArr = [];
-        let timeArr = [];
-        Object.entries(mapStats).forEach(([name, stats]) => {
-            timeArr.push({ name, hours: stats.hours });
-            if (stats.totalXp > 0) {
-                roiArr.push({ name, xph: stats.totalXp / Math.max(0.1, stats.hours) });
-            }
-        });
-        
-        roiArr.sort((a,b) => b.xph - a.xph);
-        timeArr.sort((a,b) => b.hours - a.hours);
-        
-        if (roiArr.length === 0) {
-            roiArr = [{name: 'SoulWar', xph: 15000000}, {name: 'Gnomprona', xph: 12000000}];
-            timeArr = [{name: 'SoulWar', hours: 40}, {name: 'Gnomprona', hours: 25}, {name: 'Ferumbras', hours: 10}];
-        }
-        
-        setRespawnROI(roiArr.slice(0, 5));
-        setRespawnTime(timeArr.slice(0, 5));
-
-        // --- CALC: Previsão de Churn (Alerta de Quit) ---
-        // Algoritmo: High level (1000+), fez pouca XP nas ultimas 24h, mas historicamente upava.
-        // Já que não temos tabela de history por player, usaremos a falta de XP hoje cruzada com o level absurdo.
-        let risk = allRoster
-            .filter(r => r.level > 800 && (!r.xp_gained_24h || r.xp_gained_24h < 500000))
-            .sort((a,b) => b.level - a.level)
-            .slice(0, 5);
-        setChurnRisk(risk);
-
-    } catch (err) {
-        console.error("Extreme Analytics Error:", err);
-    } finally {
-        setLoading(false);
+      if (transfersData) setTransfers(transfersData);
+    } catch (e) {
+      console.error(e);
     }
+    setLoading(false);
   };
 
-  if (loading) {
-      return (
-          <div className="flex justify-center items-center h-full py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-          </div>
-      );
-  }
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
-      <div className="mb-8 border-b border-purple-900/50 pb-4">
-        <h2 className="text-5xl font-medieval text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-2 flex items-center">
-            <BrainCircuit className="mr-4 text-purple-400" size={48} />
-            Extreme Analytics (IA Preditiva)
-        </h2>
-        <p className="text-gray-400 font-sans">A joia da coroa. Análises preditivas profundas, correlações complexas e Machine Learning (BI) aplicado à guilda.</p>
+    <div className="p-6 h-[calc(100vh-64px)] overflow-y-auto bg-black text-gray-200">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-black text-white flex items-center tracking-tight">
+            <Activity className="mr-3 text-purple-500" size={32} />
+            Radar de Eventos Global
+          </h1>
+          <p className="text-gray-400 mt-1">
+            Monitoramento de Mortes e Transferências em Tempo Real (Raspado pela Frota).
+          </p>
+        </div>
+        <button 
+          onClick={fetchData}
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors font-bold"
+        >
+          <RefreshCw className={`mr-2 ${loading ? 'animate-spin' : ''}`} size={18} />
+          Atualizar Dados
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* 1. PIB DA GUILDA */}
-        <div className="bg-black/40 border border-green-900/50 rounded-lg p-6 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
-            <h3 className="text-xl font-bold text-green-400 mb-2 flex items-center">
-                <LineChartIcon className="mr-2" size={24} />
-                PIB da Guilda (Macroeconomia)
-            </h3>
-            <p className="text-xs text-gray-400 mb-6">Volume total de riqueza líquida (Lucro) injetada na guilda por dia. Analise tendências de recessão ou expansão.</p>
-            
-            <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={gdpData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                        <XAxis dataKey="date" stroke="#666" tick={{fill: '#888', fontSize: 10}} />
-                        <YAxis stroke="#666" tick={{fill: '#888', fontSize: 10}} tickFormatter={(val) => val + 'M'} />
-                        <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} formatter={(val) => [val.toFixed(1) + ' Milhões gp', 'Lucro']} />
-                        <Line type="monotone" dataKey="profit" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', r: 4 }} />
-                    </LineChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
-
-        {/* 2. MATRIZ DE SINERGIA */}
-        <div className="bg-black/40 border border-blue-900/50 rounded-lg p-6 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
-            <h3 className="text-xl font-bold text-blue-400 mb-2 flex items-center">
-                <Flame className="mr-2" size={24} />
-                Matriz de Sinergia (Dream Teams)
-            </h3>
-            <p className="text-xs text-gray-400 mb-6">O Algoritmo cruzou todos os times e descobriu quais duplas geram mais XP/h quando caçam juntas.</p>
-            
-            <div className="space-y-4">
-                {synergy.map((s, idx) => (
-                    <div key={idx} className="bg-blue-950/20 p-4 rounded-lg border border-blue-900/30 flex justify-between items-center relative overflow-hidden">
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
-                        <div className="flex flex-col">
-                            <span className="text-gray-300 font-bold">{s.p1}</span>
-                            <span className="text-blue-500 text-xs text-center font-bold">🤝 + 🤝</span>
-                            <span className="text-gray-300 font-bold">{s.p2}</span>
-                        </div>
-                        <div className="text-right">
-                            <span className="block text-2xl font-black text-white">{(s.xph / 1000000).toFixed(1)}M/h</span>
-                            <span className="text-xs text-blue-400 font-bold">Provado em {s.hunts} hunts</span>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-
-        {/* 3. QUADRANTE DE ELITE */}
-        <div className="bg-black/40 border border-yellow-900/50 rounded-lg p-6 shadow-[0_0_20px_rgba(234,179,8,0.1)]">
-            <h3 className="text-xl font-bold text-yellow-500 mb-2 flex items-center">
-                <Trophy className="mr-2" size={24} />
-                Quadrante de Elite (XP vs Riqueza)
-            </h3>
-            <p className="text-xs text-gray-400 mb-6">Eixo X: XP Gained / Eixo Y: Profit. Identifique os Rushers (Só upam), Farmers (Só lucram) e a Elite Absoluta (Faz os dois).</p>
-            
-            <div className="h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: -20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                        <XAxis type="number" dataKey="xp" name="XP Gained" unit="M" stroke="#666" tick={{fill: '#888', fontSize: 10}} />
-                        <YAxis type="number" dataKey="profit" name="Profit Generated" unit="M" stroke="#666" tick={{fill: '#888', fontSize: 10}} />
-                        <ZAxis type="number" range={[60, 60]} />
-                        <Tooltip cursor={{strokeDasharray: '3 3'}} contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} />
-                        <Scatter name="Jogadores" data={eliteQuadrant} fill="#eab308" opacity={0.7} />
-                    </ScatterChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
-
-        {/* 4. PREVISÃO DE CHURN */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* PANEL: RECENT DEATHS */}
         <div className="bg-black/40 border border-red-900/50 rounded-lg p-6 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
-            <h3 className="text-xl font-bold text-red-500 mb-2 flex items-center">
-                <HeartCrack className="mr-2" size={24} />
-                Risco de Churn (Alerta de Inatividade)
-            </h3>
-            <p className="text-xs text-gray-400 mb-6">Jogadores de altíssimo level que caíram abruptamente para Zero XP. Risco iminente de abandonarem a guilda ou o jogo. Fale com eles.</p>
+          <h3 className="text-xl font-bold text-red-500 mb-4 flex items-center">
+            <Skull className="mr-2" size={24} />
+            Mortes Registradas (Guilda & Hunteds)
+          </h3>
+          
+          <div className="overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
+            {deaths.length === 0 && !loading && (
+              <div className="text-center text-gray-500 py-10">
+                Nenhuma morte registrada recentemente.
+              </div>
+            )}
             
             <div className="space-y-3">
-                {churnRisk.map((r, idx) => (
-                    <div key={idx} className="bg-red-950/20 p-4 rounded-lg border border-red-900/30 flex items-center justify-between">
-                        <div className="flex items-center">
-                            <Activity className="text-red-500 mr-3 animate-pulse" size={20} />
-                            <div>
-                                <span className="text-white font-bold block">{r.name}</span>
-                                <span className="text-xs text-red-400">Level {r.level} • {r.vocation}</span>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <span className="bg-red-600 text-white text-[10px] font-black uppercase px-2 py-1 rounded">Risco Crítico</span>
-                        </div>
-                    </div>
-                ))}
+              {deaths.map(d => (
+                <div key={d.id} className="bg-red-950/20 p-4 rounded-lg border border-red-900/30">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-white font-bold text-lg flex items-center">
+                      {d.character_name}
+                      {d.is_guild_member && <span className="ml-2 bg-blue-600/80 text-white text-[10px] uppercase px-2 py-0.5 rounded">Aliado</span>}
+                      {d.is_hunted && <span className="ml-2 bg-red-600/80 text-white text-[10px] uppercase px-2 py-0.5 rounded">Hunted</span>}
+                    </span>
+                    <span className="text-xs text-gray-400 font-mono">
+                      {new Date(d.death_time).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-300">
+                    <span className="text-red-400 font-semibold">Level {d.level}</span> — Morto por: <span className="text-white">{d.killed_by}</span>
+                  </div>
+                </div>
+              ))}
             </div>
+          </div>
         </div>
 
-        {/* 5. ROI DE RESPAWNS */}
-        <div className="bg-black/40 border border-orange-900/50 rounded-lg p-6 shadow-[0_0_20px_rgba(249,115,22,0.1)]">
-            <h3 className="text-xl font-bold text-orange-500 mb-2 flex items-center">
-                <Target className="mr-2" size={24} />
-                ROI de Respawns (Melhor Custo/Benefício)
-            </h3>
-            <p className="text-xs text-gray-400 mb-6">Média histórica de XP/h gerada em cada local de caça pela guilda. Descubra os locais mais eficientes.</p>
-            <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={respawnROI} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#222" horizontal={false} />
-                        <XAxis type="number" stroke="#666" tickFormatter={(val) => (val/1000000).toFixed(0) + 'M'} />
-                        <YAxis type="category" dataKey="name" stroke="#666" width={80} tick={{fill: '#888', fontSize: 10}} />
-                        <Tooltip cursor={{fill: '#222'}} contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} formatter={(val) => [(val/1000000).toFixed(1) + 'M XP/h', 'Eficiência']} />
-                        <Bar dataKey="xph" fill="#f97316" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
-
-        {/* 6. MONOPÓLIO DE TEMPO */}
+        {/* PANEL: SERVER TRANSFERS */}
         <div className="bg-black/40 border border-teal-900/50 rounded-lg p-6 shadow-[0_0_20px_rgba(20,184,166,0.1)]">
-            <h3 className="text-xl font-bold text-teal-400 mb-2 flex items-center">
-                <PieChartIcon className="mr-2" size={24} />
-                Monopólio de Tempo (Horas Gastas)
-            </h3>
-            <p className="text-xs text-gray-400 mb-6">Onde a guilda mais gasta tempo? Um ranking de horas brutas investidas em cada local de caça.</p>
-            <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={respawnTime} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
-                        <XAxis dataKey="name" stroke="#666" tick={{fill: '#888', fontSize: 10}} />
-                        <YAxis stroke="#666" tickFormatter={(val) => val + 'h'} tick={{fill: '#888', fontSize: 10}} />
-                        <Tooltip cursor={{fill: '#222'}} contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} formatter={(val) => [val.toFixed(1) + ' horas', 'Tempo']} />
-                        <Bar dataKey="hours" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
+          <h3 className="text-xl font-bold text-teal-500 mb-4 flex items-center">
+            <Plane className="mr-2" size={24} />
+            Imigração (Transfers IN/OUT)
+          </h3>
+          
+          <div className="overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
+            {transfers.length === 0 && !loading && (
+              <div className="text-center text-gray-500 py-10">
+                Nenhuma transferência registrada recentemente.
+              </div>
+            )}
+            
+            <div className="space-y-3">
+              {transfers.map(t => {
+                const isIncoming = t.transfer_type === 'IN';
+                const borderColor = isIncoming ? 'border-teal-900/40' : 'border-orange-900/40';
+                const bgColor = isIncoming ? 'bg-teal-950/20' : 'bg-orange-950/20';
+                const iconColor = isIncoming ? 'text-teal-400' : 'text-orange-400';
+                
+                return (
+                  <div key={t.id} className={`${bgColor} p-4 rounded-lg border ${borderColor} flex items-center justify-between`}>
+                    <div>
+                      <div className="text-white font-bold">{t.character_name}</div>
+                      <div className="text-xs text-gray-400 mt-1 font-mono">
+                        {new Date(t.transfer_date).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className={`font-bold flex items-center ${iconColor}`}>
+                        {isIncoming ? 'Chegou no Servidor' : 'Saiu do Servidor'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          </div>
         </div>
 
       </div>
