@@ -45,6 +45,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     tracker: { label: 'Censo Macro', icon: <LayoutDashboard size={16} /> },
     extreme: { label: 'Eventos Global', icon: <BrainCircuit size={16} /> },
     analytics: { label: 'Rankings & Tribunal', icon: <TrendingDown size={16} /> },
+    attendance: { label: 'Frequência de Guerra', icon: <CalendarDays size={16} /> },
     admin: { label: 'Painel Admin', icon: <Lock size={16} /> },
   };
 
@@ -58,7 +59,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     {
       title: 'Recursos Humanos',
       icon: <Users size={18} />,
-      items: ['roster', 'planilha', 'contribute']
+      items: ['roster', 'planilha', 'attendance', 'contribute']
     },
     {
       title: 'Economia',
