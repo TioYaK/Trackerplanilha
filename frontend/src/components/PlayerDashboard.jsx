@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
 } from 'recharts';
-import { Gavel, AlertOctagon, Ghost, Activity, Clock } from 'lucide-react';
+import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -21,6 +21,9 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
   const [playerAvatar, setPlayerAvatar] = useState(null);
   const [routine, setRoutine] = useState([]);
   const [levelHistory, setLevelHistory] = useState([]);
+  const [showMakerModal, setShowMakerModal] = useState(false);
+  const [makersData, setMakersData] = useState([]);
+  const [makersLoading, setMakersLoading] = useState(false);
 
   const fetchData = async () => {
     if (!playerName) return;
@@ -257,6 +260,18 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     return () => clearInterval(interval);
   }, [playerName]);
 
+  const handleFindMakers = async () => {
+    setShowMakerModal(true);
+    setMakersLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('find_makers', { p_character_name: playerName });
+      if (!error) setMakersData(data || []);
+    } catch (e) {
+      console.error(e);
+    }
+    setMakersLoading(false);
+  };
+
   const handleApplyStrike = async (e) => {
     e.preventDefault();
     const expiresAt = new Date();
@@ -322,8 +337,16 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
           </div>
         </div>
         
-        {/* Action Button */}
-        <div className="z-10 w-full md:w-auto">
+        {/* Action Buttons */}
+        <div className="z-10 w-full md:w-auto flex flex-col sm:flex-row gap-3">
+          <button 
+            onClick={handleFindMakers}
+            className="w-full md:w-auto py-3 px-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
+          >
+            <Search className="mr-2" size={20} />
+            Descobrir Makers
+          </button>
+          
           {isAdmin ? (
             <button 
               onClick={() => setShowStrikeModal(true)}
@@ -333,7 +356,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
               Aplicar Strike
             </button>
           ) : (
-            <div className="bg-black/50 px-4 py-2 rounded text-gray-500 text-sm border border-white/5">
+            <div className="bg-black/50 px-4 py-2 rounded text-gray-500 text-sm border border-white/5 flex items-center">
               Somente Admins punem.
             </div>
           )}
@@ -609,6 +632,62 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
         </div>
       )}
 
+      {/* MODAL DETETIVE DE MAKERS */}
+      {showMakerModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-tibia-card border border-purple-900 rounded-lg p-6 max-w-2xl w-full shadow-2xl relative">
+            <button 
+              onClick={() => setShowMakerModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white"
+            >
+              <X size={24} />
+            </button>
+            <h3 className="text-2xl font-bold text-purple-500 mb-2 flex items-center">
+              <Search className="mr-2" /> Detetive de Makers
+            </h3>
+            <p className="text-gray-300 mb-6">Procurando personagens suspeitos vinculados a: <strong className="text-white">{playerName}</strong></p>
+            
+            {makersLoading ? (
+              <div className="py-10 text-center text-purple-400 animate-pulse">
+                <Search className="mx-auto mb-4" size={48} />
+                <p>Cruzando horários de login e logout no servidor...</p>
+              </div>
+            ) : makersData.length === 0 ? (
+              <div className="py-10 text-center text-gray-500">
+                <p>Nenhum maker suspeito encontrado (ainda).</p>
+                <p className="text-xs mt-2">O algoritmo precisa de mais tempo monitorando os logins deste jogador.</p>
+              </div>
+            ) : (
+              <div className="max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-black/40 text-gray-400">
+                    <tr>
+                      <th className="p-3">Personagem Suspeito</th>
+                      <th className="p-3 text-center">Fator de Confiança</th>
+                      <th className="p-3 text-right">Último Cruzamento</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {makersData.map((m, i) => (
+                      <tr key={i} className="hover:bg-white/5">
+                        <td className="p-3 font-bold text-white">{m.candidate_name}</td>
+                        <td className="p-3 text-center">
+                          <span className="bg-purple-900/30 text-purple-400 px-2 py-1 rounded border border-purple-900/50">
+                            {m.matches} Matches
+                          </span>
+                        </td>
+                        <td className="p-3 text-right text-gray-500 font-mono">
+                          {new Date(m.last_match).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
