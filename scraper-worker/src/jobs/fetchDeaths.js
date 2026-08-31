@@ -22,7 +22,7 @@ export const runFetchDeaths = async () => {
         let count = 0;
         
         for (const death of deathsArray.slice(0, 50)) { // últimas 50
-            const pName = death.player_name || death.name || death.character_name;
+            const pName = death.victim || death.player_name || death.name || death.character_name;
             if (!pName) continue;
             
             const pNameLower = pName.toLowerCase();
