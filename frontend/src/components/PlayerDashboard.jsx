@@ -54,36 +54,27 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       
     if (memberData) setPlayerInfo(memberData);
 
-    let boundsData = [];
-    let pageBounds = 0;
-      while(true) {
-          const { data } = await supabase
-            .from('telemetry_logs')
-            .select('recorded_at, xp_total, level')
-            .eq('character_name', playerName)
-            .gte('recorded_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
-            .order('recorded_at', { ascending: true })
-            .range(pageBounds*1000, (pageBounds+1)*1000-1);
-          if (!data || data.length === 0) break;
-          boundsData.push(...data);
-          if (data.length < 1000) break;
-          pageBounds++;
-      }
-
+    const { data: boundsData } = await supabase
+      .from('historical_sessions')
+      .select('session_end, end_xp_total, end_level')
+      .eq('character_name', playerName)
+      .gte('session_end', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+      .order('session_end', { ascending: true });
+      
     if (memberData && boundsData && boundsData.length > 0) {
       // History of Level Up / Down
       let lvlHist = [];
       let prevLevel = null;
       boundsData.forEach(log => {
-          if (prevLevel !== null && log.level !== prevLevel) {
+          if (prevLevel !== null && log.end_level !== prevLevel) {
               lvlHist.push({
-                  type: log.level > prevLevel ? 'UP' : 'DOWN',
+                  type: log.end_level > prevLevel ? 'UP' : 'DOWN',
                   from: prevLevel,
-                  to: log.level,
-                  date: log.recorded_at
+                  to: log.end_level,
+                  date: log.session_end
               });
           }
-          prevLevel = log.level;
+          prevLevel = log.end_level;
       });
       lvlHist.reverse();
       setLevelHistory(lvlHist);
@@ -91,12 +82,12 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       // Heatmap Logic (14 days)
       const dailyMap = {};
       boundsData.forEach(log => {
-         const day = log.recorded_at.split('T')[0];
+         const day = log.session_end.split('T')[0];
          if (!dailyMap[day]) {
-            dailyMap[day] = { min: log.xp_total, max: log.xp_total };
+            dailyMap[day] = { min: log.end_xp_total, max: log.end_xp_total };
          } else {
-            if (log.xp_total < dailyMap[day].min) dailyMap[day].min = log.xp_total;
-            if (log.xp_total > dailyMap[day].max) dailyMap[day].max = log.xp_total;
+            if (log.end_xp_total < dailyMap[day].min) dailyMap[day].min = log.end_xp_total;
+            if (log.end_xp_total > dailyMap[day].max) dailyMap[day].max = log.end_xp_total;
          }
       });
       
@@ -144,22 +135,22 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       });
     }
 
-    // Fetch telemetry from last 24h
+    // Fetch sessions from last 24h
     const { data: teleData } = await supabase
-      .from('telemetry_logs')
+      .from('historical_sessions')
       .select('*')
       .eq('character_name', playerName)
-      .gte('recorded_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-      .order('recorded_at', { ascending: true });
+      .gte('session_end', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .order('session_end', { ascending: true });
 
     if (teleData) {
       let accumulatedXP = 0;
       const chartData = teleData.map(log => {
-        accumulatedXP += parseInt(log.delta_xp || 0, 10);
+        accumulatedXP += parseInt(log.xp_gained || 0, 10);
         return {
-          time: format(new Date(log.recorded_at), 'HH:mm'),
+          time: format(new Date(log.session_end), 'HH:mm'),
           xp: accumulatedXP,
-          rawDelta: log.delta_xp
+          rawDelta: log.xp_gained
         };
       });
       setTelemetry(chartData);
@@ -207,39 +198,24 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
         setFrequentSquad(rankedMates);
       }
 
-      // Fetch 7-day routine data
+      // Build Routine from last 7 days
       let allLogs = [];
-      let page = 0;
-      while(true) {
-        const { data: logs } = await supabase
-          .from('telemetry_logs')
-          .select('recorded_at, delta_xp')
-          .eq('character_name', playerName)
-          .gte('recorded_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-          .range(page * 1000, (page + 1) * 1000 - 1);
-          
-        if (!logs || logs.length === 0) break;
-        allLogs.push(...logs);
-        if (logs.length < 1000) break;
-        page++;
-      }
+      const { data: logs } = await supabase
+        .from('historical_sessions')
+        .select('session_end, xp_gained')
+        .eq('character_name', playerName)
+        .gte('session_end', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        
+      if (logs) allLogs = logs;
 
       if (allLogs.length > 0) {
         const hourMap = new Array(24).fill(0);
         allLogs.forEach(l => {
-          if (!l.delta_xp || l.delta_xp === '0') return;
-          // Clean string like "10.5M" or "500K" if it happens to be formatted, otherwise parse int
-          let xp = 0;
-          if (typeof l.delta_xp === 'string') {
-            if (l.delta_xp.includes('M')) xp = parseFloat(l.delta_xp) * 1000000;
-            else if (l.delta_xp.includes('K')) xp = parseFloat(l.delta_xp) * 1000;
-            else xp = parseInt(l.delta_xp, 10);
-          } else {
-            xp = l.delta_xp;
-          }
+          if (!l.xp_gained || l.xp_gained === 0) return;
+          let xp = parseInt(l.xp_gained, 10);
           if (isNaN(xp)) xp = 0;
           
-          const d = new Date(l.recorded_at);
+          const d = new Date(l.session_end);
           hourMap[d.getHours()] += xp;
         });
 
