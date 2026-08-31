@@ -5,6 +5,7 @@ import GlobalTracker from './components/GlobalTracker';
 import PlanilhaManager from './views/PlanilhaManager';
 import GuildRoster from './views/GuildRoster';
 import WarAttendance from './views/WarAttendance';
+import BazaarSniper from './views/BazaarSniper';
 import RadarHunters from './views/RadarHunters';
 import PlayerDashboard from './components/PlayerDashboard';
 import PartyDashboard from './components/PartyDashboard';
@@ -98,6 +99,7 @@ export default function App() {
       case 'live':    return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
       case 'roster':  return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
       case 'attendance': return <WarAttendance />;
+      case 'bazaar': return <BazaarSniper />;
       case 'radar':   return <RadarHunters isAdmin={isAdmin} />;
       case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
       case 'extreme': return <ExtremeAnalytics />;

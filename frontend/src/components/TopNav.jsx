@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { 
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
-  Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays
+  Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 
@@ -46,6 +46,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     extreme: { label: 'Eventos Global', icon: <BrainCircuit size={16} /> },
     analytics: { label: 'Rankings & Tribunal', icon: <TrendingDown size={16} /> },
     attendance: { label: 'Frequência de Guerra', icon: <CalendarDays size={16} /> },
+    bazaar: { label: 'Char Bazaar Sniper', icon: <Target size={16} /> },
     admin: { label: 'Painel Admin', icon: <Lock size={16} /> },
   };
 
@@ -64,7 +65,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     {
       title: 'Economia',
       icon: <Landmark size={18} />,
-      items: ['bank', 'market', 'loot']
+      items: ['bank', 'market', 'bazaar', 'loot']
     },
     {
       title: 'Inteligência',
