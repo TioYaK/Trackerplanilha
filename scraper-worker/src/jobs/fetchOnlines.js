@@ -50,14 +50,24 @@ export const runFetchOnlines = async () => {
 
       if (activeGuildNames.length > 0) {
         const now = new Date().toISOString();
+        const today = now.split('T')[0];
+        
         let updatedCount = 0;
-        // Divide em chunks de 100 para não estourar a URL
+        // Divide em chunks de 100 para não estourar a URL/Payload
         for (let i = 0; i < activeGuildNames.length; i += 100) {
           const chunk = activeGuildNames.slice(i, i + 100);
           const { error: updateErr } = await supabase
             .from('guild_members')
             .update({ last_xp_date: now })
             .in('name', chunk);
+            
+          // Log de frequência (2 minutos por ciclo)
+          await supabase.rpc('increment_attendance_batch', {
+            p_names: chunk,
+            p_date: today,
+            p_minutes: 2
+          });
+            
           if (!updateErr) updatedCount += chunk.length;
         }
         console.log(`[JOB] Carimbo de Atividade (Online) aplicado para ${updatedCount} membros da guilda.`);
