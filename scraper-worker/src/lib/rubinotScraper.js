@@ -769,11 +769,10 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20, vocation = 
                                 return false;
                             }, { timeout: 15000 }, oldFirstName);
                         } catch (e) {
-                            // Prossegue após 1s de timeout se não atualizar no DOM
+                            // timeout
                         }
-                    } else {
-                        await new Promise(r => setTimeout(r, 800));
                     }
+                    await new Promise(r => setTimeout(r, 1500)); // PAUSA ANTI-CLOUDFLARE
                     pageNum++;
                 } else {
                     keepGoing = false;
