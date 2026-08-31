@@ -501,7 +501,7 @@ function writeCache(name, data) {
     try { fs.writeFileSync(path.join(CACHE_DIR, `cache_${name}.json`), JSON.stringify(data)); } catch { /* ignore */ }
 }
 
-async function scrapeGuild(guildName, maxPages = 50) {
+async function scrapeGuild(guildName, maxPages = 200) {
     const key = `guild_${guildName.replace(/\s+/g, '_')}`;
     const cached = readCache(key);
     if (cached) {
