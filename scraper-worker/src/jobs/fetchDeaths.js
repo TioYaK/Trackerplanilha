@@ -5,9 +5,9 @@ export const runFetchDeaths = async () => {
     try {
         console.log('[JOB] Fetching Deaths (Auroria)');
         
-        // Auroria is world=11
-        const deaths = await fetchRubinotApi('/api/deaths?world=11');
-        if (!deaths || !Array.isArray(deaths)) {
+        const res = await fetchRubinotApi('/api/deaths?world=11');
+        const deathsArray = res ? (res.deaths || res.data || res) : null;
+        if (!deathsArray || !Array.isArray(deathsArray)) {
             console.log('[JOB] Deaths retornou vazio ou erro.');
             return;
         }
@@ -21,7 +21,7 @@ export const runFetchDeaths = async () => {
 
         let count = 0;
         
-        for (const death of deaths.slice(0, 50)) { // últimas 50
+        for (const death of deathsArray.slice(0, 50)) { // últimas 50
             const pName = death.player_name || death.name || death.character_name;
             if (!pName) continue;
             

@@ -9,8 +9,8 @@ export const runFetchTransfers = async () => {
 
         // Transfers Chegando em Auroria (toWorld = 11)
         const arriving = await fetchRubinotApi('/api/transfers?toWorld=11&page=1');
-        if (arriving && Array.isArray(arriving.data)) {
-            for (const t of arriving.data) {
+        if (arriving && arriving.transfers && Array.isArray(arriving.transfers)) {
+            for (const t of arriving.transfers) {
                 if (!t.player_name) continue;
                 
                 let tDate = new Date();
@@ -31,8 +31,8 @@ export const runFetchTransfers = async () => {
 
         // Transfers Saindo de Auroria (fromWorld = 11)
         const leaving = await fetchRubinotApi('/api/transfers?fromWorld=11&page=1');
-        if (leaving && Array.isArray(leaving.data)) {
-            for (const t of leaving.data) {
+        if (leaving && leaving.transfers && Array.isArray(leaving.transfers)) {
+            for (const t of leaving.transfers) {
                 if (!t.player_name) continue;
                 
                 let tDate = new Date();
