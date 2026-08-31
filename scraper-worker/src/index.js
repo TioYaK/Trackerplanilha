@@ -249,14 +249,8 @@ let emptyCycles = 0;
 let localBanUntil = null;
 
 const loop = async () => {
-  if (localBanUntil && Date.now() < localBanUntil) {
-    console.log(`[WORKER] 🔴 Suspenso devido a bloqueio/timeout. Retorna em: ${new Date(localBanUntil).toLocaleString()}`);
-    setTimeout(loop, 60000); // Tenta novamente em 1 minuto (só pra avisar e continuar dormindo)
-    return;
-  }
-
   try {
-    // CHECAGEM DE VERSÃO (KILL-SWITCH)
+    // CHECAGEM DE VERSÃO (KILL-SWITCH) DEVE VIR ANTES DO BAN DE CLOUDFLARE
     const { data: settings } = await supabase
       .from('worker_config')
       .select('min_worker_version')
@@ -272,8 +266,16 @@ const loop = async () => {
       }
     }
   } catch (err) {
-    // Se a tabela ainda não existir ou falhar, ignora e continua
+    // ignorar
   }
+
+  if (localBanUntil && Date.now() < localBanUntil) {
+    console.log(`[WORKER] 🔴 Suspenso devido a bloqueio/timeout. Retorna em: ${new Date(localBanUntil).toLocaleString()}`);
+    setTimeout(loop, 60000); // Tenta novamente em 1 minuto (só pra avisar e continuar dormindo)
+    return;
+  }
+
+
 
   const task = await fetchTask();
   if (task) {
