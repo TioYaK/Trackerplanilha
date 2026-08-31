@@ -2,9 +2,6 @@ import { supabase } from '../db.js';
 import { scrapeHighscores } from '../lib/rubinotScraper.js';
 import 'dotenv/config';
 
-// Cache global em memória para evitar consultas caras ao banco (Disk IO)
-const globalLastXpMap = new Map();
-
 export const runFetchHighscores = async (vocationStr) => {
   try {
     const voc = vocationStr === 'ALL' ? null : 
@@ -20,7 +17,7 @@ export const runFetchHighscores = async (vocationStr) => {
       return;
     }
 
-    // Buscamos quem estǭ na nossa guilda
+    // Buscamos quem está na nossa guilda
     let allGuildMembers = [];
     let from = 0;
     const step = 1000;
@@ -39,73 +36,81 @@ export const runFetchHighscores = async (vocationStr) => {
     }
 
     const memberNames = new Set(allGuildMembers.map(m => m.name.toLowerCase()));
-
-    const logsToInsert = [];
-    const names = players.filter(p => memberNames.has(p.name.toLowerCase())).map(p => p.name);
+    const relevantPlayers = players.filter(p => memberNames.has(p.name.toLowerCase()));
     
-    // Descobre nomes que não estão no cache
-    const missingNames = names.filter(n => !globalLastXpMap.has(n));
-    
-    // Busca apenas o histórico recente para os que faltam (Redução drástica de Disk IO)
-    const chunkSize = 50;
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    
-    for (let i = 0; i < missingNames.length; i += chunkSize) {
-      const chunk = missingNames.slice(i, i + chunkSize);
-      const { data: lastLogs } = await supabase
-        .from('telemetry_logs')
-        .select('character_name, xp_total')
-        .in('character_name', chunk)
-        .gte('recorded_at', yesterday)
-        .order('recorded_at', { ascending: false });
-        
-      if (lastLogs) {
-        lastLogs.forEach(row => {
-          if (!globalLastXpMap.has(row.character_name)) {
-            globalLastXpMap.set(row.character_name, parseInt(row.xp_total, 10));
-          }
-        });
-      }
-    }
-    
-    for (const player of players) {
-      if (memberNames.has(player.name.toLowerCase())) {
-        const lastXp = globalLastXpMap.get(player.name) || player.experience;
-        
-        // Atualiza o cache para o próximo ciclo
-        globalLastXpMap.set(player.name, player.experience);
-        
-        logsToInsert.push({
-          character_name: player.name,
-          level: player.level,
-          xp_total: player.experience,
-          delta_xp: player.experience - lastXp,
-          is_online: false
-        });
-      }
-    }
-
-    if (logsToInsert.length === 0) {
-      console.log(`[JOB] Nenhum membro da guilda encontrado nos highscores.`);
+    if (relevantPlayers.length === 0) {
+      console.log(`[JOB] Nenhum membro relevante encontrado nos highscores.`);
       return;
     }
 
-    // Insert em chunks para evitar erro de payload gigante
-    let insertedCount = 0;
-    for (let i = 0; i < logsToInsert.length; i += chunkSize) {
-      const chunk = logsToInsert.slice(i, i + chunkSize);
-      const { error } = await supabase.from('telemetry_logs').insert(chunk);
+    // Fetch existing states to compare
+    const names = relevantPlayers.map(p => p.name);
+    let existingStatesMap = new Map();
+    
+    const chunkSize = 100;
+    for (let i = 0; i < names.length; i += chunkSize) {
+      const chunk = names.slice(i, i + chunkSize);
+      const { data: states } = await supabase
+        .from('current_character_state')
+        .select('*')
+        .in('character_name', chunk);
+        
+      if (states) {
+        states.forEach(s => existingStatesMap.set(s.character_name.toLowerCase(), s));
+      }
+    }
+
+    const statesToUpsert = [];
+    const activeNames = [];
+    const now = new Date().toISOString();
+
+    for (const player of relevantPlayers) {
+      const existing = existingStatesMap.get(player.name.toLowerCase());
+      
+      let session_start_xp = player.experience;
+      let session_start_time = now;
+      let last_active = now;
+
+      if (existing) {
+        // Se a XP aumentou, ele está ativo
+        if (player.experience > existing.xp_total) {
+          session_start_xp = existing.session_start_xp || existing.xp_total;
+          session_start_time = existing.session_start_time || now;
+          last_active = now; // Update last active
+          activeNames.push(player.name);
+        } else {
+          // Não ganhou XP, manter os dados antigos (só atualizamos se mudou de level, etc)
+          session_start_xp = existing.session_start_xp;
+          session_start_time = existing.session_start_time;
+          last_active = existing.last_active;
+        }
+      }
+
+      statesToUpsert.push({
+        character_name: player.name,
+        level: player.level,
+        vocation: player.vocation || voc,
+        xp_total: player.experience,
+        last_active: last_active,
+        session_start_xp: session_start_xp,
+        session_start_time: session_start_time
+      });
+    }
+
+    // Upsert em chunks
+    let upsertedCount = 0;
+    for (let i = 0; i < statesToUpsert.length; i += chunkSize) {
+      const chunk = statesToUpsert.slice(i, i + chunkSize);
+      const { error } = await supabase.from('current_character_state').upsert(chunk, { onConflict: 'character_name' });
       if (error) {
-        console.error(`[JOB] Erro ao inserir chunk de logs:`, error.message);
+        console.error(`[JOB] Erro ao atualizar current_character_state:`, error.message);
       } else {
-        insertedCount += chunk.length;
+        upsertedCount += chunk.length;
       }
     }
     
-    // --- ATUALIZA O LAST_XP_DATE DOS ATIVOS ---
-    const activeNames = logsToInsert.filter(log => log.delta_xp > 0).map(log => log.character_name);
+    // --- ATUALIZA O LAST_XP_DATE DOS ATIVOS (Guild Members) ---
     if (activeNames.length > 0) {
-      const now = new Date().toISOString();
       let updatedCount = 0;
       for (let i = 0; i < activeNames.length; i += 100) {
         const chunk = activeNames.slice(i, i + 100);
@@ -118,7 +123,7 @@ export const runFetchHighscores = async (vocationStr) => {
       console.log(`[JOB] Carimbo de Atividade (last_xp_date) atualizado para ${updatedCount} membros.`);
     }
 
-    console.log(`[JOB] Inseridos ${insertedCount} logs de telemetria baseados nos Highscores.`);
+    console.log(`[JOB] Atualizados ${upsertedCount} estados de personagens (Edge Computing).`);
   } catch (error) {
     console.error(`[JOB] Erro na task FETCH_HIGHSCORES:`, error.message);
   }

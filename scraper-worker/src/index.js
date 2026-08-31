@@ -16,6 +16,7 @@ import { runFetchDeaths } from './jobs/fetchDeaths.js';
 import { runFetchKillstats } from './jobs/fetchKillstats.js';
 import { runFetchTransfers } from './jobs/fetchTransfers.js';
 import { runFetchBazaar } from './jobs/fetchBazaar.js';
+import { runCloseSessions } from './jobs/closeSessions.js';
 import { runBankSync } from './jobs/syncBankTS3.js';
 import { checkForUpdates } from './updater.js';
 import { closeBrowser } from './lib/rubinotScraper.js';
@@ -103,6 +104,7 @@ const completeTask = async (task) => {
     FETCH_KILLSTATS: 15,
     FETCH_TRANSFERS: 60,
     FETCH_BAZAAR: 10,
+    CLOSE_SESSIONS: 30,
   };
 
   let cooldownMinutes = cooldowns[task.task_type] ?? 1;
@@ -172,6 +174,8 @@ const processTask = async (task) => {
           await runFetchTransfers();
         } else if (task.task_type === 'FETCH_BAZAAR') {
           await runFetchBazaar();
+        } else if (task.task_type === 'CLOSE_SESSIONS') {
+          await runCloseSessions();
         } else if (task.task_type === 'AUDIT_SLOTS') {
           await runAuditSlots();
         } else {
@@ -220,7 +224,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.2.8';
+const WORKER_VERSION = '1.2.9';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
