@@ -8,7 +8,6 @@ import { supabase } from './db.js';
 import os from 'os';
 import fs from 'fs';
 import { runFetchGuild } from './jobs/fetchGuild.js';
-import { runFetchRivals } from './jobs/fetchRivals.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
 import { runAuditSlots } from './jobs/auditSlots.js';
