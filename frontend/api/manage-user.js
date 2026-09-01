@@ -41,10 +41,13 @@ export default async function handler(req, res) {
           return res.status(403).json({ error: 'O criador original não pode ser deletado.' });
       }
 
-      // Delete from auth.users (will cascade to profiles if configured, or we delete both)
+      // Delete from profiles first to avoid foreign key constraint error
+      const { error: profErr } = await supabase.from('profiles').delete().eq('id', targetUserId);
+      if (profErr) throw profErr;
+
+      // Then delete from auth.users
       const { error: delErr } = await supabase.auth.admin.deleteUser(targetUserId);
       if (delErr) throw delErr;
-      await supabase.from('profiles').delete().eq('id', targetUserId);
       
       // Log action
       await supabase.from('admin_logs').insert([{
