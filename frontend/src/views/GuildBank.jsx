@@ -15,8 +15,18 @@ export default function GuildBank({ isAdmin }) {
   const [showTxModal, setShowTxModal] = useState(false);
   const [txForm, setTxForm] = useState({ title: '', amount: '', type: 'OUT', description: '' });
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  // O mês de cobrança vira apenas no dia 15
+  const getBillingMonth = () => {
+    const now = new Date();
+    if (now.getDate() < 15) {
+      now.setMonth(now.getMonth() - 1);
+    }
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  };
+
+  const [selectedMonth, setSelectedMonth] = useState(getBillingMonth());
 
   const fetchData = async () => {
     setLoading(true);
