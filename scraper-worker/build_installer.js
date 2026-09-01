@@ -125,7 +125,7 @@ GUILD_NAME=${guildName}
             string loopBatPath = Path.Combine(workerPath, "loop.bat");
             string nodePath = @"C:\Program Files\nodejs\node.exe";
             if (!File.Exists(nodePath)) nodePath = "node";
-            File.WriteAllText(loopBatPath, string.Format(":loop\\ngit pull --autostash\\n\\\"{0}\\\" src/index.js\\ntimeout /t 15\\ngoto loop", nodePath));
+            File.WriteAllText(loopBatPath, string.Format(":loop\\ngit pull --autostash\\n\\\"{0}\\\" src/index.js\\nping 127.0.0.1 -n 15 > nul\\ngoto loop", nodePath));
 
             string vbsContent = string.Format(@"
 Set WshShell = CreateObject(""WScript.Shell"")
