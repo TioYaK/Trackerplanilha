@@ -5,7 +5,14 @@ import { Clock, ShieldAlert, CheckCircle, Search, Calendar } from 'lucide-react'
 export default function WarAttendance() {
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Tibia Server Save Day
+  const getTibiaDay = () => {
+    const ssDate = new Date(Date.now() - 13 * 60 * 60 * 1000);
+    return ssDate.toISOString().split('T')[0];
+  };
+
+  const [dateFilter, setDateFilter] = useState(getTibiaDay());
   const [search, setSearch] = useState('');
 
   const fetchData = async () => {

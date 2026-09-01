@@ -79,7 +79,11 @@ export const runFetchOnlines = async () => {
 
       if (activeGuildNames.length > 0) {
         const now = new Date().toISOString();
-        const today = now.split('T')[0];
+        
+        // Server Save Boundary (10h BRT = 13h UTC)
+        // Subtraindo 13h, qualquer horário antes das 10h BRT cai no dia anterior
+        const ssDate = new Date(Date.now() - 13 * 60 * 60 * 1000);
+        const today = ssDate.toISOString().split('T')[0];
         
         let updatedCount = 0;
         // Divide em chunks de 100 para não estourar a URL/Payload
