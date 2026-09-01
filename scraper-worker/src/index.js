@@ -20,6 +20,7 @@ import { runCloseSessions } from './jobs/closeSessions.js';
 import { runBankSync } from './jobs/syncBankTS3.js';
 import { runFetchRosterShard } from './jobs/fetchRosterShards.js';
 import { runSendDiscordReport } from './jobs/sendDiscordReport.js';
+import { runAuditBank } from './jobs/auditBank.js';
 import { checkForUpdates } from './updater.js';
 import { closeBrowser } from './lib/rubinotScraper.js';
 
@@ -231,7 +232,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.4.1';
+const WORKER_VERSION = '1.4.2';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -362,6 +363,11 @@ setInterval(async () => {
   console.log('\n[CRON] 🤖 Checando envio de Relatório Diário para o Discord...');
   await runSendDiscordReport();
 }, 5 * 60 * 1000);
+
+// Auditoria Financeira do Guild Bank (Dia 16)
+setInterval(async () => {
+  await runAuditBank();
+}, 60 * 60 * 1000); // Checa a cada 1 hora
 
 // ==========================================
 // SERVIDOR ADMIN LOCAL (Forçar TS3 Sync)

@@ -10,6 +10,7 @@ export default function PlanilhaManager({ isAdmin }) {
   const [newArea, setNewArea] = useState('');
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
+  const [userStrikes, setUserStrikes] = useState([]);
   const [formData, setFormData] = useState({
     party_name: '', leader_name: '', respawn_category: '', hunt_name: '', slot_start: '18:00', slot_end: '22:00', members: ''
   });
@@ -22,6 +23,15 @@ export default function PlanilhaManager({ isAdmin }) {
       if (areasData.length > 0 && !formData.respawn_category) {
         setFormData(prev => ({ ...prev, respawn_category: areasData[0].name }));
       }
+    }
+
+    if (profile?.main_character) {
+        const { data: strikes } = await supabase
+          .from('player_strikes')
+          .select('*')
+          .eq('character_name', profile.main_character)
+          .gte('expires_at', new Date().toISOString());
+        if (strikes) setUserStrikes(strikes);
     }
 
     let allParties = [];
@@ -60,6 +70,23 @@ export default function PlanilhaManager({ isAdmin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!isAdmin) {
+      // Verifica strikes do usuário
+      const { data: myStrikes } = await supabase
+        .from('player_strikes')
+        .select('*')
+        .eq('character_name', profile?.main_character)
+        .gte('expires_at', new Date().toISOString());
+
+      if (myStrikes && myStrikes.length > 0) {
+        const isInadimplente = myStrikes.some(s => s.reason.includes('Inadimplência'));
+        if (isInadimplente) {
+           alert("ACESSO NEGADO ⚖️: Você possui pendências no Guild Bank! Regularize seu pagamento para voltar a usar a Planilha.");
+           return;
+        }
+      }
+    }
 
     // Normaliza nomes: trim, colapsa espaços múltiplos e capitaliza cada palavra
     const normalizeName = (raw) => {
@@ -139,6 +166,21 @@ export default function PlanilhaManager({ isAdmin }) {
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
+      
+      {userStrikes.some(s => s.reason.includes('Inadimplência')) && (
+        <div className="bg-red-900/50 border border-red-500 rounded-lg p-6 mb-8 text-center shadow-lg shadow-red-900/20">
+          <h2 className="text-2xl font-bold text-red-400 mb-2">⚖️ Acesso Bloqueado (Inadimplência)</h2>
+          <p className="text-gray-300">
+            Você possui um **Strike Financeiro** ativo em sua conta por atraso no pagamento do Guild Bank.
+            <br />
+            O seu acesso para agendar novas PTs ou dar claim em horários está suspenso temporariamente.
+          </p>
+          <p className="text-white font-bold mt-4">
+            Por favor, regularize sua situação com um Líder para voltar a caçar com a Guilda!
+          </p>
+        </div>
+      )}
+
       <div className="mb-8 border-b border-tibia-border pb-4">
         <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Gerenciar Respawns</h2>
         <p className="text-gray-400 font-sans">Adicione ou remova os agendamentos oficiais do Discord aqui.</p>
