@@ -27,15 +27,36 @@ export const runFetchRosterShard = async (shardId) => {
         const charData = await scrapeRubinotCharacterPage(member.name);
         
         if (charData) {
-          // Atualiza dados na current_character_state
-          await supabase.from('current_character_state').upsert({
+          const { data: existing } = await supabase.from('current_character_state')
+            .select('xp_total, session_start_xp, session_start_time')
+            .eq('character_name', member.name)
+            .maybeSingle();
+
+          let xpValue = 0;
+          if (charData.experience && charData.experience.totalExperience) {
+              xpValue = parseInt(charData.experience.totalExperience.replace(/[,.]/g, ''), 10);
+          }
+
+          const updatePayload = {
             character_name: charData.name || member.name,
             level: charData.level,
             vocation: charData.vocation,
             world: charData.world,
             guild: charData.guild,
-            last_active: new Date().toISOString(), // Update last seen
-          });
+          };
+          
+          if (xpValue > 0) {
+              updatePayload.xp_total = xpValue;
+              // Só atualiza last_active se a XP SUBIU!
+              if (existing && xpValue > existing.xp_total) {
+                  updatePayload.last_active = new Date().toISOString();
+                  updatePayload.session_start_xp = existing.session_start_xp || existing.xp_total;
+                  updatePayload.session_start_time = existing.session_start_time || new Date().toISOString();
+              }
+          }
+
+          // Atualiza dados na current_character_state
+          await supabase.from('current_character_state').upsert(updatePayload, { onConflict: 'character_name' });
         }
       } catch (err) {
         console.error(`[SHARD ${shardId}] Falha ao ler detalhes de ${member.name}: ${err.message}`);

@@ -43,7 +43,26 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
       const daysToFetch = historyRange === 'week' ? 7 : 30;
       const historyStartDate = new Date(Date.now() - daysToFetch * 24 * 60 * 60 * 1000).toISOString();
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
+      
+      // Server Save Logic (10:00 AM BRT = 13:00 UTC)
+      const getLastSS = () => {
+        const now = new Date();
+        const currentHourBRT = (now.getUTCHours() - 3 + 24) % 24;
+        const ss = new Date(now);
+        if (currentHourBRT < 10) {
+          ss.setUTCDate(ss.getUTCDate() - 1);
+        }
+        ss.setUTCHours(13, 0, 0, 0);
+        return ss.getTime();
+      };
+      
+      const getTibiaDay = (d) => {
+        // Subtrai 13h do UTC para que meia-noite virtual seja 10h da manhã do Brasil.
+        const ssDate = new Date(d.getTime() - 13 * 60 * 60 * 1000);
+        return ssDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: '2-digit' });
+      };
+
+      const lastSSTime = getLastSS();
 
       let logs = [];
       const { data, error } = await supabase
@@ -75,8 +94,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           const date = new Date(log.session_end);
           const dxp = parseInt(log.xp_gained || 0, 10);
           
-          // 24h Table Logic
-          if (date.getTime() >= twentyFourHoursAgo && memberStats[log.character_name]) {
+          // Current Server Save Table Logic
+          if (date.getTime() >= lastSSTime && memberStats[log.character_name]) {
             memberStats[log.character_name].totalXpGained += dxp;
             memberStats[log.character_name].level = log.end_level;
             memberStats[log.character_name].lastSeen = date;
@@ -86,8 +105,9 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           let logMins = date.getHours() * 60 + date.getMinutes();
           if (endMins > 1440 && logMins < 600) logMins += 1440;
           
-          if (logMins >= startMins - 60 && logMins <= endMins + 60 && dxp > 0) {
-              const dayStr = date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+          // Add a 2-hour buffer instead of 60 mins just in case
+          if (logMins >= startMins - 120 && logMins <= endMins + 120 && dxp > 0) {
+              const dayStr = getTibiaDay(date);
               
               if (!historyMap[dayStr]) {
                   historyMap[dayStr] = { day: dayStr, totalXp: 0, start: date, end: date, rawDate: date };
@@ -236,7 +256,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 bg-tibia-card border border-tibia-border rounded-lg shadow-xl overflow-hidden">
-            <div className="p-4 bg-black/40 border-b border-tibia-border"><h3 className="font-bold text-white">Rendimento Individual (24h)</h3></div>
+            <div className="p-4 bg-black/40 border-b border-tibia-border"><h3 className="font-bold text-white">Rendimento Individual (Hoje/SS)</h3></div>
             <table className="w-full text-left text-sm text-gray-300">
               <thead className="bg-black/20 text-gray-400 uppercase font-semibold">
                 <tr><th className="px-6 py-3">Membro</th><th className="px-6 py-3">Level</th><th className="px-6 py-3">Status</th><th className="px-6 py-3 text-right">XP Contribuída</th></tr>
