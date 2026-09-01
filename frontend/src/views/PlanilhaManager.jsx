@@ -284,8 +284,8 @@ export default function PlanilhaManager({ isAdmin }) {
           )
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([huntName, huntParties]) => (
-            <div key={huntName} className="bg-tibia-card border border-tibia-border rounded-lg overflow-hidden shadow-lg">
-              <div className="bg-black/60 px-6 py-4 border-b border-tibia-border flex justify-between items-center">
+            <div key={huntName} className="bg-tibia-card border border-tibia-border rounded-lg overflow-x-auto shadow-lg">
+              <div className="bg-black/60 px-6 py-4 border-b border-tibia-border flex justify-between items-center min-w-[600px]">
                 <h4 className="text-xl font-bold text-tibia-highlight">{huntName}</h4>
                 <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded border border-white/10">{huntParties[0].respawn_category}</span>
               </div>

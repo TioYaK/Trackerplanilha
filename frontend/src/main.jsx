@@ -1,10 +1,13 @@
 import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import { AuthProvider } from './components/AuthContext.jsx'
 import './index.css'
+import { registerSW } from 'virtual:pwa-register'
 
-createRoot(document.getElementById('root')).render(
+registerSW({ immediate: true })
+
+ReactDOM.createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
       <App />
