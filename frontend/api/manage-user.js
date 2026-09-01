@@ -26,7 +26,9 @@ export default async function handler(req, res) {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   // Validate requestor is Super Admin
-  const { data: requestor } = await supabase.from('profiles').select('email, role').eq('email', requestorEmail).single();
+  const { data: requestor } = await supabase.from('profiles').select('email, role, main_character').eq('email', requestorEmail).single();
+  const reqName = requestor?.main_character || requestorEmail;
+
   if (!requestor || requestor.role !== 'super_admin') {
      // Fallback: If it's pifot16@gmail.com, force allow
      if (requestorEmail.toLowerCase() !== 'pifot16@gmail.com') {
@@ -52,7 +54,8 @@ export default async function handler(req, res) {
       // Log action
       await supabase.from('admin_logs').insert([{
          action: `Deletou o usuário ${target?.main_character} (${target?.email})`,
-         admin_email: requestorEmail
+         admin_email: requestorEmail,
+         admin_name: reqName
       }]);
 
       return res.status(200).json({ success: true, message: 'Usuário deletado.' });
@@ -71,7 +74,8 @@ export default async function handler(req, res) {
       // Log action
       await supabase.from('admin_logs').insert([{
          action: `Alterou o e-mail de ${target?.main_character} para ${newEmail}`,
-         admin_email: requestorEmail
+         admin_email: requestorEmail,
+         admin_name: reqName
       }]);
 
       return res.status(200).json({ success: true, message: 'Email atualizado.' });

@@ -454,7 +454,7 @@ export default function AdminPanel({ currentVisibleTabs }) {
                 {adminLogs.map(log => (
                   <tr key={log.id} className="hover:bg-white/5 transition-colors">
                     <td className="p-3 whitespace-nowrap text-gray-500">{new Date(log.created_at).toLocaleString()}</td>
-                    <td className="p-3 font-bold text-purple-400">{log.admin_email}</td>
+                    <td className="p-3 font-bold text-purple-400">{log.admin_name || log.admin_email}</td>
                     <td className="p-3">{log.action}</td>
                   </tr>
                 ))}
