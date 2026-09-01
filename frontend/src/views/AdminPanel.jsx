@@ -10,6 +10,7 @@ export default function AdminPanel({ currentVisibleTabs }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(null);
+  const [discordWebhook, setDiscordWebhook] = useState('');
   const [adminLogs, setAdminLogs] = useState([]);
 
   const isSuperAdmin = currentProfile?.role === 'super_admin' || currentProfile?.email?.toLowerCase() === 'pifot16@gmail.com';
@@ -31,8 +32,21 @@ export default function AdminPanel({ currentVisibleTabs }) {
   useEffect(() => {
     fetchUsers();
     fetchTabs();
+    fetchWebhook();
     if (isSuperAdmin) fetchLogs();
   }, [isSuperAdmin]);
+
+  const fetchWebhook = async () => {
+    const { data } = await supabase.from('webhook_settings').select('discord_url').eq('id', 1).single();
+    if (data) setDiscordWebhook(data.discord_url);
+  };
+
+  const saveWebhook = async () => {
+    setSaving(true);
+    await supabase.from('webhook_settings').upsert({ id: 1, discord_url: discordWebhook });
+    setSaving(false);
+    alert('Webhook salvo com sucesso!');
+  };
 
   const fetchLogs = async () => {
     const { data } = await supabase.from('admin_logs').select('*').order('created_at', { ascending: false }).limit(20);
@@ -425,9 +439,38 @@ export default function AdminPanel({ currentVisibleTabs }) {
           })}
         </div>
         {saving && <p className="text-yellow-500 mt-4 text-sm animate-pulse">Salvando alterações...</p>}
-      </div>
+        </div>
 
-      {/* 3. Regras de Makers */}
+        {/* 3. Integração Discord Webhook */}
+        <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl p-6">
+          <h2 className="text-2xl font-medieval text-[#5865F2] mb-6 flex items-center gap-2 border-b border-tibia-border pb-4">
+            <Mail className="text-[#5865F2]" />
+            Secretário do Discord (Webhooks)
+          </h2>
+          
+          <p className="text-gray-400 font-sans text-sm mb-6">
+            Cole a URL de um Webhook do Discord. O robô (Worker) vai enviar um Relatório Gerencial (Sala de Guerra, Mortes e Inadimplentes) <b>automaticamente todo dia às 10:00 (Server Save)</b>.
+          </p>
+
+          <div className="flex gap-4">
+            <input
+              type="text"
+              className="flex-1 bg-black/50 border border-tibia-border p-3 rounded text-white focus:outline-none focus:border-[#5865F2]"
+              placeholder="https://discord.com/api/webhooks/..."
+              value={discordWebhook}
+              onChange={(e) => setDiscordWebhook(e.target.value)}
+            />
+            <button
+              onClick={saveWebhook}
+              disabled={saving}
+              className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-3 px-6 rounded transition-colors disabled:opacity-50"
+            >
+              Salvar Webhook
+            </button>
+          </div>
+        </div>
+
+        {/* 4. Maker Config (se houver) */}
       <MakerRulesPanel />
 
       {/* 4. Logs de Super Admin */}

@@ -19,6 +19,7 @@ import { runFetchBazaar } from './jobs/fetchBazaar.js';
 import { runCloseSessions } from './jobs/closeSessions.js';
 import { runBankSync } from './jobs/syncBankTS3.js';
 import { runFetchRosterShard } from './jobs/fetchRosterShards.js';
+import { runSendDiscordReport } from './jobs/sendDiscordReport.js';
 import { checkForUpdates } from './updater.js';
 import { closeBrowser } from './lib/rubinotScraper.js';
 
@@ -354,6 +355,12 @@ loop();
 setInterval(async () => {
   console.log('\n[CRON] ⏰ Sincronização Automática do TS3 (5 min)...');
   await runBankSync();
+}, 5 * 60 * 1000);
+
+// Checa envio do Relatório Diário para o Discord a cada 5 minutos
+setInterval(async () => {
+  console.log('\n[CRON] 🤖 Checando envio de Relatório Diário para o Discord...');
+  await runSendDiscordReport();
 }, 5 * 60 * 1000);
 
 // ==========================================
