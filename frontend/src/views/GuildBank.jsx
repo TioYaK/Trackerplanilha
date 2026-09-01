@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Landmark, Check, X, Search, ShieldAlert, Banknote, FileText, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useAuth } from '../components/AuthContext';
 
 export default function GuildBank({ isAdmin }) {
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [payments, setPayments] = useState([]);
@@ -54,11 +56,13 @@ export default function GuildBank({ isAdmin }) {
     let allRoster = [];
     let page = 0;
     while(true) {
-      const { data } = await supabase.from('view_guild_roster').select('name, vocation, level').range(page*1000, (page+1)*1000 -1);
+      const { data } = await supabase.from('guild_members').select('*').range(page*1000, (page+1)*1000-1);
       if (!data || data.length === 0) break;
       allRoster.push(...data);
+      if (data.length < 1000) break;
       page++;
     }
+    setPayments(pData);
     setRoster(allRoster);
 
     // Transações
@@ -85,7 +89,7 @@ export default function GuildBank({ isAdmin }) {
         .insert([{
           character_name: playerName,
           payment_month: selectedMonth,
-          admin_name: 'Admin'
+          admin_name: profile?.main_character || 'Admin'
         }]);
     }
     fetchData();
@@ -100,7 +104,7 @@ export default function GuildBank({ isAdmin }) {
       amount_tc: parseInt(txForm.amount, 10),
       type: txForm.type,
       description: txForm.description,
-      created_by: 'Admin'
+      created_by: profile?.main_character || 'Admin'
     }]);
 
     setShowTxModal(false);

@@ -37,8 +37,8 @@ export default function GlobalAuditFeed() {
               id: `tx-${t.id}`,
               date: new Date(t.created_at),
               type: 'BANK',
-              icon: <DollarSign size={16} className={t.type === 'PAYMENT' ? "text-yellow-500" : "text-red-500"} />,
-              message: `${t.player_name} ${t.type === 'PAYMENT' ? 'realizou um depósito de' : 'sacou'} ${t.amount} TC no Guild Bank.`
+              icon: <DollarSign size={16} className={t.type === 'IN' ? "text-green-500" : "text-red-500"} />,
+              message: `O admin ${t.created_by} registrou um ${t.type === 'IN' ? 'depósito' : 'saque'} de ${t.amount_tc} TC (${t.title}).`
             });
           });
         }
