@@ -236,7 +236,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.4.6';
+const WORKER_VERSION = '1.4.7';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -452,10 +452,10 @@ supabase
      console.log(`\n[ALARME] 🚨 ${alarm.type}: ${alarm.message}`);
      
      notifier.notify({
-       title: `Auroria Alarme - ${alarm.type}`,
+       title: `BattleStorm - ${alarm.type}`,
        message: alarm.message,
        icon: path.join(process.cwd(), 'icon.png'),
-       appID: 'Auroria Tracker',
+       appID: 'BattleStorm',
        sound: true, 
        wait: false
      });
