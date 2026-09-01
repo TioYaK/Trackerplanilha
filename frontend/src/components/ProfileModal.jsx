@@ -24,6 +24,35 @@ export default function ProfileModal({ onClose }) {
     Bellum: '',
     Tenebrium: ''
   });
+  const [characterStats, setCharacterStats] = useState({ level: 'N/A', vocation: 'Desconhecida' });
+
+  useEffect(() => {
+    if (profile?.makers) {
+      setMakers(profile.makers);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (profile?.main_character) {
+      const fetchStats = async () => {
+         const { data: currentData } = await supabase.from('current_character_state')
+           .select('level, vocation')
+           .ilike('character_name', profile.main_character)
+           .maybeSingle();
+         
+         if (currentData) {
+            setCharacterStats(currentData);
+         } else {
+            const { data: gmData } = await supabase.from('guild_members')
+              .select('level, vocation')
+              .ilike('name', profile.main_character)
+              .maybeSingle();
+            if (gmData) setCharacterStats(gmData);
+         }
+      };
+      fetchStats();
+    }
+  }, [profile]);
 
   const handleChange = (server, value) => {
     setMakers(prev => ({ ...prev, [server]: value }));
@@ -207,7 +236,7 @@ export default function ProfileModal({ onClose }) {
                   </span>
                 )}
               </h3>
-              <p className="text-gray-400 text-sm">Vocation: {profile?.vocation || 'Desconhecida'} • Level: {profile?.level || 'N/A'}</p>
+              <p className="text-gray-400 text-sm">Vocation: {characterStats.vocation || 'Desconhecida'} • Level: {characterStats.level || 'N/A'}</p>
               <p className="text-tibia-primary text-xs mt-1">Status: {profile?.status === 'active' ? 'Ativo na Guilda' : profile?.status}</p>
             </div>
           </div>
