@@ -259,16 +259,17 @@ export default function PlanilhaManager({ isAdmin }) {
                 </thead>
                 <tbody className="divide-y divide-tibia-border/50">
                     {(() => {
-                      const getNormalizedMinutes = (timeStr) => {
+                      const getNormalizedMinutes = (timeStr, isEnd = false) => {
                         if (!timeStr) return 0;
                         const [h, m] = timeStr.split(':').map(Number);
-                        const adjustedH = h < 10 ? h + 24 : h; // Server Save as 10:00 boundary
+                        let adjustedH = h < 10 ? h + 24 : h; // Server Save as 10:00 boundary
+                        if (isEnd && h === 10 && m === 0) adjustedH = 34;
                         return adjustedH * 60 + m;
                       };
 
-                      const formatMinutes = (m) => {
-                        let h = Math.floor(m / 60);
-                        let min = m % 60;
+                      const formatMinutes = (mins) => {
+                        let h = Math.floor(mins / 60);
+                        const min = mins % 60;
                         if (h >= 24) h -= 24;
                         return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
                       };
@@ -310,7 +311,7 @@ export default function PlanilhaManager({ isAdmin }) {
                         const p = sortedParties[i];
                         if (i > 0) {
                           const prev = sortedParties[i - 1];
-                          const prevEnd = getNormalizedMinutes(prev.slot_end);
+                          const prevEnd = getNormalizedMinutes(prev.slot_end, true);
                           const currStart = getNormalizedMinutes(p.slot_start);
                           
                           if (currStart > prevEnd) {
@@ -323,7 +324,7 @@ export default function PlanilhaManager({ isAdmin }) {
                       // Gap after the very last party until Server Save
                       if (sortedParties.length > 0) {
                         const lastParty = sortedParties[sortedParties.length - 1];
-                        const lastEnd = getNormalizedMinutes(lastParty.slot_end);
+                        const lastEnd = getNormalizedMinutes(lastParty.slot_end, true);
                         if (lastEnd < ssEndMinutes) {
                           addGaps(lastEnd, ssEndMinutes, 'gap-end');
                         }
