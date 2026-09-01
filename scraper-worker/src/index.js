@@ -422,10 +422,30 @@ supabase
   });
 import { runValidateMakers } from './jobs/validateMakers.js';
 
+import notifier from 'node-notifier';
+import path from 'path';
+
 supabase
   .channel('maker_validation')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maker_validation_queue' }, (payload) => {
      console.log('\n[REALTIME] Novo maker recebido para validar!');
      runValidateMakers();
+  })
+  .subscribe();
+
+// GATILHO DE ALARMES GERAIS (DESKTOP NOTIFICATIONS)
+supabase
+  .channel('guild_alarms')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_alarms' }, (payload) => {
+     const alarm = payload.new;
+     console.log(`\n[ALARME] 🚨 ${alarm.type}: ${alarm.message}`);
+     
+     notifier.notify({
+       title: `Tracker Alarme - ${alarm.type}`,
+       message: alarm.message,
+       icon: path.join(process.cwd(), 'icon.png'), 
+       sound: true, 
+       wait: false
+     });
   })
   .subscribe();

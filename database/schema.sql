@@ -137,3 +137,9 @@ BEGIN
     END LOOP;
 END;
 $$;
+CREATE TABLE IF NOT EXISTS guild_alarms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    message TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'WAR',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

@@ -12,6 +12,9 @@ export default function AdminPanel({ currentVisibleTabs }) {
   const [resetting, setResetting] = useState(null);
   const [discordWebhook, setDiscordWebhook] = useState('');
   const [adminLogs, setAdminLogs] = useState([]);
+  const [alarmMessage, setAlarmMessage] = useState('');
+  const [alarmType, setAlarmType] = useState('WAR');
+  const [sendingAlarm, setSendingAlarm] = useState(false);
 
   const isSuperAdmin = currentProfile?.role === 'super_admin' || currentProfile?.email?.toLowerCase() === 'pifot16@gmail.com';
 
@@ -46,6 +49,23 @@ export default function AdminPanel({ currentVisibleTabs }) {
     await supabase.from('webhook_settings').upsert({ id: 1, discord_url: discordWebhook });
     setSaving(false);
     alert('Webhook salvo com sucesso!');
+  };
+
+  const sendAlarm = async () => {
+    if (!alarmMessage.trim()) return alert('Digite a mensagem do alarme!');
+    setSendingAlarm(true);
+    try {
+      await supabase.from('guild_alarms').insert({
+        message: alarmMessage,
+        type: alarmType,
+        created_by: currentProfile?.main_character || currentUser?.email
+      });
+      alert('Sirene disparada com sucesso!');
+      setAlarmMessage('');
+    } catch (e) {
+      alert('Erro ao disparar alarme: ' + e.message);
+    }
+    setSendingAlarm(false);
   };
 
   const fetchLogs = async () => {
@@ -468,10 +488,51 @@ export default function AdminPanel({ currentVisibleTabs }) {
               Salvar Webhook
             </button>
           </div>
-        </div>
+          </div>
 
-        {/* 4. Maker Config (se houver) */}
-      <MakerRulesPanel />
+          {/* 4. Botão do Pânico (Alarmes Gerais) */}
+          <div className="bg-tibia-card border border-red-900/50 rounded-lg shadow-xl p-6">
+            <h2 className="text-2xl font-medieval text-red-500 mb-6 flex items-center gap-2 border-b border-tibia-border pb-4">
+              <ShieldAlert className="text-red-500" />
+              Sirene de Guerra (Web Push & Desktop)
+            </h2>
+            
+            <p className="text-gray-400 font-sans text-sm mb-6">
+              Dispare um alarme que vai tocar e pipocar na tela (Desktop Windows) de todos os membros que estão rodando o Worker da guilda neste exato momento! Use com moderação.
+            </p>
+
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-4">
+                <select 
+                  className="bg-black/50 border border-tibia-border p-3 rounded text-white focus:outline-none focus:border-red-500 w-48"
+                  value={alarmType}
+                  onChange={(e) => setAlarmType(e.target.value)}
+                >
+                  <option value="WAR">🚨 PELEGO (WAR)</option>
+                  <option value="BOSS">👿 BOSS NASCEU</option>
+                  <option value="RECRUIT">🛡️ DEFESA DE SPOT</option>
+                  <option value="INFO">ℹ️ AVISO GERAL</option>
+                </select>
+                <input
+                  type="text"
+                  className="flex-1 bg-black/50 border border-tibia-border p-3 rounded text-white focus:outline-none focus:border-red-500"
+                  placeholder="Mensagem do alarme (Ex: Invasão em Yalahar - Loguem TS AGORA!)"
+                  value={alarmMessage}
+                  onChange={(e) => setAlarmMessage(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+              <button
+                onClick={sendAlarm}
+                disabled={sendingAlarm}
+                className="bg-red-900 hover:bg-red-700 text-white font-bold py-4 px-6 rounded transition-colors disabled:opacity-50 text-xl font-medieval border border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.5)]"
+              >
+                {sendingAlarm ? 'Disparando...' : '⚠️ DISPARAR SIRENE GERAL ⚠️'}
+              </button>
+            </div>
+          </div>
+
+        <MakerRulesPanel />
 
       {/* 4. Logs de Super Admin */}
       {isSuperAdmin && (
