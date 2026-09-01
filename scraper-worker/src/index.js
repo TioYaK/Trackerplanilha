@@ -139,7 +139,7 @@ const processTask = async (task) => {
   const startTime = Date.now();
 
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => { reject(new Error('CRITICAL_TIMEOUT')); }, 4.5 * 60 * 1000);
+    setTimeout(() => { reject(new Error('CRITICAL_TIMEOUT')); }, 10 * 60 * 1000);
   });
 
   const executeTask = async () => {
