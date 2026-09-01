@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import path from 'path';
+
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 import express from 'express';
@@ -423,7 +423,7 @@ supabase
 import { runValidateMakers } from './jobs/validateMakers.js';
 
 import notifier from 'node-notifier';
-import path from 'path';
+
 
 supabase
   .channel('maker_validation')
@@ -449,3 +449,4 @@ supabase
      });
   })
   .subscribe();
+
