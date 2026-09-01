@@ -1,4 +1,4 @@
-﻿import { defineConfig } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -8,6 +8,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      workbox: {
+        importScripts: ['/custom-sw.js']
+      },
       manifest: {
         name: 'BattleStorm Tracker',
         short_name: 'Tracker',

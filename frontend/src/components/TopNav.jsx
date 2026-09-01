@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
+import PushNotificationBell from './PushNotificationBell';
 
 export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTabs }) {
   const { logout, profile } = useAuth();
@@ -156,6 +157,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
 
         {/* Right Icons */}
         <div className="flex items-center space-x-3">
+          <PushNotificationBell />
           <InstallPWA />
           {isAdmin && (
             <button onClick={() => setCurrentView('admin_dashboard')} className="flex items-center px-3 py-1.5 rounded border bg-green-900/20 hover:bg-green-900/40 text-green-400 border-green-900/50 cursor-pointer transition-colors" title="Ver Central de Inteligência">
