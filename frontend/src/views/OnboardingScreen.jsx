@@ -26,10 +26,25 @@ export default function OnboardingScreen() {
     e.preventDefault();
     setError('');
 
-    const auroriaMakersList = makers.Auroria.split(',').map(m => m.trim()).filter(m => m);
+    // Clean up makers to avoid trailing commas and empty spaces
+    const cleanMakers = {};
+    Object.keys(makers).forEach(server => {
+      const list = makers[server].split(',').map(m => m.trim()).filter(m => m);
+      if (list.length > 0) {
+        cleanMakers[server] = list.join(', ');
+      }
+    });
+
+    const auroriaMakersList = (cleanMakers.Auroria || '').split(',').map(m => m.trim()).filter(m => m);
 
     if (auroriaMakersList.length === 0) {
       setError('Você precisa registrar pelo menos 1 maker no servidor Auroria (obrigatório).');
+      return;
+    }
+    
+    const isMainInAuroria = auroriaMakersList.some(m => m.toLowerCase() === profile?.main_character?.toLowerCase());
+    if (isMainInAuroria) {
+      setError(`Você não pode colocar seu Main (${profile?.main_character}) na lista de Makers.`);
       return;
     }
 
@@ -64,21 +79,41 @@ export default function OnboardingScreen() {
           }
         }
 
-        // B. Verificar Existência na Guilda e Level 300+
-        const { data: guildData, error: guildErr } = await supabase
-          .from('view_guild_roster')
-          .select('name, level')
-          .ilike('name', makerName)
-          .limit(1);
+        // B. Validação via Worker (Rede Neural)
+        const { data: jobInfo, error: jobErr } = await supabase.from('maker_validation_queue').insert({
+          character_name: makerName,
+          user_id: user.id
+        }).select().single();
 
-        if (guildErr) throw guildErr;
+        if (jobErr) throw jobErr;
+
+        // Aguardar o worker processar (timeout 45s)
+        let isDone = false;
+        let workerResult = null;
+        let attempts = 0;
         
-        if (!guildData || guildData.length === 0) {
-          throw new Error(`O personagem "${makerName}" não foi encontrado na guilda.`);
+        while (!isDone && attempts < 45) {
+          await new Promise(r => setTimeout(r, 1000));
+          attempts++;
+          
+          const { data: check } = await supabase
+            .from('maker_validation_queue')
+            .select('status, error_msg')
+            .eq('id', jobInfo.id)
+            .single();
+            
+          if (check && (check.status === 'completed' || check.status === 'error')) {
+            isDone = true;
+            workerResult = check;
+          }
         }
-        
-        if (guildData[0].level < 300) {
-          throw new Error(`O personagem "${makerName}" está no nível ${guildData[0].level}. É obrigatório ser Nível 300+.`);
+
+        if (!isDone) {
+          throw new Error(`Timeout: O Worker demorou muito para validar "${makerName}". Verifique se o Worker está rodando.`);
+        }
+
+        if (workerResult.status === 'error') {
+          throw new Error(workerResult.error_msg || `Erro ao validar "${makerName}".`);
         }
       }
 
@@ -86,7 +121,7 @@ export default function OnboardingScreen() {
       const { error: updateErr } = await supabase
         .from('profiles')
         .update({
-          makers: makers,
+          makers: cleanMakers,
           onboarding_completed: true
         })
         .eq('id', user.id);
@@ -96,7 +131,7 @@ export default function OnboardingScreen() {
       // Forçar o reload da página para o App.jsx puxar o perfil atualizado
       window.location.reload();
     } catch (err) {
-      setError('Erro ao salvar seus dados: ' + err.message);
+      setError('Erro: ' + err.message);
       setLoading(false);
     }
   };

@@ -283,10 +283,10 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
         <div className="flex items-center mb-4 md:mb-0 z-10">
           <div className="mr-5 shrink-0">
             <img 
-              src={playerAvatar || `https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/${(playerInfo?.vocation || 'None').toLowerCase()}.png`} 
+              src={playerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(playerName)}&background=111&color=eab308`} 
               alt={playerName} 
               className="w-16 h-16 rounded-full object-cover bg-black/60 border-2 border-tibia-highlight shadow-lg"
-              onError={(e) => { e.target.src = 'https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/none.png'; }}
+              onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(playerName)}&background=111&color=eab308`; }}
             />
           </div>
           <div className="mr-6">

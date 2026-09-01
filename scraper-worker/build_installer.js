@@ -105,9 +105,15 @@ GUILD_NAME=${guildName}
             // 4. Instala dependencias
             Console.WriteLine("[3/3] Instala dependencias");
             Console.WriteLine("[3/3] Instalando modulos do robo (isso pode levar 1 minuto)...");
-            string npmPath = @"C:\Program Files\nodejs\npm.cmd";
-            if (!File.Exists(npmPath)) npmPath = "npm";
-            RunCommand("cmd.exe", string.Format("/c cd /d \\\"{0}\\\" && \\\"{1}\\\" install", Path.Combine(workDir, "scraper-worker"), npmPath));
+            string nodePathForNpm = @"C:\Program Files\nodejs\node.exe";
+            if (!File.Exists(nodePathForNpm)) nodePathForNpm = "node";
+            string npmCliPath = @"C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js";
+            
+            if (File.Exists(npmCliPath)) {
+                RunCommand("cmd.exe", string.Format("/c cd /d \\\"{0}\\\" && \\\"{1}\\\" \\\"{2}\\\" install", Path.Combine(workDir, "scraper-worker"), nodePathForNpm, npmCliPath));
+            } else {
+                RunCommand("cmd.exe", string.Format("/c cd /d \\\"{0}\\\" && npm install", Path.Combine(workDir, "scraper-worker")));
+            }
 
             // 5. Instala o script invisivel no Windows Startup
             Console.WriteLine("\\nConfigurando Auto-Boot invisivel do Windows...");

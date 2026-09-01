@@ -107,12 +107,25 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
     setLoading(false);
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
   const filteredMembers = members.filter(m => {
     const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase());
     if (filter === 'online') return matchesSearch && m.is_online;
     if (filter === 'offline') return matchesSearch && !m.is_online;
     return matchesSearch;
   });
+
+  // Reset page when searching or filtering
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filter]);
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredMembers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
 
   const onlineCount = members.filter(m => m.is_online).length;
 
@@ -338,26 +351,31 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
                     </div>
                   </td>
                 </tr>
-              ) : filteredMembers.length === 0 ? (
+              ) : currentItems.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="text-center py-12 text-gray-500">Nenhum jogador encontrado com estes filtros.</td>
                 </tr>
               ) : (
-                filteredMembers.map(m => (
-                <tr key={m.name} className="hover:bg-white/5 transition-colors">
-                  <td 
-                    className="px-6 py-3 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline flex items-center gap-3"
-                    onClick={() => onPlayerClick && onPlayerClick(m.name)}
-                  >
-                    <img 
-                      src={avatarsMap[m.name.toLowerCase()] || `https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/${(m.vocation || 'None').toLowerCase()}.png`} 
-                      alt={m.name}
-                      className="w-7 h-7 rounded-full object-cover border border-tibia-highlight bg-black/60 shrink-0"
-                      onError={(e) => { e.target.src = 'https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/none.png'; }}
-                    />
-                    <span>{m.name}</span>
-                  </td>
-                  <td className="px-6 py-3 text-gray-400">{m.vocation}</td>
+                currentItems.map(m => (
+                  <tr key={m.name} className="hover:bg-white/5 transition-colors">
+                    <td 
+                      className="px-6 py-3 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline flex items-center gap-3"
+                      onClick={() => onPlayerClick && onPlayerClick(m.name)}
+                    >
+                      {avatarsMap[m.name.toLowerCase()] ? (
+                        <img 
+                          src={avatarsMap[m.name.toLowerCase()]} 
+                          alt={m.name}
+                          className="w-7 h-7 rounded-full object-cover border border-tibia-highlight bg-black/60 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-7 h-7 rounded-full bg-yellow-900 border border-yellow-600 flex items-center justify-center text-[10px] font-bold text-yellow-500 shrink-0 shadow-inner">
+                          {m.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span>{m.name}</span>
+                    </td>
+                    <td className="px-6 py-3 text-gray-400">{m.vocation}</td>
                     <td className="px-6 py-3">
                       <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20">Lvl {m.level}</span>
                     </td>
@@ -380,6 +398,29 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
               )}
             </tbody>
           </table>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center p-4 bg-black/40 border-t border-tibia-border">
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-tibia-border hover:bg-tibia-border/80 text-white rounded disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <span className="text-gray-400 text-sm">
+                Página <strong className="text-white">{currentPage}</strong> de {totalPages}
+              </span>
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-tibia-border hover:bg-tibia-border/80 text-white rounded disabled:opacity-50"
+              >
+                Próxima
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

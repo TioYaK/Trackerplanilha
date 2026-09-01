@@ -27,11 +27,12 @@ export default function AuthScreen() {
       if (isLogin) {
         await login(email, password);
       } else {
+        const cleanMain = mainCharacter.trim();
         // Validação da Guilda antes de registrar!
         const { data: roster, error: rosterErr } = await supabase
           .from('view_guild_roster')
           .select('name')
-          .ilike('name', mainCharacter) // case insensitive
+          .ilike('name', cleanMain) // case insensitive
           .limit(1);
           
         if (rosterErr) throw rosterErr;
@@ -40,7 +41,7 @@ export default function AuthScreen() {
           throw new Error('Personagem não encontrado na guilda. Verifique o nick ou procure um Admin.');
         }
 
-        await register({ email, password, name, mainCharacter, ts3Nickname });
+        await register({ email, password, name, mainCharacter: cleanMain, ts3Nickname });
         setSuccessMsg('Cadastro realizado com sucesso! Sua conta está PENDENTE e aguardando aprovação de um Administrador.');
         setIsLogin(true); // Volta pro login
       }

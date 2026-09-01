@@ -189,10 +189,10 @@ export default function ProfileModal({ onClose }) {
           <div className="flex items-center gap-4">
             <div className="relative group">
               <img 
-                src={avatarUrl || defaultVocationImg} 
-                alt={profile?.main_character || 'Avatar'} 
+                src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.main_character || 'N/A')}&background=111&color=eab308`}
+                alt="Avatar"
                 className="w-16 h-16 rounded-full object-cover bg-black/60 border-2 border-tibia-highlight shadow-md"
-                onError={(e) => { e.target.src = 'https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/none.png'; }}
+                onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.main_character || 'N/A')}&background=111&color=eab308`; }}
               />
               {avatarUrl && (
                 <span className="absolute -bottom-1 -right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-black" title="Foto customizada ativa" />

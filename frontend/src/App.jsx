@@ -13,7 +13,6 @@ import ReportExport from './components/ReportExport';
 import Rankings from './components/Rankings';
 import GuildBank from './views/GuildBank';
 import GuildMarket from './views/GuildMarket';
-import LootTracker from './views/LootTracker';
 import ExtremeAnalytics from './views/ExtremeAnalytics';
 import Contribute from './views/Contribute';
 import AuthScreen from './views/AuthScreen';
@@ -31,7 +30,7 @@ const DEFAULT_VISIBLE_TABS = [
 ];
 
 export default function App() {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, loading, logout } = useAuth();
   const [currentView, setCurrentView] = useState('live');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedParty, setSelectedParty] = useState(null);
@@ -57,6 +56,14 @@ export default function App() {
     }
   }, [user, profile]);
 
+  if (loading || (user && !profile)) {
+    return (
+      <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex items-center justify-center p-4">
+        <div className="text-yellow-500 font-medieval text-2xl animate-pulse">Carregando...</div>
+      </div>
+    );
+  }
+
   if (!user) {
     return <AuthScreen />;
   }
@@ -80,7 +87,35 @@ export default function App() {
     );
   }
 
-  if (profile?.status === 'active' && !profile.onboarding_completed) {
+  if (profile?.status === 'rejected') {
+    return (
+      <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex items-center justify-center p-4">
+        <div className="bg-black/80 border-2 border-red-900 rounded-lg shadow-tibia-glow max-w-md w-full p-8 text-center">
+          <h2 className="text-3xl font-medieval text-red-500 mb-4">Acesso Negado</h2>
+          <p className="text-gray-300 font-sans mb-6">
+            Sua solicitação de acesso para "{profile.main_character}" foi rejeitada por um administrador.
+          </p>
+          <button
+            onClick={logout}
+            className="bg-red-900/50 hover:bg-red-900 border border-red-500 text-white px-4 py-2 rounded flex items-center justify-center gap-2 w-full transition-colors"
+          >
+            <LogOut size={18} /> Sair
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (profile?.status !== 'active') {
+    // Fail-safe block to ensure ONLY 'active' statuses get past this point
+    return (
+      <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex items-center justify-center p-4">
+        <div className="text-yellow-500 font-medieval text-2xl animate-pulse">Aguardando validação do perfil...</div>
+      </div>
+    );
+  }
+
+  if (!profile.onboarding_completed) {
     return <OnboardingScreen />;
   }
 
@@ -96,7 +131,7 @@ export default function App() {
 
   const renderView = () => {
     switch (currentView) {
-      case 'live':    return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
+      case 'live':    return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
       case 'roster':  return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
       case 'attendance': return <WarAttendance />;
       case 'bazaar': return <BazaarSniper />;
@@ -106,7 +141,6 @@ export default function App() {
       case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
       case 'bank':    return <GuildBank isAdmin={isAdmin} />;
       case 'market':  return <GuildMarket isAdmin={isAdmin} />;
-      case 'loot':    return <LootTracker isAdmin={isAdmin} />;
       case 'party':   return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
       case 'contribute': return <Contribute />;
       case 'admin':   return isAdmin ? <AdminPanel /> : null;

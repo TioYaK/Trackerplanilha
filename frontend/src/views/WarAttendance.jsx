@@ -46,10 +46,10 @@ export default function WarAttendance() {
         <div>
           <h1 className="text-3xl font-black text-white flex items-center tracking-tight">
             <Clock className="mr-3 text-blue-500" size={32} />
-            Frequência de Guerra (Bater Ponto)
+            Atividade Diária (Horas Online)
           </h1>
           <p className="text-gray-400 mt-1">
-            Monitoramento de tempo online dos soldados da Guilda.
+            Monitoramento de tempo ativo diário dos membros da Guilda.
           </p>
         </div>
       </div>

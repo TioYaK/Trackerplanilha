@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { CheckCircle2, XCircle, ShieldAlert, Users, LayoutDashboard, Eye, EyeOff, Key } from 'lucide-react';
+import { CheckCircle2, XCircle, ShieldAlert, Users, LayoutDashboard, Eye, EyeOff, Key, Trash2, Mail, Crown } from 'lucide-react';
+import { useAuth } from '../components/AuthContext';
 
 export default function AdminPanel({ currentVisibleTabs }) {
+  const { user: currentUser, profile: currentProfile } = useAuth();
   const [users, setUsers] = useState([]);
   const [tabs, setTabs] = useState(currentVisibleTabs || []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(null);
+  const [adminLogs, setAdminLogs] = useState([]);
+
+  const isSuperAdmin = currentProfile?.role === 'super_admin' || currentProfile?.email?.toLowerCase() === 'pifot16@gmail.com';
 
   const allAvailableTabs = [
     { id: 'live', label: 'Monitoramento ao Vivo' },
@@ -26,7 +31,13 @@ export default function AdminPanel({ currentVisibleTabs }) {
   useEffect(() => {
     fetchUsers();
     fetchTabs();
-  }, []);
+    if (isSuperAdmin) fetchLogs();
+  }, [isSuperAdmin]);
+
+  const fetchLogs = async () => {
+    const { data } = await supabase.from('admin_logs').select('*').order('created_at', { ascending: false }).limit(20);
+    if (data) setAdminLogs(data);
+  };
 
   const fetchUsers = async () => {
     const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
@@ -47,6 +58,49 @@ export default function AdminPanel({ currentVisibleTabs }) {
   const updateUserRole = async (id, role) => {
     await supabase.from('profiles').update({ role }).eq('id', id);
     fetchUsers();
+  };
+
+  const handleDeleteUser = async (u) => {
+    if (!isSuperAdmin) return alert('Apenas o Super Admin pode deletar usuários.');
+    if (u.email?.toLowerCase() === 'pifot16@gmail.com') return alert('O criador supremo não pode ser deletado.');
+    if (!window.confirm(`ATENÇÃO SUPER ADMIN: Deseja realmente DELETAR o usuário ${u.main_character}? Isso apagará a conta dele permanentemente.`)) return;
+
+    try {
+      const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/manage-user` : '/api/manage-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', targetUserId: u.id, requestorEmail: currentProfile.email })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      alert('Usuário deletado!');
+      fetchUsers();
+      fetchLogs();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleEditEmail = async (u) => {
+    if (!isSuperAdmin) return alert('Apenas o Super Admin pode alterar e-mails.');
+    if (u.email?.toLowerCase() === 'pifot16@gmail.com') return alert('O email do criador supremo não pode ser alterado.');
+    const newEmail = window.prompt(`Novo e-mail para ${u.main_character}:`, u.email);
+    if (!newEmail || newEmail === u.email) return;
+
+    try {
+      const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/manage-user` : '/api/manage-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_email', targetUserId: u.id, newEmail, requestorEmail: currentProfile.email })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      alert('E-mail atualizado!');
+      fetchUsers();
+      fetchLogs();
+    } catch (e) {
+      alert(e.message);
+    }
   };
 
   const handleResetPassword = async (userId) => {
@@ -111,14 +165,43 @@ export default function AdminPanel({ currentVisibleTabs }) {
     }
   };
 
+  const [searchUser, setSearchUser] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  const filteredUsers = users.filter(u => {
+    const searchLower = searchUser.toLowerCase();
+    const nameMatch = (u.name || '').toLowerCase().includes(searchLower);
+    const mainMatch = (u.main_character || '').toLowerCase().includes(searchLower);
+    const emailMatch = (u.email || '').toLowerCase().includes(searchLower);
+    return nameMatch || mainMatch || emailMatch;
+  });
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in space-y-12">
       
       {/* 1. Controle de Usuários */}
       <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl p-6">
-        <h2 className="text-2xl font-medieval text-tibia-highlight mb-6 flex items-center gap-2 border-b border-tibia-border pb-4">
-          <Users className="text-tibia-primary" />
-          Aprovação e Gestão de Membros
+        <h2 className="text-2xl font-medieval text-tibia-highlight mb-6 flex items-center justify-between border-b border-tibia-border pb-4">
+          <div className="flex items-center gap-2">
+            <Users className="text-tibia-primary" />
+            Aprovação e Gestão de Membros
+          </div>
+          <input
+            type="text"
+            placeholder="Buscar usuário (Nome, Main, Email)..."
+            value={searchUser}
+            onChange={(e) => {
+              setSearchUser(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="bg-black/50 border border-tibia-border rounded px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-tibia-primary w-64 font-sans"
+          />
         </h2>
         
         {loading ? (
@@ -139,7 +222,7 @@ export default function AdminPanel({ currentVisibleTabs }) {
                 </tr>
               </thead>
               <tbody>
-                {users.map(u => (
+                {currentUsers.map(u => (
                   <tr key={u.id} className="border-b border-tibia-border hover:bg-white/5 transition-colors">
                     {/* Foto / Avatar */}
                     <td className="p-3">
@@ -148,12 +231,11 @@ export default function AdminPanel({ currentVisibleTabs }) {
                           <img 
                             src={u.avatar_url} 
                             alt={u.main_character} 
-                            className="w-10 h-10 rounded-full object-cover border border-tibia-highlight bg-black/60 shadow" 
-                            onError={(e) => { e.target.src = 'https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/none.png'; }}
+                            className="w-8 h-8 rounded-full border border-tibia-border object-cover"
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-black/50 border border-gray-700 flex items-center justify-center text-xs text-gray-500 font-bold uppercase">
-                            {u.name?.substring(0, 2) || '??'}
+                            {(u.main_character || u.name)?.substring(0, 2) || '??'}
                           </div>
                         )}
                         {u.avatar_blocked && (
@@ -205,14 +287,16 @@ export default function AdminPanel({ currentVisibleTabs }) {
                       </span>
                     </td>
                     <td className="p-3">
-                      <select 
-                        value={u.role}
-                        onChange={(e) => updateUserRole(u.id, e.target.value)}
-                        className="bg-black border border-tibia-border text-gray-300 rounded p-1 text-xs outline-none focus:border-tibia-primary"
-                      >
-                        <option value="user">Membro</option>
-                        <option value="admin">Administrador</option>
-                      </select>
+                        <select 
+                          value={u.role}
+                          onChange={(e) => updateUserRole(u.id, e.target.value)}
+                          className="bg-black border border-tibia-border text-gray-300 rounded p-1 text-xs outline-none focus:border-tibia-primary"
+                          disabled={!isSuperAdmin && u.role === 'super_admin'}
+                        >
+                          <option value="user">Membro</option>
+                          <option value="admin">Administrador</option>
+                          {isSuperAdmin && <option value="super_admin">Super Admin</option>}
+                        </select>
                     </td>
                     <td className="p-3 text-right">
                       <div className="flex items-center justify-end gap-1.5 flex-wrap">
@@ -240,7 +324,6 @@ export default function AdminPanel({ currentVisibleTabs }) {
                           <ShieldAlert size={15} />
                         </button>
 
-                        {/* Resetar Senha */}
                         <button 
                           onClick={() => handleResetPassword(u.id)} 
                           className="bg-blue-800 hover:bg-blue-700 text-white p-1.5 rounded transition-colors" 
@@ -249,6 +332,17 @@ export default function AdminPanel({ currentVisibleTabs }) {
                         >
                           {resetting === u.id ? <span className="animate-pulse">...</span> : <Key size={15} />}
                         </button>
+
+                        {isSuperAdmin && (
+                          <>
+                            <button onClick={() => handleEditEmail(u)} className="bg-purple-800 hover:bg-purple-700 text-white p-1.5 rounded transition-colors" title="Alterar E-mail">
+                              <Mail size={15} />
+                            </button>
+                            <button onClick={() => handleDeleteUser(u)} className="bg-red-950 hover:bg-red-900 border border-red-500 text-red-500 hover:text-white p-1.5 rounded transition-colors" title="Deletar Usuário Permanentemente">
+                              <Trash2 size={15} />
+                            </button>
+                          </>
+                        )}
 
                         {/* Aprovar / Rejeitar */}
                         {u.status !== 'active' && (
@@ -272,6 +366,29 @@ export default function AdminPanel({ currentVisibleTabs }) {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && totalPages > 1 && (
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-tibia-border">
+            <button 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 bg-tibia-border hover:bg-tibia-border/80 text-white rounded disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="text-gray-400 text-sm">
+              Página <strong className="text-white">{currentPage}</strong> de {totalPages}
+            </span>
+            <button 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 bg-tibia-border hover:bg-tibia-border/80 text-white rounded disabled:opacity-50"
+            >
+              Próxima
+            </button>
           </div>
         )}
       </div>
@@ -310,6 +427,152 @@ export default function AdminPanel({ currentVisibleTabs }) {
         {saving && <p className="text-yellow-500 mt-4 text-sm animate-pulse">Salvando alterações...</p>}
       </div>
 
+      {/* 3. Regras de Makers */}
+      <MakerRulesPanel />
+
+      {/* 4. Logs de Super Admin */}
+      {isSuperAdmin && (
+        <div className="bg-tibia-card border border-purple-900/40 rounded-lg shadow-xl p-6">
+          <h2 className="text-2xl font-medieval text-purple-400 mb-6 flex items-center gap-2 border-b border-purple-900/50 pb-4">
+            <Crown className="text-purple-500" />
+            Audit Log Supremo (Tempo Real)
+          </h2>
+          <p className="text-gray-400 font-sans text-sm mb-6">
+            Ações críticas realizadas por Super Admins são registradas aqui permanentemente.
+          </p>
+
+          <div className="bg-black/40 rounded overflow-hidden max-h-[300px] overflow-y-auto custom-scrollbar">
+            <table className="w-full text-left text-sm text-gray-300">
+              <thead className="bg-purple-950/40 text-purple-300 uppercase font-semibold sticky top-0">
+                <tr>
+                  <th className="p-3">Data/Hora</th>
+                  <th className="p-3">Super Admin</th>
+                  <th className="p-3">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-purple-900/30">
+                {adminLogs.map(log => (
+                  <tr key={log.id} className="hover:bg-white/5 transition-colors">
+                    <td className="p-3 whitespace-nowrap text-gray-500">{new Date(log.created_at).toLocaleString()}</td>
+                    <td className="p-3 font-bold text-purple-400">{log.admin_email}</td>
+                    <td className="p-3">{log.action}</td>
+                  </tr>
+                ))}
+                {adminLogs.length === 0 && (
+                  <tr>
+                    <td colSpan="3" className="p-4 text-center text-gray-500">Nenhum log crítico registrado.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+function MakerRulesPanel() {
+  const [rules, setRules] = useState({
+    is_mandatory: false,
+    min_level: 1,
+    allowed_vocations: [],
+    required_guild: '',
+    required_world: ''
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchRules();
+  }, []);
+
+  const fetchRules = async () => {
+    const { data, error } = await supabase.from('maker_rules').select('*').limit(1).single();
+    if (data) setRules(data);
+    setLoading(false);
+  };
+
+  const saveRules = async () => {
+    setSaving(true);
+    await supabase.from('maker_rules').upsert({ id: rules.id || undefined, ...rules });
+    setSaving(false);
+    alert('Regras de Makers salvas com sucesso!');
+  };
+
+  if (loading) return <div>Carregando regras...</div>;
+
+  return (
+    <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl p-6">
+      <h2 className="text-2xl font-medieval text-tibia-highlight mb-6 flex items-center gap-2 border-b border-tibia-border pb-4">
+        <ShieldAlert className="text-tibia-primary" />
+        Regras de Validação de Makers (Rede Neural)
+      </h2>
+      <p className="text-gray-400 font-sans text-sm mb-6">
+        Defina os requisitos rigorosos que o Worker verificará automaticamente quando um membro tentar registrar seus Makers no sistema.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-bold text-gray-300">Obrigatório Cadastrar?</label>
+          <select 
+            value={rules.is_mandatory ? 'sim' : 'nao'} 
+            onChange={(e) => setRules({...rules, is_mandatory: e.target.value === 'sim'})}
+            className="bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-tibia-primary"
+          >
+            <option value="sim">Sim (Regras estritas)</option>
+            <option value="nao">Não (Qualquer char passa)</option>
+          </select>
+        </div>
+        
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-bold text-gray-300">Nível Mínimo do Maker</label>
+          <input 
+            type="number" 
+            value={rules.min_level} 
+            onChange={(e) => setRules({...rules, min_level: parseInt(e.target.value) || 1})}
+            className="bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-tibia-primary"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-bold text-gray-300">Mundo Obrigatório</label>
+          <input 
+            type="text" 
+            placeholder="Ex: Auroria"
+            value={rules.required_world || ''} 
+            onChange={(e) => setRules({...rules, required_world: e.target.value})}
+            className="bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-tibia-primary"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-bold text-gray-300">Guilda Obrigatória (Opcional)</label>
+          <input 
+            type="text" 
+            placeholder="Ex: Academy (Deixe em branco para ignorar)"
+            value={rules.required_guild || ''} 
+            onChange={(e) => setRules({...rules, required_guild: e.target.value})}
+            className="bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-tibia-primary"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1 md:col-span-2">
+          <label className="text-sm font-bold text-gray-300">Vocações Permitidas (separadas por vírgula)</label>
+          <input 
+            type="text" 
+            placeholder="Ex: Druid, Elder Druid, Exalted Druid, Master Sorcerer"
+            value={rules.allowed_vocations?.join(', ') || ''} 
+            onChange={(e) => setRules({...rules, allowed_vocations: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})}
+            className="bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-tibia-primary"
+          />
+        </div>
+      </div>
+
+      <button onClick={saveRules} disabled={saving} className="mt-6 bg-green-700 hover:bg-green-600 text-white font-bold px-6 py-2 rounded">
+        {saving ? 'Salvando...' : 'Salvar Regras de Maker'}
+      </button>
     </div>
   );
 }

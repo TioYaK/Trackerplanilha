@@ -5,7 +5,7 @@ import GlobalAuditFeed from '../components/GlobalAuditFeed';
 import { supabase } from '../lib/supabase';
 import { RefreshCw } from 'lucide-react';
 
-export default function LiveDashboard({ onPlayerClick, onPartyClick }) {
+export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) {
   const [activeTab, setActiveTab] = useState('');
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +128,7 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick }) {
           {parties
             .filter(p => p.category === activeTab)
             .map(party => (
-              <RespawnCard key={party.id} party={party} onPlayerClick={onPlayerClick} onPartyClick={onPartyClick} />
+              <RespawnCard key={party.id} party={party} onPlayerClick={onPlayerClick} onPartyClick={onPartyClick} isAdmin={isAdmin} />
             ))}
         </div>
       )}

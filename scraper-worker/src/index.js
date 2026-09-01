@@ -18,6 +18,7 @@ import { runFetchTransfers } from './jobs/fetchTransfers.js';
 import { runFetchBazaar } from './jobs/fetchBazaar.js';
 import { runCloseSessions } from './jobs/closeSessions.js';
 import { runBankSync } from './jobs/syncBankTS3.js';
+import { runFetchRosterShard } from './jobs/fetchRosterShards.js';
 import { checkForUpdates } from './updater.js';
 import { closeBrowser } from './lib/rubinotScraper.js';
 
@@ -97,6 +98,7 @@ const completeTask = async (task) => {
   // Cooldown por tipo de tarefa
   const cooldowns = {
     FETCH_GUILD: 5,
+    FETCH_ROSTER_SHARD: 15,
     FETCH_RIVALS: 3,
     FETCH_ONLINES: 2,
     AUDIT_SLOTS: 10,
@@ -152,6 +154,10 @@ const processTask = async (task) => {
         break;
       case 'AUDIT_SLOTS':
         await runAuditSlots();
+        break;
+      case 'FETCH_ROSTER_SHARD':
+        // O id do Shard vem do page_number (1, 2, 3, 4)
+        await runFetchRosterShard(task.page_number || 1);
         break;
       case 'UPDATE_WORKERS':
         console.log('[WORKER] 🔄 Comando de Forçar Atualização recebido!');
@@ -398,3 +404,12 @@ supabase
       console.log('[REALTIME] 📡 Inscrito para receber comandos de Sincronização em Tempo Real.');
     }
   });
+import { runValidateMakers } from './jobs/validateMakers.js';
+
+supabase
+  .channel('maker_validation')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maker_validation_queue' }, (payload) => {
+     console.log('\n[REALTIME] Novo maker recebido para validar!');
+     runValidateMakers();
+  })
+  .subscribe();

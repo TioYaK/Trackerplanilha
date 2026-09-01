@@ -41,11 +41,10 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     contribute: { label: 'Ajude a Guilda', icon: <Swords size={16} /> },
     bank: { label: 'Guild Bank', icon: <Landmark size={16} /> },
     market: { label: 'Mercado Interno', icon: <ShoppingBag size={16} /> },
-    loot: { label: 'Loot Split', icon: <Calculator size={16} /> },
     tracker: { label: 'Censo Macro', icon: <LayoutDashboard size={16} /> },
     extreme: { label: 'Eventos Global', icon: <BrainCircuit size={16} /> },
     analytics: { label: 'Rankings & Tribunal', icon: <TrendingDown size={16} /> },
-    attendance: { label: 'Frequência de Guerra', icon: <CalendarDays size={16} /> },
+    attendance: { label: 'Atividade Diária', icon: <CalendarDays size={16} /> },
     bazaar: { label: 'Char Bazaar Sniper', icon: <Target size={16} /> },
     admin: { label: 'Painel Admin', icon: <Lock size={16} /> },
   };
@@ -65,7 +64,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     {
       title: 'Economia',
       icon: <Landmark size={18} />,
-      items: ['bank', 'market', 'bazaar', 'loot']
+      items: ['bank', 'market', 'bazaar']
     },
     {
       title: 'Inteligência',

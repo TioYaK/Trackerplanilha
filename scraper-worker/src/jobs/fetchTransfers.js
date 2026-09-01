@@ -21,7 +21,9 @@ export const runFetchTransfers = async () => {
                 const record = {
                     character_name: t.player_name,
                     transfer_type: 'IN', // Chegou
-                    transfer_date: tDate.toISOString()
+                    transfer_date: tDate.toISOString(),
+                    level: t.player_level || 0,
+                    other_world: t.from_world || 'Unknown'
                 };
 
                 const { error } = await supabase.from('server_transfers').insert(record);
@@ -43,7 +45,9 @@ export const runFetchTransfers = async () => {
                 const record = {
                     character_name: t.player_name,
                     transfer_type: 'OUT', // Saiu
-                    transfer_date: tDate.toISOString()
+                    transfer_date: tDate.toISOString(),
+                    level: t.player_level || 0,
+                    other_world: t.to_world || 'Unknown'
                 };
 
                 const { error } = await supabase.from('server_transfers').insert(record);

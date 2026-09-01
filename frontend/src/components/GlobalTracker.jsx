@@ -152,7 +152,8 @@ export default function GlobalTracker() {
           });
 
           const vocColors = {
-            'Elite Knight': '#3B82F6', 'Elder Druid': '#10B981', 'Master Sorcerer': '#EF4444', 'Royal Paladin': '#F59E0B'
+            'Elite Knight': '#3B82F6', 'Elder Druid': '#10B981', 'Master Sorcerer': '#EF4444', 'Royal Paladin': '#F59E0B',
+            'Monk': '#8B5CF6', 'Exalted Monk': '#8B5CF6'
           };
 
           vData = Object.values(vocStats)
@@ -219,7 +220,7 @@ export default function GlobalTracker() {
         let rTier = [];
         if (partiesData) {
         const huntStats = {};
-        const hoursPerVoc = { 'Elite Knight': 0, 'Elder Druid': 0, 'Master Sorcerer': 0, 'Royal Paladin': 0 };
+        const hoursPerVoc = { 'Elite Knight': 0, 'Elder Druid': 0, 'Master Sorcerer': 0, 'Royal Paladin': 0, 'Monk': 0, 'Exalted Monk': 0 };
         const globalHours = new Array(24).fill(0);
         const playerMates = {};
         

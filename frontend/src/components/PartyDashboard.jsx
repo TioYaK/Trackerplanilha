@@ -46,20 +46,16 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
 
       let logs = [];
-      let page = 0;
-      while(true) {
-          const { data } = await supabase
-            .from('telemetry_logs')
-            .select('character_name, delta_xp, recorded_at, level')
-            .in('character_name', party.members)
-            .gte('recorded_at', historyStartDate)
-            .order('recorded_at', { ascending: true })
-            .range(page*1000, (page+1)*1000-1);
-            if (!data || data.length === 0) break;
-            logs.push(...data);
-            if (data.length < 1000) break;
-            page++;
-        }
+      const { data, error } = await supabase
+        .from('historical_sessions')
+        .select('character_name, xp_gained, session_end, end_level')
+        .in('character_name', party.members)
+        .gte('session_end', historyStartDate)
+        .order('session_end', { ascending: true });
+        
+      if (!error && data) {
+        logs = data;
+      }
 
       if (logs) {
         const memberStats = {};
@@ -76,13 +72,13 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         if (endMins < startMins) endMins += 1440; // Cross midnight
 
         logs.forEach(log => {
-          const date = new Date(log.recorded_at);
-          const dxp = parseInt(log.delta_xp || 0, 10);
+          const date = new Date(log.session_end);
+          const dxp = parseInt(log.xp_gained || 0, 10);
           
           // 24h Table Logic
           if (date.getTime() >= twentyFourHoursAgo && memberStats[log.character_name]) {
             memberStats[log.character_name].totalXpGained += dxp;
-            memberStats[log.character_name].level = log.level;
+            memberStats[log.character_name].level = log.end_level;
             memberStats[log.character_name].lastSeen = date;
           }
 

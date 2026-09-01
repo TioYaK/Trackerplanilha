@@ -115,9 +115,9 @@ export default function BazaarSniper() {
                 <div className="flex items-center space-x-4 mb-4 mt-2">
                   <div className="w-14 h-14 bg-black/60 border border-tibia-border rounded-full flex items-center justify-center">
                     <img 
-                      src={`https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/${(auction.vocation || 'None').toLowerCase().replace(' ', '')}.png`} 
-                      alt="Voc"
-                      className="w-10 h-10 object-contain drop-shadow-md"
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(auction.character_name)}&background=111&color=eab308`} 
+                      alt={auction.vocation} 
+                      className="w-10 h-10 object-cover shrink-0 rounded-full"
                       onError={(e) => { e.target.style.display = 'none'; }}
                     />
                   </div>
