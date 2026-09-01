@@ -54,7 +54,7 @@ export default function GlobalAuditFeed() {
               date: dummyDate, 
               type: 'PARTY',
               icon: <Swords size={16} className="text-blue-500" />,
-              message: `${p.leader_name} agendou uma PT em "${p.hunt_name}" para o slot das ${p.slot_start}.`
+              message: `O admin ${p.created_by || 'Admin'} agendou uma PT para ${p.leader_name} em "${p.hunt_name}" para o slot das ${p.slot_start}.`
             });
           });
         }

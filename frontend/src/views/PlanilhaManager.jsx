@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Plus, Trash2, Edit } from 'lucide-react';
+import { useAuth } from '../components/AuthContext';
 
 export default function PlanilhaManager({ isAdmin }) {
+  const { profile } = useAuth();
   const [parties, setParties] = useState([]);
   const [areas, setAreas] = useState([]);
   const [newArea, setNewArea] = useState('');
@@ -94,7 +96,8 @@ export default function PlanilhaManager({ isAdmin }) {
         hunt_name: formData.hunt_name,
         slot_start: formData.slot_start,
         slot_end: formData.slot_end,
-        members: membersArray
+        members: membersArray,
+        created_by: profile?.main_character || 'Admin'
       }]);
       error = res.error;
     }
