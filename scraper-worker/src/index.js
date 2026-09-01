@@ -236,7 +236,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.4.7';
+const WORKER_VERSION = '1.4.8';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -434,16 +434,17 @@ supabase
   })
   .subscribe();
 
-// GATILHO DE ALARMES GERAIS (DESKTOP NOTIFICATIONS)
+// GATILHO DE ALARMES GERAIS (DESKTOP E WEB PUSH NOTIFICATIONS)
 const processedAlarms = new Set();
+import webpush from 'web-push';
+
 supabase
   .channel('guild_alarms')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_alarms' }, (payload) => {
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_alarms' }, async (payload) => {
      const alarm = payload.new;
-     if (processedAlarms.has(alarm.id)) return; // Evita notificação duplicada
+     if (processedAlarms.has(alarm.id)) return;
      processedAlarms.add(alarm.id);
      
-     // Mantém o Set pequeno pra não vazar memória
      if (processedAlarms.size > 100) {
        const iterator = processedAlarms.values();
        processedAlarms.delete(iterator.next().value);
@@ -451,6 +452,7 @@ supabase
 
      console.log(`\n[ALARME] 🚨 ${alarm.type}: ${alarm.message}`);
      
+     // 1. Notificação Nativa (Desktop do Worker)
      notifier.notify({
        title: `BattleStorm - ${alarm.type}`,
        message: alarm.message,
@@ -459,6 +461,48 @@ supabase
        sound: true, 
        wait: false
      });
+
+     // 2. Notificação Web Push (Navegadores/Celulares da Guilda)
+     try {
+       // Puxa as chaves VAPID
+       const { data: config } = await supabase.from('worker_config').select('vapid_public_key, vapid_private_key').eq('id', 1).single();
+       if (!config || !config.vapid_public_key || !config.vapid_private_key) return;
+
+       webpush.setVapidDetails(
+         'mailto:admin@battlestorm.com',
+         config.vapid_public_key,
+         config.vapid_private_key
+       );
+
+       // Puxa todas as inscrições
+       const { data: subs } = await supabase.from('push_subscriptions').select('*');
+       if (!subs || subs.length === 0) return;
+
+       console.log(`[WEB PUSH] Disparando para ${subs.length} navegadores...`);
+       
+       const pushPayload = JSON.stringify({
+         title: `BattleStorm - ${alarm.type}`,
+         body: alarm.message,
+         icon: '/pwa-192x192.png',
+         badge: '/pwa-192x192.png',
+         url: '/'
+       });
+
+       // Dispara em paralelo para todos
+       await Promise.all(subs.map(async (sub) => {
+         try {
+           await webpush.sendNotification(sub.subscription, pushPayload);
+         } catch (err) {
+           if (err.statusCode === 410 || err.statusCode === 404) {
+             // Inscrição expirou ou foi revogada pelo usuário, removemos do banco
+             await supabase.from('push_subscriptions').delete().eq('id', sub.id);
+           }
+         }
+       }));
+       console.log(`[WEB PUSH] ✅ Disparo concluído!`);
+     } catch (e) {
+       console.log(`[WEB PUSH] Erro ao disparar:`, e.message);
+     }
   })
   .subscribe();
 
