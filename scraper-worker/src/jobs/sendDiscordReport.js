@@ -1,4 +1,4 @@
-﻿import { supabase } from '../db.js';
+import { supabase } from '../db.js';
 import axios from 'axios';
 
 export const runSendDiscordReport = async () => {
@@ -15,7 +15,7 @@ export const runSendDiscordReport = async () => {
         const todayStr = ssDate.toISOString().split('T')[0];
 
         if (webhook.last_sent_date === todayStr) {
-            console.log([JOB] Relatório já enviado hoje (). Pulando...);
+            console.log(`[JOB] Relatório já enviado hoje (${todayStr}). Pulando...`);
             return;
         }
 
@@ -23,13 +23,13 @@ export const runSendDiscordReport = async () => {
         // 1. Coleta de Dados (Macro)
         // ===================================
         const { data: census } = await supabase.from('view_macro_census').select('*').single();
-        const { data: parties } = await supabase.from('parties_planilhadas').select('id');
+        const { data: parties } = await supabase.from('parties_planilhadas').select('id').eq('date_str', todayStr);
         
-        let report = 📰 **RELATÓRIO DIÁRIO DE GUILDA** 📰\n\n;
+        let report = `📰 **RELATÓRIO DIÁRIO DE GUILDA** 📰\n\n`;
         
-        report += 📊 **CENSO MACRO:**\n;
-        report += - Membros Ativos Hoje: \n;
-        report += - Total de PTs Agendadas:  PTs\n\n;
+        report += `📊 **CENSO MACRO:**\n`;
+        report += `- Membros Ativos Hoje: ${census?.ativos_7_dias || 0}\n`;
+        report += `- Total de PTs Agendadas: ${parties?.length || 0} PTs\n\n`;
 
         // ===================================
         // 2. Coleta de Dados (Rushadores)
@@ -44,16 +44,16 @@ export const runSendDiscordReport = async () => {
             let top50Xp = 0;
             roster.forEach(r => top50Xp += (r.xp_gained_24h || 0));
             
-            report += 🔥 **TOP CARREGADORES:**\n;
-            report += - Top 50 Membros fizeram: +M XP\n\n;
+            report += `🔥 **TOP CARREGADORES:**\n`;
+            report += `- Top 50 Membros fizeram: +${(top50Xp / 1000000).toFixed(1)}M XP\n\n`;
             
-            report += ⭐ **Destaques do Dia (Top 3):**\n;
+            report += `⭐ **Destaques do Dia (Top 3):**\n`;
             roster.slice(0, 3).forEach((r, i) => {
                 if (r.xp_gained_24h > 0) {
-                    report +=   .  (+M XP)\n;
+                    report += `${i + 1}. ${r.name} (+${(r.xp_gained_24h / 1000000).toFixed(1)}M XP)\n`;
                 }
             });
-            report += \n;
+            report += `\n`;
         }
 
         // ===================================
@@ -67,14 +67,14 @@ export const runSendDiscordReport = async () => {
             .limit(3);
 
         if (dead && dead.length > 0) {
-            report += 💀 **MURO DAS LAMENTAÇÕES:**\n;
+            report += `☠️ **MURO DAS LAMENTAÇÕES:**\n`;
             dead.forEach(d => {
-                report += -  perdeu M XP\n;
+                report += `- ${d.name} perdeu ${(Math.abs(d.xp_gained_24h) / 1000000).toFixed(1)}M XP\n`;
             });
-            report += \n;
+            report += `\n`;
         }
 
-        report += ⚔️ *Bom jogo a todos! Organizem suas PTs e não deixem os respawns vazios!*;
+        report += `⚔️ *Bom jogo a todos! Organizem suas PTs e não deixem os respawns vazios!*`;
 
         // ===================================
         // Disparo para o Webhook

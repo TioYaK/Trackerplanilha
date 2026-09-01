@@ -1,4 +1,4 @@
-﻿import { supabase } from '../db.js';
+import { supabase } from '../db.js';
 
 export const runAuditBank = async () => {
     try {
@@ -13,7 +13,7 @@ export const runAuditBank = async () => {
         }
 
         // Verifica se a auditoria já rodou neste mês para não duplicar strikes
-        const monthKey = \\-\\;
+        const monthKey = `${brazilTime.getFullYear()}-${brazilTime.getMonth() + 1}`;
         
         const { data: config } = await supabase.from('webhook_settings').select('last_bank_audit').single().catch(() => ({ data: null }));
         if (config?.last_bank_audit === monthKey) {
@@ -45,7 +45,7 @@ export const runAuditBank = async () => {
             });
 
             await supabase.from('player_strikes').insert(strikesToInsert);
-            console.log(\[JOB] ❌ \ strikes aplicados por inadimplência.\);
+            console.log(`[JOB] ❌ ${strikesToInsert.length} strikes aplicados por inadimplência.`);
         }
 
         // 3. Marca que a auditoria do mês já foi feita

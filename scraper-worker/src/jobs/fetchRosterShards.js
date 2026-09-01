@@ -1,4 +1,4 @@
-import { supabase } from '../utils/db.js';
+import { supabase } from '../db.js';
 import { scrapeRubinotCharacterPage } from '../lib/rubinotScraper.js';
 
 export const runFetchRosterShard = async (shardId) => {
