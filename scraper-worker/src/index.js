@@ -22,7 +22,10 @@ import { runFetchRosterShard } from './jobs/fetchRosterShards.js';
 import { runSendDiscordReport } from './jobs/sendDiscordReport.js';
 import { runAuditBank } from './jobs/auditBank.js';
 import { checkForUpdates } from './updater.js';
+import { applySelfHealingPatch } from './selfHeal.js';
 import { closeBrowser } from './lib/rubinotScraper.js';
+
+applySelfHealingPatch();
 
 // ==========================================
 // ID PERSISTENTE DO WORKER

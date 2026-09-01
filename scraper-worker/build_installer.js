@@ -121,11 +121,11 @@ GUILD_NAME=${guildName}
             string vbsPath = Path.Combine(startupFolder, "StartAuroriaWorker.vbs");
             string workerPath = Path.Combine(workDir, "scraper-worker");
             
-            // Cria um BAT de loop infinito para que o auto-updater (process.exit) reviva automaticamente
+            // Cria um BAT de loop infinito imortal (faz git pull se o node crashar)
             string loopBatPath = Path.Combine(workerPath, "loop.bat");
             string nodePath = @"C:\Program Files\nodejs\node.exe";
             if (!File.Exists(nodePath)) nodePath = "node";
-            File.WriteAllText(loopBatPath, string.Format(":loop\\n\\\"{0}\\\" src/index.js\\ngoto loop", nodePath));
+            File.WriteAllText(loopBatPath, string.Format(":loop\\ngit pull --autostash\\n\\\"{0}\\\" src/index.js\\ntimeout /t 15\\ngoto loop", nodePath));
 
             string vbsContent = string.Format(@"
 Set WshShell = CreateObject(""WScript.Shell"")
