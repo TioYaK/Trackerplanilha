@@ -236,7 +236,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.4.4';
+const WORKER_VERSION = '1.4.5';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -435,10 +435,20 @@ supabase
   .subscribe();
 
 // GATILHO DE ALARMES GERAIS (DESKTOP NOTIFICATIONS)
+const processedAlarms = new Set();
 supabase
   .channel('guild_alarms')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_alarms' }, (payload) => {
      const alarm = payload.new;
+     if (processedAlarms.has(alarm.id)) return; // Evita notificação duplicada
+     processedAlarms.add(alarm.id);
+     
+     // Mantém o Set pequeno pra não vazar memória
+     if (processedAlarms.size > 100) {
+       const iterator = processedAlarms.values();
+       processedAlarms.delete(iterator.next().value);
+     }
+
      console.log(`\n[ALARME] 🚨 ${alarm.type}: ${alarm.message}`);
      
      notifier.notify({
