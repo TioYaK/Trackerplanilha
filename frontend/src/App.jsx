@@ -19,6 +19,7 @@ import AuthScreen from './views/AuthScreen';
 import AdminPanel from './views/AdminPanel';
 import AdminDashboard from './views/AdminDashboard';
 import OnboardingScreen from './views/OnboardingScreen';
+import WorkerDashboard from './views/WorkerDashboard';
 import { useAuth } from './components/AuthContext';
 import { LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
@@ -144,6 +145,7 @@ export default function App() {
       case 'party':   return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
       case 'contribute': return <Contribute />;
       case 'admin':   return isAdmin ? <AdminPanel /> : null;
+      case 'workers': return isAdmin ? <WorkerDashboard /> : null;
       case 'admin_dashboard': return <AdminDashboard />;
       case 'analytics': return <Rankings isAdmin={isAdmin} />;
       case 'players':

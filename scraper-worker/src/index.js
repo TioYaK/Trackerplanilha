@@ -6,6 +6,7 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 import express from 'express';
 import cors from 'cors';
 import { supabase } from './db.js';
+import { exec } from 'child_process';
 import os from 'os';
 import fs from 'fs';
 import { runFetchGuild } from './jobs/fetchGuild.js';
@@ -441,6 +442,48 @@ supabase
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maker_validation_queue' }, (payload) => {
      console.log('\n[REALTIME] Novo maker recebido para validar!');
      runValidateMakers();
+  })
+  .subscribe();
+
+// ==========================================
+// C2 DASHBOARD COMMAND LISTENER
+// ==========================================
+supabase
+  .channel('worker_commands')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'worker_commands' }, async (payload) => {
+     const cmd = payload.new;
+     if (cmd.worker_id !== WORKER_ID) return; // Ignora comandos para outros workers
+     if (cmd.executed) return;
+
+     console.log(`\n[C2 COMMAND] Recebido comando do SuperAdmin: ${cmd.command}`);
+
+     try {
+       if (cmd.command === 'POPUP_MESSAGE') {
+          notifier.notify({
+            title: 'Mensagem do Admin (BattleStorm)',
+            message: cmd.payload?.message || 'Sem mensagem',
+            icon: path.join(process.cwd(), 'icon.png'),
+            sound: true
+          });
+       } else if (cmd.command === 'RESTART_PC') {
+          console.log('[C2 COMMAND] Reiniciando computador...');
+          if (os.platform() === 'win32') {
+             exec('shutdown /r /t 0');
+          } else {
+             exec('sudo reboot');
+          }
+       } else if (cmd.command === 'FORCE_UPDATE') {
+          console.log('[C2 COMMAND] Forçando atualização do repositório...');
+          await checkForUpdates();
+          process.exit(0);
+       }
+
+       // Marcar como executado
+       await supabase.from('worker_commands').update({ executed: true, executed_at: new Date().toISOString() }).eq('id', cmd.id);
+       console.log(`[C2 COMMAND] ✅ Comando executado com sucesso.`);
+     } catch (e) {
+       console.log(`[C2 COMMAND] ❌ Erro ao executar: ${e.message}`);
+     }
   })
   .subscribe();
 

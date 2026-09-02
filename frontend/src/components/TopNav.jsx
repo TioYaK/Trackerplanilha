@@ -36,42 +36,37 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
 
   // Mapeamento original de views e ícones para facilitar o uso no menu
   const viewsData = {
-    live: { label: 'Monitoramento ao Vivo', icon: <Activity size={16} /> },
-    radar: { label: 'Radar da Guilda', icon: <Crosshair size={16} /> },
-    roster: { label: 'Exército da Guilda', icon: <Users size={16} /> },
-    planilha: { label: 'Painel de Agendamento', icon: <CalendarDays size={16} /> },
-    contribute: { label: 'Ajude a Guilda', icon: <Swords size={16} /> },
-    bank: { label: 'Guild Bank', icon: <Landmark size={16} /> },
-    market: { label: 'Mercado Interno', icon: <ShoppingBag size={16} /> },
-    tracker: { label: 'Censo Macro', icon: <LayoutDashboard size={16} /> },
-    extreme: { label: 'Eventos Global', icon: <BrainCircuit size={16} /> },
+    live: { label: 'Visão Geral (Ao Vivo)', icon: <Activity size={16} /> },
+    roster: { label: 'Membros da Guilda', icon: <Users size={16} /> },
+    radar: { label: 'Radar de Inimigos (Hunted)', icon: <ShieldAlert size={16} /> },
+    tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
+    planilha: { label: 'Controle de Hunts & PTs', icon: <FileSpreadsheet size={16} /> },
+    bank: { label: 'Tesouraria da Guilda', icon: <Landmark size={16} /> },
+    market: { label: 'Mercado Interno (Trocas)', icon: <Store size={16} /> },
+    extreme: { label: 'Análise de Jogadores', icon: <Crosshair size={16} /> },
     analytics: { label: 'Rankings & Tribunal', icon: <TrendingDown size={16} /> },
     attendance: { label: 'Atividade Diária', icon: <CalendarDays size={16} /> },
     bazaar: { label: 'Char Bazaar Sniper', icon: <Target size={16} /> },
     admin: { label: 'Painel Admin', icon: <Lock size={16} /> },
+    workers: { label: 'Comando & Controle (C2)', icon: <Server size={16} /> },
   };
 
   // Agrupamento para os Dropdowns
   let menuGroups = [
     {
-      title: 'Combate & Radar',
-      icon: <Crosshair size={18} />,
-      items: ['live', 'radar']
+      title: 'Operações e Radar',
+      icon: <Activity size={18} />,
+      items: ['live', 'radar', 'bazaar', 'extreme']
     },
     {
-      title: 'Recursos Humanos',
+      title: 'Gestão da Guilda',
       icon: <Users size={18} />,
-      items: ['roster', 'planilha', 'attendance', 'contribute']
+      items: ['roster', 'attendance', 'analytics', 'tracker']
     },
     {
-      title: 'Economia',
+      title: 'Economia e Hunts',
       icon: <Landmark size={18} />,
-      items: ['bank', 'market', 'bazaar']
-    },
-    {
-      title: 'Inteligência',
-      icon: <BrainCircuit size={18} />,
-      items: ['tracker', 'extreme', 'analytics']
+      items: ['bank', 'market', 'planilha']
     }
   ];
 
@@ -88,7 +83,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     menuGroups.push({
       title: 'Administração',
       icon: <Lock size={18} />,
-      items: ['admin']
+      items: ['admin', 'workers']
     });
   }
 
