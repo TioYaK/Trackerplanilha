@@ -236,7 +236,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.4.8';
+const WORKER_VERSION = '1.4.9';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -464,6 +464,23 @@ supabase
 
      // 2. Notificação Web Push (Navegadores/Celulares da Guilda)
      try {
+       // --- ELEIÇÃO DE LÍDER ---
+       // Apenas 1 worker deve disparar o Web Push para não floodar os celulares!
+       const cutoffLimit = new Date(Date.now() - 12 * 60 * 1000).toISOString();
+       const { data: onlineWorkers } = await supabase
+         .from('worker_heartbeats')
+         .select('worker_id')
+         .gte('last_ping', cutoffLimit)
+         .order('started_at', { ascending: true })
+         .order('worker_id', { ascending: true })
+         .limit(1);
+         
+       const isLeader = onlineWorkers && onlineWorkers.length > 0 && onlineWorkers[0].worker_id === WORKER_ID;
+       if (!isLeader) {
+         console.log(`[WEB PUSH] Outro worker assumiu a liderança do disparo. Silenciando...`);
+         return;
+       }
+
        // Puxa as chaves VAPID
        const { data: config } = await supabase.from('worker_config').select('vapid_public_key, vapid_private_key').eq('id', 1).single();
        if (!config || !config.vapid_public_key || !config.vapid_private_key) return;
