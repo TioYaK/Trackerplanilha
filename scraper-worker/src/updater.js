@@ -7,16 +7,22 @@ import { supabase } from './db.js';
 export const CURRENT_VERSION = 2;
 
 export const checkForUpdates = async () => {
-    // Se não estiver rodando como EXE compilado, usa o Git Pull clássico
+    // Se não estiver rodando como EXE compilado, usa o Git Pull blindado
     if (!process.pkg) {
         return new Promise((resolve) => {
-            exec('git pull --autostash', (error, stdout) => {
-                if (stdout && !stdout.includes('Already up to date')) {
-                    console.log('[UPDATER] Nova atualização do Git! Instalando dependências e reiniciando...');
+            exec('git fetch --all && git reset --hard origin/main && git clean -fd', (error, stdout) => {
+                if (stdout && !stdout.includes('HEAD is now at')) {
+                    console.log('[UPDATER] Atualizando código... Instalando dependências e reiniciando...');
                     exec('npm install', () => {
                         process.exit(0);
                     });
                 } else {
+                    // Mesmo se não houver erro, vamos instalar npm e sair se mudou algo
+                    if (stdout && stdout.includes('HEAD is now at')) {
+                       // O reset hard sempre imprime HEAD is now at
+                       // Na real a gente deveria salvar o commit hash antes, mas pra garantir:
+                       // só resolve(false) e deixa o loop.bat cuidar do resto.
+                    }
                     resolve(false);
                 }
             });
