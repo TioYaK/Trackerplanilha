@@ -325,7 +325,7 @@ export default function AdminPanel({ currentVisibleTabs }) {
                           value={u.role}
                           onChange={(e) => updateUserRole(u.id, e.target.value)}
                           className="bg-black border border-tibia-border text-gray-300 rounded p-1 text-xs outline-none focus:border-tibia-primary"
-                          disabled={!isSuperAdmin && u.role === 'super_admin'}
+                          disabled={!isSuperAdmin}
                         >
                           <option value="user">Membro</option>
                           <option value="admin">Administrador</option>
