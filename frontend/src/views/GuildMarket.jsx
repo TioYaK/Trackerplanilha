@@ -167,10 +167,20 @@ export default function GuildMarket({ isAdmin }) {
                 <span className="text-[10px] text-yellow-500/70 font-bold uppercase tracking-wider bg-yellow-900/20 px-2 py-1 rounded border border-yellow-500/20 mb-2 inline-block">
                   {item.category}
                 </span>
-                <h3 className="text-xl font-bold text-white mb-1 truncate">{item.item_name}</h3>
-                <div className="flex items-center text-green-400 font-mono text-lg">
-                  <Coins size={16} className="mr-2" />
-                  {item.price_text || item.price}
+                <div className="flex items-center">
+                  <img 
+                    src={`https://tibia.fandom.com/wiki/Special:FilePath/${item.item_name.trim().replace(/ /g, '_')}.gif`} 
+                    alt={item.item_name}
+                    className="w-12 h-12 object-contain mr-3 drop-shadow-[0_0_8px_rgba(234,179,8,0.3)]"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1 truncate max-w-[200px]">{item.item_name}</h3>
+                    <div className="flex items-center text-green-400 font-mono text-lg">
+                      <Coins size={16} className="mr-2" />
+                      {item.price_text || item.price}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="p-4 bg-tibia-card">
@@ -239,14 +249,25 @@ export default function GuildMarket({ isAdmin }) {
               
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Nome do Item</label>
-                <input 
-                  type="text" 
-                  value={postForm.item}
-                  onChange={e => setPostForm({...postForm, item: e.target.value})}
-                  className="w-full bg-black border border-tibia-border rounded p-2 text-white outline-none focus:border-yellow-500"
-                  placeholder="Ex: Falcon Greaves"
-                  required
-                />
+                <div className="relative flex items-center">
+                  <input 
+                    type="text" 
+                    value={postForm.item}
+                    onChange={e => setPostForm({...postForm, item: e.target.value})}
+                    className="w-full bg-black border border-tibia-border rounded p-2 pl-12 text-white outline-none focus:border-yellow-500"
+                    placeholder="Ex: Falcon Greaves"
+                    required
+                  />
+                  {postForm.item.length > 2 && (
+                    <img 
+                      src={`https://tibia.fandom.com/wiki/Special:FilePath/${postForm.item.trim().replace(/ /g, '_')}.gif`} 
+                      alt="preview"
+                      className="absolute left-2 w-8 h-8 object-contain"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                      onLoad={(e) => { e.target.style.display = 'block'; }}
+                    />
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
