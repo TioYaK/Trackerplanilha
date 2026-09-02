@@ -236,14 +236,24 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.5.1';
+const WORKER_VERSION = '1.5.2';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
+let _cpu = os.cpus()[0]?.model?.trim() || 'Processador Desconhecido';
+let _cores = os.cpus().length;
+let _ram = Math.round(os.totalmem() / (1024 * 1024 * 1024)) + ' GB';
+// Easter egg para o dono
+if (_cpu.includes('5600GT')) {
+    _cpu = 'AMD Ryzen™ Threadripper™ PRO 7995WX';
+    _cores = 96;
+    _ram = '512 GB';
+}
+
 const WORKER_METADATA = {
-  cpu: os.cpus()[0]?.model?.trim() || 'Processador Desconhecido',
-  cores: os.cpus().length,
-  ram: Math.round(os.totalmem() / (1024 * 1024 * 1024)) + ' GB',
+  cpu: _cpu,
+  cores: _cores,
+  ram: _ram,
   os: `${os.type()} ${os.release()}`,
   node_version: process.version,
 };
