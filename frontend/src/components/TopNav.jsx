@@ -48,6 +48,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     analytics: { label: 'Rankings & Tribunal', icon: <TrendingDown size={16} /> },
     attendance: { label: 'Atividade Diária', icon: <CalendarDays size={16} /> },
     bazaar: { label: 'Char Bazaar Sniper', icon: <Target size={16} /> },
+    contribute: { label: 'Ajude a Guilda', icon: <Swords size={16} /> },
     admin: { label: 'Painel Admin', icon: <Lock size={16} /> },
     workers: { label: 'Comando & Controle (C2)', icon: <Server size={16} /> },
   };
@@ -62,7 +63,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     {
       title: 'Gestão da Guilda',
       icon: <Users size={18} />,
-      items: ['roster', 'attendance', 'analytics', 'tracker']
+      items: ['roster', 'attendance', 'analytics', 'tracker', 'contribute']
     },
     {
       title: 'Economia e Hunts',

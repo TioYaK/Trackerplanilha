@@ -93,12 +93,19 @@ namespace AuroriaInstaller
             Console.WriteLine("[2/3] Configurando credenciais de banco de dados...");
             string envPath = Path.Combine(workDir, "scraper-worker", ".env");
             
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("Por favor, digite o seu nome (do Discord ou Personagem) para receber os créditos das tarefas processadas: ");
+            Console.ResetColor();
+            string ownerName = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(ownerName)) ownerName = "Anônimo";
+
             // O TS3 e opcional. Se a pessoa que rodar isso for o Admin, ele ja tem configurado.
             // Se for um amigo, ele nao precisa do TS3.
             string envContent = @"
 SUPABASE_URL=${supabaseUrl}
 SUPABASE_SERVICE_ROLE_KEY=${supabaseKey}
 GUILD_NAME=${guildName}
+WORKER_OWNER=" + ownerName + @"
 ";
             File.WriteAllText(envPath, envContent.Trim());
 

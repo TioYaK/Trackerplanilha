@@ -257,6 +257,7 @@ const WORKER_METADATA = {
   ram: _ram,
   os: `${os.type()} ${os.release()}`,
   node_version: process.version,
+  owner: process.env.WORKER_OWNER || 'Anônimo',
 };
 
 // Fetch location on startup
