@@ -58,7 +58,7 @@ const fetchTask = async () => {
     const crashLimit = new Date();
     crashLimit.setMinutes(crashLimit.getMinutes() - LOCK_TIMEOUT_MINUTES);
 
-    const orQuery = `and(status.eq.PENDING,or(locked_at.is.null,locked_at.lte.${now})),and(status.eq.IN_PROGRESS,locked_at.lte.${crashLimit.toISOString()})`;
+    const orQuery = `and(status.eq.PENDING,or(locked_at.is.null,locked_at.lte.${new Date().toISOString()})),and(status.eq.IN_PROGRESS,locked_at.lte.${crashLimit.toISOString()})`;
 
     const { data: tasks, error } = await supabase
       .from('task_queue')
@@ -236,7 +236,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.4.9';
+const WORKER_VERSION = '1.5.0';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
