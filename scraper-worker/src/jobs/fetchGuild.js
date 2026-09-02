@@ -1,5 +1,5 @@
 import { supabase } from '../db.js';
-import { scrapeGuild } from '../lib/rubinotScraper.js';
+import { fetchRubinotApi } from '../lib/rubinotScraper.js';
 import 'dotenv/config';
 
 export const runFetchGuild = async () => {
@@ -7,12 +7,14 @@ export const runFetchGuild = async () => {
   console.log(`[JOB] Buscando dados da guilda: ${guildName}`);
 
   try {
-    const members = await scrapeGuild(guildName, 200);
-
-    if (!members || members.length === 0) {
-      console.log(`[JOB] Nenhum membro encontrado (Cloudflare bloqueou ou guilda vazia).`);
+    const res = await fetchRubinotApi(`/api/guilds/${guildName}`);
+    
+    if (!res || !res.guild || !res.guild.members || res.guild.members.length === 0) {
+      console.log(`[JOB] Nenhum membro encontrado ou guilda vazia.`);
       return;
     }
+    
+    const members = res.guild.members;
 
     // Remove duplicatas pelo nome
     const uniqueMembersMap = new Map();
@@ -22,7 +24,7 @@ export const runFetchGuild = async () => {
         vocation: m.vocation,
         level: m.level,
         rank: m.rank || null,          // FIX: campo rank agora é incluído no upsert
-        is_online: m.status === 'Online',
+        is_online: m.isOnline || false,
       });
     });
 
