@@ -39,7 +39,11 @@ export const runFetchBazaar = async () => {
           current_bid: auc.currentValue,
           auction_end: new Date(auc.auctionEnd * 1000).toISOString(),
           is_hunted: isHunted,
-          is_sniping_opportunity: isSnipingOp
+          is_sniping_opportunity: isSnipingOp,
+          skills_data: auc.skills || {},
+          items_data: auc.highlightItems || [],
+          mag_level: auc.magLevel || 0,
+          charm_points: auc.charmPoints || 0
         });
       }
     }

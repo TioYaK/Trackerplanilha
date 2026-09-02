@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Target, AlertTriangle, Clock, TrendingDown, Coins, Search, ExternalLink } from 'lucide-react';
+import { Target, AlertTriangle, Clock, TrendingDown, Coins, Search, ExternalLink, Star, Shield, Sword, Wand2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -113,7 +113,7 @@ export default function BazaarSniper() {
                 </div>
 
                 <div className="flex items-center space-x-4 mb-4 mt-2">
-                  <div className="w-14 h-14 bg-black/60 border border-tibia-border rounded-full flex items-center justify-center">
+                  <div className="w-14 h-14 bg-black/60 border border-tibia-border rounded-full flex items-center justify-center relative">
                     <img 
                       src={`https://ui-avatars.com/api/?name=${encodeURIComponent(auction.character_name)}&background=111&color=eab308`} 
                       alt={auction.vocation} 
@@ -128,17 +128,50 @@ export default function BazaarSniper() {
                   </div>
                 </div>
 
-                <div className="space-y-3 mb-4">
-                  <div className="bg-black/40 p-3 rounded flex justify-between items-center border border-white/5">
+                <div className="flex justify-between items-center bg-black/40 p-2 rounded border border-white/5 mb-3 text-sm">
+                  <div className="flex items-center text-blue-400" title="Main Skill">
+                    {(auction.vocation?.includes('Sorcerer') || auction.vocation?.includes('Druid')) ? (
+                      <><Wand2 size={14} className="mr-1" /> {auction.mag_level || '?'}</>
+                    ) : auction.vocation?.includes('Paladin') ? (
+                      <><Target size={14} className="mr-1" /> {auction.skills_data?.dist || '?'}</>
+                    ) : (
+                      <><Sword size={14} className="mr-1" /> {Math.max(auction.skills_data?.sword||0, auction.skills_data?.axe||0, auction.skills_data?.club||0) || '?'}</>
+                    )}
+                  </div>
+                  <div className="flex items-center text-gray-400" title="Shielding">
+                    <Shield size={14} className="mr-1" /> {auction.skills_data?.shielding || '?'}
+                  </div>
+                  <div className="flex items-center text-purple-400" title="Charm Points">
+                    <Star size={14} className="mr-1" /> {auction.charm_points || 0}
+                  </div>
+                </div>
+
+                {auction.items_data && auction.items_data.length > 0 && (
+                  <div className="flex gap-2 mb-4 bg-black/30 p-2 rounded border border-white/5 overflow-x-auto">
+                    {auction.items_data.slice(0, 5).map(item => (
+                      <img 
+                        key={item.name} 
+                        src={`https://tibia.fandom.com/wiki/Special:FilePath/${item.name.trim().replace(/ /g, '_')}.gif`} 
+                        alt={item.name} 
+                        title={item.name} 
+                        className="w-8 h-8 object-contain drop-shadow-md"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-2 mb-4">
+                  <div className="bg-black/40 p-2 rounded flex justify-between items-center border border-white/5">
                     <span className="text-gray-400 text-sm">Lance Atual:</span>
                     <span className="font-bold text-yellow-400 flex items-center text-lg">
                       {auction.current_bid} <Coins size={14} className="ml-1" />
                     </span>
                   </div>
                   
-                  <div className="bg-black/40 p-3 rounded flex justify-between items-center border border-white/5">
+                  <div className="bg-black/40 p-2 rounded flex justify-between items-center border border-white/5">
                     <span className="text-gray-400 text-sm">Termina:</span>
-                    <span className="font-bold text-blue-400 flex items-center">
+                    <span className="font-bold text-blue-400 flex items-center text-sm">
                       <Clock size={14} className="mr-1" /> {endsIn}
                     </span>
                   </div>
