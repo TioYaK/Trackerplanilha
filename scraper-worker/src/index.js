@@ -101,27 +101,27 @@ const fetchTask = async () => {
 };
 
 const completeTask = async (task) => {
-  // Cooldown por tipo de tarefa
+  // Cooldown em SEGUNDOS por tipo de tarefa
   const cooldowns = {
-    FETCH_GUILD: 5,
-    FETCH_ROSTER_SHARD: 15,
-    FETCH_RIVALS: 3,
-    FETCH_ONLINES: 2,
-    AUDIT_SLOTS: 10,
-    FETCH_DEATHS: 2,
-    FETCH_KILLSTATS: 15,
-    FETCH_TRANSFERS: 60,
-    FETCH_BAZAAR: 10,
-    CLOSE_SESSIONS: 30,
+    FETCH_ONLINES: 30,     // 30s
+    FETCH_DEATHS: 30,      // 30s
+    FETCH_RIVALS: 60,      // 1m
+    FETCH_GUILD: 3600,     // 1h
+    FETCH_BAZAAR: 3600,    // 1h
+    FETCH_ROSTER_SHARD: 900, // 15m
+    AUDIT_SLOTS: 600,      // 10m
+    FETCH_KILLSTATS: 900,  // 15m
+    FETCH_TRANSFERS: 3600, // 60m
+    CLOSE_SESSIONS: 1800,  // 30m
   };
 
-  let cooldownMinutes = cooldowns[task.task_type] ?? 1;
-  if (task.task_type.startsWith('FETCH_HIGHSCORE')) cooldownMinutes = 10;
+  let cooldownSeconds = cooldowns[task.task_type] ?? 60;
+  if (task.task_type.startsWith('FETCH_HIGHSCORE')) cooldownSeconds = 600; // 10m
 
   const nextRun = new Date();
-  nextRun.setMinutes(nextRun.getMinutes() + cooldownMinutes);
+  nextRun.setSeconds(nextRun.getSeconds() + cooldownSeconds);
 
-  console.log(`[WORKER] ✔ ${task.task_type} concluída. Próxima execução em ${cooldownMinutes}min.`);
+  console.log(`[WORKER] ✔ ${task.task_type} concluída. Próxima execução em ${cooldownSeconds}s.`);
 
   await supabase
     .from('task_queue')
