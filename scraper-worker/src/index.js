@@ -355,11 +355,11 @@ const sendHeartbeat = async () => {
   }
 };
 
-// Primeiro heartbeat após 1 minuto, depois a cada 10 minutos
+// Primeiro heartbeat imediato, depois a cada 1 minuto
 setTimeout(() => {
   sendHeartbeat();
-  setInterval(sendHeartbeat, 10 * 60 * 1000);
-}, 60 * 1000);
+  setInterval(sendHeartbeat, 60 * 1000);
+}, 5000);
 
 // Iniciar Loop
 loop();
