@@ -64,7 +64,7 @@ export default function GuildMarket({ isAdmin }) {
     const { error } = await supabase.from('guild_market').insert([{
       seller_name: postForm.seller,
       item_name: postForm.item,
-      price: postForm.price,
+      price_text: postForm.price,
       category: postForm.category,
       status: 'Active'
     }]);
@@ -170,7 +170,7 @@ export default function GuildMarket({ isAdmin }) {
                 <h3 className="text-xl font-bold text-white mb-1 truncate">{item.item_name}</h3>
                 <div className="flex items-center text-green-400 font-mono text-lg">
                   <Coins size={16} className="mr-2" />
-                  {item.price}
+                  {item.price_text || item.price}
                 </div>
               </div>
               <div className="p-4 bg-tibia-card">
