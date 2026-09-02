@@ -346,7 +346,7 @@ async function scrapeRubinotCharacterPage(characterName) {
         await blockHeavyAssets(tempPage);
         await tempPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-        const url = `https://rubinot-eve.otservices.space/characters/${encodeURIComponent(characterName)}`;
+        const url = `https://rubinot.com.br/characters/${encodeURIComponent(characterName)}`;
         await tempPage.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
         await new Promise(resolve => setTimeout(resolve, 1200));
 
