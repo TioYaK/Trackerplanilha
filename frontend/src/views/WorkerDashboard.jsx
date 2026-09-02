@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Server, Activity, HardDrive, Cpu, Terminal, RefreshCw, PowerOff, MessageSquare, Clock, ShieldAlert } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -33,7 +33,7 @@ export default function WorkerDashboard() {
   };
 
   const sendCommand = async (workerId, command, payload = {}) => {
-    if (!window.confirm(Tem certeza que deseja enviar o comando " + "" + " para este Worker?)) return;
+    if (!window.confirm(`Tem certeza que deseja enviar o comando ${command} para este Worker?`)) return;
     
     setSendingCmd(workerId);
     try {
@@ -42,7 +42,7 @@ export default function WorkerDashboard() {
         command: command,
         payload: payload
       });
-      alert(Comando " + "" + " enviado com sucesso! O Worker deve executar em instantes se estiver online.);
+      alert(`Comando ${command} enviado com sucesso! O Worker deve executar em instantes se estiver online.`);
     } catch (e) {
       alert('Erro ao enviar comando: ' + e.message);
     } finally {
@@ -80,16 +80,16 @@ export default function WorkerDashboard() {
         {workers.map(w => {
           const isOnline = new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000;
           return (
-            <div key={w.worker_id} className={"bg-tibia-card border  p-6 rounded-lg shadow-xl"}>
+            <div key={w.worker_id} className={`bg-tibia-card border ${isOnline ? 'border-green-900/50' : 'border-red-900/50'} p-6 rounded-lg shadow-xl`}>
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center">
-                  <Server size={24} className={"mr-3 "} />
+                  <Server size={24} className={`mr-3 ${isOnline ? 'text-green-400' : 'text-red-400'}`} />
                   <div>
                     <h3 className="text-xl font-bold text-white">{w.worker_id}</h3>
                     <p className="text-sm text-gray-400 flex items-center mt-1">
                       <Activity size={14} className="mr-1" />
                       Status: 
-                      <span className={"ml-1 font-bold "}>
+                      <span className={`ml-1 font-bold ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
                         {isOnline ? 'ONLINE' : 'OFFLINE'}
                       </span>
                     </p>
@@ -131,7 +131,7 @@ export default function WorkerDashboard() {
                   onClick={() => sendCommand(w.worker_id, 'FORCE_UPDATE')}
                   className="flex items-center px-4 py-2 bg-blue-900/40 hover:bg-blue-900/60 text-blue-400 border border-blue-900/50 rounded transition-colors text-sm font-bold"
                 >
-                  <RefreshCw size={16} className={"mr-2 "} />
+                  <RefreshCw size={16} className={`mr-2 ${sendingCmd === w.worker_id ? 'animate-spin' : ''}`} />
                   Forçar Update
                 </button>
                 <button 
