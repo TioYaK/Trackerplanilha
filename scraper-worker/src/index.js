@@ -214,11 +214,11 @@ const processTask = async (task) => {
     console.error(`[WORKER] ❌ Falha na tarefa ${task.task_type}:`, error.message);
 
     if (error.message === 'CRITICAL_TIMEOUT' || error.message.includes('Cloudflare')) {
-      console.warn('[WORKER] ⏰ Timeout crítico/Cloudflare! Pausando ESTE WORKER por 24 horas para evitar ban de IP...');
+      console.warn('[WORKER] ⏰ Timeout crítico/Cloudflare! Pausando ESTE WORKER por 1 hora para evitar ban de IP...');
       try { await closeBrowser(); } catch (e) { /* ignore */ }
       
-      // Bane o worker localmente por 24 horas
-      localBanUntil = Date.now() + 24 * 60 * 60 * 1000;
+      // Bane o worker localmente por 1 hora
+      localBanUntil = Date.now() + 1 * 60 * 60 * 1000;
       
       // Devolve a task para a fila imediatamente para que OUTRO worker assuma
       await supabase
