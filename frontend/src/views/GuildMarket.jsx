@@ -198,7 +198,7 @@ export default function GuildMarket({ isAdmin }) {
                   </button>
                 ) : (
                   <div className="w-full text-center py-2 text-xs text-gray-500 bg-black/30 rounded border border-white/5">
-                    Mande PM para {item.seller_name} in-game!
+                    Mande PM para {item.seller_name} in-game ou procure no TS!
                   </div>
                 )}
               </div>
