@@ -734,13 +734,19 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20, vocation = 
 
                 let clicked = false;
                 try {
+                    await page.waitForSelector('.lucide-chevron-right', { timeout: 10000 }).catch(() => {});
                     clicked = await page.evaluate(() => {
-                        const buttons = Array.from(document.querySelectorAll('button, a'));
-                        const nextBtn = buttons.find(b => b.title === 'Próxima Página' || b.innerHTML.includes('chevron-right'));
-                        
-                        if (nextBtn && !nextBtn.disabled) { 
-                            nextBtn.click(); 
-                            return true; 
+                        const svgs = Array.from(document.querySelectorAll('svg.lucide-chevron-right'));
+                        // Filter svgs that are inside a button with title Próxima Página or similar
+                        for (const svg of svgs) {
+                            const btn = svg.closest('button');
+                            if (btn && !btn.disabled && (btn.title === 'Próxima Página' || btn.title.includes('P') && btn.title.includes('gina') || btn.innerHTML.includes('chevron-right'))) {
+                                // Double check it's actually the pagination button (it has a specific class or we just trust it)
+                                // Actually, any button with chevron-right that isn't disabled should be the pagination one,
+                                // because the others are dropdowns with chevron-down, or links.
+                                btn.click();
+                                return true;
+                            }
                         }
                         return false;
                     });
@@ -772,7 +778,7 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20, vocation = 
                             // timeout
                         }
                     }
-                    await new Promise(r => setTimeout(r, 1500)); // PAUSA ANTI-CLOUDFLARE
+                    await new Promise(r => setTimeout(r, 4000)); // PAUSA ANTI-CLOUDFLARE
                     pageNum++;
                 } else {
                     keepGoing = false;

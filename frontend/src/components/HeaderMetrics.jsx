@@ -7,10 +7,9 @@ export default function HeaderMetrics({ parties = [] }) {
 
   useEffect(() => {
     const fetchMetrics = async () => {
-      const { data, error } = await supabase.from('view_macro_census').select('*').single();
-      if (!error && data) {
-        setMetrics(data);
-      }
+      const { count: total_members } = await supabase.from('guild_members').select('*', { count: 'exact', head: true });
+      const { count: active_members } = await supabase.from('guild_members').select('*', { count: 'exact', head: true }).eq('is_active_7d', true);
+      setMetrics({ total_members: total_members || 0, active_members: active_members || 0 });
     };
     fetchMetrics();
   }, []);
