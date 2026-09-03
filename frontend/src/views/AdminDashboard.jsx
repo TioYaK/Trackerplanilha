@@ -277,7 +277,7 @@ export default function AdminDashboard() {
                     <button 
                       onClick={async () => {
                         try {
-                           await supabase.from('task_queue').update({ status: 'PENDING', locked_at: new Date(Date.now() - 3600000).toISOString() }).like('task_type', 'FETCH_HIGHSCORE%');
+                           await supabase.from('task_queue').update({ status: 'PENDING', locked_at: new Date(Date.now() - 3600000).toISOString() }).in('task_type', ['FETCH_HIGHSCORE_KNIGHT', 'FETCH_HIGHSCORE_PALADIN', 'FETCH_HIGHSCORE_DRUID', 'FETCH_HIGHSCORE_SORCERER', 'FETCH_HIGHSCORE_MONK']);
                            alert('Ordem de Highscores enviada!');
                         } catch (e) { alert('Erro'); }
                       }}
