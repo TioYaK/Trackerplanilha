@@ -25,6 +25,8 @@ scraper-worker/*.html
 scraper-worker/dist/
 scraper-worker/pkg_build/
 *.exe
+# Excecao: o instalador publicado na Vercel deve ser versionado
+!frontend/public/*.exe
 
 # Worker runtime
 scraper-worker/worker_id.txt
