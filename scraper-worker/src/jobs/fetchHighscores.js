@@ -35,6 +35,19 @@ export const runFetchHighscores = async (vocationStr) => {
       allGuildMembers.push(...huntedData);
     }
 
+    // Buscamos membros de parties_planilhadas
+    const { data: partyData } = await supabase.from('parties_planilhadas').select('members, leader_name');
+    if (partyData) {
+      partyData.forEach(p => {
+        if (p.leader_name) allGuildMembers.push({ name: p.leader_name });
+        if (Array.isArray(p.members)) {
+          p.members.forEach(m => {
+            if (m) allGuildMembers.push({ name: m });
+          });
+        }
+      });
+    }
+
     const memberNames = new Set(allGuildMembers.map(m => m.name.toLowerCase()));
     const relevantPlayers = players.filter(p => memberNames.has(p.name.toLowerCase()));
     

@@ -28,6 +28,50 @@ export const runFetchGuild = async () => {
       });
     });
 
+    // Adiciona membros de parties_planilhadas e hunted_list para garantir que NUNCA sejam purgados
+    const { data: activeParties } = await supabase.from('parties_planilhadas').select('members, leader_name');
+    if (activeParties) {
+      activeParties.forEach(p => {
+        if (p.leader_name && !uniqueMembersMap.has(p.leader_name)) {
+          uniqueMembersMap.set(p.leader_name, {
+            name: p.leader_name,
+            vocation: null,
+            level: null,
+            rank: 'Leader',
+            is_online: false
+          });
+        }
+        if (Array.isArray(p.members)) {
+          p.members.forEach(m => {
+            if (m && !uniqueMembersMap.has(m)) {
+              uniqueMembersMap.set(m, {
+                name: m,
+                vocation: null,
+                level: null,
+                rank: 'Member',
+                is_online: false
+              });
+            }
+          });
+        }
+      });
+    }
+
+    const { data: huntedList } = await supabase.from('hunted_list').select('name');
+    if (huntedList) {
+      huntedList.forEach(h => {
+        if (h.name && !uniqueMembersMap.has(h.name)) {
+          uniqueMembersMap.set(h.name, {
+            name: h.name,
+            vocation: null,
+            level: null,
+            rank: 'Hunted',
+            is_online: false
+          });
+        }
+      });
+    }
+
     const upsertData = Array.from(uniqueMembersMap.values());
 
     // Upsert em chunks para não exceder o payload limit
@@ -45,9 +89,9 @@ export const runFetchGuild = async () => {
       }
     }
 
-    console.log(`[JOB] ✅ ${insertedCount} membros processados (rank incluído).`);
+    console.log(`[JOB] ✅ ${insertedCount} membros processados (incluindo PTs e Hunteds).`);
 
-    // --- PURGE: Remove membros que saíram da guilda ---
+    // --- PURGE: Remove apenas membros que realmente saíram da guilda ---
     try {
       const activeNames = Array.from(uniqueMembersMap.keys());
       let allDbNames = [];
@@ -62,8 +106,8 @@ export const runFetchGuild = async () => {
         page++;
       }
 
-      const activeNamesSet = new Set(activeNames);
-      const leftGuildNames = allDbNames.filter(name => !activeNamesSet.has(name));
+      const activeNamesSet = new Set(activeNames.map(n => n.toLowerCase()));
+      const leftGuildNames = allDbNames.filter(name => !activeNamesSet.has(name.toLowerCase()));
 
       if (leftGuildNames.length > 0) {
         console.log(`[JOB] 🧹 Limpando ${leftGuildNames.length} membros que saíram da guilda...`);
