@@ -50,6 +50,7 @@ export default function RadarHunters({ isAdmin }) {
                   }
                 });
               }
+            } // fechamento do for loop
             setXpData(xpMap);
          }
       }
