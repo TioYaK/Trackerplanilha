@@ -1,7 +1,6 @@
 # ==============================================================
 #  AURORIA WORKER - Instalador em 1 clique (PowerShell)
-#  Versao 1.5 - Arquivo de texto puro, sem .exe, sem virus
-#  Como usar: Clique com botao direito -> "Executar com PowerShell"
+#  Versao 1.5 - Fail-safe & Robusto
 # ==============================================================
 param()
 
@@ -11,15 +10,13 @@ If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     Exit
 }
 
-$ErrorActionPreference = "SilentlyContinue"
-
 Write-Host ""
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host "   AURORIA WORKER - Instalador e Gerenciador de Robo" -ForegroundColor Cyan
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# ---- Busca credenciais do servidor (nao ficam salvas no script) ----
+# ---- [0/4] Busca credenciais ----
 Write-Host "[0/4] Obtendo credenciais seguras do servidor..." -ForegroundColor Gray
 try {
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
@@ -59,6 +56,7 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 
 # ---- [2/4] Baixa o codigo ----
 $WorkDir = Join-Path $env:APPDATA "AuroriaWorker"
+$WorkerPath = Join-Path $WorkDir "scraper-worker"
 Write-Host ""
 Write-Host "[2/4] Baixando a ultima versao do robo..." -ForegroundColor Yellow
 
@@ -67,11 +65,13 @@ if (Test-Path (Join-Path $WorkDir ".git")) {
     git -C $WorkDir fetch --all
     git -C $WorkDir reset --hard origin/main
 } else {
-    if (Test-Path $WorkDir) { Remove-Item $WorkDir -Recurse -Force }
+    if (Test-Path $WorkDir) { Remove-Item $WorkDir -Recurse -Force -ErrorAction SilentlyContinue }
+    New-Item -ItemType Directory -Path $WorkDir -Force | Out-Null
     git clone https://github.com/TioYaK/Trackerplanilha.git $WorkDir
 }
 
-$WorkerPath = Join-Path $WorkDir "scraper-worker"
+# Garante que a pasta existe mesmo se o git clone falhar por algum motivo
+New-Item -ItemType Directory -Path $WorkerPath -Force | Out-Null
 
 # ---- [3/4] Credenciais ----
 Write-Host ""
@@ -88,10 +88,12 @@ $envLines = @(
 $envLines | Set-Content -Path (Join-Path $WorkerPath ".env") -Encoding UTF8
 Write-Host "  -> Credenciais salvas." -ForegroundColor Green
 
-Write-Host "  -> Instalando modulos (aguarde ~1 minuto)..." -ForegroundColor Gray
-Push-Location $WorkerPath
-npm install --silent
-Pop-Location
+if (Test-Path $WorkerPath) {
+    Write-Host "  -> Instalando modulos do Node.js..." -ForegroundColor Gray
+    Push-Location $WorkerPath
+    npm install --silent
+    Pop-Location
+}
 
 # ---- [4/4] Auto-start via Task Scheduler ----
 Write-Host ""
@@ -104,6 +106,7 @@ $IndexJs  = Join-Path $WorkerPath "src\index.js"
 $LoopBat  = Join-Path $WorkerPath "loop.bat"
 $VbsPath  = Join-Path $WorkerPath "run_worker.vbs"
 
+# Cria loop.bat de auto-update e run
 $batLines = @(
     "@echo off",
     ":loop",
@@ -116,10 +119,12 @@ $batLines = @(
 )
 $batLines | Set-Content -Path $LoopBat -Encoding ASCII
 
+# Cria VBS invisivel
 $vbsContent = "Set WshShell = CreateObject(""WScript.Shell"")" + [Environment]::NewLine +
               "WshShell.Run ""cmd.exe /c """"$LoopBat"""""", 0, False"
 $vbsContent | Set-Content -Path $VbsPath -Encoding ASCII
 
+# Registra no Task Scheduler
 $taskXml = @"
 <?xml version='1.0' encoding='UTF-16'?>
 <Task version='1.2' xmlns='http://schemas.microsoft.com/windows/2004/02/mit/task'>
@@ -144,7 +149,12 @@ schtasks /Delete /TN "AuroriaWorker" /F 2>$null | Out-Null
 schtasks /Create /TN "AuroriaWorker" /XML $TempXml | Out-Null
 Remove-Item $TempXml -ErrorAction SilentlyContinue
 
-Start-Process wscript.exe -ArgumentList ("`"" + $VbsPath + "`"") -WindowStyle Hidden
+# Inicia agora se o arquivo VBS existir
+if (Test-Path $VbsPath) {
+    Start-Process wscript.exe -ArgumentList ("`"" + $VbsPath + "`"") -WindowStyle Hidden
+} else {
+    Write-Host "AVISO: O arquivo VBS nao foi encontrado em $VbsPath" -ForegroundColor Red
+}
 
 Write-Host ""
 Write-Host "======================================================" -ForegroundColor Green
