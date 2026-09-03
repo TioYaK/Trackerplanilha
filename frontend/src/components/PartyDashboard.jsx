@@ -75,11 +75,57 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       if (!error && data) {
         logs = data;
       }
+      
+      // Busca estado atual (Edge Computing) para mesclar com as sessões finalizadas
+      let currentStates = [];
+      const { data: states } = await supabase
+        .from('current_character_state')
+        .select('*')
+        .in('character_name', party.members);
+        
+      if (states) {
+        currentStates = states;
+      }
+      
+      let guildData = [];
+      const { data: gData } = await supabase
+        .from('guild_members')
+        .select('name, level')
+        .in('name', party.members);
+        
+      if (gData) {
+        guildData = gData;
+      }
 
       if (logs) {
         const memberStats = {};
         party.members.forEach(m => {
           memberStats[m] = { name: m, totalXpGained: 0, level: '?', lastSeen: null };
+        });
+        
+        guildData.forEach(g => {
+          if (memberStats[g.name]) {
+            memberStats[g.name].level = g.level;
+          }
+        });
+
+        currentStates.forEach(state => {
+          if (memberStats[state.character_name]) {
+            const m = memberStats[state.character_name];
+            m.level = state.level;
+            const lastActive = new Date(state.last_active);
+            if (!m.lastSeen || lastActive > m.lastSeen) {
+               m.lastSeen = lastActive;
+            }
+            
+            // Soma a XP da sessão atual se estiver ativo e for de hoje (SS)
+            if (lastActive.getTime() >= lastSSTime) {
+                const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
+                if (deltaXp > 0) {
+                   m.totalXpGained += deltaXp;
+                }
+            }
+          }
         });
 
         // Agrupamento para o Gráfico de Histórico
