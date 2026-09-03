@@ -112,7 +112,7 @@ $batLines = @(
     ":loop",
     "git -C `"$WorkDir`" fetch --all",
     "git -C `"$WorkDir`" reset --hard origin/main",
-    "git -C `"$WorkDir`" clean -fd",
+    "git -C `"$WorkDir`" clean -fd -e .env -e loop.bat -e run_worker.vbs",
     "`"$NodeExe`" `"$IndexJs`"",
     "ping 127.0.0.1 -n 15 > nul",
     "goto loop"
