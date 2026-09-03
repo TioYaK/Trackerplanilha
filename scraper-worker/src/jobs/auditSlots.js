@@ -84,20 +84,27 @@ export const runAuditSlots = async () => {
         continue;
       }
 
-      // Telemetria dos últimos 20 minutos
+      // Telemetria baseada em Edge Computing (current_character_state)
       const twentyMinsAgo = new Date(now.getTime() - 20 * 60000).toISOString();
-      const { data: logs } = await supabase
-        .from('telemetry_logs')
-        .select('character_name, delta_xp, recorded_at')
-        .in('character_name', party.members)
-        .gte('recorded_at', twentyMinsAgo);
+      const { data: states } = await supabase
+        .from('current_character_state')
+        .select('character_name, xp_total, session_start_xp, last_active')
+        .in('character_name', party.members);
 
       let isHunting = false;
       let totalDelta = 0;
 
-      if (logs && logs.length > 0) {
-        logs.forEach((log) => { totalDelta += Number(log.delta_xp || 0); });
-        if (totalDelta > 0) isHunting = true;
+      if (states && states.length > 0) {
+        states.forEach((state) => { 
+          const delta = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
+          if (delta > 0) {
+            totalDelta += delta;
+          }
+          // Se ganhou XP nos ultimos 20 min, ta ativo
+          if (state.last_active && state.last_active >= twentyMinsAgo && delta > 0) {
+            isHunting = true;
+          }
+        });
       }
 
       const todayDate = new Date().toISOString().split('T')[0];
