@@ -8,7 +8,9 @@ export default function HeaderMetrics({ parties = [] }) {
   useEffect(() => {
     const fetchMetrics = async () => {
       const { count: total_members } = await supabase.from('guild_members').select('*', { count: 'exact', head: true });
-      const { count: active_members } = await supabase.from('guild_members').select('*', { count: 'exact', head: true }).eq('is_active_7d', true);
+      const { count: active_members } = await supabase.from('guild_members')
+        .select('*', { count: 'exact', head: true })
+        .gte('last_xp_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
       setMetrics({ total_members: total_members || 0, active_members: active_members || 0 });
     };
     fetchMetrics();

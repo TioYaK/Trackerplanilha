@@ -79,7 +79,10 @@ export default function GlobalTracker() {
         // Run all independent queries in parallel to eliminate waterfall
         const fetchCensusP = (async () => {
           const { count: total_members } = await supabase.from('guild_members').select('*', { count: 'exact', head: true });
-          const { count: active_members } = await supabase.from('guild_members').select('*', { count: 'exact', head: true }).eq('is_active_7d', true);
+          const { count: active_members } = await supabase
+            .from('guild_members')
+            .select('*', { count: 'exact', head: true })
+            .gte('last_xp_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
           return { data: { total_members: total_members || 0, active_members: active_members || 0 } };
         })();
         const fetchHuntersP = supabase.from('view_top_rushers_24h').select('*', { count: 'exact', head: true });
