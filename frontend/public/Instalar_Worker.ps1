@@ -22,6 +22,7 @@ Write-Host ""
 # ---- Busca credenciais do servidor (nao ficam salvas no script) ----
 Write-Host "[0/4] Obtendo credenciais seguras do servidor..." -ForegroundColor Gray
 try {
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
     $configUrl = "https://trackerplanilha.vercel.app/api/worker-config"
     $config = Invoke-RestMethod -Uri $configUrl -Method GET -TimeoutSec 15
     $SUPABASE_URL = $config.url
