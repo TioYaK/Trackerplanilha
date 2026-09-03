@@ -120,8 +120,7 @@ $batLines = @(
 $batLines | Set-Content -Path $LoopBat -Encoding ASCII
 
 # Cria VBS invisivel
-$vbsContent = "Set WshShell = CreateObject(""WScript.Shell"")" + [Environment]::NewLine +
-              "WshShell.Run ""cmd.exe /c """"$LoopBat"""""", 0, False"
+$vbsContent = 'Set WshShell = CreateObject("WScript.Shell")' + "`r`n" + 'WshShell.Run "cmd.exe /c ""' + $LoopBat + '""", 0, False'
 $vbsContent | Set-Content -Path $VbsPath -Encoding ASCII
 
 # Registra no Task Scheduler
