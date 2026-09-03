@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Server, Activity, HardDrive, Cpu, Terminal, RefreshCw, PowerOff, MessageSquare, Clock, ShieldAlert } from 'lucide-react';
+import { Server, Activity, HardDrive, Cpu, Terminal, RefreshCw, PowerOff, MessageSquare, Clock, ShieldAlert, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -85,7 +85,15 @@ export default function WorkerDashboard() {
                 <div className="flex items-center">
                   <Server size={24} className={`mr-3 ${isOnline ? 'text-green-400' : 'text-red-400'}`} />
                   <div>
-                    <h3 className="text-xl font-bold text-white">{w.worker_id}</h3>
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      {w.metadata?.owner && w.metadata.owner !== 'Anônimo' && (
+                        <span className="bg-tibia-primary/20 text-tibia-primary text-xs px-2 py-1 rounded border border-tibia-primary/30 flex items-center">
+                          <User size={12} className="mr-1" />
+                          {w.metadata.owner}
+                        </span>
+                      )}
+                      {w.worker_id}
+                    </h3>
                     <p className="text-sm text-gray-400 flex items-center mt-1">
                       <Activity size={14} className="mr-1" />
                       Status: 
