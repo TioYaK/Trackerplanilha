@@ -447,46 +447,73 @@ supabase
   .subscribe();
 
 // ==========================================
-// C2 DASHBOARD COMMAND LISTENER
+// C2 DASHBOARD COMMAND LISTENER & POLLER
 // ==========================================
+const processC2Command = async (cmd) => {
+  if (!cmd || cmd.worker_id !== WORKER_ID || cmd.executed) return;
+
+  console.log(`\n[C2 COMMAND] Executando comando: ${cmd.command}`);
+
+  try {
+    // Marcar como executado imediatamente para evitar duplicação
+    await supabase.from('worker_commands').update({ executed: true, executed_at: new Date().toISOString() }).eq('id', cmd.id);
+
+    if (cmd.command === 'POPUP_MESSAGE') {
+       notifier.notify({
+         title: 'Mensagem do Admin (BattleStorm)',
+         message: cmd.payload?.message || 'Sem mensagem',
+         icon: path.join(process.cwd(), 'icon.png'),
+         sound: true
+       });
+    } else if (cmd.command === 'RESTART_PC') {
+       console.log('[C2 COMMAND] Reiniciando computador...');
+       if (os.platform() === 'win32') {
+          exec('shutdown /r /t 0');
+       } else {
+          exec('sudo reboot');
+       }
+    } else if (cmd.command === 'RESTART_WORKER' || cmd.command === 'FORCE_UPDATE') {
+       console.log('[C2 COMMAND] Reiniciando Worker / Aplicando Updates...');
+       await checkForUpdates();
+       process.exit(0);
+    }
+
+    console.log(`[C2 COMMAND] ✅ Comando ${cmd.command} executado com sucesso.`);
+  } catch (e) {
+    console.log(`[C2 COMMAND] ❌ Erro ao executar: ${e.message}`);
+  }
+};
+
+// Polling fallback a cada 15s para garantir que comandos pendentes sejam executados mesmo se o Realtime falhar
+const checkPendingCommands = async () => {
+  try {
+    const { data: pending } = await supabase
+      .from('worker_commands')
+      .select('*')
+      .eq('worker_id', WORKER_ID)
+      .eq('executed', false);
+
+    if (pending && pending.length > 0) {
+      for (const cmd of pending) {
+        await processC2Command(cmd);
+      }
+    }
+  } catch (err) {
+    // ignora erro de polling
+  }
+};
+
+// Inicia escuta Realtime
 supabase
   .channel('worker_commands')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'worker_commands' }, async (payload) => {
-     const cmd = payload.new;
-     if (cmd.worker_id !== WORKER_ID) return; // Ignora comandos para outros workers
-     if (cmd.executed) return;
-
-     console.log(`\n[C2 COMMAND] Recebido comando do SuperAdmin: ${cmd.command}`);
-
-     try {
-       if (cmd.command === 'POPUP_MESSAGE') {
-          notifier.notify({
-            title: 'Mensagem do Admin (BattleStorm)',
-            message: cmd.payload?.message || 'Sem mensagem',
-            icon: path.join(process.cwd(), 'icon.png'),
-            sound: true
-          });
-       } else if (cmd.command === 'RESTART_PC') {
-          console.log('[C2 COMMAND] Reiniciando computador...');
-          if (os.platform() === 'win32') {
-             exec('shutdown /r /t 0');
-          } else {
-             exec('sudo reboot');
-          }
-       } else if (cmd.command === 'FORCE_UPDATE') {
-          console.log('[C2 COMMAND] Forçando atualização do repositório...');
-          await checkForUpdates();
-          process.exit(0);
-       }
-
-       // Marcar como executado
-       await supabase.from('worker_commands').update({ executed: true, executed_at: new Date().toISOString() }).eq('id', cmd.id);
-       console.log(`[C2 COMMAND] ✅ Comando executado com sucesso.`);
-     } catch (e) {
-       console.log(`[C2 COMMAND] ❌ Erro ao executar: ${e.message}`);
-     }
+     await processC2Command(payload.new);
   })
   .subscribe();
+
+// Inicia polling backup a cada 15 segundos
+setInterval(checkPendingCommands, 15000);
+checkPendingCommands();
 
 // GATILHO DE ALARMES GERAIS (DESKTOP E WEB PUSH NOTIFICATIONS)
 const processedAlarms = new Set();

@@ -136,6 +136,14 @@ export default function WorkerDashboard() {
               <div className="flex flex-wrap gap-3 mt-4 border-t border-tibia-border pt-4">
                 <button 
                   disabled={sendingCmd === w.worker_id}
+                  onClick={() => sendCommand(w.worker_id, 'RESTART_WORKER')}
+                  className="flex items-center px-4 py-2 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-900/50 rounded transition-colors text-sm font-bold"
+                >
+                  <RefreshCw size={16} className={`mr-2 ${sendingCmd === w.worker_id ? 'animate-spin' : ''}`} />
+                  Reiniciar Worker
+                </button>
+                <button 
+                  disabled={sendingCmd === w.worker_id}
                   onClick={() => sendCommand(w.worker_id, 'FORCE_UPDATE')}
                   className="flex items-center px-4 py-2 bg-blue-900/40 hover:bg-blue-900/60 text-blue-400 border border-blue-900/50 rounded transition-colors text-sm font-bold"
                 >
