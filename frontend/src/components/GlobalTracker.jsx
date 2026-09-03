@@ -77,7 +77,11 @@ export default function GlobalTracker() {
       setLoading(true);
       try {
         // Run all independent queries in parallel to eliminate waterfall
-        const fetchCensusP = supabase.from('view_macro_census').select('*').single();
+        const fetchCensusP = (async () => {
+          const { count: total_members } = await supabase.from('guild_members').select('*', { count: 'exact', head: true });
+          const { count: active_members } = await supabase.from('guild_members').select('*', { count: 'exact', head: true }).eq('is_active_7d', true);
+          return { data: { total_members: total_members || 0, active_members: active_members || 0 } };
+        })();
         const fetchHuntersP = supabase.from('view_top_rushers_24h').select('*', { count: 'exact', head: true });
         const fetchDailyP = supabase.from('view_macro_daily').select('*').order('day_date', { ascending: true });
         const fetchPartiesP = supabase.from('parties_planilhadas').select('hunt_name, slot_start, slot_end, delta_xp, members').not('delta_xp', 'is', null);
