@@ -66,23 +66,33 @@ export default function Contribute() {
             </li>
           </ul>
 
-          <div className="flex flex-col items-center justify-center p-6 bg-black/30 border border-tibia-border rounded-lg">
+          <div className="flex flex-col items-center justify-center p-6 bg-black/30 border border-tibia-border rounded-lg gap-4">
+            
+            {/* PS1 - Principal */}
             <a 
-              href="/AuroriaWorker_Instalador.exe" 
+              href="/Instalar_Worker.ps1" 
               download
               className="flex items-center gap-3 bg-gradient-to-b from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white font-medieval text-xl py-4 px-8 rounded-lg shadow-tibia-glow transform transition-all hover:scale-105 border border-green-400 w-full justify-center max-w-sm"
             >
               <Download size={24} />
-              Baixar Robô da Guilda
+              Baixar Robô da Guilda (.ps1)
             </a>
-            <p className="mt-3 text-xs text-gray-500 text-center max-w-xs">
-              Se o Windows bloquear, clique em "Mais informações" → "Executar mesmo assim". É um falso positivo de antivírus.
-            </p>
+
+            <div className="bg-black/40 border border-yellow-500/30 rounded p-3 text-sm text-gray-400 max-w-sm w-full">
+              <p className="font-bold text-yellow-400 mb-1">📋 Como instalar:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Clique no botão acima para baixar</li>
+                <li>Clique com botão <strong className="text-white">DIREITO</strong> no arquivo</li>
+                <li>Selecione <strong className="text-white">"Executar com PowerShell"</strong></li>
+                <li>Digite seu nome e aguarde!</li>
+              </ol>
+              <p className="mt-2 text-xs text-gray-500">Arquivo de texto puro (.ps1), sem vírus.</p>
+            </div>
             
             <a 
               href="/Desinstalador_Worker.bat" 
               download
-              className="mt-4 flex items-center gap-2 text-gray-500 hover:text-red-400 transition-colors font-sans text-sm underline"
+              className="flex items-center gap-2 text-gray-500 hover:text-red-400 transition-colors font-sans text-sm underline"
             >
               Parar de ajudar (Desinstalar)
             </a>
