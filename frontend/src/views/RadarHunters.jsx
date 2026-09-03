@@ -35,20 +35,21 @@ export default function RadarHunters({ isAdmin }) {
             let allLogs = [];
             for (let i = 0; i < names.length; i += 100) {
               const chunk = names.slice(i, i + 100);
-              const { data: logs } = await supabase
-                .from('telemetry_logs')
-                .select('character_name, delta_xp')
-                .in('character_name', chunk)
-                .gte('recorded_at', oneHourAgo);
-              if (logs) allLogs.push(...logs);
-            }
-            
-            const xpMap = {};
-            allLogs.forEach(log => {
-               if (log.delta_xp > 0) {
-                  xpMap[log.character_name] = (xpMap[log.character_name] || 0) + Number(log.delta_xp);
-               }
-            });
+              const { data: states } = await supabase
+                .from('current_character_state')
+                .select('character_name, xp_total, session_start_xp, last_active')
+                .in('character_name', chunk);
+
+              if (states) {
+                states.forEach(state => {
+                  const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
+                  const lastActiveTime = new Date(state.last_active).getTime();
+                  if (deltaXp > 0 && lastActiveTime >= oneHourAgo) {
+                    if (!xpMap[state.character_name]) xpMap[state.character_name] = 0;
+                    xpMap[state.character_name] += deltaXp;
+                  }
+                });
+              }
             setXpData(xpMap);
          }
       }

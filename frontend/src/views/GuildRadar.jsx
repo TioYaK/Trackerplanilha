@@ -14,32 +14,9 @@ export default function GuildRadar() {
         const { data: guildMembers } = await supabase.from('guild_members').select('name, vocation, level');
         if (!guildMembers || guildMembers.length === 0) return;
 
-        // 2. Pega telemetria das últimas 2 horas
+        // 2. Pega telemetria das ï¿½ltimas 2 horas
         const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
         
-        let logs = [];
-        let page = 0;
-        const membersList = guildMembers.map(m => m.name);
-        
-        while(true) {
-          const { data } = await supabase
-            .from('telemetry_logs')
-            .select('character_name, delta_xp, recorded_at, level')
-            .in('character_name', membersList)
-            .gte('recorded_at', twoHoursAgo)
-            .order('recorded_at', { ascending: true })
-            .range(page * 1000, (page + 1) * 1000 - 1);
-            
-          if (!data || data.length === 0) break;
-          logs.push(...data);
-          if (data.length < 1000) break;
-          page++;
-        }
-
-        const now = Date.now();
-        const thirtyMinsAgo = now - 30 * 60 * 1000;
-        const oneHourAgo = now - 60 * 60 * 1000;
-
         const memberStats = {};
         guildMembers.forEach(m => {
           memberStats[m.name] = { 
@@ -51,23 +28,42 @@ export default function GuildRadar() {
           };
         });
 
-        logs.forEach(log => {
-          const dxp = parseInt(log.delta_xp || 0, 10);
-          if (dxp > 0 && memberStats[log.character_name]) {
-             const m = memberStats[log.character_name];
-             const logDate = new Date(log.recorded_at).getTime();
-             
-             if (logDate >= oneHourAgo) {
-                 m.xpLastHour += dxp;
-             }
-             if (logDate >= thirtyMinsAgo) {
-                 m.isHunting = true;
-             }
-             
-             m.lastSeen = logDate;
-             if (!m.huntStart || logDate < m.huntStart) m.huntStart = logDate;
+        const membersList = guildMembers.map(m => m.name);
+        
+        const fetchStates = async () => {
+          let allStates = [];
+          for (let i = 0; i < membersList.length; i += 100) {
+            const chunk = membersList.slice(i, i + 100);
+            const { data } = await supabase
+              .from('current_character_state')
+              .select('*')
+              .in('character_name', chunk);
+            if (data) allStates = allStates.concat(data);
           }
-        });
+          return allStates;
+        };
+
+        const states = await fetchStates();
+        const now = Date.now();
+        const thirtyMinsAgo = now - 30 * 60 * 1000;
+
+        if (states) {
+          states.forEach(state => {
+            const m = memberStats[state.character_name];
+            if (m) {
+              const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
+              const lastActiveTime = new Date(state.last_active).getTime();
+              
+              if (deltaXp > 0 && lastActiveTime >= thirtyMinsAgo) {
+                m.isHunting = true;
+                m.xpLastHour = deltaXp;
+                m.huntStart = new Date(state.session_start_time).getTime();
+                m.lastSeen = lastActiveTime;
+              }
+              m.level = state.level || m.level;
+            }
+          });
+        }
 
         const activeHunters = Object.values(memberStats)
            .filter(m => m.isHunting)
@@ -109,7 +105,7 @@ export default function GuildRadar() {
           Radar da Guilda
         </h2>
         <p className="text-gray-400 font-sans">
-          Monitoramento em tempo real de membros que estão ganhando XP (ativos nos últimos 30 minutos).
+          Monitoramento em tempo real de membros que estï¿½o ganhando XP (ativos nos ï¿½ltimos 30 minutos).
         </p>
       </div>
 
@@ -120,7 +116,7 @@ export default function GuildRadar() {
       ) : hunters.length === 0 ? (
         <div className="bg-tibia-card border border-tibia-border rounded-lg p-10 flex flex-col items-center justify-center text-gray-500">
            <AlertCircle size={48} className="mb-4 opacity-50" />
-           <p className="text-xl font-bold">Nenhum membro caçando no momento.</p>
+           <p className="text-xl font-bold">Nenhum membro caï¿½ando no momento.</p>
            <p className="text-sm mt-2">O radar detecta ganhos de XP automaticamente a cada 5 minutos.</p>
         </div>
       ) : (
@@ -149,7 +145,7 @@ export default function GuildRadar() {
                        <p className="text-lg font-bold text-tibia-highlight">+{formatXp(h.xpLastHour)}</p>
                     </div>
                     <div>
-                       <p className="text-xs text-gray-500 uppercase font-bold">Duração</p>
+                       <p className="text-xs text-gray-500 uppercase font-bold">Duraï¿½ï¿½o</p>
                        <p className="text-lg font-bold text-gray-300 flex items-center">
                           <Clock size={16} className="mr-1" />
                           {durationMins > 0 ? ${durationMins}m : 'Agora'}
