@@ -54,7 +54,7 @@ export default function Contribute() {
             </li>
             <li className="flex items-start gap-3">
               <CheckCircle2 className="text-tibia-primary shrink-0 mt-0.5" size={20} />
-              <span>Dê dois cliques no <strong>AuroriaWorker_Instalador.exe</strong>.</span>
+              <span>Clique com botão <strong>DIREITO</strong> no arquivo <strong>Instalar_Worker.ps1</strong>.</span>
             </li>
             <li className="flex items-start gap-3">
               <CheckCircle2 className="text-tibia-primary shrink-0 mt-0.5" size={20} />
@@ -68,25 +68,30 @@ export default function Contribute() {
 
           <div className="flex flex-col items-center justify-center p-6 bg-black/30 border border-tibia-border rounded-lg gap-4">
             
-            {/* PS1 - Principal */}
+            {/* BAT - Principal (1-clique) */}
             <a 
-              href="/Instalar_Worker.ps1" 
+              href="/Instalar_Worker.bat" 
               download
               className="flex items-center gap-3 bg-gradient-to-b from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white font-medieval text-xl py-4 px-8 rounded-lg shadow-tibia-glow transform transition-all hover:scale-105 border border-green-400 w-full justify-center max-w-sm"
             >
               <Download size={24} />
-              Baixar Robô da Guilda (.ps1)
+              Baixar Robô da Guilda (.bat)
             </a>
 
             <div className="bg-black/40 border border-yellow-500/30 rounded p-3 text-sm text-gray-400 max-w-sm w-full">
-              <p className="font-bold text-yellow-400 mb-1">📋 Como instalar:</p>
+              <p className="font-bold text-yellow-400 mb-1">⚡ Instalação em 1 clique:</p>
               <ol className="list-decimal list-inside space-y-1">
-                <li>Clique no botão acima para baixar</li>
-                <li>Clique com botão <strong className="text-white">DIREITO</strong> no arquivo</li>
-                <li>Selecione <strong className="text-white">"Executar com PowerShell"</strong></li>
-                <li>Digite seu nome e aguarde!</li>
+                <li>Baixe o arquivo <strong className="text-white">Instalar_Worker.bat</strong></li>
+                <li>Dê <strong className="text-white">DOIS CLIQUES</strong> nele para executar</li>
+                <li>Digite seu nome no terminal e pronto!</li>
               </ol>
-              <p className="mt-2 text-xs text-gray-500">Arquivo de texto puro (.ps1), sem vírus.</p>
+              <div className="mt-3 pt-2 border-t border-white/10 text-xs text-gray-400">
+                <span>Outra opção (PowerShell): </span>
+                <a href="/Instalar_Worker.ps1" download className="text-blue-400 underline font-semibold hover:text-blue-300">
+                  Baixar .ps1
+                </a>
+                <span className="block text-[11px] text-gray-500 mt-0.5">(Para .ps1: Botão DIREITO → Executar com PowerShell)</span>
+              </div>
             </div>
             
             <a 
