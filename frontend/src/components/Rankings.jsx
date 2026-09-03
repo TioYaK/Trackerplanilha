@@ -18,23 +18,15 @@ export default function Rankings({ isAdmin }) {
     const { data: rushersData } = await supabase
       .from('view_top_rushers_24h')
       .select('*')
-      .gt('xp_gained', 0)
+      .gt('exp_gained', 0)
       .limit(5);
 
     if (rushersData) setTopRushers(rushersData);
 
     // 2. PT de Elite (Maior XP Registrada Hoje)
-    const now2 = new Date();
-    let todayStr2 = now2.toISOString().split('T')[0];
-    if (now2.getHours() < 10) {
-       const yesterday2 = new Date(now2);
-       yesterday2.setDate(yesterday2.getDate() - 1);
-       todayStr2 = yesterday2.toISOString().split('T')[0];
-    }
     const { data: partiesDataXP } = await supabase
       .from('parties_planilhadas')
-      .select('*')
-      .eq('date', todayStr2);
+      .select('*');
 
     if (partiesDataXP && partiesDataXP.length > 0) {
       let bestParty = null;
@@ -75,22 +67,14 @@ export default function Rankings({ isAdmin }) {
     if (strikesData) setActiveStrikes(strikesData);
 
     // 4. Tribunal Autônomo (Auditoria de Fantasmas)
-    const now = new Date();
-    let todayStr = now.toISOString().split('T')[0];
-    if (now.getHours() < 10) {
-       const yesterday = new Date(now);
-       yesterday.setDate(yesterday.getDate() - 1);
-       todayStr = yesterday.toISOString().split('T')[0];
-    }
-    
     const { data: partiesData } = await supabase
       .from('parties_planilhadas')
-      .select('*')
-      .eq('date', todayStr);
+      .select('*');
 
     const detectedGhosts = [];
     
     if (partiesData && strikesData) {
+      const now = new Date();
       const currentMins = now.getHours() * 60 + now.getMinutes();
       const currentNormalized = currentMins < 600 ? currentMins + 1440 : currentMins;
       
@@ -208,8 +192,15 @@ export default function Rankings({ isAdmin }) {
                 topRushers.map((r, i) => (
                   <tr key={r.name} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4 font-bold text-yellow-500">{i + 1}º</td>
-                    <td className="px-6 py-4 font-medium text-white">{r.name} <span className="text-xs text-gray-500 block">{r.vocation} - Lvl {r.level}</span></td>
-                    <td className="px-6 py-4 text-right font-bold text-green-400">+{formatXP(r.xp_gained)}</td>
+                    <td className="px-6 py-4 font-medium text-white">
+                      {r.name}
+                      {(r.vocation || r.level) && (
+                        <span className="text-xs text-gray-500 block">
+                          {r.vocation ? r.vocation : ''} {r.level ? `- Lvl ${r.level}` : ''}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right font-bold text-green-400">+{formatXP(r.exp_gained)}</td>
                   </tr>
                 ))
               )}
