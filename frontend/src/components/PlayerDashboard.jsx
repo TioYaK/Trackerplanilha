@@ -45,19 +45,42 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       setPlayerAvatar(null);
     }
 
-    // Fetch Player Level from guild_members
-    const { data: memberData } = await supabase
+    // Fetch Player Level from guild_members with fallback to current_character_state
+    let memberData = null;
+    const { data: gMembers } = await supabase
       .from('guild_members')
       .select('level, vocation, is_online')
-      .eq('name', playerName)
-      .single();
+      .ilike('name', playerName);
+
+    if (gMembers && gMembers.length > 0) {
+      const validG = gMembers.find(g => g.level !== null && g.level !== undefined) || gMembers[0];
+      if (validG && validG.level) {
+        memberData = validG;
+      }
+    }
+
+    if (!memberData) {
+      const { data: cData } = await supabase
+        .from('current_character_state')
+        .select('level, vocation, last_active')
+        .ilike('character_name', playerName)
+        .maybeSingle();
+
+      if (cData) {
+        memberData = {
+          level: cData.level,
+          vocation: cData.vocation,
+          is_online: cData.last_active ? (new Date() - new Date(cData.last_active)) < 15 * 60 * 1000 : false
+        };
+      }
+    }
       
     if (memberData) setPlayerInfo(memberData);
 
     const { data: boundsData } = await supabase
       .from('historical_sessions')
       .select('session_end, end_xp_total, end_level')
-      .eq('character_name', playerName)
+      .ilike('character_name', playerName)
       .gte('session_end', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
       .order('session_end', { ascending: true });
       
@@ -139,7 +162,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     const { data: teleData } = await supabase
       .from('historical_sessions')
       .select('*')
-      .eq('character_name', playerName)
+      .ilike('character_name', playerName)
       .gte('session_end', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       .order('session_end', { ascending: true });
 
@@ -160,7 +183,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     const { data: strikesData } = await supabase
       .from('player_strikes')
       .select('*')
-      .eq('character_name', playerName)
+      .ilike('character_name', playerName)
       .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
 

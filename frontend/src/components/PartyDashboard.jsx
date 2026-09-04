@@ -68,51 +68,52 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       const { data, error } = await supabase
         .from('historical_sessions')
         .select('character_name, xp_gained, session_end, end_level')
-        .in('character_name', party.members)
         .gte('session_end', historyStartDate)
         .order('session_end', { ascending: true });
         
       if (!error && data) {
-        logs = data;
+        const partyMemberSet = new Set(party.members.map(m => m.toLowerCase()));
+        logs = data.filter(d => partyMemberSet.has(d.character_name.toLowerCase()));
       }
       
       // Busca estado atual (Edge Computing) para mesclar com as sessões finalizadas
       let currentStates = [];
       const { data: states } = await supabase
         .from('current_character_state')
-        .select('*')
-        .in('character_name', party.members);
+        .select('*');
         
       if (states) {
-        currentStates = states;
+        const partyMemberSet = new Set(party.members.map(m => m.toLowerCase()));
+        currentStates = states.filter(s => partyMemberSet.has(s.character_name.toLowerCase()));
       }
       
       let guildData = [];
       const { data: gData } = await supabase
         .from('guild_members')
-        .select('name, level')
-        .in('name', party.members);
+        .select('name, level');
         
       if (gData) {
-        guildData = gData;
+        const partyMemberSet = new Set(party.members.map(m => m.toLowerCase()));
+        guildData = gData.filter(g => partyMemberSet.has(g.name.toLowerCase()));
       }
 
       if (logs) {
         const memberStats = {};
         party.members.forEach(m => {
-          memberStats[m] = { name: m, totalXpGained: 0, level: '?', lastSeen: null };
+          memberStats[m.toLowerCase()] = { name: m, totalXpGained: 0, level: '?', lastSeen: null };
         });
         
         guildData.forEach(g => {
-          if (memberStats[g.name]) {
-            memberStats[g.name].level = g.level;
+          const m = memberStats[g.name.toLowerCase()];
+          if (m && g.level) {
+            m.level = g.level;
           }
         });
 
         currentStates.forEach(state => {
-          if (memberStats[state.character_name]) {
-            const m = memberStats[state.character_name];
-            m.level = state.level;
+          const m = memberStats[state.character_name.toLowerCase()];
+          if (m) {
+            m.level = state.level || m.level;
             const lastActive = new Date(state.last_active);
             if (!m.lastSeen || lastActive > m.lastSeen) {
                m.lastSeen = lastActive;
@@ -139,12 +140,13 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         logs.forEach(log => {
           const date = new Date(log.session_end);
           const dxp = parseInt(log.xp_gained || 0, 10);
+          const m = memberStats[log.character_name.toLowerCase()];
           
           // Current Server Save Table Logic
-          if (date.getTime() >= lastSSTime && memberStats[log.character_name]) {
-            memberStats[log.character_name].totalXpGained += dxp;
-            memberStats[log.character_name].level = log.end_level;
-            memberStats[log.character_name].lastSeen = date;
+          if (date.getTime() >= lastSSTime && m) {
+            m.totalXpGained += dxp;
+            m.level = log.end_level || m.level;
+            m.lastSeen = date;
           }
 
           // Historical Chart Logic
