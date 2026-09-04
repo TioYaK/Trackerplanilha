@@ -23,6 +23,7 @@ import { runBankSync } from './jobs/syncBankTS3.js';
 import { runFetchRosterShard } from './jobs/fetchRosterShards.js';
 import { runSendDiscordReport } from './jobs/sendDiscordReport.js';
 import { runAuditBank } from './jobs/auditBank.js';
+import { runProcessAutoInvites } from './jobs/processAutoInvites.js';
 import { checkForUpdates } from './updater.js';
 import { applySelfHealingPatch } from './selfHeal.js';
 import { closeBrowser } from './lib/rubinotScraper.js';
@@ -106,6 +107,7 @@ const completeTask = async (task) => {
   const cooldowns = {
     FETCH_ONLINES: 30,     // 30s
     FETCH_DEATHS: 30,      // 30s
+    PROCESS_GUILD_INVITES: 30, // 30s
     FETCH_RIVALS: 60,      // 1m
     FETCH_GUILD: 3600,     // 1h
     FETCH_BAZAAR: 3600,    // 1h
@@ -152,6 +154,9 @@ const processTask = async (task) => {
     switch (task.task_type) {
       case 'FETCH_GUILD':
         await runFetchGuild();
+        break;
+      case 'PROCESS_GUILD_INVITES':
+        await runProcessAutoInvites();
         break;
       case 'FETCH_ONLINES':
         await runFetchOnlines();
