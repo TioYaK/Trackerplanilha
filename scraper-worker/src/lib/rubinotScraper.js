@@ -646,9 +646,13 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20, vocation = 
         if (vocation) {
             const vocOptionValue = await page.evaluate((vocName) => {
                 const selects = document.querySelectorAll('select');
-                if (selects.length > 1) {
-                    const opt = Array.from(selects[1].querySelectorAll('option'))
-                        .find(o => o.textContent.trim().toLowerCase() === vocName.toLowerCase());
+                if (selects.length > 2) {
+                    const query = vocName.toLowerCase().replace(/s$/, ''); // trim trailing s
+                    const opt = Array.from(selects[2].querySelectorAll('option'))
+                        .find(o => {
+                            const text = o.textContent.trim().toLowerCase();
+                            return text.includes(query) || query.includes(text.replace(/s$/, ''));
+                        });
                     return opt ? opt.value : null;
                 }
                 return null;
@@ -658,9 +662,9 @@ async function scrapeHighscores(world, onPageScraped, maxPages = 20, vocation = 
                 try {
                     await page.evaluate((val) => {
                         const selects = document.querySelectorAll('select');
-                        if (selects.length > 1) {
-                            selects[1].value = val;
-                            selects[1].dispatchEvent(new Event('change', { bubbles: true }));
+                        if (selects.length > 2) {
+                            selects[2].value = val;
+                            selects[2].dispatchEvent(new Event('change', { bubbles: true }));
                         }
                     }, vocOptionValue);
                     await new Promise(r => setTimeout(r, 2000));
