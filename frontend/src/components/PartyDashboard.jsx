@@ -47,9 +47,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       // Server Save Logic (10:00 AM BRT = 13:00 UTC)
       const getLastSS = () => {
         const now = new Date();
-        const currentHourBRT = (now.getUTCHours() - 3 + 24) % 24;
         const ss = new Date(now);
-        if (currentHourBRT < 10) {
+        if (now.getUTCHours() < 13) {
           ss.setUTCDate(ss.getUTCDate() - 1);
         }
         ss.setUTCHours(13, 0, 0, 0);
