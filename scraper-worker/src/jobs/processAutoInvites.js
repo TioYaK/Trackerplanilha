@@ -8,8 +8,10 @@ import fs from 'fs';
 puppeteer.use(StealthPlugin());
 
 // ==========================================
-// CONTAS DOS LÍDERES CADASTRADAS POR SERVIDOR
+// CONFIGURAÇÕES DA PLANILHA E CONTAS PADRÃO
 // ==========================================
+const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/11ODx6WKc8qrlp_QLffMLgn9M95o42JiDhgUnG1w9K5Y/edit?usp=sharing';
+
 const DEFAULT_ACCOUNTS = {
   vesperia: { world: 'Vesperia', account_name: 'pifot16+maker9182@gmail.com', password: 'Liususu!28@', guild_name: 'Shell' },
   auroria: { world: 'Auroria', account_name: 'pifot16+maker781272@gmail.com', password: 'Liususu!28@3', guild_name: 'Shell' },
@@ -34,14 +36,35 @@ function findChrome() {
 }
 
 /**
- * Busca convites diretamente de uma Planilha do Google via URL/CSV
+ * Parser customizado de linha CSV com tratamento de aspas duplas
+ */
+function parseCsvLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+/**
+ * Busca convites diretamente da Planilha do Google configurada
  */
 async function syncGoogleSheetInvites() {
-  const sheetUrl = process.env.GOOGLE_SHEET_URL || process.env.GOOGLE_SHEETS_CSV_URL;
+  const sheetUrl = process.env.GOOGLE_SHEET_URL || DEFAULT_SHEET_URL;
   if (!sheetUrl) return;
 
   try {
-    // Converter URL normal de edição do Google Sheets para o endpoint CSV export
     let csvUrl = sheetUrl;
     if (sheetUrl.includes('/edit')) {
       csvUrl = sheetUrl.replace(/\/edit.*$/, '/gviz/tq?tqx=out:csv');
@@ -53,43 +76,53 @@ async function syncGoogleSheetInvites() {
     if (!response.ok) return;
 
     const csvText = await response.text();
-    const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = csvText.split('\n').filter(Boolean);
     if (lines.length <= 1) return;
 
-    console.log(`[AutoInvite] 📊 Lendo planilha do Google (${lines.length - 1} linhas)...`);
+    let addedCount = 0;
 
     for (let i = 1; i < lines.length; i++) {
-      // Parser simples de CSV (remove aspas duplas)
-      const columns = lines[i].split(',').map(col => col.replace(/^"|"$/g, '').trim());
+      const cols = parseCsvLine(lines[i]);
 
-      const charName = columns[0];
-      const world = columns[1] || 'Auroria';
-      const guild = columns[2] || 'Shell';
-      const status = columns[3] ? columns[3].toUpperCase() : '';
+      // Mapeamento das Colunas da Planilha:
+      // B (index 1) = Sistema ("invite")
+      // C (index 2) = Nome do Personagem (Pode ser separado por vírgula)
+      // D (index 3) = Status de Processamento ("Pendente", "Processando", "Finalizado")
+      // G (index 6) = Servidor de Origem/Destino ("Auroria", "Belaria", etc.)
+      const sistema = (cols[1] || '').replace(/"/g, '').trim().toLowerCase();
+      const rawChar = (cols[2] || '').replace(/"/g, '').trim();
+      const statusD = (cols[3] || '').replace(/"/g, '').trim();
+      const servidor = (cols[6] || '').replace(/"/g, '').trim() || 'Auroria';
 
-      // Se não houver nome de char ou se já estiver marcado como CONVIDADO/OK na planilha, ignora
-      if (!charName || status.includes('CONVIDADO') || status.includes('OK') || status.includes('SUCCESS')) {
-        continue;
+      if (sistema === 'invite' && rawChar && (!statusD || statusD === '' || statusD.toLowerCase() === 'pendente')) {
+        // Tratar lista de chars separados por vírgula em Coluna C
+        const charList = rawChar.split(',').map(c => c.trim()).filter(Boolean);
+
+        for (const charName of charList) {
+          // Verificar se já está cadastrado na fila do Supabase
+          const { data: existing } = await supabase
+            .from('guild_invites_queue')
+            .select('id, status')
+            .ilike('character_name', charName)
+            .ilike('world', servidor)
+            .maybeSingle();
+
+          if (!existing) {
+            await supabase.from('guild_invites_queue').insert({
+              character_name: charName,
+              world: servidor,
+              guild_name: 'Shell',
+              status: 'PENDING',
+              requested_by: 'Planilha Google'
+            });
+            addedCount++;
+          }
+        }
       }
+    }
 
-      // Verificar se já existe na fila do Supabase
-      const { data: existing } = await supabase
-        .from('guild_invites_queue')
-        .select('id, status')
-        .ilike('character_name', charName)
-        .ilike('world', world)
-        .maybeSingle();
-
-      if (!existing) {
-        console.log(`[AutoInvite] 📥 Novo char detectado na Planilha do Google: '${charName}' (${world})`);
-        await supabase.from('guild_invites_queue').insert({
-          character_name: charName,
-          world: world,
-          guild_name: guild,
-          status: 'PENDING',
-          requested_by: 'Planilha Google'
-        });
-      }
+    if (addedCount > 0) {
+      console.log(`[AutoInvite] 📊 ${addedCount} novos convites importados da Planilha Google para o Supabase!`);
     }
   } catch (err) {
     console.error('[AutoInvite] Erro ao sincronizar Planilha do Google:', err.message);
@@ -103,7 +136,7 @@ export async function runProcessAutoInvites() {
   console.log('[AutoInvite] 🔍 Verificando fila de convites pendentes...');
 
   try {
-    // 0. Sincronizar planilha do Google se a URL estiver configurada
+    // 0. Sincronizar planilha do Google
     await syncGoogleSheetInvites();
 
     // 1. Buscar convites pendentes
@@ -112,7 +145,7 @@ export async function runProcessAutoInvites() {
       .select('*')
       .eq('status', 'PENDING')
       .order('created_at', { ascending: true })
-      .limit(10);
+      .limit(15);
 
     if (fetchErr) {
       console.error('[AutoInvite] Erro ao consultar fila de convites:', fetchErr.message);
