@@ -287,9 +287,9 @@ async function loginRubinot(page, accountName, password) {
       return true;
     }
 
-    await page.waitForSelector('input[name="email"], input[name="account"], #account', { timeout: 10000 });
+    await new Promise(r => setTimeout(r, 2500));
 
-    const accInput = await page.$('input[name="email"], input[name="account"], input[name="name"], #account');
+    const accInput = await page.$('input[name="email"], input[name="account"], input[name="name"], #account, input[type="email"]');
     const passInput = await page.$('input[name="password"], input[type="password"], #password');
 
     if (!accInput || !passInput) {
