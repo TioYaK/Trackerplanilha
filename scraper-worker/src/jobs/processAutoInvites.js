@@ -94,7 +94,7 @@ async function syncGoogleSheetInvites() {
       const statusD = (cols[3] || '').replace(/"/g, '').trim();
       const servidor = (cols[6] || '').replace(/"/g, '').trim() || 'Auroria';
 
-      if (sistema === 'invite' && rawChar && (!statusD || statusD === '' || statusD.toLowerCase() === 'pendente')) {
+      if (sistema === 'invite' && rawChar && statusD.toLowerCase() === 'pendente') {
         // Tratar lista de chars separados por vírgula em Coluna C
         const charList = rawChar.split(',').map(c => c.trim()).filter(Boolean);
 
