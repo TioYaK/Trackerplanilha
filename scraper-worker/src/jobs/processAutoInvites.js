@@ -12,6 +12,14 @@ puppeteer.use(StealthPlugin());
 // ==========================================
 const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/11ODx6WKc8qrlp_QLffMLgn9M95o42JiDhgUnG1w9K5Y/export?format=csv';
 
+const WORLD_IDS = {
+  auroria: '11',
+  belaria: '15',
+  bellum: '30',
+  tenebrium: '21',
+  vesperia: '16',
+};
+
 const DEFAULT_ACCOUNTS = {
   vesperia: { world: 'Vesperia', account_name: 'pifot16+maker9182@gmail.com', password: 'Liususu!28@', guild_name: 'Shell' },
   auroria: { world: 'Auroria', account_name: 'pifot16+maker781272@gmail.com', password: 'Liususu!28@3', guild_name: 'Shell' },
@@ -69,10 +77,10 @@ async function syncGoogleSheetInvites() {
     if (sheetUrl.includes('/edit')) {
       csvUrl = sheetUrl.replace(/\/edit.*$/, '/export?format=csv');
     } else if (!sheetUrl.includes('export?format=csv')) {
-      csvUrl = 'https://docs.google.com/spreadsheets/d/11ODx6WKc8qrlp_QLffMLgn9M95o42JiDhgUnG1w9K5Y/export?format=csv';
+      csvUrl = DEFAULT_SHEET_URL;
     }
 
-    const response = await fetch(csvUrl, { timeout: 15000 });
+    const response = await fetch(csvUrl, { signal: AbortSignal.timeout(15000) });
     if (!response.ok) return;
 
     const csvText = await response.text();
@@ -102,11 +110,9 @@ async function syncGoogleSheetInvites() {
                         statusF !== 'processado';
 
       if (sistema === 'invite' && rawChar && isPending) {
-        // Tratar lista de chars separados por vírgula em Coluna C
         const charList = rawChar.split(',').map(c => c.trim()).filter(Boolean);
 
         for (const charName of charList) {
-          // Verificar se já está cadastrado na fila do Supabase
           const { data: existing } = await supabase
             .from('guild_invites_queue')
             .select('id, status')
@@ -198,7 +204,6 @@ export async function runProcessAutoInvites() {
       for (const [world, invites] of Object.entries(invitesByWorld)) {
         console.log(`\n[AutoInvite] 🌐 Iniciando lote para o mundo: ${world} (${invites.length} convites)`);
 
-        // Buscar conta no banco ou usar conta pré-definida
         let leaderAcc = null;
         const { data: dbAcc } = await supabase
           .from('guild_leader_accounts')
@@ -226,7 +231,7 @@ export async function runProcessAutoInvites() {
           continue;
         }
 
-        // Tentar fazer login no RubinOT
+        // Login no RubinOT
         console.log(`[AutoInvite] 🔑 Efetuando login no RubinOT (${world}) com a conta: ${leaderAcc.account_name}...`);
         const loggedIn = await loginRubinot(page, leaderAcc.account_name, leaderAcc.password);
 
@@ -246,9 +251,9 @@ export async function runProcessAutoInvites() {
         // Processar cada convite deste mundo
         for (const invite of invites) {
           const guildTarget = invite.guild_name || leaderAcc.guild_name || 'Shell';
-          console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}'...`);
+          console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}' (${world})...`);
 
-          const result = await inviteCharacter(page, guildTarget, invite.character_name);
+          const result = await inviteCharacter(page, world, guildTarget, invite.character_name);
 
           if (result.success) {
             console.log(`[AutoInvite] ✅ Sucesso: ${invite.character_name} convidado!`);
@@ -278,16 +283,16 @@ export async function runProcessAutoInvites() {
  */
 async function loginRubinot(page, accountName, password) {
   try {
-    await page.goto('https://rubinot.com.br/account/login', { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto('https://rubinot.com.br/login', { waitUntil: 'networkidle2', timeout: 30000 });
 
     const currentUrl = page.url();
-    if (currentUrl.includes('/account/manage') || currentUrl.includes('/account/dashboard')) {
+    if (currentUrl.includes('/account/manage') || currentUrl.includes('/account/dashboard') || currentUrl.includes('/characters')) {
       return true;
     }
 
-    await page.waitForSelector('input[name="account"], input[name="name"], input[name="email"], #account', { timeout: 10000 });
+    await page.waitForSelector('input[name="email"], input[name="account"], #account', { timeout: 10000 });
 
-    const accInput = await page.$('input[name="account"], input[name="name"], input[name="email"], #account');
+    const accInput = await page.$('input[name="email"], input[name="account"], input[name="name"], #account');
     const passInput = await page.$('input[name="password"], input[type="password"], #password');
 
     if (!accInput || !passInput) {
@@ -301,18 +306,24 @@ async function loginRubinot(page, accountName, password) {
     await passInput.click({ clickCount: 3 });
     await passInput.type(password);
 
-    const submitBtn = await page.$('button[type="submit"], input[type="submit"]');
-    if (submitBtn) {
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {}),
-        submitBtn.click()
-      ]);
-    } else {
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {}),
-        page.keyboard.press('Enter')
-      ]);
+    // Clicar no botão 'Entrar'
+    const buttons = await page.$$('button[type="submit"], button');
+    let enterBtn = null;
+    for (const btn of buttons) {
+      const txt = await page.evaluate(el => el.innerText, btn);
+      if (txt && txt.trim().toLowerCase() === 'entrar') {
+        enterBtn = btn;
+        break;
+      }
     }
+
+    if (enterBtn) {
+      await enterBtn.click();
+    } else {
+      await page.keyboard.press('Enter');
+    }
+
+    await new Promise(r => setTimeout(r, 3000));
 
     const afterUrl = page.url();
     const content = await page.content();
@@ -322,7 +333,7 @@ async function loginRubinot(page, accountName, password) {
       return false;
     }
 
-    return !afterUrl.includes('/login');
+    return true;
   } catch (err) {
     console.error('[AutoInvite] Erro durante o login:', err.message);
     return false;
@@ -332,12 +343,27 @@ async function loginRubinot(page, accountName, password) {
 /**
  * Função de auxílio para Convidar Personagem na Guilda
  */
-async function inviteCharacter(page, guildName, characterName) {
+async function inviteCharacter(page, world, guildName, characterName) {
   try {
+    // 1. Ir para a página de guildas
+    await page.goto('https://rubinot.com.br/guilds', { waitUntil: 'networkidle2', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 2000));
+
+    // 2. Selecionar o mundo no dropdown
+    const worldKey = world.toLowerCase();
+    const worldId = WORLD_IDS[worldKey] || '11';
+
+    const select = await page.$('select');
+    if (select) {
+      await page.select('select', worldId).catch(() => {});
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    // 3. Navegar para a página da guilda
     const encodedGuild = encodeURIComponent(guildName);
     const targetUrl = `https://rubinot.com.br/guilds/${encodedGuild}`;
-
     await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 2000));
 
     let inviteInput = await page.$('input[name="name"], input[name="character_name"], input[name="invite_name"], input[placeholder*="Personagem"], input[placeholder*="Character"]');
 
@@ -347,7 +373,7 @@ async function inviteCharacter(page, guildName, characterName) {
         const text = await page.evaluate(el => el.textContent, btn);
         if (text && (text.toLowerCase().includes('convidar') || text.toLowerCase().includes('invite'))) {
           await btn.click().catch(() => {});
-          await page.waitForTimeout(1000);
+          await new Promise(r => setTimeout(r, 1000));
           break;
         }
       }
@@ -383,13 +409,11 @@ async function inviteCharacter(page, guildName, characterName) {
 
     const inviteBtn = await page.$('button[type="submit"], input[value*="Invite"], input[value*="Convidar"]');
     if (inviteBtn) {
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {}),
-        inviteBtn.click()
-      ]);
+      await inviteBtn.click();
+      await new Promise(r => setTimeout(r, 2000));
     } else {
       await page.keyboard.press('Enter');
-      await page.waitForTimeout(2000);
+      await new Promise(r => setTimeout(r, 2000));
     }
 
     const pageContent = await page.content();
