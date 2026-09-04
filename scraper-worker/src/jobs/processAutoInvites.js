@@ -10,7 +10,7 @@ puppeteer.use(StealthPlugin());
 // ==========================================
 // CONFIGURAÇÕES DA PLANILHA E CONTAS PADRÃO
 // ==========================================
-const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/11ODx6WKc8qrlp_QLffMLgn9M95o42JiDhgUnG1w9K5Y/edit?usp=sharing';
+const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/11ODx6WKc8qrlp_QLffMLgn9M95o42JiDhgUnG1w9K5Y/export?format=csv';
 
 const DEFAULT_ACCOUNTS = {
   vesperia: { world: 'Vesperia', account_name: 'pifot16+maker9182@gmail.com', password: 'Liususu!28@', guild_name: 'Shell' },
@@ -67,9 +67,9 @@ async function syncGoogleSheetInvites() {
   try {
     let csvUrl = sheetUrl;
     if (sheetUrl.includes('/edit')) {
-      csvUrl = sheetUrl.replace(/\/edit.*$/, '/gviz/tq?tqx=out:csv');
-    } else if (!sheetUrl.includes('out:csv')) {
-      csvUrl = `${sheetUrl.replace(/\/$/, '')}/gviz/tq?tqx=out:csv`;
+      csvUrl = sheetUrl.replace(/\/edit.*$/, '/export?format=csv');
+    } else if (!sheetUrl.includes('export?format=csv')) {
+      csvUrl = 'https://docs.google.com/spreadsheets/d/11ODx6WKc8qrlp_QLffMLgn9M95o42JiDhgUnG1w9K5Y/export?format=csv';
     }
 
     const response = await fetch(csvUrl, { timeout: 15000 });
@@ -87,14 +87,21 @@ async function syncGoogleSheetInvites() {
       // Mapeamento das Colunas da Planilha:
       // B (index 1) = Sistema ("invite")
       // C (index 2) = Nome do Personagem (Pode ser separado por vírgula)
-      // D (index 3) = Status de Processamento ("Pendente", "Processando", "Finalizado")
+      // D (index 3) = Status de Processamento ("Pendente", "", "Concluido", "Finalizado")
+      // F (index 5) = Status do Invite ("Processado", "Sucesso", etc.)
       // G (index 6) = Servidor de Origem/Destino ("Auroria", "Belaria", etc.)
       const sistema = (cols[1] || '').replace(/"/g, '').trim().toLowerCase();
       const rawChar = (cols[2] || '').replace(/"/g, '').trim();
-      const statusD = (cols[3] || '').replace(/"/g, '').trim();
+      const statusD = (cols[3] || '').replace(/"/g, '').trim().toLowerCase();
+      const statusF = (cols[5] || '').replace(/"/g, '').trim().toLowerCase();
       const servidor = (cols[6] || '').replace(/"/g, '').trim() || 'Auroria';
 
-      if (sistema === 'invite' && rawChar && statusD.toLowerCase() === 'pendente') {
+      const isPending = (statusD === '' || statusD === 'pendente') &&
+                        statusD !== 'concluido' &&
+                        statusD !== 'finalizado' &&
+                        statusF !== 'processado';
+
+      if (sistema === 'invite' && rawChar && isPending) {
         // Tratar lista de chars separados por vírgula em Coluna C
         const charList = rawChar.split(',').map(c => c.trim()).filter(Boolean);
 
@@ -113,7 +120,7 @@ async function syncGoogleSheetInvites() {
               world: servidor,
               guild_name: 'Shell',
               status: 'PENDING',
-              requested_by: 'Planilha Google'
+              requested_by: `Planilha Google (Linha ${i+1})`
             });
             addedCount++;
           }
