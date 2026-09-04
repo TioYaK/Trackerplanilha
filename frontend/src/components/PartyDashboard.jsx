@@ -63,37 +63,40 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
       const lastSSTime = getLastSS();
 
+      const orFilterName = party.members.map(m => 'name.ilike.' + m).join(',');
+      const orFilterChar = party.members.map(m => 'character_name.ilike.' + m).join(',');
+
       let logs = [];
       const { data, error } = await supabase
         .from('historical_sessions')
         .select('character_name, xp_gained, session_end, end_level')
+        .or(orFilterChar)
         .gte('session_end', historyStartDate)
         .order('session_end', { ascending: true });
         
       if (!error && data) {
-        const partyMemberSet = new Set(party.members.map(m => m.toLowerCase()));
-        logs = data.filter(d => partyMemberSet.has(d.character_name.toLowerCase()));
+        logs = data;
       }
       
       // Busca estado atual (Edge Computing) para mesclar com as sessões finalizadas
       let currentStates = [];
       const { data: states } = await supabase
         .from('current_character_state')
-        .select('*');
+        .select('*')
+        .or(orFilterChar);
         
       if (states) {
-        const partyMemberSet = new Set(party.members.map(m => m.toLowerCase()));
-        currentStates = states.filter(s => partyMemberSet.has(s.character_name.toLowerCase()));
+        currentStates = states;
       }
       
       let guildData = [];
       const { data: gData } = await supabase
         .from('guild_members')
-        .select('name, level');
+        .select('name, level')
+        .or(orFilterName);
         
       if (gData) {
-        const partyMemberSet = new Set(party.members.map(m => m.toLowerCase()));
-        guildData = gData.filter(g => partyMemberSet.has(g.name.toLowerCase()));
+        guildData = gData;
       }
 
       if (logs) {
