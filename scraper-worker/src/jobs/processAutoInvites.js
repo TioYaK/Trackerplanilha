@@ -21,11 +21,11 @@ const WORLD_IDS = {
 };
 
 const DEFAULT_ACCOUNTS = {
-  vesperia: { world: 'Vesperia', account_name: 'pifot16+maker9182@gmail.com', password: 'Liususu!28@', guild_name: 'Shell' },
-  auroria: { world: 'Auroria', account_name: 'pifot16+maker781272@gmail.com', password: 'Liususu!28@3', guild_name: 'Shell' },
-  bellum: { world: 'BELLUM', account_name: 'pifot16+mak3r78372@gmail.com', password: 'Liusas!2asd', guild_name: 'Shell' },
-  belaria: { world: 'Belaria', account_name: 'pifot16+guizera@gmail.com', password: 'Ljajhsj@J7172', guild_name: 'Shell' },
-  tenebrium: { world: 'Tenebrium', account_name: 'pifot16+rubinot2@gmail.com', password: '88100267hH**', guild_name: 'Shell' },
+  vesperia: { world: 'Vesperia', account_name: 'pifot16+maker9182@gmail.com', password: 'Liususu!28@', guild_name: 'Shellpatrocina' },
+  auroria: { world: 'Auroria', account_name: 'pifot16+maker781272@gmail.com', password: 'Liususu!28@3', guild_name: 'Shellpatrocina' },
+  bellum: { world: 'BELLUM', account_name: 'pifot16+mak3r78372@gmail.com', password: 'Liusas!2asd', guild_name: 'Shellpatrocina' },
+  belaria: { world: 'Belaria', account_name: 'pifot16+guizera@gmail.com', password: 'Ljajhsj@J7172', guild_name: 'Shellpatrocina' },
+  tenebrium: { world: 'Tenebrium', account_name: 'pifot16+rubinot2@gmail.com', password: '88100267hH**', guild_name: 'Shellpatrocina' },
 };
 
 function findChrome() {
@@ -247,7 +247,7 @@ export async function runProcessAutoInvites() {
 
         // Processar cada convite deste mundo
         for (const invite of invites) {
-          const guildTarget = invite.guild_name || leaderAcc.guild_name || 'Shell';
+          const guildTarget = invite.guild_name || leaderAcc.guild_name || process.env.GUILD_NAME || 'Shellpatrocina';
           console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}' (${world})...`);
 
           const result = await inviteCharacter(page, world, guildTarget, invite.character_name);
