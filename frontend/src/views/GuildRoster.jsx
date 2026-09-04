@@ -46,14 +46,32 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
       return allData;
     };
 
+    const fetchStatesP = async () => {
+      let allStates = [];
+      let page = 0;
+      while (true) {
+        const { data } = await supabase
+          .from('current_character_state')
+          .select('character_name, xp_total, session_start_xp')
+          .not('session_start_xp', 'is', null)
+          .range(page * 1000, (page + 1) * 1000 - 1);
+        if (!data || data.length === 0) break;
+        allStates.push(...data);
+        if (data.length < 1000) break;
+        page++;
+      }
+      return allStates;
+    };
+
     const fetchProfilesP = supabase
       .from('profiles')
       .select('main_character, avatar_url')
       .not('avatar_url', 'is', null);
 
-    const [allData, { data: profs }] = await Promise.all([
+    const [allData, { data: profs }, states] = await Promise.all([
       fetchRosterP(),
-      fetchProfilesP
+      fetchProfilesP,
+      fetchStatesP()
     ]);
     
     if (profs) {
@@ -66,7 +84,23 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
       setAvatarsMap(map);
     }
 
-    setMembers(allData);
+    const stateMap = new Map();
+    if (states) {
+      states.forEach(s => {
+        const activeXp = Math.max(0, (s.xp_total || 0) - (s.session_start_xp || s.xp_total || 0));
+        if (activeXp > 0) {
+          stateMap.set(s.character_name.toLowerCase(), activeXp);
+        }
+      });
+    }
+
+    const mergedData = allData.map(m => {
+      const activeXp = stateMap.get(m.name.toLowerCase()) || 0;
+      const totalXp = (m.xp_gained_24h || 0) + activeXp;
+      return { ...m, xp_gained_24h: totalXp };
+    });
+
+    setMembers(mergedData);
     setLoading(false);
   };
 

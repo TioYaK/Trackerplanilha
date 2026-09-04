@@ -102,7 +102,31 @@ export default function GlobalTracker() {
             if (rosterData.length < 1000) break; // optimize: if less than max page, it's the last one
             page++;
           }
-          return allRoster;
+
+          let allStates = [];
+          let statePage = 0;
+          while (true) {
+            const { data: stateData } = await supabase
+              .from('current_character_state')
+              .select('character_name, xp_total, session_start_xp')
+              .not('session_start_xp', 'is', null)
+              .range(statePage * 1000, (statePage + 1) * 1000 - 1);
+            if (!stateData || stateData.length === 0) break;
+            allStates.push(...stateData);
+            if (stateData.length < 1000) break;
+            statePage++;
+          }
+
+          const stateMap = new Map();
+          allStates.forEach(s => {
+            const activeXp = Math.max(0, (s.xp_total || 0) - (s.session_start_xp || s.xp_total || 0));
+            if (activeXp > 0) stateMap.set(s.character_name.toLowerCase(), activeXp);
+          });
+
+          return allRoster.map(m => {
+            const activeXp = stateMap.get(m.name.toLowerCase()) || 0;
+            return { ...m, xp_gained_24h: (m.xp_gained_24h || 0) + activeXp };
+          });
         };
 
         const [
