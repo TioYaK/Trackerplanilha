@@ -104,10 +104,7 @@ async function syncGoogleSheetInvites() {
       const statusF = (cols[5] || '').replace(/"/g, '').trim().toLowerCase();
       const servidor = (cols[6] || '').replace(/"/g, '').trim() || 'Auroria';
 
-      const isPending = (statusD === '' || statusD === 'pendente') &&
-                        statusD !== 'concluido' &&
-                        statusD !== 'finalizado' &&
-                        statusF !== 'processado';
+      const isPending = statusD === 'pendente';
 
       if (sistema === 'invite' && rawChar && isPending) {
         const charList = rawChar.split(',').map(c => c.trim()).filter(Boolean);
