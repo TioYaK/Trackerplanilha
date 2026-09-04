@@ -7,6 +7,17 @@ import fs from 'fs';
 
 puppeteer.use(StealthPlugin());
 
+// ==========================================
+// CONTAS DOS LÍDERES CADASTRADAS POR SERVIDOR
+// ==========================================
+const DEFAULT_ACCOUNTS = {
+  vesperia: { world: 'Vesperia', account_name: 'pifot16+maker9182@gmail.com', password: 'Liususu!28@', guild_name: 'Shell' },
+  auroria: { world: 'Auroria', account_name: 'pifot16+maker781272@gmail.com', password: 'Liususu!28@3', guild_name: 'Shell' },
+  bellum: { world: 'BELLUM', account_name: 'pifot16+mak3r78372@gmail.com', password: 'Liusas!2asd', guild_name: 'Shell' },
+  belaria: { world: 'Belaria', account_name: 'pifot16+guizera@gmail.com', password: 'Ljajhsj@J7172', guild_name: 'Shell' },
+  tenebrium: { world: 'Tenebrium', account_name: 'pifot16+rubinot2@gmail.com', password: '88100267hH**', guild_name: 'Shell' },
+};
+
 function findChrome() {
   const candidates = [
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -23,12 +34,78 @@ function findChrome() {
 }
 
 /**
+ * Busca convites diretamente de uma Planilha do Google via URL/CSV
+ */
+async function syncGoogleSheetInvites() {
+  const sheetUrl = process.env.GOOGLE_SHEET_URL || process.env.GOOGLE_SHEETS_CSV_URL;
+  if (!sheetUrl) return;
+
+  try {
+    // Converter URL normal de edição do Google Sheets para o endpoint CSV export
+    let csvUrl = sheetUrl;
+    if (sheetUrl.includes('/edit')) {
+      csvUrl = sheetUrl.replace(/\/edit.*$/, '/gviz/tq?tqx=out:csv');
+    } else if (!sheetUrl.includes('out:csv')) {
+      csvUrl = `${sheetUrl.replace(/\/$/, '')}/gviz/tq?tqx=out:csv`;
+    }
+
+    const response = await fetch(csvUrl, { timeout: 15000 });
+    if (!response.ok) return;
+
+    const csvText = await response.text();
+    const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length <= 1) return;
+
+    console.log(`[AutoInvite] 📊 Lendo planilha do Google (${lines.length - 1} linhas)...`);
+
+    for (let i = 1; i < lines.length; i++) {
+      // Parser simples de CSV (remove aspas duplas)
+      const columns = lines[i].split(',').map(col => col.replace(/^"|"$/g, '').trim());
+
+      const charName = columns[0];
+      const world = columns[1] || 'Auroria';
+      const guild = columns[2] || 'Shell';
+      const status = columns[3] ? columns[3].toUpperCase() : '';
+
+      // Se não houver nome de char ou se já estiver marcado como CONVIDADO/OK na planilha, ignora
+      if (!charName || status.includes('CONVIDADO') || status.includes('OK') || status.includes('SUCCESS')) {
+        continue;
+      }
+
+      // Verificar se já existe na fila do Supabase
+      const { data: existing } = await supabase
+        .from('guild_invites_queue')
+        .select('id, status')
+        .ilike('character_name', charName)
+        .ilike('world', world)
+        .maybeSingle();
+
+      if (!existing) {
+        console.log(`[AutoInvite] 📥 Novo char detectado na Planilha do Google: '${charName}' (${world})`);
+        await supabase.from('guild_invites_queue').insert({
+          character_name: charName,
+          world: world,
+          guild_name: guild,
+          status: 'PENDING',
+          requested_by: 'Planilha Google'
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[AutoInvite] Erro ao sincronizar Planilha do Google:', err.message);
+  }
+}
+
+/**
  * Executa o processamento de convites de guilda pendentes na fila
  */
 export async function runProcessAutoInvites() {
   console.log('[AutoInvite] 🔍 Verificando fila de convites pendentes...');
 
   try {
+    // 0. Sincronizar planilha do Google se a URL estiver configurada
+    await syncGoogleSheetInvites();
+
     // 1. Buscar convites pendentes
     const { data: pendingInvites, error: fetchErr } = await supabase
       .from('guild_invites_queue')
@@ -49,7 +126,7 @@ export async function runProcessAutoInvites() {
 
     console.log(`[AutoInvite] 📋 Encontrados ${pendingInvites.length} convites para processar.`);
 
-    // 2. Marcar como IN_PROGRESS para evitar que outro worker processe ao mesmo tempo
+    // 2. Marcar como IN_PROGRESS
     const inviteIds = pendingInvites.map(i => i.id);
     await supabase
       .from('guild_invites_queue')
@@ -81,15 +158,23 @@ export async function runProcessAutoInvites() {
       for (const [world, invites] of Object.entries(invitesByWorld)) {
         console.log(`\n[AutoInvite] 🌐 Iniciando lote para o mundo: ${world} (${invites.length} convites)`);
 
-        // Buscar conta do líder do servidor
-        const { data: leaderAcc, error: accErr } = await supabase
+        // Buscar conta no banco ou usar conta pré-definida
+        let leaderAcc = null;
+        const { data: dbAcc } = await supabase
           .from('guild_leader_accounts')
           .select('*')
           .ilike('world', world)
           .maybeSingle();
 
-        if (accErr || !leaderAcc) {
-          const errMsg = `Nenhuma conta de líder cadastrada para o mundo '${world}' em 'guild_leader_accounts'.`;
+        if (dbAcc) {
+          leaderAcc = dbAcc;
+        } else {
+          const defaultKey = world.toLowerCase();
+          leaderAcc = DEFAULT_ACCOUNTS[defaultKey] || null;
+        }
+
+        if (!leaderAcc) {
+          const errMsg = `Nenhuma conta de líder cadastrada para o mundo '${world}'.`;
           console.error(`[AutoInvite] ❌ ${errMsg}`);
 
           for (const inv of invites) {
@@ -155,13 +240,11 @@ async function loginRubinot(page, accountName, password) {
   try {
     await page.goto('https://rubinot.com.br/account/login', { waitUntil: 'networkidle2', timeout: 30000 });
 
-    // Verificar se já está logado
     const currentUrl = page.url();
     if (currentUrl.includes('/account/manage') || currentUrl.includes('/account/dashboard')) {
       return true;
     }
 
-    // Preencher formulário de login
     await page.waitForSelector('input[name="account"], input[name="name"], input[name="email"], #account', { timeout: 10000 });
 
     const accInput = await page.$('input[name="account"], input[name="name"], input[name="email"], #account');
@@ -172,14 +255,12 @@ async function loginRubinot(page, accountName, password) {
       return false;
     }
 
-    // Digitar credenciais
     await accInput.click({ clickCount: 3 });
     await accInput.type(accountName);
 
     await passInput.click({ clickCount: 3 });
     await passInput.type(password);
 
-    // Clicar em Entrar / Submit
     const submitBtn = await page.$('button[type="submit"], input[type="submit"]');
     if (submitBtn) {
       await Promise.all([
@@ -193,7 +274,6 @@ async function loginRubinot(page, accountName, password) {
       ]);
     }
 
-    // Verificar se o login teve sucesso
     const afterUrl = page.url();
     const content = await page.content();
 
@@ -235,7 +315,6 @@ async function inviteCharacter(page, guildName, characterName) {
     }
 
     if (!inviteInput) {
-      // Tentativa fallback via fetch interno
       const submitResult = await page.evaluate(async (gName, cName) => {
         try {
           const res = await fetch(`/api/guilds/${encodeURIComponent(gName)}/invite`, {
