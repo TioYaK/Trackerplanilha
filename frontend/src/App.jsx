@@ -7,6 +7,7 @@ import GuildRoster from './views/GuildRoster';
 import WarAttendance from './views/WarAttendance';
 import BazaarSniper from './views/BazaarSniper';
 import RadarHunters from './views/RadarHunters';
+import RespawnTracker from './views/RespawnTracker';
 import PlayerDashboard from './components/PlayerDashboard';
 import PartyDashboard from './components/PartyDashboard';
 import ReportExport from './components/ReportExport';
@@ -27,7 +28,7 @@ import { supabase } from './lib/supabase';
 // Tabs padrão visíveis quando não há configuração no banco
 const DEFAULT_VISIBLE_TABS = [
   'live', 'radar', 'roster', 'planilha', 'contribute',
-  'bank', 'market', 'loot', 'tracker', 'extreme', 'analytics',
+  'bank', 'market', 'loot', 'tracker', 'extreme', 'analytics', 'respawns'
 ];
 
 export default function App() {
@@ -135,6 +136,7 @@ export default function App() {
       case 'live':    return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
       case 'roster':  return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
       case 'attendance': return <WarAttendance />;
+      case 'respawns': return <RespawnTracker isAdmin={isAdmin} />;
       case 'bazaar': return <BazaarSniper />;
       case 'radar':   return <RadarHunters isAdmin={isAdmin} />;
       case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;

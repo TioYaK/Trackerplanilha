@@ -42,6 +42,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     radar: { label: 'Radar de Inimigos (Hunted)', icon: <ShieldAlert size={16} /> },
     tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
     planilha: { label: 'Controle de Hunts & PTs', icon: <FileSpreadsheet size={16} /> },
+    respawns: { label: 'Respawns & Caves', icon: <ShieldAlert size={16} /> },
     bank: { label: 'Tesouraria da Guilda', icon: <Landmark size={16} /> },
     market: { label: 'Mercado Interno (Trocas)', icon: <Store size={16} /> },
     extreme: { label: 'Análise de Jogadores', icon: <Crosshair size={16} /> },
@@ -58,7 +59,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     {
       title: 'Operações e Radar',
       icon: <Activity size={18} />,
-      items: ['live', 'radar', 'bazaar', 'extreme']
+      items: ['live', 'radar', 'bazaar', 'extreme', 'respawns']
     },
     {
       title: 'Gestão da Guilda',
