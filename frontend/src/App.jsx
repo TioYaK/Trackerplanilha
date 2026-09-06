@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import TopNav from './components/TopNav';
-import ActiveClaimsSidebar from './components/ActiveClaimsSidebar';
 import LiveDashboard from './views/LiveDashboard';
 import GlobalTracker from './components/GlobalTracker';
 import PlanilhaManager from './views/PlanilhaManager';
@@ -174,8 +173,7 @@ export default function App() {
         isAdmin={isAdmin}
         visibleTabs={visibleTabs ?? DEFAULT_VISIBLE_TABS}
       />
-      <ActiveClaimsSidebar />
-      <main className="w-full">
+            <main className="w-full">
         {renderView()}
       </main>
     </div>
