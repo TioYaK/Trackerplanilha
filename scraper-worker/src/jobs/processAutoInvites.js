@@ -13,7 +13,7 @@ async function updateSheetIfApplicable(invite, updates) {
     const matches = [...invite.requested_by.matchAll(/Linha (\d+)/g)];
     for (const match of matches) {
       if (match && match[1]) {
-        await updateSheetRow(parseInt(match[1]), updates);
+        await new Promise(r => setTimeout(r, 1000)); await updateSheetRow(parseInt(match[1]), updates);
       }
     }
   }

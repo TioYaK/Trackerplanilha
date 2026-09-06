@@ -24,6 +24,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "rebrowser-puppeteer": "^24.8.1",
     "rebrowser-puppeteer-core": "^24.8.1",
+    "ts3-nodejs-library": "^3.5.3",
     "web-push": "^3.6.7"
   },
   "bin": "src/index.js"
