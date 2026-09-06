@@ -8,7 +8,7 @@ export default function RespawnTracker({ isAdmin }) {
 
   async function fetchData() {
     const { data, error } = await supabase.from('respawns').select('*').order('id');
-    if (!Data) return;
+    if (!data) return;
     setRespawns(data);
   }
 
@@ -42,7 +42,7 @@ export default function RespawnTracker({ isAdmin }) {
 
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredRespawns.map(respawn => (
-            <div key={respawn_id} className="bg-black/40 border border-tibia-border/50 rounded-md p-4 hover:border-tibia-primary/transition-colors flex flex-col">
+            <div key={respawn.id} className="bg-black/40 border border-tibia-border/50 rounded-md p-4 hover:border-tibia-primary/50 transition-colors flex flex-col">
               <div className="flex justify-between items-start mb-2">
                 <div className="font-bold text-tibia-primary">{respawn.name}</div>
                 <div className="bg-tibia-primary/10 text-tibia-primary xs px-2 py-0.5 rounded-full font-mono font-bold">{respawn.id}</div>
