@@ -1,11 +1,23 @@
 'use strict';
 
 import { supabase } from '../db.js';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import fs from 'fs';
+import puppeteer from 'rebrowser-puppeteer'; // Usando fork anti-detecção
 
-puppeteer.use(StealthPlugin());
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { updateSheetRow } from '../lib/googleSheets.js';
+
+async function updateSheetIfApplicable(invite, updates) {
+  if (invite.requested_by && invite.requested_by.includes('Linha')) {
+    const matches = [...invite.requested_by.matchAll(/Linha (\d+)/g)];
+    for (const match of matches) {
+      if (match && match[1]) {
+        await updateSheetRow(parseInt(match[1]), updates);
+      }
+    }
+  }
+}
 
 // ==========================================
 // CONFIGURAÇÕES DA PLANILHA E CONTAS PADRÃO
@@ -21,19 +33,19 @@ const WORLD_IDS = {
 };
 
 const DEFAULT_ACCOUNTS = {
-  vesperia: { world: 'Vesperia', account_name: 'pifot16+maker9182@gmail.com', password: 'Liususu!28@', guild_name: 'Shellpatrocina' },
+  vesperia: { world: 'Vesperia', account_name: 'pifot16+maker9182@gmail.com', password: 'Liususu!28@', guild_name: 'Battlestorm Vesperia' },
   auroria: { world: 'Auroria', account_name: 'pifot16+maker781272@gmail.com', password: 'Liususu!28@3', guild_name: 'Shellpatrocina' },
-  bellum: { world: 'BELLUM', account_name: 'pifot16+mak3r78372@gmail.com', password: 'Liusas!2asd', guild_name: 'Shellpatrocina' },
-  belaria: { world: 'Belaria', account_name: 'pifot16+guizera@gmail.com', password: 'Ljajhsj@J7172', guild_name: 'Shellpatrocina' },
-  tenebrium: { world: 'Tenebrium', account_name: 'pifot16+rubinot2@gmail.com', password: '88100267hH**', guild_name: 'Shellpatrocina' },
+  bellum: { world: 'BELLUM', account_name: 'pifot16+mak3r78372@gmail.com', password: 'Liusas!2asd', guild_name: 'Battlestorm Bellum' },
+  belaria: { world: 'Belaria', account_name: 'pifot16+guizera@gmail.com', password: 'Ljajhsj@J7172', guild_name: 'Battlestorm Belaria' },
+  tenebrium: { world: 'Tenebrium', account_name: 'pifot16+rubinot2@gmail.com', password: '88100267hH**', guild_name: 'Battlestorm Retro' },
 };
 
 function findChrome() {
   const candidates = [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     process.env.CHROME_PATH,
   ].filter(Boolean);
 
@@ -105,14 +117,15 @@ async function syncGoogleSheetInvites() {
       const servidor = (cols[6] || '').replace(/"/g, '').trim() || 'Auroria';
 
       const isPending = statusD === 'pendente';
+      const currentReqBy = `Linha ${i + 1}`;
 
-      if (sistema === 'invite' && rawChar && isPending) {
+      if ((sistema === 'invite' || sistema === '') && rawChar && isPending) {
         const charList = rawChar.split(',').map(c => c.trim()).filter(Boolean);
 
         for (const charName of charList) {
           const { data: existing } = await supabase
             .from('guild_invites_queue')
-            .select('id, status')
+            .select('id, status, requested_by')
             .ilike('character_name', charName)
             .ilike('world', servidor)
             .maybeSingle();
@@ -123,8 +136,19 @@ async function syncGoogleSheetInvites() {
               world: servidor,
               guild_name: 'Shell',
               status: 'PENDING',
-              requested_by: `Planilha Google (Linha ${i+1})`
+              requested_by: currentReqBy
             });
+            addedCount++;
+          } else {
+            let newReqBy = existing.requested_by || '';
+            if (!newReqBy.includes(currentReqBy)) {
+              newReqBy += (newReqBy ? ', ' : '') + currentReqBy;
+            }
+            
+            await supabase.from('guild_invites_queue').update({
+              status: 'PENDING',
+              requested_by: newReqBy
+            }).eq('id', existing.id);
             addedCount++;
           }
         }
@@ -137,6 +161,47 @@ async function syncGoogleSheetInvites() {
   } catch (err) {
     console.error('[AutoInvite] Erro ao sincronizar Planilha do Google:', err.message);
   }
+}
+
+// ==========================================
+// LÓGICA DE CÓPIA DE PERFIL DO LAUNCHER
+// ==========================================
+const RUBINOT_PROFILE = path.join(os.homedir(), 'AppData', 'Local', 'rubinot-launcher', 'EBWebView');
+const WORK_PROFILE_BASE = path.join(process.cwd(), 'worker_profiles');
+
+function copyDirSafe(src, dest) {
+  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+  let files;
+  try { files = fs.readdirSync(src); } catch { return; }
+  for (const file of files) {
+    const srcPath = path.join(src, file);
+    const destPath = path.join(dest, file);
+    try {
+      const stat = fs.statSync(srcPath);
+      if (stat.isDirectory()) {
+        copyDirSafe(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    } catch { /* arquivo bloqueado, pula */ }
+  }
+}
+
+function ensureProfile(world) {
+  const profileDest = path.join(WORK_PROFILE_BASE, `launcher_${world}`);
+  const srcDefault = path.join(WORK_PROFILE_BASE, 'auroria_launcher', 'Default');
+  const destDefault = path.join(profileDest, 'Default');
+  
+  // Se o perfil do mundo não existir, copia do auroria_launcher (que já tem o cookie cf_clearance validado para o Chrome)
+  if (!fs.existsSync(destDefault) && fs.existsSync(srcDefault)) {
+    console.log(`[PROFILE] Copiando perfil validado do Chrome para mundo ${world}...`);
+    copyDirSafe(srcDefault, destDefault);
+  }
+  
+  if (!fs.existsSync(profileDest)) {
+    fs.mkdirSync(profileDest, { recursive: true });
+  }
+  return profileDest;
 }
 
 /**
@@ -176,6 +241,10 @@ export async function runProcessAutoInvites() {
       .update({ status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
       .in('id', inviteIds);
 
+    for (const inv of pendingInvites) {
+      await updateSheetIfApplicable(inv, { statusD: 'Processando', workerE: `Worker-${inv.world || 'Auto'}` });
+    }
+
     // 3. Agrupar por Mundo/Servidor
     const invitesByWorld = {};
     for (const invite of pendingInvites) {
@@ -186,68 +255,81 @@ export async function runProcessAutoInvites() {
 
     // 4. Inicializar o browser
     const chromeExe = findChrome();
-    const launchOpts = {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--window-size=1920,1080'],
-    };
-    if (chromeExe) launchOpts.executablePath = chromeExe;
+    
+    // Configuração base (agora mudou para instanciar dentro do loop de mundos)
+    for (const [world, invites] of Object.entries(invitesByWorld)) {
+      console.log(`\n[AutoInvite] 🌐 Iniciando lote para o mundo: ${world} (${invites.length} convites)`);
 
-    const browser = await puppeteer.launch(launchOpts);
+      let leaderAcc = null;
+      const { data: dbAcc } = await supabase
+        .from('guild_leader_accounts')
+        .select('*')
+        .ilike('world', world)
+        .maybeSingle();
 
-    try {
-      const page = await browser.newPage();
-      await page.setViewport({ width: 1920, height: 1080 });
+      if (dbAcc) {
+        leaderAcc = dbAcc;
+      } else {
+        const defaultKey = world.toLowerCase();
+        leaderAcc = DEFAULT_ACCOUNTS[defaultKey] || null;
+      }
 
-      for (const [world, invites] of Object.entries(invitesByWorld)) {
-        console.log(`\n[AutoInvite] 🌐 Iniciando lote para o mundo: ${world} (${invites.length} convites)`);
+      if (!leaderAcc) {
+        const errMsg = `Nenhuma conta de líder cadastrada para o mundo '${world}'.`;
+        console.error(`[AutoInvite] ❌ ${errMsg}`);
 
-        let leaderAcc = null;
-        const { data: dbAcc } = await supabase
-          .from('guild_leader_accounts')
-          .select('*')
-          .ilike('world', world)
-          .maybeSingle();
-
-        if (dbAcc) {
-          leaderAcc = dbAcc;
-        } else {
-          const defaultKey = world.toLowerCase();
-          leaderAcc = DEFAULT_ACCOUNTS[defaultKey] || null;
+        for (const inv of invites) {
+          await supabase
+            .from('guild_invites_queue')
+            .update({ status: 'FAILED', error_message: errMsg, updated_at: new Date().toISOString() })
+            .eq('id', inv.id);
+          await updateSheetIfApplicable(inv, { statusD: 'Finalizado', statusF: 'Falha: ' + errMsg });
         }
+        continue;
+      }
 
-        if (!leaderAcc) {
-          const errMsg = `Nenhuma conta de líder cadastrada para o mundo '${world}'.`;
-          console.error(`[AutoInvite] ❌ ${errMsg}`);
+      const profilePath = ensureProfile(world);
 
-          for (const inv of invites) {
-            await supabase
-              .from('guild_invites_queue')
-              .update({ status: 'FAILED', error_message: errMsg, updated_at: new Date().toISOString() })
-              .eq('id', inv.id);
-          }
-          continue;
-        }
+      console.log(`[PUPPETEER] Abrindo navegador para ${world}...`);
+      const browser = await puppeteer.launch({
+        headless: false, // Turnstile é mais permissivo quando não é headless
+        executablePath: chromeExe || undefined,
+        userDataDir: profilePath,
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox',
+          '--window-size=1280,800',
+          '--disable-blink-features=AutomationControlled',
+          '--exclude-switches=enable-automation'
+        ],
+        ignoreDefaultArgs: ['--enable-automation'],
+      });
 
+      try {
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1280, height: 800 });
+        
         // Login no RubinOT
         console.log(`[AutoInvite] 🔑 Efetuando login no RubinOT (${world}) com a conta: ${leaderAcc.account_name}...`);
         const loggedIn = await loginRubinot(page, leaderAcc.account_name, leaderAcc.password);
 
         if (!loggedIn) {
           const errMsg = `Falha ao realizar login na conta '${leaderAcc.account_name}' no RubinOT.`;
-          console.error(`[AutoInvite] ❌ ${errMsg}`);
+          console.error(`[AutoInvite] ❌ ${errMsg} O sistema tentará novamente no próximo ciclo.`);
 
+          // Em vez de falhar todos, apenas pula este mundo. 
+          // Como não atualizamos o Supabase, eles continuarão PENDING e serão tentados novamente em 30s.
           for (const inv of invites) {
-            await supabase
-              .from('guild_invites_queue')
-              .update({ status: 'FAILED', error_message: errMsg, updated_at: new Date().toISOString() })
-              .eq('id', inv.id);
+            await updateSheetIfApplicable(inv, { statusD: 'Pendente', statusF: 'Site Lento (Aguardando Retentativa)' });
           }
-          continue;
+          await browser.close();
+          continue; // Pula para o próximo mundo
         }
 
         // Processar cada convite deste mundo
         for (const invite of invites) {
-          const guildTarget = invite.guild_name || leaderAcc.guild_name || process.env.GUILD_NAME || 'Shellpatrocina';
+          let guildTarget = invite.guild_name || leaderAcc.guild_name || process.env.GUILD_NAME || 'Shellpatrocina';
+          if (guildTarget.toLowerCase() === 'shell') guildTarget = leaderAcc.guild_name || 'Shellpatrocina';
           console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}' (${world})...`);
 
           const result = await inviteCharacter(page, world, guildTarget, invite.character_name);
@@ -258,17 +340,30 @@ export async function runProcessAutoInvites() {
               .from('guild_invites_queue')
               .update({ status: 'SUCCESS', error_message: null, updated_at: new Date().toISOString() })
               .eq('id', invite.id);
+            await updateSheetIfApplicable(invite, { statusD: 'Finalizado', statusF: 'Sucesso' });
           } else {
             console.error(`[AutoInvite] ❌ Falha (${invite.character_name}): ${result.reason}`);
-            await supabase
-              .from('guild_invites_queue')
-              .update({ status: 'FAILED', error_message: result.reason, updated_at: new Date().toISOString() })
-              .eq('id', invite.id);
+            
+            const isTempError = result.reason.includes('timeout') || 
+                                result.reason.includes('Formulário de convite não encontrado');
+
+            if (isTempError) {
+               // Erro temporário (site engasgou) - Mantém pendente para o próximo ciclo!
+               console.log(`[AutoInvite] 🔄 Retentativa agendada para '${invite.character_name}' devido a lentidão do site.`);
+               await updateSheetIfApplicable(invite, { statusD: 'Pendente', statusF: 'Site Lento (Aguardando Retentativa)' });
+            } else {
+               // Erro definitivo (já tem guilda, não existe, etc) - Falha e encerra
+               await supabase
+                 .from('guild_invites_queue')
+                 .update({ status: 'FAILED', error_message: result.reason, updated_at: new Date().toISOString() })
+                 .eq('id', invite.id);
+               await updateSheetIfApplicable(invite, { statusD: 'Finalizado', statusF: 'Falha: ' + result.reason });
+            }
           }
         }
+      } finally {
+        await browser.close().catch(() => {});
       }
-    } finally {
-      await browser.close().catch(() => {});
     }
   } catch (err) {
     console.error('[AutoInvite] Erro inesperado ao processar convites:', err.message);
@@ -280,55 +375,32 @@ export async function runProcessAutoInvites() {
  */
 async function loginRubinot(page, accountName, password) {
   try {
-    await page.goto('https://rubinot.com.br/login', { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto('https://rubinot.com.br/login', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(e => console.error('[AutoInvite] Aviso de timeout no /login, prosseguindo...'));
+    await new Promise(r => setTimeout(r, 2000));
 
-    const currentUrl = page.url();
-    if (currentUrl.includes('/account/manage') || currentUrl.includes('/account/dashboard') || currentUrl.includes('/characters')) {
-      return true;
-    }
-
-    await new Promise(r => setTimeout(r, 2500));
-
-    const accInput = await page.$('input[name="email"], input[name="account"], input[name="name"], #account, input[type="email"]');
-    const passInput = await page.$('input[name="password"], input[type="password"], #password');
-
-    if (!accInput || !passInput) {
-      console.error('[AutoInvite] Inputs de login não encontrados na página.');
-      return false;
-    }
-
-    await accInput.click({ clickCount: 3 });
-    await accInput.type(accountName);
-
-    await passInput.click({ clickCount: 3 });
-    await passInput.type(password);
-
-    // Clicar no botão 'Entrar'
-    const buttons = await page.$$('button[type="submit"], button');
-    let enterBtn = null;
-    for (const btn of buttons) {
-      const txt = await page.evaluate(el => el.innerText, btn);
-      if (txt && txt.trim().toLowerCase() === 'entrar') {
-        enterBtn = btn;
-        break;
-      }
-    }
-
-    if (enterBtn) {
-      await enterBtn.click();
-    } else {
-      await page.keyboard.press('Enter');
-    }
-
-    await new Promise(r => setTimeout(r, 3000));
-
-    const afterUrl = page.url();
-    const content = await page.content();
-
-    if (content.toLowerCase().includes('senha incorreta') || content.toLowerCase().includes('invalid password')) {
-      console.error('[AutoInvite] Senha ou conta incorreta no RubinOT.');
-      return false;
-    }
+    // Usar a mesma lógica de login direto pela API do NextAuth que funcionou perfeitamente nos nossos testes
+    await page.evaluate(async (email, pass) => {
+      try {
+        const csrfRes = await fetch('/api/auth/csrf');
+        const csrfData = await csrfRes.json();
+        const params = new URLSearchParams();
+        params.append('email', email);
+        params.append('password', pass);
+        params.append('csrfToken', csrfData.csrfToken);
+        params.append('json', 'true');
+        await fetch('/api/auth/callback/credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString()
+        });
+      } catch(e) {}
+    }, accountName, password);
+    
+    await new Promise(r => setTimeout(r, 1500));
+    
+    // Atualiza a página para aplicar a sessão
+    await page.reload({ waitUntil: 'networkidle2' });
+    await new Promise(r => setTimeout(r, 1000));
 
     return true;
   } catch (err) {
@@ -342,91 +414,105 @@ async function loginRubinot(page, accountName, password) {
  */
 async function inviteCharacter(page, world, guildName, characterName) {
   try {
-    // 1. Ir para a página de guildas
-    await page.goto('https://rubinot.com.br/guilds', { waitUntil: 'networkidle2', timeout: 30000 });
-    await new Promise(r => setTimeout(r, 2000));
-
-    // 2. Selecionar o mundo no dropdown
-    const worldKey = world.toLowerCase();
-    const worldId = WORLD_IDS[worldKey] || '11';
-
-    const select = await page.$('select');
-    if (select) {
-      await page.select('select', worldId).catch(() => {});
-      await new Promise(r => setTimeout(r, 2000));
-    }
-
-    // 3. Navegar para a página da guilda
+    // 1. Ir para a página de gerenciar guilda diretamente
     const encodedGuild = encodeURIComponent(guildName);
-    const targetUrl = `https://rubinot.com.br/guilds/${encodedGuild}`;
+    const targetUrl = `https://rubinot.com.br/guilds/${encodedGuild}/manage`;
     await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
     await new Promise(r => setTimeout(r, 2000));
 
-    let inviteInput = await page.$('input[name="name"], input[name="character_name"], input[name="invite_name"], input[placeholder*="Personagem"], input[placeholder*="Character"]');
+    // Fechar banner de cookies se existir
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button'));
+      const aceitar = btns.find(b => b.innerText.includes('Aceitar'));
+      if (aceitar) aceitar.click();
+    });
+    await new Promise(r => setTimeout(r, 500));
 
-    if (!inviteInput) {
-      const buttons = await page.$$('button, a');
-      for (const btn of buttons) {
-        const text = await page.evaluate(el => el.textContent, btn);
-        if (text && (text.toLowerCase().includes('convidar') || text.toLowerCase().includes('invite'))) {
-          await btn.click().catch(() => {});
-          await new Promise(r => setTimeout(r, 1000));
-          break;
+    // Clicar na aba Convidar
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button'));
+      const btn = btns.find(b => b.innerText.trim() === 'Convidar');
+      if (btn) btn.click();
+    });
+    await new Promise(r => setTimeout(r, 1500));
+
+    // Digitar personagem
+    const input = await page.$('input[placeholder="Nome do personagem"]');
+    if (!input) {
+       await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_input_missing.png' });
+       return { success: false, reason: 'Input de convite não encontrado na página (verifique permissões).' };
+    }
+    
+    await input.click({ clickCount: 3 });
+    await input.type(characterName, { delay: 80 });
+    await new Promise(r => setTimeout(r, 500));
+
+    // Clicar botão Convidar
+    await page.evaluate(() => {
+      const inp = document.querySelector('input[placeholder="Nome do personagem"]');
+      if (inp) {
+        const parent = inp.closest('form') || inp.parentElement;
+        const btn = parent?.querySelector('button[type="submit"], button');
+        if (btn) btn.click();
+      }
+    });
+
+    // Esperar processamento do Cloudflare e resposta da página
+    let turnstileSolved = false;
+    for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        
+        // Ocultado a requisição dupla via API, já que a UI consome o token e envia o formulário automaticamente.
+        
+        if (!turnstileSolved) {
+            try {
+                const tsFrame = page.frames().find(f => f.url().includes('challenges.cloudflare.com'));
+                if (tsFrame) {
+                    const checkbox = await tsFrame.$('input[type="checkbox"]');
+                    if (checkbox) {
+                        await checkbox.click();
+                        turnstileSolved = true;
+                        // Não espera muito, no próximo tick do loop ele já vai pegar o token
+                    } else {
+                        // Tentar clicar no widget via bounding box
+                        const body = await tsFrame.$('body');
+                        if (body) {
+                           await body.click();
+                           turnstileSolved = true;
+                        }
+                    }
+                }
+            } catch(e) {}
         }
-      }
-      inviteInput = await page.$('input[name="name"], input[name="character_name"], input[name="invite_name"], input[placeholder*="Personagem"]');
-    }
-
-    if (!inviteInput) {
-      const submitResult = await page.evaluate(async (gName, cName) => {
-        try {
-          const res = await fetch(`/api/guilds/${encodeURIComponent(gName)}/invite`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ character: cName, name: cName })
-          });
-          const json = await res.json();
-          return { status: res.status, data: json };
-        } catch (e) {
-          return { error: e.message };
+        
+        // Vamos buscar frases exatas no texto da página para caso a UI tenha funcionado
+        const pageText = await page.evaluate(() => document.body.innerText.toLowerCase());
+        
+        if (pageText.includes('has been invited') || pageText.includes('foi convidado') || pageText.includes('sucesso')) {
+            return { success: true };
         }
-      }, guildName, characterName);
-
-      if (submitResult && submitResult.status === 200) {
-        return { success: true };
-      }
-      if (submitResult && submitResult.data && submitResult.data.message) {
-        return { success: false, reason: submitResult.data.message };
-      }
-      return { success: false, reason: 'Formulário de convite não encontrado no painel da guilda.' };
+        
+        if (pageText.includes('não existe') || pageText.includes('does not exist') || pageText.includes('does not live on the same world')) {
+            return { success: false, reason: 'Personagem não encontrado no RubinOT (ou está em outro mundo).' };
+        }
+        
+        if (pageText.includes('already in a guild') || pageText.includes('already belongs') || pageText.includes('already a member of')) {
+            return { success: false, reason: 'Personagem já pertence a uma guilda.' };
+        }
+        
+        // Cuidado: a UI tem um título "Convites pendentes", por isso NÃO podemos buscar só pela palavra "pendente"
+        if (pageText.includes('already been invited') || pageText.includes('já foi convidado') || pageText.includes('already invited')) {
+            return { success: false, reason: 'Personagem já possui convite pendente.' };
+        }
+        
+        if (pageText.includes('token is required') || pageText.includes('verification token')) {
+            return { success: false, reason: 'Bloqueado pelo Cloudflare (Token is required).' };
+        }
     }
-
-    await inviteInput.click({ clickCount: 3 });
-    await inviteInput.type(characterName);
-
-    const inviteBtn = await page.$('button[type="submit"], input[value*="Invite"], input[value*="Convidar"]');
-    if (inviteBtn) {
-      await inviteBtn.click();
-      await new Promise(r => setTimeout(r, 2000));
-    } else {
-      await page.keyboard.press('Enter');
-      await new Promise(r => setTimeout(r, 2000));
-    }
-
-    const pageContent = await page.content();
-    const lowerContent = pageContent.toLowerCase();
-
-    if (lowerContent.includes('não existe') || lowerContent.includes('does not exist')) {
-      return { success: false, reason: 'Personagem não encontrado no RubinOT.' };
-    }
-    if (lowerContent.includes('já possui') || lowerContent.includes('already in a guild')) {
-      return { success: false, reason: 'Personagem já pertence a uma guilda.' };
-    }
-    if (lowerContent.includes('pendente') || lowerContent.includes('already invited')) {
-      return { success: false, reason: 'Personagem já possui convite pendente.' };
-    }
-
-    return { success: true };
+    
+    // Screenshot para debugar qual foi a mensagem real do site
+    await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_timeout.png' });
+    return { success: false, reason: 'Timeout aguardando confirmação do convite.' };
   } catch (err) {
     return { success: false, reason: `Erro na navegação: ${err.message}` };
   }

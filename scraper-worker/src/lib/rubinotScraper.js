@@ -2,19 +2,16 @@
 
 import fs from 'fs';
 import path from 'path';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import puppeteer from 'rebrowser-puppeteer';
 import * as cheerio from 'cheerio';
 
-puppeteer.use(StealthPlugin());
-
-// ─── Localizar Chrome ─────────────────────────────────────────────────────────
+// ─── Localizar Chrome/Edge ─────────────────────────────────────────────────────────
 function findChrome() {
     const candidates = [
-        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
         'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
         process.env.CHROME_PATH,
     ].filter(Boolean);
 
@@ -84,7 +81,9 @@ async function initBrowser() {
             '--disable-gpu',
             '--disable-dev-shm-usage',
             '--window-size=1920,1080',
+            '--disable-blink-features=AutomationControlled',
         ],
+        ignoreDefaultArgs: ['--enable-automation']
     };
     if (chromeExe) launchOpts.executablePath = chromeExe;
 
@@ -161,13 +160,28 @@ async function safeGoto(page, url, { timeout = 30000 } = {}) {
     }
 
     if (await isCloudflareBlocked(page)) {
-        console.log('[Scraper] Challenge do Cloudflare detectado. Aguardando resolução...');
-        try {
-            await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 20000 });
-        } catch { /* não resolveu automaticamente */ }
+        console.log('[Scraper] Challenge do Cloudflare detectado. Tentando resolver...');
+        
+        let solved = false;
+        for (let i = 0; i < 15; i++) {
+            await new Promise(r => setTimeout(r, 1000));
+            
+            if (!(await isCloudflareBlocked(page))) {
+                solved = true;
+                break;
+            }
+            
+            const tsFrame = page.frames().find(f => f.url().includes('challenges.cloudflare.com'));
+            if (tsFrame) {
+                const cb = await tsFrame.$('.ctp-checkbox-label').catch(() => null);
+                if (cb) {
+                    await cb.click().catch(() => {});
+                }
+            }
+        }
 
-        if (await isCloudflareBlocked(page)) {
-            console.warn('[Scraper] Cloudflare NÃO resolvido. Reiniciando browser...');
+        if (!solved) {
+            console.warn('[Scraper] Cloudflare NÃO resolvido.');
             return null;
         }
         console.log('[Scraper] ✅ Cloudflare resolvido!');
@@ -347,7 +361,8 @@ async function scrapeRubinotCharacterPage(characterName) {
         await tempPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
         const url = `https://rubinot.com.br/characters/${encodeURIComponent(characterName)}`;
-        await tempPage.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+        const html = await safeGoto(tempPage, url, { timeout: 60000 });
+        if (!html) throw new Error('Cloudflare bloqueou o acesso ou timeout excedido.');
         await new Promise(resolve => setTimeout(resolve, 1200));
 
         const tabs = [
@@ -810,7 +825,8 @@ async function scrapePlayer(playerName) {
         await blockHeavyAssets(tempPage);
         await tempPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-        await tempPage.goto('https://rubinot.com.br/characters', { waitUntil: 'networkidle2', timeout: 30000 });
+        const html = await safeGoto(tempPage, 'https://rubinot.com.br/characters', { timeout: 30000 });
+        if (!html) throw new Error('Cloudflare bloqueou o acesso ou timeout excedido.');
         const input = await tempPage.waitForSelector('input[placeholder="Digite o nome do personagem..."]', { timeout: 10000 });
         if (!input) {
             console.warn('[Scraper] Campo de busca não encontrado.');
@@ -1008,7 +1024,8 @@ async function fetchRubinotApi(endpoint) {
     try {
         await initBrowser();
         page = await globalBrowser.newPage();
-        await page.goto('https://rubinot.com.br/deaths');
+        const html = await safeGoto(page, 'https://rubinot.com.br/deaths');
+        if (!html) throw new Error('Cloudflare bloqueou o acesso.');
         const data = await page.evaluate(async (url) => {
             const res = await fetch(url);
             return await res.json();
