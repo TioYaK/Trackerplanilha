@@ -347,7 +347,7 @@ export async function runProcessAutoInvites() {
             console.error(`[AutoInvite] ❌ Falha (${invite.character_name}): ${result.reason}`);
             
             const isTempError = result.reason.includes('timeout') || 
-                                result.reason.includes('Formulário de convite não encontrado');
+                                result.reason.includes('Formul') || result.reason.includes('Input de convite') || result.reason.includes('503');
 
             if (isTempError) {
                // Erro temporário (site engasgou) - Mantém pendente para o próximo ciclo!
@@ -519,3 +519,4 @@ async function inviteCharacter(page, world, guildName, characterName) {
     return { success: false, reason: `Erro na navegação: ${err.message}` };
   }
 }
+
