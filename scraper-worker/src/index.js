@@ -526,9 +526,14 @@ supabase
   })
   .subscribe();
 
-// Inicia polling backup a cada 15 segundos
-setInterval(checkPendingCommands, 15000);
-checkPendingCommands();
+  // Inicia polling backup a cada 15 segundos
+  setInterval(checkPendingCommands, 15000);
+  checkPendingCommands();
+  
+  // Polling de Seguranca para Invites a cada 60s (roda em paralelo a tarefas longas)
+  setInterval(() => {
+    runProcessAutoInvites();
+  }, 60000);
 
 // GATILHO DE ALARMES GERAIS (DESKTOP E WEB PUSH NOTIFICATIONS)
 const processedAlarms = new Set();
