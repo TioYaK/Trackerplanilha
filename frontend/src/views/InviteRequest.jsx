@@ -2,7 +2,16 @@ import React, { useState, useEffect } from 'react';
 
 import { supabase } from '../lib/supabase';
 
-export default function InviteRequest() {
+export default function InviteRequest({ isPublic = false }) {
+  const [clientId] = useState(() => {
+    let id = localStorage.getItem('invite_client_id');
+    if (!id) {
+      id = Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('invite_client_id', id);
+    }
+    return id;
+  });
+
   const [characterName, setCharacterName] = useState('');
   const [world, setWorld] = useState('Auroria');
   const [status, setStatus] = useState('idle'); // idle, loading, success, error
@@ -26,7 +35,7 @@ export default function InviteRequest() {
       const { data, error } = await supabase
         .from('guild_invites_queue')
         .select('*')
-        .eq('requested_by', 'WebSite')
+        .like('requested_by', isPublic ? `WebSite_${clientId}` : 'WebSite%')
         .order('created_at', { ascending: false })
         .limit(100);
       if (!error) setRecentInvites(data || []);
@@ -59,7 +68,7 @@ export default function InviteRequest() {
             world: world,
             guild_name: guildName,
             status: 'PENDING',
-            requested_by: 'WebSite'
+            requested_by: isPublic ? `WebSite_${clientId}` : 'WebSite'
           }
         ]);
 

@@ -332,7 +332,7 @@ export async function runProcessAutoInvites() {
           if (guildTarget.toLowerCase() === 'shell') guildTarget = leaderAcc.guild_name || 'Shellpatrocina';
           console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}' (${world})...`);
 
-          console.log([AutoInvite] Aguardando 5 segundos para não sobrecarregar o site...);
+          console.log(`[AutoInvite] Aguardando 5 segundos para não sobrecarregar o site...`);
           await new Promise(r => setTimeout(r, 5000));
           const result = await inviteCharacter(page, world, guildTarget, invite.character_name);
 

@@ -34,3 +34,5 @@ scraper-worker/worker_id.txt
 # Logs
 *.log
 logs/
+worker_profiles/  
+scraper-worker/google-credentials.json  

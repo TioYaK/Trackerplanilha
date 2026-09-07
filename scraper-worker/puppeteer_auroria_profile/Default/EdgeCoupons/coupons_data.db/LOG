@@ -1,0 +1,5 @@
+2026/09/04-15:59:48.244 9cc Creating DB D:\projeto mirror\TrackerPlanilhado\scraper-worker\puppeteer_auroria_profile\Default\EdgeCoupons/coupons_data.db since it was missing.
+2026/09/04-15:59:48.248 9cc Reusing MANIFEST D:\projeto mirror\TrackerPlanilhado\scraper-worker\puppeteer_auroria_profile\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/09/04-15:59:48.571 41fc Level-0 table #5: started
+2026/09/04-15:59:48.575 41fc Level-0 table #5: 683273 bytes OK
+2026/09/04-15:59:48.577 41fc Delete type=0 #3
