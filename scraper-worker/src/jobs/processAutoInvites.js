@@ -302,10 +302,19 @@ export async function runProcessAutoInvites() {
         continue;
       }
 
-      const profilePath = ensureProfile(world);
+        const profilePath = ensureProfile(world);
 
-      console.log(`[PUPPETEER] Abrindo navegador para ${world}...`);
-      const browser = await puppeteer.launch({
+        // Limpar lock files do Chrome de sessões anteriores que possam ter crashado
+        const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+        for (const lf of lockFiles) {
+          const lockPath = path.join(profilePath, lf);
+          if (fs.existsSync(lockPath)) {
+            try { fs.unlinkSync(lockPath); console.log(`[PUPPETEER] Lock file removido: ${lf}`); } catch {}
+          }
+        }
+
+        console.log(`[PUPPETEER] Abrindo navegador para ${world}...`);
+        const browser = await puppeteer.launch({
         headless: false, // Turnstile é mais permissivo quando não é headless
         executablePath: chromeExe || undefined,
         userDataDir: profilePath,
