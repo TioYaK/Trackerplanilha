@@ -567,12 +567,14 @@ async function inviteCharacter(page, world, guildName, characterName) {
             return { success: true };
         }
         
-        if (pageText.includes('nǜo existe') || pageText.includes('does not exist') || pageText.includes('does not live on the same world')) {
+        if (pageText.includes('não existe') || pageText.includes('nao existe') || pageText.includes('does not exist') || 
+            pageText.includes('player not found') || pageText.includes('character not found') ||
+            pageText.includes('does not live on the same world') || pageText.includes('not found')) {
               try {
                   const { fetchRubinotApi } = await import('../lib/rubinotScraper.js');
                   const charData = await fetchRubinotApi('/api/characters/' + encodeURIComponent(characterName));
                   if (charData && charData.character && charData.character.world) {
-                      return { success: false, reason: `Falha: Personagem está no mundo ${charData.character.world}.` };
+                      return { success: false, reason: `Personagem está no mundo ${charData.character.world}.` };
                   }
               } catch (e) {}
               return { success: false, reason: 'Personagem não encontrado no RubinOT (ou está em outro mundo).' };
