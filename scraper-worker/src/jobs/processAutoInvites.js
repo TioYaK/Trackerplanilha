@@ -214,6 +214,9 @@ export async function runProcessAutoInvites() {
     // 0. Sincronizar planilha do Google
     await syncGoogleSheetInvites();
 
+    const fiveMinsAgo = new Date(Date.now() - 5 * 60000).toISOString();
+    await supabase.from('guild_invites_queue').update({ status: 'PENDING' }).eq('status', 'IN_PROGRESS').lt('updated_at', fiveMinsAgo);
+
     // 1. Buscar convites pendentes
     const { data: pendingInvites, error: fetchErr } = await supabase
       .from('guild_invites_queue')
@@ -514,7 +517,7 @@ async function inviteCharacter(page, world, guildName, characterName) {
     
     // Screenshot para debugar qual foi a mensagem real do site
     await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_timeout.png' });
-    return { success: false, reason: 'Timeout aguardando confirmação do convite.' };
+    return { success: false, reason: 'Cloudflare bloqueou o POST (Turnstile)ção do convite.' };
   } catch (err) {
     return { success: false, reason: `Erro na navegação: ${err.message}` };
   }
