@@ -205,10 +205,18 @@ function ensureProfile(world) {
   return profileDest;
 }
 
+let isProcessing = false;
+
 /**
  * Executa o processamento de convites de guilda pendentes na fila
  */
 export async function runProcessAutoInvites() {
+  if (isProcessing) {
+    console.log('[AutoInvite] Já existe um lote em processamento. Ignorando gatilho simultâneo.');
+    return;
+  }
+  isProcessing = true;
+
   console.log('[AutoInvite] 🔍 Verificando fila de convites pendentes...');
 
   try {
@@ -239,19 +247,21 @@ export async function runProcessAutoInvites() {
     console.log(`[AutoInvite] 📋 Encontrados ${pendingInvites.length} convites para processar.`);
 
     // 2. Marcar como IN_PROGRESS
-    const inviteIds = pendingInvites.map(i => i.id);
+    const filteredInvites = pendingInvites.filter(i => (i.world || '').toLowerCase() !== 'malveria');
+    if (filteredInvites.length === 0) { console.log('[AutoInvite] Apenas convites de mundos ignorados (Malveria). Pulando.'); isProcessing = false; return; }
+    const inviteIds = filteredInvites.map(i => i.id);
     await supabase
       .from('guild_invites_queue')
       .update({ status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
       .in('id', inviteIds);
 
-    for (const inv of pendingInvites) {
+    for (const inv of filteredInvites) {
       await updateSheetIfApplicable(inv, { statusD: 'Processando', workerE: `Worker-${inv.world || 'Auto'}` });
     }
 
     // 3. Agrupar por Mundo/Servidor
     const invitesByWorld = {};
-    for (const invite of pendingInvites) {
+    for (const invite of filteredInvites) {
       const worldKey = (invite.world || 'Auroria').trim();
       if (!invitesByWorld[worldKey]) invitesByWorld[worldKey] = [];
       invitesByWorld[worldKey].push(invite);
@@ -336,8 +346,8 @@ export async function runProcessAutoInvites() {
           if (guildTarget.toLowerCase() === 'shell') guildTarget = leaderAcc.guild_name || 'Shellpatrocina';
           console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}' (${world})...`);
 
-          console.log(`[AutoInvite] Aguardando 5 segundos para não sobrecarregar o site...`);
-          await new Promise(r => setTimeout(r, 5000));
+          console.log(`[AutoInvite] Aguardando 1 minuto para não sobrecarregar o site...`);
+          await new Promise(r => setTimeout(r, 60000));
           const result = await inviteCharacter(page, world, guildTarget, invite.character_name);
 
           if (result.success) {
