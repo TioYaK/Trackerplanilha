@@ -28,7 +28,7 @@ import { supabase } from './lib/supabase';
 // Tabs padrão visíveis quando não há configuração no banco
 const DEFAULT_VISIBLE_TABS = [
   'live', 'radar', 'roster', 'planilha', 'contribute',
-  'bank', 'market', 'loot', 'tracker', 'extreme', 'analytics', 'respawns'
+  'bank', 'market', 'loot', 'tracker', 'extreme', 'respawns', 'respawns'
 ];
 
 export default function App() {

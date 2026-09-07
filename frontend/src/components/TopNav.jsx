@@ -5,7 +5,7 @@ import {
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
   Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
-  ShieldAlert, Search, FileSpreadsheet, Store
+  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
@@ -43,6 +43,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
     planilha: { label: 'Controle de Hunts & PTs', icon: <FileSpreadsheet size={16} /> },
     respawns: { label: 'Respawns & Caves', icon: <ShieldAlert size={16} /> },
+    invite: { label: 'Solicitar Convite', icon: <UserPlus size={16} /> },
     bank: { label: 'Tesouraria da Guilda', icon: <Landmark size={16} /> },
     market: { label: 'Mercado Interno (Trocas)', icon: <Store size={16} /> },
     extreme: { label: 'Análise de Jogadores', icon: <Crosshair size={16} /> },
