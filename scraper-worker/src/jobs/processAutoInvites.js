@@ -448,9 +448,9 @@ async function loginRubinot(page, accountName, password) {
         await new Promise(r => setTimeout(r, 1000));
       }
 
-      // Verificar se está logado (o menu mostra "Entrar" quando não está logado)
+      // Verificar se está logado (quando logado aparecem "Minha Conta" e "Sair")
       const pageContent = await page.content();
-      const isLoggedIn = !pageContent.includes('>Entrar<') && !pageContent.includes('href="/login"');
+      const isLoggedIn = pageContent.includes('Minha Conta') || pageContent.includes('>Sair<') || pageContent.includes('Logado como');
 
       if (!isLoggedIn) {
         await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_login_fail.png' });
