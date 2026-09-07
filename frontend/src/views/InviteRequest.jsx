@@ -56,6 +56,15 @@ export default function InviteRequest({ isPublic = false }) {
     return () => supabase.removeChannel(channel);
   }, []);
 
+  const handleRetry = async (id) => {
+    try {
+      await supabase.from('guild_invites_queue').update({ status: 'PENDING', error_message: null }).eq('id', id);
+      fetchRecentInvites();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!characterName.trim()) return;
@@ -103,8 +112,8 @@ export default function InviteRequest({ isPublic = false }) {
   });
 
   return (
-    <div className="p-8 max-w-5xl mx-auto text-tibia-highlight flex flex-col lg:flex-row gap-8">
-      <div className="lg:w-1/3 w-full">
+    <div className="p-8 w-full max-w-[1600px] mx-auto text-tibia-highlight flex flex-col lg:flex-row gap-8">
+      <div className="lg:w-1/4 w-full">
         <div className="bg-tibia-card border border-tibia-border p-6 shadow-lg">
         <h1 className="text-2xl font-bold mb-6 text-center text-tibia-primary">
           Solicitar Convite da Guilda
@@ -160,7 +169,7 @@ export default function InviteRequest({ isPublic = false }) {
         </div>
       </div>
 
-      <div className="lg:w-2/3 w-full bg-tibia-card border border-tibia-border shadow-lg flex flex-col">
+      <div className="lg:w-3/4 w-full bg-tibia-card border border-tibia-border shadow-lg flex flex-col">
         <div className="p-4 border-b border-tibia-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h2 className="text-lg font-bold text-tibia-primary">Convites Solicitados pelo Site</h2>
@@ -201,7 +210,7 @@ export default function InviteRequest({ isPublic = false }) {
             <tbody className="divide-y divide-tibia-border">
               {filteredInvites.length === 0 ? (
                 <tr>
-                  <td colSpan={isPublic ? "5" : "6"} className="py-8 text-center text-tibia-highlight/50">
+                  <td colSpan={isPublic ? "5" : "7"} className="py-8 text-center text-tibia-highlight/50">
                     Nenhum convite encontrado.
                   </td>
                 </tr>
