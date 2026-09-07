@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import { supabase } from '../lib/supabase';
 
@@ -7,6 +7,7 @@ export default function InviteRequest() {
   const [world, setWorld] = useState('Auroria');
   const [status, setStatus] = useState('idle'); // idle, loading, success, error
   const [message, setMessage] = useState('');
+  const [recentInvites, setRecentInvites] = useState([]);
 
   const worldGuildMap = {
     'Auroria': 'Shellpatrocina',
@@ -15,6 +16,26 @@ export default function InviteRequest() {
     'Tenebrium': 'Battlestorm Retro',
     'Vesperia': 'Battlestorm Vesperia'
   };
+
+  const fetchRecentInvites = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('guild_invites_queue')
+        .select('*')
+        .eq('requested_by', 'WebSite')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (!error) setRecentInvites(data || []);
+    } catch (err) {}
+  };
+
+  useEffect(() => {
+    fetchRecentInvites();
+    const channel = supabase.channel('public:guild_invites_queue').on('postgres_changes', { event: '*', schema: 'public', table: 'guild_invites_queue' }, () => {
+      fetchRecentInvites();
+    }).subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,15 +64,23 @@ export default function InviteRequest() {
       setStatus('success');
       setMessage(`Convite para ${characterName} solicitado com sucesso!<br/>O robô enviará o convite em breve.`);
       setCharacterName('');
+      fetchRecentInvites();
     } catch (err) {
       setStatus('error');
       setMessage('Erro ao solicitar convite: ' + err.message);
     }
   };
 
+  const getStatusBadge = (status, msg) => {
+    if (status === 'SUCCESS') return <span className="px-2 py-1 bg-green-900/30 text-green-400 border border-green-500/50 rounded text-xs">Sucesso</span>;
+    if (status === 'FAILED') return <span className="px-2 py-1 bg-red-900/30 text-red-400 border border-red-500/50 rounded text-xs" title={msg}>Falha</span>;
+    return <span className="px-2 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-500/50 rounded text-xs">Pendente</span>;
+  };
+
   return (
-    <div className="p-8 max-w-md mx-auto text-tibia-highlight">
-      <div className="bg-tibia-card border border-tibia-border p-6 shadow-lg">
+    <div className="p-8 max-w-5xl mx-auto text-tibia-highlight flex flex-col lg:flex-row gap-8">
+      <div className="lg:w-1/3 w-full">
+        <div className="bg-tibia-card border border-tibia-border p-6 shadow-lg">
         <h1 className="text-2xl font-bold mb-6 text-center text-tibia-primary">
           Solicitar Convite da Guilda
         </h1>
@@ -64,7 +93,7 @@ export default function InviteRequest() {
               value={characterName}
               onChange={(e) => setCharacterName(e.target.value)}
               placeholder="Ex: Kingg Archeer"
-              className="w-full bg-[141414] border border-tibia-border rounded py-2 px-3 focus:outline-none focus:border-tibia-primary text-white"
+              className="w-full bg-[#141414] border border-tibia-border rounded py-2 px-3 focus:outline-none focus:border-tibia-primary text-tibia-primary"
               required
             />
           </div>
@@ -74,13 +103,13 @@ export default function InviteRequest() {
             <select
               value={world}
               onChange={(e) => setWorld(e.target.value)}
-              className="w-full bg-[141414] border border-tibia-border rounded py-2 px-3 focus:outline-none focus:border-tibia-primary text-white"
+              className="w-full bg-[#141414] border border-tibia-border rounded py-2 px-3 focus:outline-none focus:border-tibia-primary text-tibia-primary"
             >
-              <option value="Auroria">Auroria - Shellpatrocina</option>
-              <option value="Belaria">Belaria - Battlestorm Belaria</option>
-              <option value="Bellum">Bellum - Battlestorm Bellum</option>
-              <option value="Tenebrium">Tenebrium - Battlestorm Retro</option>
-              <option value="Vesperia">Vesperia - Battlestorm Vesperia</option>
+              <option className="bg-[#141414] text-tibia-primary" value="Auroria">Auroria - Shellpatrocina</option>
+              <option className="bg-[#141414] text-tibia-primary" value="Belaria">Belaria - Battlestorm Belaria</option>
+              <option className="bg-[#141414] text-tibia-primary" value="Bellum">Bellum - Battlestorm Bellum</option>
+              <option className="bg-[#141414] text-tibia-primary" value="Tenebrium">Tenebrium - Battlestorm Retro</option>
+              <option className="bg-[#141414] text-tibia-primary" value="Vesperia">Vesperia - Battlestorm Vesperia</option>
             </select>
           </div>
 
@@ -102,6 +131,50 @@ export default function InviteRequest() {
             {message}
           </div>
         )}
+        </div>
+      </div>
+
+      <div className="lg:w-2/3 w-full bg-tibia-card border border-tibia-border shadow-lg">
+        <div className="p-4 border-b border-tibia-border flex justify-between items-center">
+          <h2 className="text-lg font-bold text-tibia-primary">Convites Solicitados pelo Site</h2>
+          <span className="text-xs text-tibia-highlight/70">Atualização em tempo real</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-tibia-bg">
+              <tr>
+                <th className="py-2 px-4 text-left text-xs font-medium">Data/Hora</th>
+                <th className="py-2 px-4 text-left text-xs font-medium">Personagem</th>
+                <th className="py-2 px-4 text-left text-xs font-medium">Mundo</th>
+                <th className="py-2 px-4 text-left text-xs font-medium">Status</th>
+                <th className="py-2 px-4 text-left text-xs font-medium">Detalhes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-tibia-border">
+              {recentInvites.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="py-8 text-center text-tibia-highlight/50">
+                    Nenhum convite solicitado pelo site ainda.
+                  </td>
+                </tr>
+              ) : recentInvites.map((inv) => (
+                <tr key={inv.id} className="hover:bg-tibia-bg/50">
+                  <td className="py-2 px-4 text-xs">
+                    {new Date(inv.created_at).toLocaleDateString('pt-BR')} <br/>
+                    {new Date(inv.created_at).toLocaleTimeString('pt-BR')}
+                  </td>
+                  <td className="py-2 px-4 text-sm font-bold text-white">{inv.character_name}</td>
+                  <td className="py-2 px-4 text-xs">{inv.world}</td>
+                  <td className="py-2 px-4">{getStatusBadge(inv.status, inv.error_message)}</td>
+                  <td className="py-2 px-4 text-xs max-w-[200px] truncate" title={inv.error_message || ''}>
+                    {inv.status === 'FAILED' ? (inv.error_message || 'Falha desconhecida') :
+                       inv.status === 'SUCCESS' ? 'Convite enviado!' : 'Aguardando robô...'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
