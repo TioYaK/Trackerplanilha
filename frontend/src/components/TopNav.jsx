@@ -65,7 +65,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     {
       title: 'Gestão da Guilda',
       icon: <Users size={18} />,
-      items: ['roster', 'attendance', 'analytics', 'tracker', 'contribute']
+      items: ['roster', 'invite', 'attendance', 'analytics', 'tracker', 'contribute']
     },
     {
       title: 'Economia e Hunts',
