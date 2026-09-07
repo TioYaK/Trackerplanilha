@@ -392,40 +392,70 @@ export async function runProcessAutoInvites() {
  * Função de auxílio para Login no RubinOT
  */
 async function loginRubinot(page, accountName, password) {
-  try {
-    await page.goto('https://rubinot.com.br/login', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(e => console.error('[AutoInvite] Aviso de timeout no /login, prosseguindo...'));
-    await new Promise(r => setTimeout(r, 2000));
+    try {
+      await page.goto('https://rubinot.com.br/login', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(e =>
+        console.error('[AutoInvite] Aviso de timeout no /login, prosseguindo...'));
+      await new Promise(r => setTimeout(r, 2000));
 
-    // Usar a mesma lógica de login direto pela API do NextAuth que funcionou perfeitamente nos nossos testes
-    await page.evaluate(async (email, pass) => {
-      try {
-        const csrfRes = await fetch('/api/auth/csrf');
-        const csrfData = await csrfRes.json();
-        const params = new URLSearchParams();
-        params.append('email', email);
-        params.append('password', pass);
-        params.append('csrfToken', csrfData.csrfToken);
-        params.append('json', 'true');
-        await fetch('/api/auth/callback/credentials', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: params.toString()
+      // Tentar preencher o formulário de login visualmente (mais confiável que API)
+      const emailInput = await page.$('input[type="email"], input[name="email"], input[id="email"]');
+      const passInput  = await page.$('input[type="password"], input[name="password"], input[id="password"]');
+
+      if (emailInput && passInput) {
+        await emailInput.click({ clickCount: 3 });
+        await emailInput.type(accountName, { delay: 60 });
+        await passInput.click({ clickCount: 3 });
+        await passInput.type(password, { delay: 60 });
+        await new Promise(r => setTimeout(r, 500));
+
+        await page.evaluate(() => {
+          const form = document.querySelector('form');
+          const btn = form?.querySelector('button[type="submit"], button') || document.querySelector('button[type="submit"]');
+          if (btn) btn.click();
         });
-      } catch(e) {}
-    }, accountName, password);
-    
-    await new Promise(r => setTimeout(r, 1500));
-    
-    // Atualiza a página para aplicar a sessão
-    await page.reload({ waitUntil: 'networkidle2' });
-    await new Promise(r => setTimeout(r, 1000));
 
-    return true;
-  } catch (err) {
-    console.error('[AutoInvite] Erro durante o login:', err.message);
-    return false;
+        await new Promise(r => setTimeout(r, 3000));
+        await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+      } else {
+        // Fallback: API do NextAuth
+        await page.evaluate(async (email, pass) => {
+          try {
+            const csrfRes = await fetch('/api/auth/csrf');
+            const csrfData = await csrfRes.json();
+            const params = new URLSearchParams();
+            params.append('email', email);
+            params.append('password', pass);
+            params.append('csrfToken', csrfData.csrfToken);
+            params.append('json', 'true');
+            await fetch('/api/auth/callback/credentials', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: params.toString()
+            });
+          } catch(e) {}
+        }, accountName, password);
+        await new Promise(r => setTimeout(r, 1500));
+        await page.reload({ waitUntil: 'networkidle2' });
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      // Verificar se está logado (o menu mostra "Entrar" quando não está logado)
+      const pageContent = await page.content();
+      const isLoggedIn = !pageContent.includes('>Entrar<') && !pageContent.includes('href="/login"');
+
+      if (!isLoggedIn) {
+        await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_login_fail.png' });
+        console.error(`[AutoInvite] ❌ Login falhou para ${accountName} (sessão não detectada).`);
+        return false;
+      }
+
+      console.log(`[AutoInvite] ✅ Login confirmado para ${accountName}.`);
+      return true;
+    } catch (err) {
+      console.error('[AutoInvite] Erro durante o login:', err.message);
+      return false;
+    }
   }
-}
 
 /**
  * Função de auxílio para Convidar Personagem na Guilda
