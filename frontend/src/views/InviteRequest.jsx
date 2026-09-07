@@ -32,12 +32,17 @@ export default function InviteRequest({ isPublic = false }) {
 
   const fetchRecentInvites = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('guild_invites_queue')
         .select('*')
-        .like('requested_by', isPublic ? `WebSite_${clientId}` : 'WebSite%')
         .order('created_at', { ascending: false })
         .limit(100);
+        
+      if (isPublic) {
+        query = query.like('requested_by', `WebSite_${clientId}`);
+      }
+
+      const { data, error } = await query;
       if (!error) setRecentInvites(data || []);
     } catch (err) {}
   };
@@ -186,6 +191,7 @@ export default function InviteRequest({ isPublic = false }) {
                 <th className="py-2 px-4 text-left text-xs font-medium">Data/Hora</th>
                 <th className="py-2 px-4 text-left text-xs font-medium">Personagem</th>
                 <th className="py-2 px-4 text-left text-xs font-medium">Mundo</th>
+                {!isPublic && <th className="py-2 px-4 text-left text-xs font-medium">Origem</th>}
                 <th className="py-2 px-4 text-left text-xs font-medium">Status</th>
                 <th className="py-2 px-4 text-left text-xs font-medium">Detalhes</th>
               </tr>
@@ -193,7 +199,7 @@ export default function InviteRequest({ isPublic = false }) {
             <tbody className="divide-y divide-tibia-border">
               {filteredInvites.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="py-8 text-center text-tibia-highlight/50">
+                  <td colSpan={isPublic ? "5" : "6"} className="py-8 text-center text-tibia-highlight/50">
                     Nenhum convite encontrado.
                   </td>
                 </tr>
@@ -201,14 +207,18 @@ export default function InviteRequest({ isPublic = false }) {
                 <tr key={inv.id} className="hover:bg-tibia-bg/50">
                   <td className="py-2 px-4 text-xs">
                     {new Date(inv.created_at).toLocaleDateString('pt-BR')} <br/>
-                    {new Date(inv.created_at).toLocaleTimeString('pt-BR')}
+                    <span className="text-gray-500">{new Date(inv.created_at).toLocaleTimeString('pt-BR')}</span>
                   </td>
-                  <td className="py-2 px-4 text-sm font-bold text-white">{inv.character_name}</td>
-                  <td className="py-2 px-4 text-xs">{inv.world}</td>
+                  <td className="py-2 px-4 text-sm font-medium">{inv.character_name}</td>
+                  <td className="py-2 px-4 text-xs text-gray-400">{inv.world}</td>
+                  {!isPublic && (
+                    <td className="py-2 px-4 text-xs text-gray-400">
+                      {inv.requested_by && inv.requested_by.startsWith('WebSite') ? 'Site Público' : inv.requested_by || 'Planilha/Outros'}
+                    </td>
+                  )}
                   <td className="py-2 px-4">{getStatusBadge(inv.status, inv.error_message)}</td>
-                  <td className="py-2 px-4 text-xs max-w-[200px] truncate" title={inv.error_message || ''}>
-                    {inv.status === 'FAILED' ? (inv.error_message || 'Falha desconhecida') :
-                       inv.status === 'SUCCESS' ? 'Convite enviado!' : 'Aguardando admin...'}
+                  <td className="py-2 px-4 text-xs text-gray-400 max-w-[200px] truncate" title={inv.error_message || ''}>
+                    {inv.status === 'PENDING' ? 'Aguardando admin...' : inv.error_message || 'OK'}
                   </td>
                 </tr>
               ))}
