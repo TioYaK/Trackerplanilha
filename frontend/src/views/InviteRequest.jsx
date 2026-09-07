@@ -27,7 +27,8 @@ export default function InviteRequest({ isPublic = false }) {
     'Belaria': 'Battlestorm Belaria',
     'Bellum': 'Battlestorm Bellum',
     'Tenebrium': 'Battlestorm Retro',
-    'Vesperia': 'Battlestorm Vesperia'
+    'Vesperia': 'Battlestorm Vesperia',
+    'Malveria': 'Battlestorm Malveria'
   };
 
   const fetchRecentInvites = async () => {
@@ -134,6 +135,7 @@ export default function InviteRequest({ isPublic = false }) {
               <option className="bg-[#141414] text-tibia-primary" value="Bellum">Bellum - Battlestorm Bellum</option>
               <option className="bg-[#141414] text-tibia-primary" value="Tenebrium">Tenebrium - Battlestorm Retro</option>
               <option className="bg-[#141414] text-tibia-primary" value="Vesperia">Vesperia - Battlestorm Vesperia</option>
+              <option className="bg-[#141414] text-tibia-primary" value="Malveria">Malveria - Battlestorm Malveria</option>
             </select>
           </div>
 
