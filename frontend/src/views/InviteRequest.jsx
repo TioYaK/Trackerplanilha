@@ -168,7 +168,7 @@ export default function InviteRequest() {
                   <td className="py-2 px-4">{getStatusBadge(inv.status, inv.error_message)}</td>
                   <td className="py-2 px-4 text-xs max-w-[200px] truncate" title={inv.error_message || ''}>
                     {inv.status === 'FAILED' ? (inv.error_message || 'Falha desconhecida') :
-                       inv.status === 'SUCCESS' ? 'Convite enviado!' : 'Aguardando robô...'}
+                       inv.status === 'SUCCESS' ? 'Convite enviado!' : 'Aguardando admin...'}
                   </td>
                 </tr>
               ))}
