@@ -8,6 +8,10 @@ export default function InviteRequest() {
   const [status, setStatus] = useState('idle'); // idle, loading, success, error
   const [message, setMessage] = useState('');
   const [recentInvites, setRecentInvites] = useState([]);
+  
+  // Filtros
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const worldGuildMap = {
     'Auroria': 'Shellpatrocina',
@@ -24,7 +28,7 @@ export default function InviteRequest() {
         .select('*')
         .eq('requested_by', 'WebSite')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(100);
       if (!error) setRecentInvites(data || []);
     } catch (err) {}
   };
@@ -76,6 +80,12 @@ export default function InviteRequest() {
     if (status === 'FAILED') return <span className="px-2 py-1 bg-red-900/30 text-red-400 border border-red-500/50 rounded text-xs" title={msg}>Falha</span>;
     return <span className="px-2 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-500/50 rounded text-xs">Pendente</span>;
   };
+
+  const filteredInvites = recentInvites.filter(inv => {
+    const matchName = inv.character_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = statusFilter === 'ALL' || inv.status === statusFilter;
+    return matchName && matchStatus;
+  });
 
   return (
     <div className="p-8 max-w-5xl mx-auto text-tibia-highlight flex flex-col lg:flex-row gap-8">
@@ -134,12 +144,33 @@ export default function InviteRequest() {
         </div>
       </div>
 
-      <div className="lg:w-2/3 w-full bg-tibia-card border border-tibia-border shadow-lg">
-        <div className="p-4 border-b border-tibia-border flex justify-between items-center">
-          <h2 className="text-lg font-bold text-tibia-primary">Convites Solicitados pelo Site</h2>
-          <span className="text-xs text-tibia-highlight/70">Atualização em tempo real</span>
+      <div className="lg:w-2/3 w-full bg-tibia-card border border-tibia-border shadow-lg flex flex-col">
+        <div className="p-4 border-b border-tibia-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-tibia-primary">Convites Solicitados pelo Site</h2>
+            <span className="text-xs text-tibia-highlight/70">Atualização em tempo real (Últimos 100)</span>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <input 
+              type="text" 
+              placeholder="Pesquisar personagem..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-[#141414] border border-tibia-border rounded py-1 px-3 text-sm focus:outline-none focus:border-tibia-primary text-tibia-primary"
+            />
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-[#141414] border border-tibia-border rounded py-1 px-3 text-sm focus:outline-none focus:border-tibia-primary text-tibia-primary"
+            >
+              <option className="bg-[#141414]" value="ALL">Todos os Status</option>
+              <option className="bg-[#141414]" value="PENDING">Pendentes</option>
+              <option className="bg-[#141414]" value="SUCCESS">Sucesso</option>
+              <option className="bg-[#141414]" value="FAILED">Falhas</option>
+            </select>
+          </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto flex-1">
           <table className="w-full">
             <thead className="bg-tibia-bg">
               <tr>
@@ -151,13 +182,13 @@ export default function InviteRequest() {
               </tr>
             </thead>
             <tbody className="divide-y divide-tibia-border">
-              {recentInvites.length === 0 ? (
+              {filteredInvites.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="py-8 text-center text-tibia-highlight/50">
-                    Nenhum convite solicitado pelo site ainda.
+                    Nenhum convite encontrado.
                   </td>
                 </tr>
-              ) : recentInvites.map((inv) => (
+              ) : filteredInvites.map((inv) => (
                 <tr key={inv.id} className="hover:bg-tibia-bg/50">
                   <td className="py-2 px-4 text-xs">
                     {new Date(inv.created_at).toLocaleDateString('pt-BR')} <br/>
