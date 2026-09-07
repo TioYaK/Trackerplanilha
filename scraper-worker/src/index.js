@@ -445,9 +445,11 @@ import notifier from 'node-notifier';
 
   supabase
     .channel('guild_invites')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_invites_queue' }, () => {
-      console.log('\n[REALTIME] Novo pedido de invite recebido pelo site!');
-      runProcessAutoInvites();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_invites_queue' }, (payload) => {
+      if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && payload.new.status === 'PENDING')) {
+        console.log('\n[REALTIME] Gatilho acionado (Novo invite ou Reprocessamento)!');
+        runProcessAutoInvites();
+      }
     })
     .subscribe();
 
