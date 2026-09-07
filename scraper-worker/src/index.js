@@ -443,8 +443,16 @@ import { runValidateMakers } from './jobs/validateMakers.js';
 import notifier from 'node-notifier';
 
 
-supabase
-  .channel('maker_validation')
+  supabase
+    .channel('guild_invites')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_invites_queue' }, () => {
+      console.log('\n[REALTIME] Novo pedido de invite recebido pelo site!');
+      runProcessAutoInvites();
+    })
+    .subscribe();
+
+  supabase
+    .channel('maker_validation')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maker_validation_queue' }, (payload) => {
      console.log('\n[REALTIME] Novo maker recebido para validar!');
      runValidateMakers();
