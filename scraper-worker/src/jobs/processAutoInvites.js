@@ -332,6 +332,8 @@ export async function runProcessAutoInvites() {
           if (guildTarget.toLowerCase() === 'shell') guildTarget = leaderAcc.guild_name || 'Shellpatrocina';
           console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}' (${world})...`);
 
+          console.log([AutoInvite] Aguardando 5 segundos para não sobrecarregar o site...);
+          await new Promise(r => setTimeout(r, 5000));
           const result = await inviteCharacter(page, world, guildTarget, invite.character_name);
 
           if (result.success) {
@@ -502,7 +504,7 @@ async function inviteCharacter(page, world, guildName, characterName) {
         
         // Cuidado: a UI tem um título "Convites pendentes", por isso NÃO podemos buscar só pela palavra "pendente"
         if (pageText.includes('already been invited') || pageText.includes('já foi convidado') || pageText.includes('already invited')) {
-            return { success: false, reason: 'Personagem já possui convite pendente.' };
+            return { success: true, reason: 'Personagem já possui convite pendente.' };
         }
         
         if (pageText.includes('token is required') || pageText.includes('verification token')) {

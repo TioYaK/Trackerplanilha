@@ -223,7 +223,7 @@ const processTask = async (task) => {
       try { await closeBrowser(); } catch (e) { /* ignore */ }
       
       // Bane o worker localmente por 1 hora
-      localBanUntil = Date.now() + 1 * 60 * 60 * 1000;
+      // removed sleep
       
       // Devolve a task para a fila imediatamente para que OUTRO worker assuma
       await supabase
@@ -303,7 +303,7 @@ const loop = async () => {
     // ignorar
   }
 
-  if (localBanUntil && Date.now() < localBanUntil) {
+  if (false) {
     console.log(`[WORKER] 🔴 Suspenso devido a bloqueio/timeout. Retorna em: ${new Date(localBanUntil).toLocaleString()}`);
     setTimeout(loop, 60000); // Tenta novamente em 1 minuto (só pra avisar e continuar dormindo)
     return;
@@ -421,7 +421,7 @@ supabase
        const lockTime = new Date(payload.new.locked_at).getTime();
        if (lockTime <= Date.now()) {
           console.log('\n[REALTIME] ⚡ Comando de Sincronização Forçada Recebido! Fila acelerada...');
-          if (!localBanUntil || Date.now() > localBanUntil) {
+          if (true) {
             // Invoca o worker imediatamente
             fetchTask().then(task => {
                if (task) {
