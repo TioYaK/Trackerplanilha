@@ -205,6 +205,7 @@ export default function InviteRequest({ isPublic = false }) {
                 {!isPublic && <th className="py-2 px-4 text-left text-xs font-medium">Origem</th>}
                 <th className="py-2 px-4 text-left text-xs font-medium">Status</th>
                 <th className="py-2 px-4 text-left text-xs font-medium">Detalhes</th>
+                {!isPublic && <th className="py-2 px-4 text-center text-xs font-medium">Ações</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-tibia-border">
@@ -231,6 +232,18 @@ export default function InviteRequest({ isPublic = false }) {
                   <td className="py-2 px-4 text-xs text-gray-400 max-w-[200px] truncate" title={inv.error_message || ''}>
                     {inv.status === 'PENDING' ? 'Aguardando admin...' : inv.error_message || 'OK'}
                   </td>
+                  {!isPublic && (
+                    <td className="py-2 px-4 text-center">
+                      {inv.status === 'FAILED' && (
+                        <button
+                          onClick={() => handleRetry(inv.id)}
+                          className="bg-[#141414] hover:bg-tibia-primary hover:text-black border border-tibia-border rounded px-2 py-1 text-xs transition-colors"
+                        >
+                          🔄 Reprocessar
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
