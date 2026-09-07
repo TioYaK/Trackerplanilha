@@ -8,6 +8,7 @@ import WarAttendance from './views/WarAttendance';
 import BazaarSniper from './views/BazaarSniper';
 import RadarHunters from './views/RadarHunters';
 import RespawnTracker from './views/RespawnTracker';
+import InviteRequest from './views/InviteRequest';
 import PlayerDashboard from './components/PlayerDashboard';
 import PartyDashboard from './components/PartyDashboard';
 import ReportExport from './components/ReportExport';
@@ -137,6 +138,7 @@ export default function App() {
       case 'roster':  return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
       case 'attendance': return <WarAttendance />;
       case 'respawns': return <RespawnTracker isAdmin={isAdmin} />;
+      case 'invite': return <InviteRequest />;
       case 'bazaar': return <BazaarSniper />;
       case 'radar':   return <RadarHunters isAdmin={isAdmin} />;
       case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
