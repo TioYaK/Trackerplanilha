@@ -205,17 +205,35 @@ function ensureProfile(world) {
   return profileDest;
 }
 
-let isProcessing = false;
+const LOCK_FILE = path.join(process.cwd(), '.invite_processing.lock');
+
+function acquireLock() {
+  try {
+    // O flag 'wx' falha se o arquivo já existe — lock atômico
+    fs.writeFileSync(LOCK_FILE, String(process.pid), { flag: 'wx' });
+    return true;
+  } catch {
+    // Verificar se o processo dono do lock ainda está vivo
+    try {
+      const pid = parseInt(fs.readFileSync(LOCK_FILE, 'utf8'));
+      try { process.kill(pid, 0); return false; } // processo ainda vivo
+      catch { fs.unlinkSync(LOCK_FILE); return acquireLock(); } // processo morto, remove lock
+    } catch { return false; }
+  }
+}
+
+function releaseLock() {
+  try { fs.unlinkSync(LOCK_FILE); } catch {}
+}
 
 /**
  * Executa o processamento de convites de guilda pendentes na fila
  */
 export async function runProcessAutoInvites() {
-  if (isProcessing) {
-    console.log('[AutoInvite] Já existe um lote em processamento. Ignorando gatilho simultâneo.');
+  if (!acquireLock()) {
+    console.log('[AutoInvite] Já existe um lote em processamento (lock de arquivo). Ignorando gatilho simultâneo.');
     return;
   }
-  isProcessing = true;
 
   console.log('[AutoInvite] 🔍 Verificando fila de convites pendentes...');
 
@@ -393,7 +411,7 @@ export async function runProcessAutoInvites() {
   } catch (err) {
     console.error('[AutoInvite] Erro inesperado ao processar convites:', err.message);
   } finally {
-    isProcessing = false;
+    releaseLock();
   }
 }
 
