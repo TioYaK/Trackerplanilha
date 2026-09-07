@@ -383,6 +383,8 @@ export async function runProcessAutoInvites() {
     }
   } catch (err) {
     console.error('[AutoInvite] Erro inesperado ao processar convites:', err.message);
+  } finally {
+    isProcessing = false;
   }
 }
 
