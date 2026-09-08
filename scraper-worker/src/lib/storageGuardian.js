@@ -3,6 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { fileURLToPath } from 'url';
 
 /**
  * Localizador Universal de Navegadores (Cross-Platform).
@@ -82,7 +83,8 @@ export function cleanStalePuppeteerProfiles(maxAgeMinutes = 10) {
         entry.startsWith('puppeteer_dev_') ||
         entry.startsWith('Importer_') ||
         entry.startsWith('.org.chromium.Chromium.') ||
-        entry.startsWith('.com.google.Chrome.')
+        entry.startsWith('.com.google.Chrome.') ||
+        entry.startsWith('scoped_dir')
       ) {
         const fullPath = path.join(tempDir, entry);
         try {
@@ -113,7 +115,14 @@ export function cleanStalePuppeteerProfiles(maxAgeMinutes = 10) {
  */
 export function cleanWorkerProfileCaches() {
   try {
-    const baseDir = path.join(process.cwd(), 'worker_profiles');
+    let baseDir = path.join(process.cwd(), 'worker_profiles');
+    if (!fs.existsSync(baseDir)) {
+      try {
+        const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+        const candidate = path.resolve(moduleDir, '../../worker_profiles');
+        if (fs.existsSync(candidate)) baseDir = candidate;
+      } catch {}
+    }
     if (!fs.existsSync(baseDir)) return 0;
 
     const profileDirs = fs.readdirSync(baseDir);
@@ -124,7 +133,28 @@ export function cleanWorkerProfileCaches() {
       'Crashpad',
       'DawnGraphiteCache',
       'DawnWebGPUCache',
-      'Shared Dictionary'
+      'Shared Dictionary',
+      'component_crx_cache',
+      'ProvenanceData',
+      'Edge Entity Extraction',
+      'EdgeLanguageDetectionModel',
+      'Edge Wallet',
+      'Edge Shopping',
+      'Edge Web Discover',
+      'Edge Collections',
+      'Speech Recognition',
+      'GrShaderCache',
+      'BrowserMetrics',
+      'OptimizationHints',
+      'SafetyTips',
+      'Subresource Filter',
+      'Certificate Revocation',
+      'File Type Policies',
+      'Crowd Deny',
+      'OnDeviceHeadSuggestModel',
+      'SmartScreen',
+      'Recovery',
+      'AutofillStates'
     ];
 
     let pruned = 0;
@@ -133,13 +163,9 @@ export function cleanWorkerProfileCaches() {
       try {
         if (!fs.statSync(fullPDir).isDirectory()) continue;
 
-        // Se o navegador está com esse perfil aberto neste exato momento, pula com segurança
-        if (
-          fs.existsSync(path.join(fullPDir, 'SingletonLock')) ||
-          fs.existsSync(path.join(fullPDir, 'Default', 'SingletonLock'))
-        ) {
-          continue;
-        }
+        // Limpa stale locks primeiro
+        cleanStaleLocks(fullPDir);
+        cleanStaleLocks(path.join(fullPDir, 'Default'));
 
         const checkBases = [fullPDir, path.join(fullPDir, 'Default')];
         for (const base of checkBases) {
@@ -148,17 +174,30 @@ export function cleanWorkerProfileCaches() {
             const target = path.join(base, cName);
             if (fs.existsSync(target)) {
               try {
-                fs.rmSync(target, { recursive: true, force: true, maxRetries: 0 });
+                fs.rmSync(target, { recursive: true, force: true, maxRetries: 1 });
                 pruned++;
               } catch {}
             }
           }
+
+          // Descarta arquivos de métricas soltos (*.pma) e *.tmp
+          try {
+            const items = fs.readdirSync(base);
+            for (const item of items) {
+              if (item.endsWith('.pma') || item.endsWith('.tmp') || item.startsWith('BrowserMetrics-')) {
+                try {
+                  fs.unlinkSync(path.join(base, item));
+                  pruned++;
+                } catch {}
+              }
+            }
+          } catch {}
         }
       } catch {}
     }
 
     if (pruned > 0) {
-      console.log(`[STORAGE] 🗂️ Perfis otimizados: ${pruned} pastas de cache interno descartadas.`);
+      console.log(`[STORAGE] 🗂️ Perfis otimizados: ${pruned} itens de cache/métricas descartados.`);
     }
     return pruned;
   } catch (err) {
@@ -236,6 +275,13 @@ export function getLeanChromeArgs(extraArgs = []) {
     '--disable-gpu-shader-disk-cache',
     '--disable-gpu-program-cache',
     '--disable-component-update',
+    '--disable-background-networking',
+    '--disable-default-apps',
+    '--disable-domain-reliability',
+    '--disable-features=OptimizationHints,Translate,MediaRouter,EdgeEntityExtraction,EdgeSmartScreen,AutofillServerCommunication,CalculateNativeWinOcclusion',
+    '--disable-sync',
+    '--metrics-recording-only=false',
+    '--no-report-upload',
     '--aggressive-cache-discard',
     '--no-default-browser-check',
     '--no-first-run',

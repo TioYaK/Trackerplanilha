@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Target, Activity, Users, Clock, AlertCircle } from 'lucide-react';
+import { parseUtcDate, formatVocation } from '../lib/tibiaUtils';
 
 export default function GuildRadar() {
   const [hunters, setHunters] = useState([]);
@@ -19,8 +20,9 @@ export default function GuildRadar() {
         
         const memberStats = {};
         guildMembers.forEach(m => {
-          memberStats[m.name] = { 
+          memberStats[m.name.toLowerCase()] = { 
               ...m, 
+              vocation: formatVocation(m.vocation),
               xpLastHour: 0, 
               isHunting: false, 
               lastSeen: null,
@@ -49,15 +51,17 @@ export default function GuildRadar() {
 
         if (states) {
           states.forEach(state => {
-            const m = memberStats[state.character_name];
+            const m = memberStats[state.character_name?.toLowerCase()];
             if (m) {
               const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
-              const lastActiveTime = new Date(state.last_active).getTime();
+              const activeDate = parseUtcDate(state.last_active);
+              const lastActiveTime = activeDate ? activeDate.getTime() : 0;
               
-              if (deltaXp > 0 && lastActiveTime >= thirtyMinsAgo) {
+              if (deltaXp > 0 && lastActiveTime >= thirtyMinsAgo && lastActiveTime <= now + 60000) {
                 m.isHunting = true;
                 m.xpLastHour = deltaXp;
-                m.huntStart = new Date(state.session_start_time).getTime();
+                const startDate = parseUtcDate(state.session_start_time);
+                m.huntStart = startDate ? startDate.getTime() : lastActiveTime;
                 m.lastSeen = lastActiveTime;
               }
               m.level = state.level || m.level;

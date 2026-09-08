@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Landmark, Check, X, Search, ShieldAlert, Banknote, FileText, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useAuth } from '../components/AuthContext';
+import { formatVocation } from '../lib/tibiaUtils';
 
 export default function GuildBank({ isAdmin }) {
   const { profile } = useAuth();
@@ -238,11 +239,11 @@ export default function GuildBank({ isAdmin }) {
                   {loading ? (
                     <tr><td colSpan="4" className="text-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto"></div></td></tr>
                   ) : filteredRoster.map(m => {
-                    const isPaid = payments.some(p => p.character_name === m.name);
+                    const isPaid = payments.some(p => p.character_name?.toLowerCase() === m.name?.toLowerCase());
                     return (
                       <tr key={m.name} className="hover:bg-white/5 transition-colors">
                         <td className="px-6 py-4 font-bold text-white">{m.name}</td>
-                        <td className="px-6 py-4 text-gray-400">{m.vocation} <span className="text-xs bg-gray-800 px-1 rounded ml-1 border border-gray-700">Lvl {m.level}</span></td>
+                        <td className="px-6 py-4 text-gray-400">{formatVocation(m.vocation)} <span className="text-xs bg-gray-800 px-1 rounded ml-1 border border-gray-700">Lvl {m.level}</span></td>
                         <td className="px-6 py-4">
                           {isPaid ? (
                             <span className="bg-green-900/30 text-green-400 px-3 py-1 rounded border border-green-500/30 flex items-center w-max">

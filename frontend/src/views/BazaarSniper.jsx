@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Target, AlertTriangle, Clock, TrendingDown, Coins, Search, ExternalLink, Star, Shield, Sword, Wand2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatVocation } from '../lib/tibiaUtils';
 
 export default function BazaarSniper() {
   const [alerts, setAlerts] = useState([]);
@@ -123,7 +124,7 @@ export default function BazaarSniper() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white leading-tight">{auction.character_name}</h3>
-                    <p className="text-gray-400 text-sm font-bold">Lvl {auction.level} • {auction.vocation}</p>
+                    <p className="text-gray-400 text-sm font-bold">Lvl {auction.level} • {formatVocation(auction.vocation)}</p>
                     <p className="text-xs text-gray-500">{auction.world_name}</p>
                   </div>
                 </div>

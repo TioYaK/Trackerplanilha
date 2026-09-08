@@ -62,19 +62,32 @@ const fetchTask = async () => {
     const crashLimit = new Date();
     crashLimit.setMinutes(crashLimit.getMinutes() - LOCK_TIMEOUT_MINUTES);
 
-    const orQuery = `and(status.eq.PENDING,or(locked_at.is.null,locked_at.lte.${new Date().toISOString()})),and(status.eq.IN_PROGRESS,locked_at.lte.${crashLimit.toISOString()})`;
+    const orQuery = `and(status.eq.PENDING,or(locked_at.is.null,locked_at.lte.${now})),and(status.eq.IN_PROGRESS,locked_at.lte.${crashLimit.toISOString()})`;
 
-    const { data: tasks, error } = await supabase
+    // 1. Prioriza tarefas críticas em tempo real para evitar inanição (starvation)
+    const priorityTypes = ['UPDATE_WORKERS', 'PROCESS_GUILD_INVITES', 'FETCH_ONLINES', 'FETCH_DEATHS'];
+    const { data: prioTasks } = await supabase
       .from('task_queue')
       .select('*')
+      .in('task_type', priorityTypes)
       .or(orQuery)
       .order('locked_at', { ascending: true, nullsFirst: true })
       .limit(1);
 
-    if (error) throw error;
-    if (!tasks || tasks.length === 0) return null;
+    let task = (prioTasks && prioTasks.length > 0) ? prioTasks[0] : null;
 
-    const task = tasks[0];
+    if (!task) {
+      const { data: tasks, error } = await supabase
+        .from('task_queue')
+        .select('*')
+        .or(orQuery)
+        .order('locked_at', { ascending: true, nullsFirst: true })
+        .limit(1);
+
+      if (error) throw error;
+      if (!tasks || tasks.length === 0) return null;
+      task = tasks[0];
+    }
 
     // Tenta aplicar o lock (concorrência otimista)
     let query = supabase
@@ -561,6 +574,11 @@ supabase
   setInterval(() => {
     runProcessAutoInvites();
   }, 60000);
+
+  // Polling de Seguranca para Onlines a cada 45s (mantém presença em tempo real sem travar)
+  setInterval(() => {
+    runFetchOnlines().catch(err => console.error('[FETCH_ONLINES] Erro no polling de segurança:', err.message));
+  }, 45000);
 
   // Fechamento e arquivamento de sessões inativas a cada 10 min
   setInterval(() => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Search, User, UserCheck, UserMinus, Crosshair, Crown } from 'lucide-react';
+import { formatVocation } from '../lib/tibiaUtils';
 
 export default function GuildRoster({ onPlayerClick, isAdmin }) {
   const [members, setMembers] = useState([]);
@@ -168,10 +169,11 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
   const maxShare = Math.ceil(mmLevel / 0.66);
   const mmCandidates = members.filter(m => m.is_online && m.level >= minShare && m.level <= maxShare);
   
-  const mmEKs = mmCandidates.filter(m => m.vocation === 'Elite Knight');
-  const mmEDs = mmCandidates.filter(m => m.vocation === 'Elder Druid');
-  const mmMSs = mmCandidates.filter(m => m.vocation === 'Master Sorcerer');
-  const mmRPs = mmCandidates.filter(m => m.vocation === 'Royal Paladin');
+  const isVoc = (v, target) => formatVocation(v).toLowerCase().includes(target.toLowerCase());
+  const mmEKs = mmCandidates.filter(m => isVoc(m.vocation, 'knight'));
+  const mmEDs = mmCandidates.filter(m => isVoc(m.vocation, 'druid'));
+  const mmMSs = mmCandidates.filter(m => isVoc(m.vocation, 'sorcerer'));
+  const mmRPs = mmCandidates.filter(m => isVoc(m.vocation, 'paladin'));
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
@@ -409,7 +411,7 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
                       )}
                       <span>{m.name}</span>
                     </td>
-                    <td className="px-6 py-3 text-gray-400">{m.vocation}</td>
+                    <td className="px-6 py-3 text-gray-400">{formatVocation(m.vocation)}</td>
                     <td className="px-6 py-3">
                       <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20">Lvl {m.level}</span>
                     </td>

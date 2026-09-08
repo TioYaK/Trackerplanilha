@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Save, User, Camera, Trash2, Link as LinkIcon, AlertTriangle, ShieldAlert, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { formatVocation } from '../lib/tibiaUtils';
 
 export default function ProfileModal({ onClose }) {
   const { user, profile, refreshProfile } = useAuth();
@@ -41,13 +42,21 @@ export default function ProfileModal({ onClose }) {
            .maybeSingle();
          
          if (currentData) {
-            setCharacterStats(currentData);
+            setCharacterStats({
+              level: currentData.level || 'N/A',
+              vocation: formatVocation(currentData.vocation)
+            });
          } else {
             const { data: gmData } = await supabase.from('guild_members')
               .select('level, vocation')
               .ilike('name', profile.main_character)
               .maybeSingle();
-            if (gmData) setCharacterStats(gmData);
+            if (gmData) {
+              setCharacterStats({
+                level: gmData.level || 'N/A',
+                vocation: formatVocation(gmData.vocation)
+              });
+            }
          }
       };
       fetchStats();
@@ -199,7 +208,7 @@ export default function ProfileModal({ onClose }) {
     }
   };
 
-  const defaultVocationImg = `https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/${(profile?.vocation || 'None').toLowerCase()}.png`;
+  const defaultVocationImg = `https://github.com/TioYaK/Trackerplanilha/raw/main/scrapper/images/vocations/${(characterStats?.vocation || 'None').toLowerCase().replace(/\s+/g, '')}.png`;
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 font-sans backdrop-blur-sm animate-fade-in">

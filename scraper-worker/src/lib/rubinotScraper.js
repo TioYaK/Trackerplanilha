@@ -379,7 +379,7 @@ async function fetchRubinotEveCharacter(characterName, world) {
     };
 }
 
-async function scrapeRubinotCharacterPage(characterName) {
+async function scrapeRubinotCharacterPage(characterName, options = {}) {
     if (!characterName) return null;
     await initBrowser();
 
@@ -390,11 +390,14 @@ async function scrapeRubinotCharacterPage(characterName) {
         await tempPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
         const url = `https://rubinot.com.br/characters/${encodeURIComponent(characterName)}`;
-        const html = await safeGoto(tempPage, url, { timeout: 60000 });
+        const html = await safeGoto(tempPage, url, { timeout: 35000 });
         if (!html) throw new Error('Cloudflare bloqueou o acesso ou timeout excedido.');
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        await new Promise(resolve => setTimeout(resolve, 600));
 
-        const tabs = [
+        const tabs = options.onlyExperience ? [
+            ['character', 'character'],
+            ['experience', 'experience'],
+        ] : [
             ['character', 'character'],
             ['history', 'history'],
             ['skills', 'skills'],
@@ -405,14 +408,16 @@ async function scrapeRubinotCharacterPage(characterName) {
         const pageData = {};
 
         for (const [tabName, key] of tabs) {
-            const trigger = await tempPage.$(`[id$="-trigger-${tabName}"]`);
-            if (trigger) {
-                try {
-                    await trigger.click();
-                } catch (e) {
-                    // ignore click failures; try to parse whatever is available
+            if (tabName !== 'character') {
+                const trigger = await tempPage.$(`[id$="-trigger-${tabName}"]`);
+                if (trigger) {
+                    try {
+                        await trigger.click();
+                    } catch (e) {
+                        // ignore click failures; try to parse whatever is available
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 350));
                 }
-                await new Promise(resolve => setTimeout(resolve, 900));
             }
 
             const panelData = await tempPage.evaluate((tabName) => {
@@ -517,6 +522,14 @@ async function scrapeRubinotCharacterPage(characterName) {
                 return { rawText: text };
             }, tabName);
             pageData[key] = panelData;
+        }
+
+        if (pageData.character) {
+            pageData.name = pageData.character.name || characterName;
+            pageData.level = pageData.character.level ? parseInt(pageData.character.level, 10) : undefined;
+            pageData.vocation = pageData.character.vocation;
+            pageData.world = pageData.character.world;
+            pageData.guild = pageData.character.guild;
         }
 
         return pageData;

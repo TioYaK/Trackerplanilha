@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Users, Activity, Crosshair } from 'lucide-react';
 
+import { isSlotActiveNow } from '../lib/tibiaUtils';
+
 export default function HeaderMetrics({ parties = [] }) {
   const [metrics, setMetrics] = useState({ total_members: 0, active_members: 0 });
 
@@ -16,15 +18,10 @@ export default function HeaderMetrics({ parties = [] }) {
     fetchMetrics();
   }, []);
 
-  // Calcular slots atuais (baseado na hora atual)
-  const now = new Date();
-  const currentHour = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-  
-  const currentParties = parties.filter(p => p.slot_start <= currentHour && p.slot_end >= currentHour);
+  // Calcular slots atuais (baseado no horário de Brasília com suporte a meia-noite)
+  const currentParties = parties.filter(p => isSlotActiveNow(p.slot_start, p.slot_end));
   const totalCurrentSlots = currentParties.length;
-  // Para MVP sem a view complexa no frontend, consideramos Ghost Slot se status for explicitamente 'GHOST_SLOT'
-  // ou apenas exibimos o total se não tiver telemetria embutida
-  const idleSlots = currentParties.filter(p => p.status === 'GHOST_SLOT').length;
+  const idleSlots = currentParties.filter(p => p.status === 'GHOST_SLOT' || p.status === 'FALTA_1' || p.status === 'FALTA_2').length;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

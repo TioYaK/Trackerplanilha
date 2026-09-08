@@ -19,12 +19,34 @@ export const runFetchRosterShard = async (shardId) => {
 
     // Filter members for this shard
     const shardMembers = members.filter(m => regexFilter.test(m.name.trim()));
-    console.log(`[SHARD ${shardId}] Processando ${shardMembers.length} jogadores.`);
+    if (shardMembers.length === 0) return;
 
-    for (const member of shardMembers) {
+    // Prioriza os membros que nunca foram atualizados ou que foram atualizados há mais tempo
+    const { data: states } = await supabase
+      .from('current_character_state')
+      .select('character_name, updated_at');
+
+    const stateMap = new Map();
+    if (states) {
+      states.forEach(s => {
+        const time = s.updated_at ? new Date(s.updated_at).getTime() : 0;
+        stateMap.set(s.character_name.toLowerCase(), time);
+      });
+    }
+
+    shardMembers.sort((a, b) => {
+      const ta = stateMap.get(a.name.toLowerCase()) || 0;
+      const tb = stateMap.get(b.name.toLowerCase()) || 0;
+      return ta - tb;
+    });
+
+    const batch = shardMembers.slice(0, 15);
+    console.log(`[SHARD ${shardId}] Processando lote prioritário de ${batch.length} (total no shard: ${shardMembers.length}).`);
+
+    for (const member of batch) {
       try {
-        console.log(`[SHARD ${shardId}] Inspecionando detalhadamente: ${member.name}`);
-        const charData = await scrapeRubinotCharacterPage(member.name);
+        console.log(`[SHARD ${shardId}] Inspecionando: ${member.name}`);
+        const charData = await scrapeRubinotCharacterPage(member.name, { onlyExperience: true });
         
         if (charData) {
           const { data: existing } = await supabase.from('current_character_state')
@@ -37,26 +59,44 @@ export const runFetchRosterShard = async (shardId) => {
               xpValue = parseInt(charData.experience.totalExperience.replace(/[,.]/g, ''), 10);
           }
 
+          const resolvedName = charData.name || charData.character?.name || member.name;
+          const resolvedLevel = charData.level || (charData.character?.level ? parseInt(charData.character.level, 10) : undefined);
+          const resolvedVoc = charData.vocation || charData.character?.vocation;
+
           const updatePayload = {
-            character_name: charData.name || member.name,
-            level: charData.level,
-            vocation: charData.vocation,
-            world: charData.world,
-            guild: charData.guild,
+            character_name: resolvedName,
+            updated_at: new Date().toISOString()
           };
+
+          if (resolvedLevel) updatePayload.level = resolvedLevel;
+          if (resolvedVoc) updatePayload.vocation = resolvedVoc;
+          if (charData.world || charData.character?.world) updatePayload.world = charData.world || charData.character?.world;
+          if (charData.guild || charData.character?.guild) updatePayload.guild = charData.guild || charData.character?.guild;
           
           if (xpValue > 0) {
               updatePayload.xp_total = xpValue;
-              // Só atualiza last_active se a XP SUBIU!
-              if (existing && xpValue > existing.xp_total) {
+              if (existing) {
+                if (xpValue > (existing.xp_total || 0)) {
                   updatePayload.last_active = new Date().toISOString();
                   updatePayload.session_start_xp = existing.session_start_xp || existing.xp_total;
                   updatePayload.session_start_time = existing.session_start_time || new Date().toISOString();
+                }
+              } else {
+                updatePayload.session_start_xp = xpValue;
+                updatePayload.session_start_time = new Date().toISOString();
               }
           }
 
           // Atualiza dados na current_character_state
           await supabase.from('current_character_state').upsert(updatePayload, { onConflict: 'character_name' });
+
+          // Atualiza também level e vocação no guild_members se disponíveis
+          if (resolvedLevel || resolvedVoc) {
+            const gmPayload = {};
+            if (resolvedLevel) gmPayload.level = resolvedLevel;
+            if (resolvedVoc) gmPayload.vocation = resolvedVoc;
+            await supabase.from('guild_members').update(gmPayload).ilike('name', member.name);
+          }
         }
       } catch (err) {
         console.error(`[SHARD ${shardId}] Falha ao ler detalhes de ${member.name}: ${err.message}`);

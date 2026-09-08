@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ShieldAlert, Crosshair, UserPlus, Clock, Trash2, Skull } from 'lucide-react';
+import { parseUtcDate } from '../lib/tibiaUtils';
 
 export default function RadarHunters({ isAdmin }) {
   const [huntedList, setHuntedList] = useState([]);
@@ -29,10 +30,11 @@ export default function RadarHunters({ isAdmin }) {
       setHuntedList(data || []);
 
       if (data && data.length > 0) {
-         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+         const nowMs = Date.now();
+         const oneHourAgoMs = nowMs - 60 * 60 * 1000;
          const names = data.filter(h => h.is_online).map(h => h.name);
          if (names.length > 0) {
-            let allLogs = [];
+            const xpMap = {};
             for (let i = 0; i < names.length; i += 100) {
               const chunk = names.slice(i, i + 100);
               const { data: states } = await supabase
@@ -43,14 +45,15 @@ export default function RadarHunters({ isAdmin }) {
               if (states) {
                 states.forEach(state => {
                   const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
-                  const lastActiveTime = new Date(state.last_active).getTime();
-                  if (deltaXp > 0 && lastActiveTime >= oneHourAgo) {
-                    if (!xpMap[state.character_name]) xpMap[state.character_name] = 0;
-                    xpMap[state.character_name] += deltaXp;
+                  const activeDate = parseUtcDate(state.last_active);
+                  const lastActiveTime = activeDate ? activeDate.getTime() : 0;
+                  if (deltaXp > 0 && lastActiveTime >= oneHourAgoMs && lastActiveTime <= nowMs + 60000) {
+                    const key = state.character_name.toLowerCase();
+                    xpMap[key] = (xpMap[key] || 0) + deltaXp;
                   }
                 });
               }
-            } // fechamento do for loop
+            }
             setXpData(xpMap);
          }
       }
@@ -199,7 +202,7 @@ export default function RadarHunters({ isAdmin }) {
                 </thead>
                 <tbody className="divide-y divide-tibia-border/30">
                   {huntedList.map((hunted) => {
-                    const huntedXp = xpData[hunted.name] || 0;
+                    const huntedXp = xpData[hunted.name?.toLowerCase()] || xpData[hunted.name] || 0;
                     const isHunting = huntedXp > 0;
                     return (
                     <tr key={hunted.id} className="hover:bg-white/5 transition-colors group">

@@ -22,7 +22,7 @@ export default function RespawnTracker({ isAdmin }) {
   );
 
   return (
-    <div className="p-4 max-w-7xl mx-auto u-full">
+    <div className="p-4 max-w-7xl mx-auto w-full">
       <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-tibia-inset">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-medieval text-tibia-primary flex items-center gap-2">
@@ -45,7 +45,7 @@ export default function RespawnTracker({ isAdmin }) {
             <div key={respawn.id} className="bg-black/40 border border-tibia-border/50 rounded-md p-4 hover:border-tibia-primary/50 transition-colors flex flex-col">
               <div className="flex justify-between items-start mb-2">
                 <div className="font-bold text-tibia-primary">{respawn.name}</div>
-                <div className="bg-tibia-primary/10 text-tibia-primary xs px-2 py-0.5 rounded-full font-mono font-bold">{respawn.id}</div>
+                <div className="bg-tibia-primary/10 text-tibia-primary text-xs px-2 py-0.5 rounded-full font-mono font-bold">{respawn.id}</div>
               </div>
               <div className="text-sm text-gray-400 flex items-center gap-1 mb-4">
                 <Map size={14} />

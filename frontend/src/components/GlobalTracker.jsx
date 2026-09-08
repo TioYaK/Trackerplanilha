@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users, DollarSign, Clock, Network, FileText } from 'lucide-react';
+import { formatVocation } from '../lib/tibiaUtils';
 
 export default function GlobalTracker() {
   const [census, setCensus] = useState({ total_members: 0, active_members: 0 });
@@ -166,10 +167,12 @@ export default function GlobalTracker() {
           const lvlStats = { '1-499': 0, '500-999': 0, '1000-1499': 0, '1500-1999': 0, '2000+': 0 };
 
           allRoster.forEach(m => {
-            const voc = m.vocation || 'N/A';
-            if (!vocStats[voc]) vocStats[voc] = { name: voc, members: 0, total_xp: 0 };
-            vocStats[voc].members += 1;
-            vocStats[voc].total_xp += m.xp_gained_24h || 0;
+            const voc = formatVocation(m.vocation);
+            if (voc && voc !== 'None' && voc !== 'N/A') {
+              if (!vocStats[voc]) vocStats[voc] = { name: voc, members: 0, total_xp: 0 };
+              vocStats[voc].members += 1;
+              vocStats[voc].total_xp += m.xp_gained_24h || 0;
+            }
 
             if (m.level < 500) lvlStats['1-499']++;
             else if (m.level < 1000) lvlStats['500-999']++;
@@ -184,6 +187,7 @@ export default function GlobalTracker() {
 
           const vocColors = {
             'Elite Knight': '#3B82F6', 'Elder Druid': '#10B981', 'Master Sorcerer': '#EF4444', 'Royal Paladin': '#F59E0B',
+            'Knight': '#3B82F6', 'Druid': '#10B981', 'Sorcerer': '#EF4444', 'Paladin': '#F59E0B',
             'Monk': '#8B5CF6', 'Exalted Monk': '#8B5CF6'
           };
 
@@ -279,9 +283,12 @@ export default function GlobalTracker() {
           if (p.members && Array.isArray(p.members)) {
             p.members.forEach(mName => {
                // Supply Demand
-               const player = allRoster.find(r => r.name === mName);
-               if (player && hoursPerVoc[player.vocation] !== undefined) {
-                  hoursPerVoc[player.vocation] += durationHours;
+               const player = allRoster.find(r => r.name?.toLowerCase() === mName?.toLowerCase());
+               if (player) {
+                  const pVoc = formatVocation(player.vocation);
+                  if (hoursPerVoc[pVoc] !== undefined) {
+                     hoursPerVoc[pVoc] += durationHours;
+                  }
                }
 
                // Social Radar

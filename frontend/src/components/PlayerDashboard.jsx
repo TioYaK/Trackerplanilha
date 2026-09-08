@@ -7,40 +7,7 @@ import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X } from 'lucide-r
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const parseUtcDate = (dStr) => {
-  if (!dStr) return null;
-  if (dStr instanceof Date) return dStr;
-  if (typeof dStr !== 'string') return new Date(dStr);
-  if (!dStr.endsWith('Z') && !dStr.includes('+') && !dStr.includes('-', 10)) {
-    return new Date(dStr + 'Z');
-  }
-  return new Date(dStr);
-};
-
-const toBrtDateStr = (dateObj) => {
-  if (!dateObj) return '';
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(dateObj);
-};
-
-const VOCATION_MAP = {
-  '0': 'Nenhuma',
-  '1': 'Sorcerer',
-  '2': 'Druid',
-  '3': 'Paladin',
-  '4': 'Knight',
-  '5': 'Master Sorcerer',
-  '6': 'Elder Druid',
-  '7': 'Royal Paladin',
-  '8': 'Elite Knight',
-  '9': 'Monk',
-  '10': 'Exalted Monk'
-};
-
-const formatVocation = (voc) => {
-  if (!voc) return 'Desconhecida';
-  const str = String(voc).trim();
-  return VOCATION_MAP[str] || voc;
-};
+import { parseUtcDate, toBrtDateStr, formatVocation } from '../lib/tibiaUtils';
 
 export default function PlayerDashboard({ playerName, isAdmin }) {
   const [telemetry, setTelemetry] = useState([]);
@@ -110,14 +77,25 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       .maybeSingle();
 
     let isOnline = false;
+    const nowMs = Date.now();
+    const isRecentlyActive = cData?.last_active ? (() => {
+      const activeDate = parseUtcDate(cData.last_active);
+      if (!activeDate) return false;
+      const diff = nowMs - activeDate.getTime();
+      return diff >= 0 && diff < 20 * 60 * 1000;
+    })() : false;
+
     if (lastLoginEvent) {
       if (lastLoginEvent.event_type === 'LOGOUT') {
         isOnline = false;
       } else if (lastLoginEvent.event_type === 'LOGIN') {
-        isOnline = memberData ? Boolean(memberData.is_online) : (cData?.last_active ? (new Date() - parseUtcDate(cData.last_active)) < 20 * 60 * 1000 : false);
+        const loginDate = parseUtcDate(lastLoginEvent.event_time);
+        const loginDiff = loginDate ? (nowMs - loginDate.getTime()) : Infinity;
+        // Se o login foi nas últimas 24h e o membro consta online ou tem atividade recente
+        isOnline = (loginDiff >= 0 && loginDiff < 24 * 60 * 60 * 1000) && (memberData ? Boolean(memberData.is_online) : isRecentlyActive);
       }
     } else {
-      isOnline = memberData ? Boolean(memberData.is_online) : (cData?.last_active ? (new Date() - parseUtcDate(cData.last_active)) < 20 * 60 * 1000 : false);
+      isOnline = memberData ? Boolean(memberData.is_online) : isRecentlyActive;
     }
 
     const rawVoc = cData?.vocation || memberData?.vocation;
@@ -322,14 +300,13 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
 
     if (strikesData) setStrikes(strikesData);
 
-    // Fetch frequent squad (Panelinhas)
+    // Fetch frequent squad (Panelinhas) - case-insensitive
     let squadData = [];
     let pageSquad = 0;
     while(true) {
         const { data } = await supabase
           .from('parties_planilhadas')
           .select('members')
-          .contains('members', JSON.stringify([playerName]))
           .range(pageSquad*1000, (pageSquad+1)*1000-1);
         if (!data || data.length === 0) break;
         squadData.push(...data);
@@ -339,13 +316,17 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
 
     if (squadData) {
       const mates = {};
+      const targetLower = playerName.toLowerCase().trim();
       squadData.forEach(p => {
-        if (!p.members) return;
-        p.members.forEach(m => {
-          if (m !== playerName) {
-            mates[m] = (mates[m] || 0) + 1;
-          }
-        });
+        if (!p.members || !Array.isArray(p.members)) return;
+        const inParty = p.members.some(m => m && m.toLowerCase().trim() === targetLower);
+        if (inParty) {
+          p.members.forEach(m => {
+            if (m && m.toLowerCase().trim() !== targetLower) {
+              mates[m] = (mates[m] || 0) + 1;
+            }
+          });
+        }
       });
       const rankedMates = Object.entries(mates)
         .sort((a,b) => b[1] - a[1])
@@ -585,7 +566,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
             <div>
               <p className="text-sm text-gray-400 font-bold mb-1">A Máquina do Tempo (Previsão de Level)</p>
               <p className="text-xs text-gray-500">
-                Baseado na média de <span className="text-purple-400 font-bold">{(prediction.avgXpPerDay / 1000000).toFixed(1)}M XP/dia</span> (últimos 14 dias)
+                Baseado na média de <span className="text-purple-400 font-bold">{Number.isFinite(prediction.avgXpPerDay) ? (prediction.avgXpPerDay / 1000000).toFixed(1) : '0.0'}M XP/dia</span> (últimos 14 dias)
               </p>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Skull, Plane, ShieldAlert, Activity, RefreshCw, Radar } from 'lucide-react';
+import { toBrtDateStr, toBrtTimeStr } from '../lib/tibiaUtils';
 
 export default function ExtremeAnalytics() {
   const [deaths, setDeaths] = useState([]);
@@ -89,7 +90,7 @@ export default function ExtremeAnalytics() {
                       {d.is_hunted && <span className="bg-orange-900/30 text-orange-400 text-[10px] uppercase px-2 py-0.5 rounded border border-orange-900/50">Inimigo</span>}
                     </span>
                     <span className="text-xs text-gray-500 font-mono bg-black/40 px-2 py-1 rounded">
-                      {new Date(d.death_time).toLocaleTimeString()}
+                      {toBrtTimeStr(d.death_time)}
                     </span>
                   </div>
                   
@@ -136,7 +137,7 @@ export default function ExtremeAnalytics() {
                         {t.level > 0 && <span className="bg-gray-800 text-gray-300 text-[10px] uppercase px-2 py-0.5 rounded border border-gray-700">Lvl {t.level}</span>}
                       </span>
                       <span className="text-xs text-gray-500 font-mono bg-black/40 px-2 py-1 rounded">
-                        {new Date(t.transfer_date).toLocaleDateString()}
+                        {toBrtDateStr(t.transfer_date)}
                       </span>
                     </div>
                     

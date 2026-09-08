@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Clock, TrendingUp, AlertTriangle, Users, Info } from 'lucide-react';
+import { Clock, TrendingUp, AlertTriangle, Users, Info, CheckCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { parseUtcDate, isSlotActiveNow } from '../lib/tibiaUtils';
 
 const toMinutes = (timeStr) => {
   if (!timeStr || typeof timeStr !== 'string') return 0;
@@ -118,7 +119,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       let guildData = [];
       const { data: gData } = await supabase
         .from('guild_members')
-        .select('name, level')
+        .select('name, level, is_online')
         .or(orFilterName);
         
       if (gData) {
@@ -193,13 +194,16 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       // 5. Calcula estatísticas individuais dos membros
       const memberStats = {};
       party.members.forEach(m => {
-        memberStats[m.toLowerCase()] = { name: m, totalXpGained: 0, level: '?', lastSeen: null };
+        memberStats[m.toLowerCase()] = { name: m, totalXpGained: 0, level: '?', lastSeen: null, isOnlineRoster: false };
       });
       
       guildData.forEach(g => {
         const m = memberStats[g.name.toLowerCase()];
-        if (m && g.level) {
-          m.level = g.level;
+        if (m) {
+          if (g.level) m.level = g.level;
+          if (g.is_online !== undefined && g.is_online !== null) {
+            m.isOnlineRoster = Boolean(g.is_online);
+          }
         }
       });
 
@@ -251,12 +255,15 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       }
       setSessionLabel(activeLabel);
 
+      const nowMs = Date.now();
       const processedMembers = Object.values(memberStats).map(m => {
         const raw = m.totalXpGained;
+        const diff = m.lastSeen ? (nowMs - m.lastSeen.getTime()) : Infinity;
+        const isRecentlyActive = diff >= 0 && diff < 20 * 60 * 1000;
         return { 
           ...m, 
           formattedXp: formatXp(raw), 
-          isOnline: m.lastSeen && (new Date() - m.lastSeen) < 25 * 60 * 1000 
+          isOnline: Boolean(m.isOnlineRoster) || isRecentlyActive
         };
       });
 
@@ -294,18 +301,72 @@ export default function PartyDashboard({ party, onPlayerClick }) {
     GHOST_SLOT: 'border-red-500 bg-red-500/10 text-red-400',
     DEFAULT: 'border-tibia-border bg-tibia-card text-gray-400'
   };
+  const isSlotActive = isSlotActiveNow(party.slot_start, party.slot_end);
+
   const nowBrt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   const currentTotalMinutes = nowBrt.getHours() * 60 + nowBrt.getMinutes();
-
   const startMin = toMinutes(party.slot_start);
   let endMin = toMinutes(party.slot_end);
   if (endMin <= startMin) endMin += 1440;
   let currentMin = currentTotalMinutes;
   if (currentMin < startMin && endMin > 1440) currentMin += 1440;
-  const isSlotActive = currentMin >= startMin && currentMin <= endMin;
   const isSlotPast = currentMin > endMin;
 
   const currentStatus = party.status || 'DEFAULT';
+
+  let displayStatus = 'Aguardando Slot';
+  let statusColorClass = 'text-gray-400';
+  let StatusIcon = Clock;
+
+  if (isSlotActive) {
+    if (currentStatus === 'EFFICIENT') {
+      displayStatus = 'Caçando Ativamente';
+      statusColorClass = 'text-green-400';
+      StatusIcon = TrendingUp;
+    } else if (currentStatus === 'SUBOPTIMAL') {
+      displayStatus = 'Ociosidade Parcial';
+      statusColorClass = 'text-yellow-400';
+      StatusIcon = Clock;
+    } else if (currentStatus === 'FALTA_1') {
+      displayStatus = 'Falta (1/3)';
+      statusColorClass = 'text-orange-400';
+      StatusIcon = AlertTriangle;
+    } else if (currentStatus === 'FALTA_2') {
+      displayStatus = 'Falta (2/3)';
+      statusColorClass = 'text-orange-500';
+      StatusIcon = AlertTriangle;
+    } else if (currentStatus === 'GHOST_SLOT') {
+      displayStatus = 'Slot Fantasma (Abandono)';
+      statusColorClass = 'text-red-400';
+      StatusIcon = AlertTriangle;
+    } else {
+      displayStatus = 'Slot em Andamento';
+      statusColorClass = 'text-blue-400';
+      StatusIcon = Clock;
+    }
+  } else if (isSlotPast) {
+    if (currentStatus === 'GHOST_SLOT') {
+      displayStatus = 'Slot Fantasma (Abandono)';
+      statusColorClass = 'text-red-400';
+      StatusIcon = AlertTriangle;
+    } else if (currentStatus === 'FALTA_1') {
+      displayStatus = 'Slot Concluído (1/3 Falta)';
+      statusColorClass = 'text-orange-400';
+      StatusIcon = AlertTriangle;
+    } else if (currentStatus === 'FALTA_2') {
+      displayStatus = 'Slot Concluído (2/3 Falta)';
+      statusColorClass = 'text-orange-500';
+      StatusIcon = AlertTriangle;
+    } else {
+      displayStatus = 'Slot Concluído';
+      statusColorClass = 'text-blue-400';
+      StatusIcon = CheckCircle;
+    }
+  } else {
+    displayStatus = 'Aguardando Slot';
+    statusColorClass = 'text-gray-400';
+    StatusIcon = Clock;
+  }
 
   const chartData = membersData.map(m => ({ name: m.name.split(' ')[0], xp: m.totalXpGained }));
   const formatXpAxis = (tick) => formatXp(tick);
@@ -329,18 +390,9 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <p className="text-xs text-gray-500 uppercase font-bold">Status do Slot</p>
-            <p className={`text-lg font-bold flex items-center ${statusColors[currentStatus]?.split(' ')[2] || ''}`}>
-              {currentStatus === 'EFFICIENT' && <TrendingUp size={20} className="mr-2 text-green-400" />}
-              {currentStatus === 'SUBOPTIMAL' && <Clock size={20} className="mr-2 text-yellow-400" />}
-              {(currentStatus === 'FALTA_1' || currentStatus === 'FALTA_2') && <AlertTriangle size={20} className="mr-2 text-orange-400" />}
-              {currentStatus === 'GHOST_SLOT' && <AlertTriangle size={20} className="mr-2 text-red-400" />}
-              <span>
-                {currentStatus === 'EFFICIENT' ? 'Caçando Ativamente' :
-                 currentStatus === 'SUBOPTIMAL' ? 'Ociosidade Parcial' :
-                 currentStatus === 'FALTA_1' ? 'Falta (1/3)' :
-                 currentStatus === 'FALTA_2' ? 'Falta (2/3)' :
-                 currentStatus === 'GHOST_SLOT' ? 'Slot Abandonado (Ghost)' : 'Aguardando Slot'}
-              </span>
+            <p className={`text-lg font-bold flex items-center ${statusColorClass}`}>
+              <StatusIcon size={20} className="mr-2" />
+              <span>{displayStatus}</span>
             </p>
           </div>
           <div>
