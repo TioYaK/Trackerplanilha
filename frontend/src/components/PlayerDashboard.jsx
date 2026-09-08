@@ -22,6 +22,26 @@ const toBrtDateStr = (dateObj) => {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(dateObj);
 };
 
+const VOCATION_MAP = {
+  '0': 'Nenhuma',
+  '1': 'Sorcerer',
+  '2': 'Druid',
+  '3': 'Paladin',
+  '4': 'Knight',
+  '5': 'Master Sorcerer',
+  '6': 'Elder Druid',
+  '7': 'Royal Paladin',
+  '8': 'Elite Knight',
+  '9': 'Monk',
+  '10': 'Exalted Monk'
+};
+
+const formatVocation = (voc) => {
+  if (!voc) return 'Desconhecida';
+  const str = String(voc).trim();
+  return VOCATION_MAP[str] || voc;
+};
+
 export default function PlayerDashboard({ playerName, isAdmin }) {
   const [telemetry, setTelemetry] = useState([]);
   const [strikes, setStrikes] = useState([]);
@@ -60,7 +80,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       setPlayerAvatar(null);
     }
 
-    // Fetch Player Level from guild_members with fallback to current_character_state
+    // Fetch Player Level & Vocation from guild_members with fallback to current_character_state
     let memberData = null;
     const { data: gMembers } = await supabase
       .from('guild_members')
@@ -80,15 +100,35 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       .ilike('character_name', playerName)
       .maybeSingle();
 
-    if (!memberData && cData) {
-      memberData = {
-        level: cData.level,
-        vocation: cData.vocation,
-        is_online: cData.last_active ? (new Date() - parseUtcDate(cData.last_active)) < 15 * 60 * 1000 : false
-      };
+    // Check latest login/logout event for accurate online status
+    const { data: lastLoginEvent } = await supabase
+      .from('login_events')
+      .select('event_type, event_time')
+      .ilike('character_name', playerName)
+      .order('event_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let isOnline = false;
+    if (lastLoginEvent) {
+      if (lastLoginEvent.event_type === 'LOGOUT') {
+        isOnline = false;
+      } else if (lastLoginEvent.event_type === 'LOGIN') {
+        isOnline = memberData ? Boolean(memberData.is_online) : (cData?.last_active ? (new Date() - parseUtcDate(cData.last_active)) < 20 * 60 * 1000 : false);
+      }
+    } else {
+      isOnline = memberData ? Boolean(memberData.is_online) : (cData?.last_active ? (new Date() - parseUtcDate(cData.last_active)) < 20 * 60 * 1000 : false);
     }
-      
-    if (memberData) setPlayerInfo(memberData);
+
+    const rawVoc = cData?.vocation || memberData?.vocation;
+    const finalVocation = formatVocation(rawVoc);
+    const finalLevel = memberData?.level || cData?.level || null;
+
+    setPlayerInfo({
+      level: finalLevel,
+      vocation: finalVocation,
+      is_online: isOnline
+    });
 
     let currentXP = cData?.xp_total ? Number(cData.xp_total) : 0;
     let currentDelta = 0;
@@ -108,8 +148,30 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       currentXP = Number(boundsData[boundsData.length - 1].end_xp_total || 0);
     }
 
-    // History of Level Up / Down
+    // History of Level Up / Down & Deaths
+    const { data: deathsData } = await supabase
+      .from('recent_deaths')
+      .select('level, killed_by, death_time')
+      .ilike('character_name', playerName)
+      .gte('death_time', fourteenDaysAgo)
+      .order('death_time', { ascending: false });
+
     let lvlHist = [];
+
+    // Add deaths from recent_deaths
+    (deathsData || []).forEach(d => {
+      const fromLvl = Number(d.level) || 0;
+      const toLvl = Math.max(1, fromLvl - 1);
+      lvlHist.push({
+        type: 'DOWN',
+        from: fromLvl,
+        to: toLvl,
+        reason: d.killed_by || 'Desconhecido',
+        date: d.death_time
+      });
+    });
+
+    // Add level transitions from historical_sessions
     let prevLevel = null;
     (boundsData || []).forEach(log => {
       if (prevLevel !== null && log.end_level && log.end_level !== prevLevel) {
@@ -117,12 +179,14 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
           type: log.end_level > prevLevel ? 'UP' : 'DOWN',
           from: prevLevel,
           to: log.end_level,
+          reason: null,
           date: log.session_end
         });
       }
       if (log.end_level) prevLevel = log.end_level;
     });
-    lvlHist.reverse();
+
+    lvlHist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     setLevelHistory(lvlHist);
 
     // Heatmap Logic (14 days)
@@ -488,22 +552,24 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
         {/* Level History Card */}
         <div className="bg-tibia-card p-4 rounded-lg border border-yellow-900/50 flex items-center justify-between col-span-1">
           <div className="w-full">
-            <p className="text-sm text-gray-400 mb-2 font-bold">Histórico de Nível (14 dias)</p>
+            <p className="text-sm text-gray-400 mb-2 font-bold">Histórico de Nível e Mortes (14 dias)</p>
             {levelHistory.length > 0 ? (
               <ul className="text-xs space-y-1 max-h-24 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600">
                 {levelHistory.map((h, idx) => (
                   <li key={idx} className="flex justify-between border-b border-white/5 pb-1 last:border-0 last:pb-0">
-                    <span className="text-gray-400">{format(new Date(h.date), "dd/MM HH:mm")}</span>
+                    <span className="text-gray-400">{format(parseUtcDate(h.date), "dd/MM HH:mm")}</span>
                     {h.type === 'UP' ? (
                       <span className="text-green-400 font-bold">Lvl {h.from} &rarr; {h.to}</span>
                     ) : (
-                      <span className="text-red-500 font-bold">Lvl {h.from} &rarr; {h.to} (Morte)</span>
+                      <span className="text-red-500 font-bold truncate max-w-[180px]" title={h.reason ? `Morto por: ${h.reason}` : 'Morte'}>
+                        Lvl {h.from} &rarr; {h.to} ({h.reason || 'Morte'})
+                      </span>
                     )}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-gray-500 italic">Nenhuma mudança de level registrada.</p>
+              <p className="text-xs text-gray-500 italic">Nenhuma mudança de level ou morte registrada.</p>
             )}
           </div>
         </div>

@@ -16,12 +16,31 @@ export const runFetchGuild = async () => {
     
     const members = res.guild.members;
 
+    const VOCATION_MAP = {
+      '0': 'Nenhuma',
+      '1': 'Sorcerer',
+      '2': 'Druid',
+      '3': 'Paladin',
+      '4': 'Knight',
+      '5': 'Master Sorcerer',
+      '6': 'Elder Druid',
+      '7': 'Royal Paladin',
+      '8': 'Elite Knight',
+      '9': 'Monk',
+      '10': 'Exalted Monk'
+    };
+    const formatVocation = (voc) => {
+      if (!voc) return 'Desconhecida';
+      const str = String(voc).trim();
+      return VOCATION_MAP[str] || voc;
+    };
+
     // Remove duplicatas pelo nome
     const uniqueMembersMap = new Map();
     members.forEach(m => {
       uniqueMembersMap.set(m.name, {
         name: m.name,
-        vocation: m.vocation,
+        vocation: formatVocation(m.vocation),
         level: m.level,
         rank: m.rank || null,          // FIX: campo rank agora é incluído no upsert
         is_online: m.isOnline || false,

@@ -69,13 +69,46 @@ export const runFetchOnlines = async () => {
       }
     }
 
-    // --- CARIMBO DE ATIVIDADE PARA QUEM ESTÁ ONLINE ---
-    // A ideia genial do dono: Se o cara está online no site, ele está ativo!
-    const { data: guildMembers } = await supabase.from('guild_members').select('name');
-    if (guildMembers && guildMembers.length > 0) {
-      const activeGuildNames = guildMembers
+    // --- SINCRONIZAÇÃO DE STATUS ONLINE E CARIMBO DE ATIVIDADE ---
+    let allGuildMembers = [];
+    let page = 0;
+    while (true) {
+      const { data: gChunk } = await supabase
+        .from('guild_members')
+        .select('name, is_online')
+        .range(page * 1000, (page + 1) * 1000 - 1);
+      if (!gChunk || gChunk.length === 0) break;
+      allGuildMembers.push(...gChunk);
+      if (gChunk.length < 1000) break;
+      page++;
+    }
+
+    if (allGuildMembers.length > 0) {
+      const activeGuildNames = allGuildMembers
         .filter(m => onlineSet.has(m.name.toLowerCase()))
         .map(m => m.name);
+
+      const toSetOnline = allGuildMembers
+        .filter(m => onlineSet.has(m.name.toLowerCase()) && !m.is_online)
+        .map(m => m.name);
+
+      const toSetOffline = allGuildMembers
+        .filter(m => !onlineSet.has(m.name.toLowerCase()) && m.is_online)
+        .map(m => m.name);
+
+      if (toSetOnline.length > 0) {
+        for (let i = 0; i < toSetOnline.length; i += 100) {
+          await supabase.from('guild_members').update({ is_online: true }).in('name', toSetOnline.slice(i, i + 100));
+        }
+        console.log(`[JOB] ${toSetOnline.length} membros da guilda marcados como ONLINE.`);
+      }
+
+      if (toSetOffline.length > 0) {
+        for (let i = 0; i < toSetOffline.length; i += 100) {
+          await supabase.from('guild_members').update({ is_online: false }).in('name', toSetOffline.slice(i, i + 100));
+        }
+        console.log(`[JOB] ${toSetOffline.length} membros da guilda marcados como OFFLINE.`);
+      }
 
       if (activeGuildNames.length > 0) {
         const now = new Date().toISOString();
