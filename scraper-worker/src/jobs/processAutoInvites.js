@@ -333,18 +333,18 @@ export async function runProcessAutoInvites() {
 
         console.log(`[PUPPETEER] Abrindo navegador para ${world}...`);
         const browser = await puppeteer.launch({
-        headless: false, // Turnstile é mais permissivo quando não é headless
-        executablePath: chromeExe || undefined,
-        userDataDir: profilePath,
-        args: [
-          '--no-sandbox', 
-          '--disable-setuid-sandbox',
-          '--window-size=1280,800',
-          '--disable-blink-features=AutomationControlled',
-          '--exclude-switches=enable-automation'
-        ],
-        ignoreDefaultArgs: ['--enable-automation'],
-      });
+          headless: 'new', // Modo headless moderno — sem janelas visíveis acumulando, mas sem ser detectado como bot
+          executablePath: chromeExe || undefined,
+          userDataDir: profilePath,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--window-size=1280,800',
+            '--disable-blink-features=AutomationControlled',
+            '--exclude-switches=enable-automation'
+          ],
+          ignoreDefaultArgs: ['--enable-automation'],
+        });
 
       try {
         const page = await browser.newPage();
