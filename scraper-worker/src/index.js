@@ -28,7 +28,7 @@ import { runArchiveSessions } from './jobs/archiveSessions.js';
 import { checkForUpdates } from './updater.js';
 import { applySelfHealingPatch } from './selfHeal.js';
 import { closeBrowser, isInMaintenance } from './lib/rubinotScraper.js';
-import { cleanStalePuppeteerProfiles } from './lib/cleanupTemp.js';
+import { runFullStorageMaintenance, getDiskHealth } from './lib/storageGuardian.js';
 
 applySelfHealingPatch();
 
@@ -253,7 +253,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.5.3';
+const WORKER_VERSION = '1.6.0';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -343,13 +343,23 @@ const loop = async () => {
 
 const sendHeartbeat = async () => {
   try {
+    const disk = getDiskHealth();
+    const metadata = {
+      ...WORKER_METADATA,
+      disk_free_gb: disk.freeGb,
+      disk_total_gb: disk.totalGb,
+      disk_percent_free: disk.percentFree,
+      disk_warning: disk.isLowDisk,
+      disk_text: disk.text,
+    };
+
     await supabase.from('worker_heartbeats').upsert({
       worker_id: WORKER_ID,
       last_ping: new Date().toISOString(),
       started_at: WORKER_STARTED,
       version: WORKER_VERSION,
       location: WORKER_LOCATION,
-      metadata: WORKER_METADATA,
+      metadata,
     });
 
     const statsToFlush = { ...sessionStats };
@@ -401,10 +411,10 @@ setInterval(async () => {
   await runAuditBank();
 }, 60 * 60 * 1000); // Checa a cada 1 hora
 
-// Limpeza periódica de perfis temporários órfãos do Puppeteer (evita encher o disco)
-setTimeout(() => cleanStalePuppeteerProfiles(10), 10000);
+// Guardião do Armazenamento: Limpeza preventiva automática de disco e perfis
+setTimeout(() => runFullStorageMaintenance(), 5000);
 setInterval(() => {
-  cleanStalePuppeteerProfiles(15);
+  runFullStorageMaintenance();
 }, 30 * 60 * 1000); // Checa a cada 30 minutos
 
 // ==========================================

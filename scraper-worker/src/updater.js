@@ -10,21 +10,26 @@ export const checkForUpdates = async () => {
     // Se não estiver rodando como EXE compilado, usa o Git Pull blindado
     if (!process.pkg) {
         return new Promise((resolve) => {
-            exec('git fetch --all && git reset --hard origin/main && git clean -fd', (error, stdout) => {
-                if (stdout && !stdout.includes('HEAD is now at')) {
-                    console.log('[UPDATER] Atualizando código... Instalando dependências e reiniciando...');
-                    exec('npm install', () => {
-                        process.exit(0);
+            exec('git rev-parse HEAD', (err1, currentHead) => {
+                const oldHash = currentHead ? currentHead.trim() : '';
+                exec('git fetch origin main', (err2) => {
+                    exec('git rev-parse origin/main', (err3, remoteHead) => {
+                        const newHash = remoteHead ? remoteHead.trim() : '';
+                        if (oldHash && newHash && oldHash !== newHash) {
+                            console.log(`[UPDATER] 🚀 Nova versão detectada no GitHub (${oldHash.slice(0, 7)} -> ${newHash.slice(0, 7)})!`);
+                            console.log('[UPDATER] Atualizando código com git reset --hard...');
+                            exec('git reset --hard origin/main && git clean -fd', () => {
+                                console.log('[UPDATER] Executando npm install e reiniciando...');
+                                exec('npm install', () => {
+                                    console.log('[UPDATER] ✅ Atualização concluída. Reiniciando processo...');
+                                    process.exit(0);
+                                });
+                            });
+                            return;
+                        }
+                        resolve(false);
                     });
-                } else {
-                    // Mesmo se não houver erro, vamos instalar npm e sair se mudou algo
-                    if (stdout && stdout.includes('HEAD is now at')) {
-                       // O reset hard sempre imprime HEAD is now at
-                       // Na real a gente deveria salvar o commit hash antes, mas pra garantir:
-                       // só resolve(false) e deixa o loop.bat cuidar do resto.
-                    }
-                    resolve(false);
-                }
+                });
             });
         });
     }

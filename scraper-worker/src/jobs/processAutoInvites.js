@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { updateSheetRow } from '../lib/googleSheets.js';
+import { findUniversalChrome, getLeanChromeArgs, getDebugScreenshotPath, cleanStaleLocks } from '../lib/storageGuardian.js';
 
 async function updateSheetIfApplicable(invite, updates) {
   if (invite.requested_by && invite.requested_by.includes('Linha')) {
@@ -40,21 +41,6 @@ const DEFAULT_ACCOUNTS = {
   tenebrium: { world: 'Tenebrium', account_name: 'pifot16+rubinot2@gmail.com', password: '88100267hH**', guild_name: 'Battlestorm Retro' },
   malveria: { world: 'Malveria', account_name: 'pifot16+grim@gmail.com', password: 'Kx3ngjasjd!2', guild_name: 'Battlestorm Malveria' }
 };
-
-function findChrome() {
-  const candidates = [
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    process.env.CHROME_PATH,
-  ].filter(Boolean);
-
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
-}
 
 /**
  * Parser customizado de linha CSV com tratamento de aspas duplas
@@ -289,7 +275,7 @@ export async function runProcessAutoInvites() {
     }
 
     // 4. Inicializar o browser
-    const chromeExe = findChrome();
+    const chromeExe = findUniversalChrome();
     
     // Configuração base (agora mudou para instanciar dentro do loop de mundos)
     for (const [world, invites] of Object.entries(invitesByWorld)) {
@@ -324,29 +310,18 @@ export async function runProcessAutoInvites() {
       }
 
         const profilePath = ensureProfile(world);
-
-        // Limpar lock files do Chrome de sessões anteriores que possam ter crashado
-        const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
-        for (const lf of lockFiles) {
-          const lockPath = path.join(profilePath, lf);
-          if (fs.existsSync(lockPath)) {
-            try { fs.unlinkSync(lockPath); console.log(`[PUPPETEER] Lock file removido: ${lf}`); } catch {}
-          }
-        }
+        cleanStaleLocks(profilePath);
 
         console.log(`[PUPPETEER] Abrindo navegador para ${world}...`);
         const browser = await puppeteer.launch({
           headless: false, // Necessário para passar no Cloudflare Turnstile
           executablePath: chromeExe || undefined,
           userDataDir: profilePath,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
+          args: getLeanChromeArgs([
             '--window-size=1280,800',
             '--window-position=9999,9999', // Empurra a janela pra fora da tela visível
-            '--disable-blink-features=AutomationControlled',
             '--exclude-switches=enable-automation'
-          ],
+          ]),
           ignoreDefaultArgs: ['--enable-automation'],
         });
 
@@ -485,7 +460,7 @@ async function loginRubinot(page, accountName, password) {
         await new Promise(r => setTimeout(r, 2000));
       } else {
         console.error(`[AutoInvite] ⚠️ Campos de login não encontrados para ${accountName}. Tentando screenshot...`);
-        await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_login_form.png' });
+        await page.screenshot({ path: getDebugScreenshotPath('debug_login_form.png') }).catch(() => {});
         return false;
       }
 
@@ -494,7 +469,7 @@ async function loginRubinot(page, accountName, password) {
       const isLoggedIn = pageContent.includes('Minha Conta') || pageContent.includes('>Sair<') || pageContent.includes('Logado como');
 
       if (!isLoggedIn) {
-        await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_login_fail.png' });
+        await page.screenshot({ path: getDebugScreenshotPath('debug_login_fail.png') }).catch(() => {});
         console.error(`[AutoInvite] ❌ Login falhou para ${accountName} (sessão não detectada).`);
         return false;
       }
@@ -537,7 +512,7 @@ async function inviteCharacter(page, world, guildName, characterName) {
     // Digitar personagem
     const input = await page.$('input[placeholder="Nome do personagem"]');
     if (!input) {
-       await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_input_missing.png' });
+       await page.screenshot({ path: getDebugScreenshotPath('debug_input_missing.png') }).catch(() => {});
        return { success: false, reason: 'Input de convite não encontrado na página (verifique permissões).' };
     }
     
@@ -618,7 +593,7 @@ async function inviteCharacter(page, world, guildName, characterName) {
     }
     
     // Screenshot para debugar qual foi a mensagem real do site
-    await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_timeout.png' });
+    await page.screenshot({ path: getDebugScreenshotPath('debug_timeout.png') }).catch(() => {});
     return { success: false, reason: 'Cloudflare bloqueou o POST (Turnstile)ção do convite.' };
   } catch (err) {
     return { success: false, reason: `Erro na navegação: ${err.message}` };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Server, Activity, HardDrive, Cpu, Terminal, RefreshCw, PowerOff, MessageSquare, Clock, ShieldAlert, User } from 'lucide-react';
+import { Server, Activity, HardDrive, Cpu, Terminal, RefreshCw, PowerOff, MessageSquare, Clock, ShieldAlert, User, Database } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -25,28 +25,49 @@ export default function WorkerDashboard() {
       if (!error && data) {
         setWorkers(data);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error('Erro ao buscar workers:', err);
     } finally {
       setLoading(false);
     }
   };
 
   const sendCommand = async (workerId, command, payload = {}) => {
-    if (!window.confirm(`Tem certeza que deseja enviar o comando ${command} para este Worker?`)) return;
-    
     setSendingCmd(workerId);
     try {
-      await supabase.from('worker_commands').insert({
-        worker_id: workerId,
-        command: command,
-        payload: payload
-      });
-      alert(`Comando ${command} enviado com sucesso! O Worker deve executar em instantes se estiver online.`);
-    } catch (e) {
-      alert('Erro ao enviar comando: ' + e.message);
+      const { error } = await supabase
+        .from('worker_commands')
+        .insert({
+          worker_id: workerId,
+          command,
+          payload,
+          executed: false
+        });
+
+      if (error) throw error;
+      alert(`Comando ${command} enviado com sucesso para ${workerId}!`);
+    } catch (err) {
+      alert(`Falha ao enviar comando: ${err.message}`);
     } finally {
       setSendingCmd(null);
+    }
+  };
+
+  const handleForceUpdateAll = async () => {
+    if (!window.confirm('Deseja forçar atualização e limpeza preventiva em TODOS os workers online?')) return;
+    try {
+      const activeWorkers = workers.filter(w => new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000);
+      for (const w of activeWorkers) {
+        await supabase.from('worker_commands').insert({
+          worker_id: w.worker_id,
+          command: 'FORCE_UPDATE',
+          payload: {},
+          executed: false
+        });
+      }
+      alert(`Comando de Atualização disparado para ${activeWorkers.length} workers ativos!`);
+    } catch (err) {
+      alert(`Erro: ${err.message}`);
     }
   };
 
@@ -71,8 +92,17 @@ export default function WorkerDashboard() {
           </h2>
           <p className="text-gray-400">Painel de Comando e Controle da Rede Neural (SuperAdmin)</p>
         </div>
-        <div className="bg-black/60 border border-tibia-border p-3 rounded-lg text-sm text-gray-300">
-          Total Nodes: <span className="text-green-400 font-bold">{workers.length}</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleForceUpdateAll}
+            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 border border-blue-400 text-sm transition-all"
+          >
+            <RefreshCw size={16} className="mr-2" />
+            ⚡ Forçar Atualização em Todos
+          </button>
+          <div className="bg-black/60 border border-tibia-border p-3 rounded-lg text-sm text-gray-300">
+            Total Nodes: <span className="text-green-400 font-bold">{workers.length}</span>
+          </div>
         </div>
       </div>
 
@@ -113,7 +143,7 @@ export default function WorkerDashboard() {
               </div>
 
               {w.metadata && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 bg-black/40 p-4 rounded border border-white/5 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 bg-black/40 p-4 rounded border border-white/5 text-sm">
                   <div>
                     <p className="text-gray-500 text-xs">CPU</p>
                     <p className="text-gray-300 flex items-center"><Cpu size={12} className="mr-1"/> {w.metadata.cpu}</p>
@@ -121,6 +151,13 @@ export default function WorkerDashboard() {
                   <div>
                     <p className="text-gray-500 text-xs">RAM</p>
                     <p className="text-gray-300 flex items-center"><HardDrive size={12} className="mr-1"/> {w.metadata.ram}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 text-xs">Disco</p>
+                    <p className={`flex items-center ${w.metadata.disk_warning ? 'text-red-400 font-bold animate-pulse' : 'text-gray-300'}`}>
+                      <Database size={12} className={`mr-1 ${w.metadata.disk_warning ? 'text-red-400' : 'text-gray-400'}`} />
+                      {w.metadata.disk_text || (w.metadata.disk_free_gb ? `${w.metadata.disk_free_gb} GB livres` : 'OK')}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-500 text-xs">Localidade</p>

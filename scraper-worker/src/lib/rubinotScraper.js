@@ -4,22 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import puppeteer from 'rebrowser-puppeteer';
 import * as cheerio from 'cheerio';
-
-// ─── Localizar Chrome/Edge ─────────────────────────────────────────────────────────
-function findChrome() {
-    const candidates = [
-        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        process.env.CHROME_PATH,
-    ].filter(Boolean);
-
-    for (const p of candidates) {
-        if (fs.existsSync(p)) return p;
-    }
-    return null; // puppeteer usará o bundled chromium
-}
+import { findUniversalChrome, getLeanChromeArgs, cleanStaleLocks } from './storageGuardian.js';
 
 // ─── Estado do browser ────────────────────────────────────────────────────────
 let globalBrowser  = null;
