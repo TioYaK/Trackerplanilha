@@ -99,7 +99,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const { data: boundsData } = await supabase
       .from('historical_sessions')
-      .select('session_start, session_end, start_xp_total, end_xp_total, start_level, end_level, xp_gained')
+      .select('session_start, session_end, end_xp_total, end_level, xp_gained')
       .ilike('character_name', playerName)
       .gte('session_end', fourteenDaysAgo)
       .order('session_end', { ascending: true });
@@ -112,14 +112,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     let lvlHist = [];
     let prevLevel = null;
     (boundsData || []).forEach(log => {
-      if (log.start_level && log.end_level && log.start_level !== log.end_level) {
-        lvlHist.push({
-          type: log.end_level > log.start_level ? 'UP' : 'DOWN',
-          from: log.start_level,
-          to: log.end_level,
-          date: log.session_end
-        });
-      } else if (prevLevel !== null && log.end_level && log.end_level !== prevLevel) {
+      if (prevLevel !== null && log.end_level && log.end_level !== prevLevel) {
         lvlHist.push({
           type: log.end_level > prevLevel ? 'UP' : 'DOWN',
           from: prevLevel,
