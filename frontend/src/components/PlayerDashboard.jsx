@@ -7,6 +7,21 @@ import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X } from 'lucide-r
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+const parseUtcDate = (dStr) => {
+  if (!dStr) return null;
+  if (dStr instanceof Date) return dStr;
+  if (typeof dStr !== 'string') return new Date(dStr);
+  if (!dStr.endsWith('Z') && !dStr.includes('+') && !dStr.includes('-', 10)) {
+    return new Date(dStr + 'Z');
+  }
+  return new Date(dStr);
+};
+
+const toBrtDateStr = (dateObj) => {
+  if (!dateObj) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(dateObj);
+};
+
 export default function PlayerDashboard({ playerName, isAdmin }) {
   const [telemetry, setTelemetry] = useState([]);
   const [strikes, setStrikes] = useState([]);
@@ -59,124 +74,185 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       }
     }
 
-    if (!memberData) {
-      const { data: cData } = await supabase
-        .from('current_character_state')
-        .select('level, vocation, last_active')
-        .ilike('character_name', playerName)
-        .maybeSingle();
+    const { data: cData } = await supabase
+      .from('current_character_state')
+      .select('xp_total, session_start_xp, level, vocation, last_active')
+      .ilike('character_name', playerName)
+      .maybeSingle();
 
-      if (cData) {
-        memberData = {
-          level: cData.level,
-          vocation: cData.vocation,
-          is_online: cData.last_active ? (new Date() - new Date(cData.last_active)) < 15 * 60 * 1000 : false
-        };
-      }
+    if (!memberData && cData) {
+      memberData = {
+        level: cData.level,
+        vocation: cData.vocation,
+        is_online: cData.last_active ? (new Date() - parseUtcDate(cData.last_active)) < 15 * 60 * 1000 : false
+      };
     }
       
     if (memberData) setPlayerInfo(memberData);
 
+    let currentXP = cData?.xp_total ? Number(cData.xp_total) : 0;
+    let currentDelta = 0;
+    if (cData?.xp_total && cData?.session_start_xp && Number(cData.xp_total) > Number(cData.session_start_xp)) {
+      currentDelta = Number(cData.xp_total) - Number(cData.session_start_xp);
+    }
+
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const { data: boundsData } = await supabase
       .from('historical_sessions')
-      .select('session_end, end_xp_total, end_level')
+      .select('session_start, session_end, start_xp_total, end_xp_total, start_level, end_level, xp_gained')
       .ilike('character_name', playerName)
-      .gte('session_end', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+      .gte('session_end', fourteenDaysAgo)
       .order('session_end', { ascending: true });
-      
-    if (memberData && boundsData && boundsData.length > 0) {
-      // History of Level Up / Down
-      let lvlHist = [];
-      let prevLevel = null;
-      boundsData.forEach(log => {
-          if (prevLevel !== null && log.end_level !== prevLevel) {
-              lvlHist.push({
-                  type: log.end_level > prevLevel ? 'UP' : 'DOWN',
-                  from: prevLevel,
-                  to: log.end_level,
-                  date: log.session_end
-              });
-          }
-          prevLevel = log.end_level;
-      });
-      lvlHist.reverse();
-      setLevelHistory(lvlHist);
 
-      // Heatmap Logic (14 days)
-      const dailyMap = {};
-      boundsData.forEach(log => {
-         const day = log.session_end.split('T')[0];
-         if (!dailyMap[day]) {
-            dailyMap[day] = { min: log.end_xp_total, max: log.end_xp_total };
-         } else {
-            if (log.end_xp_total < dailyMap[day].min) dailyMap[day].min = log.end_xp_total;
-            if (log.end_xp_total > dailyMap[day].max) dailyMap[day].max = log.end_xp_total;
-         }
-      });
-      
-      const hData = [];
-      for (let i = 13; i >= 0; i--) {
-         const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-         const dayStr = d.toISOString().split('T')[0];
-         let xpMade = 0;
-         if (dailyMap[dayStr]) {
-            xpMade = dailyMap[dayStr].max - dailyMap[dayStr].min;
-         }
-         hData.push({ date: dayStr, xp: xpMade });
+    if (currentXP === 0 && boundsData && boundsData.length > 0) {
+      currentXP = Number(boundsData[boundsData.length - 1].end_xp_total || 0);
+    }
+
+    // History of Level Up / Down
+    let lvlHist = [];
+    let prevLevel = null;
+    (boundsData || []).forEach(log => {
+      if (log.start_level && log.end_level && log.start_level !== log.end_level) {
+        lvlHist.push({
+          type: log.end_level > log.start_level ? 'UP' : 'DOWN',
+          from: log.start_level,
+          to: log.end_level,
+          date: log.session_end
+        });
+      } else if (prevLevel !== null && log.end_level && log.end_level !== prevLevel) {
+        lvlHist.push({
+          type: log.end_level > prevLevel ? 'UP' : 'DOWN',
+          from: prevLevel,
+          to: log.end_level,
+          date: log.session_end
+        });
       }
-      setHeatmap(hData);
+      if (log.end_level) prevLevel = log.end_level;
+    });
+    lvlHist.reverse();
+    setLevelHistory(lvlHist);
 
-      // Prediction Logic (using bounds, which is now 14 days)
-      const oldest = boundsData[0];
-      const newest = boundsData[boundsData.length - 1];
-      const currentXP = newest.xp_total;
-      const xpGained14d = currentXP - oldest.xp_total;
-      
-      const msPassed = new Date(newest.recorded_at) - new Date(oldest.recorded_at);
-      const daysPassed = Math.max(1, msPassed / (1000 * 60 * 60 * 24)); // avoid div by 0
-      
-      const avgXpPerDay = Math.floor(xpGained14d / daysPassed);
-      
-      const currentLevel = memberData.level;
+    // Heatmap Logic (14 days)
+    const dailyMap = {};
+    (boundsData || []).forEach(log => {
+      const d = parseUtcDate(log.session_start || log.session_end);
+      const dayStr = toBrtDateStr(d);
+      if (!dayStr) return;
+      dailyMap[dayStr] = (dailyMap[dayStr] || 0) + (Number(log.xp_gained) || 0);
+    });
+
+    if (currentDelta > 0) {
+      const todayStr = toBrtDateStr(new Date());
+      dailyMap[todayStr] = (dailyMap[todayStr] || 0) + currentDelta;
+    }
+
+    const hData = [];
+    const now = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const targetDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dayStr = toBrtDateStr(targetDate);
+      const xpMade = dailyMap[dayStr] || 0;
+      hData.push({ date: dayStr, xp: xpMade });
+    }
+    setHeatmap(hData);
+
+    // Prediction Logic (14 days)
+    const totalXp14d = (boundsData || []).reduce((acc, log) => acc + (Number(log.xp_gained) || 0), 0) + currentDelta;
+    let daysSpan = 1;
+    if (boundsData && boundsData.length > 0) {
+      const oldestTime = parseUtcDate(boundsData[0].session_start || boundsData[0].session_end).getTime();
+      const msPassed = Date.now() - oldestTime;
+      daysSpan = Math.min(14, Math.max(1, msPassed / (1000 * 60 * 60 * 24)));
+    }
+
+    const avgXpPerDay = totalXp14d > 0 ? Math.floor(totalXp14d / Math.max(1, daysSpan)) : 0;
+    const currentLevel = memberData?.level || cData?.level || (boundsData && boundsData.length > 0 ? boundsData[boundsData.length - 1].end_level : null);
+
+    if (currentLevel) {
       let nextMilestone = Math.ceil((currentLevel + 1) / 100) * 100;
-      if (nextMilestone === currentLevel) nextMilestone += 100;
-      
+      if (nextMilestone <= currentLevel) nextMilestone = (Math.floor(currentLevel / 100) + 1) * 100;
+
       const getTibiaXPForLevel = (l) => Math.floor((50 / 3) * (Math.pow(l, 3) - 6 * Math.pow(l, 2) + 17 * l - 12));
-      
-      const xpRequiredForNext = getTibiaXPForLevel(currentLevel + 1) - currentXP;
-      const xpRequiredForMilestone = getTibiaXPForLevel(nextMilestone) - currentXP;
-      
-      let daysToNext = avgXpPerDay > 0 ? (xpRequiredForNext / avgXpPerDay) : null;
-      let daysToMilestone = avgXpPerDay > 0 ? (xpRequiredForMilestone / avgXpPerDay) : null;
-      
+
+      if (!currentXP || currentXP <= 0) {
+        currentXP = getTibiaXPForLevel(currentLevel);
+      }
+
+      const xpRequiredForNext = Math.max(0, getTibiaXPForLevel(currentLevel + 1) - currentXP);
+      const xpRequiredForMilestone = Math.max(0, getTibiaXPForLevel(nextMilestone) - currentXP);
+
+      const daysToNext = avgXpPerDay > 0 ? (xpRequiredForNext / avgXpPerDay) : null;
+      const daysToMilestone = avgXpPerDay > 0 ? (xpRequiredForMilestone / avgXpPerDay) : null;
+
       setPrediction({
         currentLevel,
         nextMilestone,
         avgXpPerDay,
-        daysToNext,
-        daysToMilestone
+        daysToNext: Number.isFinite(daysToNext) ? daysToNext : null,
+        daysToMilestone: Number.isFinite(daysToMilestone) ? daysToMilestone : null
       });
+    } else {
+      setPrediction(null);
     }
 
-    // Fetch sessions from last 24h
+    // Fetch sessions from last 48h for telemetry
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     const { data: teleData } = await supabase
       .from('historical_sessions')
       .select('*')
       .ilike('character_name', playerName)
-      .gte('session_end', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte('session_end', fortyEightHoursAgo)
       .order('session_end', { ascending: true });
 
-    if (teleData) {
+    if (teleData && teleData.length > 0) {
       let accumulatedXP = 0;
-      const chartData = teleData.map(log => {
-        accumulatedXP += parseInt(log.xp_gained || 0, 10);
-        return {
-          time: format(new Date(log.session_end), 'HH:mm'),
+      const chartData = [];
+      teleData.forEach(log => {
+        const sStart = parseUtcDate(log.session_start || log.session_end);
+        const sEnd = parseUtcDate(log.session_end);
+        const xpGained = Number(log.xp_gained || 0);
+
+        if (log.session_start && log.session_start !== log.session_end) {
+          chartData.push({
+            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(sStart),
+            xp: accumulatedXP,
+            rawDelta: 0
+          });
+        }
+
+        accumulatedXP += xpGained;
+        chartData.push({
+          time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(sEnd),
           xp: accumulatedXP,
-          rawDelta: log.xp_gained
-        };
+          rawDelta: xpGained
+        });
       });
+
+      if (currentDelta > 0) {
+        chartData.push({
+          time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(new Date()),
+          xp: accumulatedXP + currentDelta,
+          rawDelta: currentDelta
+        });
+      }
       setTelemetry(chartData);
+    } else if (currentDelta > 0) {
+      const now = new Date();
+      const start = cData?.last_active ? parseUtcDate(cData.last_active) : new Date(now.getTime() - 30 * 60 * 1000);
+      setTelemetry([
+        {
+          time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(start),
+          xp: 0,
+          rawDelta: 0
+        },
+        {
+          time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(now),
+          xp: currentDelta,
+          rawDelta: currentDelta
+        }
+      ]);
+    } else {
+      setTelemetry([]);
     }
 
     // Fetch strikes
@@ -204,53 +280,77 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
         pageSquad++;
     }
 
-      if (squadData) {
-        const mates = {};
-        squadData.forEach(p => {
-          if (!p.members) return;
-          p.members.forEach(m => {
-            if (m !== playerName) {
-              mates[m] = (mates[m] || 0) + 1;
-            }
-          });
+    if (squadData) {
+      const mates = {};
+      squadData.forEach(p => {
+        if (!p.members) return;
+        p.members.forEach(m => {
+          if (m !== playerName) {
+            mates[m] = (mates[m] || 0) + 1;
+          }
         });
-        const rankedMates = Object.entries(mates)
-          .sort((a,b) => b[1] - a[1])
-          .map(([name, count]) => ({ name, count }))
-          .slice(0, 3);
-        setFrequentSquad(rankedMates);
-      }
+      });
+      const rankedMates = Object.entries(mates)
+        .sort((a,b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count }))
+        .slice(0, 3);
+      setFrequentSquad(rankedMates);
+    }
 
-      // Build Routine from last 7 days
-      let allLogs = [];
-      const { data: logs } = await supabase
-        .from('historical_sessions')
-        .select('session_end, xp_gained')
-        .eq('character_name', playerName)
-        .gte('session_end', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-        
-      if (logs) allLogs = logs;
+    // Build Routine from last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: logs } = await supabase
+      .from('historical_sessions')
+      .select('session_start, session_end, xp_gained')
+      .ilike('character_name', playerName)
+      .gte('session_end', sevenDaysAgo);
 
-      if (allLogs.length > 0) {
-        const hourMap = new Array(24).fill(0);
-        allLogs.forEach(l => {
-          if (!l.xp_gained || l.xp_gained === 0) return;
-          let xp = parseInt(l.xp_gained, 10);
-          if (isNaN(xp)) xp = 0;
-          
-          const d = new Date(l.session_end);
-          hourMap[d.getHours()] += xp;
+    const hourMap = new Array(24).fill(0);
+    if (logs && logs.length > 0) {
+      logs.forEach(l => {
+        let xp = Number(l.xp_gained || 0);
+        if (!xp || xp <= 0) return;
+
+        const sStart = parseUtcDate(l.session_start || l.session_end);
+        const sEnd = parseUtcDate(l.session_end);
+
+        const getBrtH = (d) => {
+          const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Sao_Paulo',
+            hour: 'numeric',
+            hour12: false
+          }).formatToParts(d);
+          const p = parts.find(x => x.type === 'hour');
+          return parseInt(p ? p.value : d.getHours(), 10) % 24;
+        };
+
+        const startH = getBrtH(sStart);
+        const endH = getBrtH(sEnd);
+
+        const activeHours = [];
+        if (startH <= endH) {
+          for (let h = startH; h <= endH; h++) activeHours.push(h);
+        } else {
+          for (let h = startH; h < 24; h++) activeHours.push(h);
+          for (let h = 0; h <= endH; h++) activeHours.push(h);
+        }
+
+        if (activeHours.length === 0) activeHours.push(endH);
+        const perHourXp = Math.round(xp / activeHours.length);
+        activeHours.forEach(h => {
+          hourMap[h] += perHourXp;
         });
+      });
+    }
 
-        const routineData = hourMap.map((xp, index) => ({
-          hour: `${index.toString().padStart(2, '0')}:00`,
-          xp: xp
-        }));
-        setRoutine(routineData);
-      }
+    const routineData = hourMap.map((xp, index) => ({
+      hour: `${index.toString().padStart(2, '0')}:00`,
+      xp: xp
+    }));
+    setRoutine(routineData);
 
-      setLoading(false);
-    };
+    setLoading(false);
+  };
 
   useEffect(() => {
     fetchData();
@@ -460,10 +560,10 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
           <p className="text-xs text-gray-400 mb-6">Dias com maior intensidade de caça ganham cores mais vivas.</p>
           
           <div className="flex flex-wrap gap-2">
-            {heatmap.map((day, i) => {
-              const d = new Date(day.date);
-              const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-              const dayName = days[d.getDay() + 1 > 6 ? 0 : d.getDay() + 1]; // timezone compensation
+            {heatmap.map((day) => {
+              const d = new Date(day.date + 'T12:00:00Z');
+              const rawDay = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'short' }).replace('.', '');
+              const dayName = rawDay.charAt(0).toUpperCase() + rawDay.slice(1);
               
               let bgColor = 'bg-gray-800 border-gray-700';
               if (day.xp > 100000000) bgColor = 'bg-green-400 border-green-300 shadow-[0_0_10px_rgba(74,222,128,0.5)]'; // > 100M
@@ -477,7 +577,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
                   <span className="text-[10px] text-gray-500">{dayName}</span>
                   
                   {/* Tooltip */}
-                  <div className="absolute bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-black border border-white/10 text-white text-xs py-1 px-2 rounded whitespace-nowrap z-10 pointer-events-none">
+                  <div className="absolute bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-black border border-white/10 text-white text-xs py-1 px-2 rounded whitespace-nowrap z-10 pointer-events-none shadow-lg">
                     {day.date}: {day.xp > 0 ? `+${(day.xp / 1000000).toFixed(1)}M XP` : '0 XP'}
                   </div>
                 </div>
@@ -488,7 +588,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       )}
 
       {/* Radar de Rotina (Horários Ativos) */}
-      {routine.length > 0 && routine.some(r => r.xp > 0) && (
+      {routine.length > 0 && (
         <div className="bg-tibia-card p-6 rounded-lg border border-blue-900/50 shadow-xl mt-8">
           <h3 className="text-xl font-bold text-blue-400 mb-2 flex items-center">
             <Clock className="mr-2" size={24} />
@@ -551,12 +651,12 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       {/* Gráfico de XP */}
       <div className="bg-tibia-card p-6 rounded-lg border border-tibia-border">
         <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-          <Activity className="mr-2 text-tibia-primary" /> Sessões de Caça (Últimas 24h)
+          <Activity className="mr-2 text-tibia-primary" /> Sessões de Caça (Últimas 48h)
         </h3>
         {loading ? (
           <div className="h-64 flex justify-center items-center text-gray-500">Carregando telemetria...</div>
         ) : telemetry.length === 0 ? (
-          <div className="h-64 flex justify-center items-center text-gray-500">Sem atividade registrada nas últimas 24h.</div>
+          <div className="h-64 flex justify-center items-center text-gray-500">Sem atividade registrada nas últimas 48h.</div>
         ) : (
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -570,7 +670,7 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
                   formatter={(value) => [value >= 1000000 ? (value/1000000).toFixed(2)+'M' : value, 'XP Acumulada']}
                 />
                 <Legend />
-                <Line type="monotone" dataKey="xp" name="Curva de XP" stroke="#10B981" strokeWidth={3} dot={false} activeDot={{ r: 8 }} />
+                <Line type="monotone" dataKey="xp" name="Curva de XP" stroke="#10B981" strokeWidth={3} dot={{ r: 3, fill: '#10B981' }} activeDot={{ r: 8 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
