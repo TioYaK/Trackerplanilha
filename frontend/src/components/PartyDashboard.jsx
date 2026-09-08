@@ -317,7 +317,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         <p className="text-gray-400 font-sans">Verifique o rendimento coletivo e individual da hunt.</p>
       </div>
       
-      <div className={`p-6 rounded-lg border-2 ${isSlotActive ? (statusColors[currentStatus]?.split(' text-')[0] || 'border-tibia-border') : (currentStatus === 'GHOST_SLOT' ? 'border-red-500 bg-red-500/10' : 'border-tibia-border bg-tibia-card')} mb-8 relative overflow-hidden`}>
+      <div className={`p-6 rounded-lg border-2 ${statusColors[currentStatus]?.split(' text-')[0] || 'border-tibia-border'} mb-8 relative overflow-hidden`}>
         <div className="absolute top-0 right-0 p-4 opacity-10"><Users size={120} /></div>
         <h2 className="text-4xl font-black text-white mb-2">{party.party_name}</h2>
         <div className="flex flex-wrap gap-4 text-sm font-medium">
@@ -329,33 +329,18 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <p className="text-xs text-gray-500 uppercase font-bold">Status do Slot</p>
-            <p className="text-lg font-bold flex items-center">
-              {isSlotActive ? (
-                <>
-                  {currentStatus === 'EFFICIENT' && <TrendingUp size={20} className="mr-2 text-green-400" />}
-                  {currentStatus === 'SUBOPTIMAL' && <Clock size={20} className="mr-2 text-yellow-400" />}
-                  {(currentStatus === 'FALTA_1' || currentStatus === 'FALTA_2') && <AlertTriangle size={20} className="mr-2 text-orange-400" />}
-                  {currentStatus === 'GHOST_SLOT' && <AlertTriangle size={20} className="mr-2 text-red-400" />}
-                  <span className={statusColors[currentStatus]?.split(' ')[2] || 'text-white'}>
-                    {currentStatus === 'EFFICIENT' ? 'Caçando Ativamente' :
-                     currentStatus === 'SUBOPTIMAL' ? 'Ociosidade Parcial' :
-                     currentStatus === 'FALTA_1' ? 'Falta (1/3)' :
-                     currentStatus === 'FALTA_2' ? 'Falta (2/3)' :
-                     currentStatus === 'GHOST_SLOT' ? 'Slot Abandonado (Ghost)' : 'Aguardando Slot'}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Clock size={20} className="mr-2 text-gray-400" />
-                  <span className="text-gray-300">
-                    {currentStatus === 'GHOST_SLOT' ? 'Slot Abandonado (Ghost)' :
-                     currentStatus === 'FALTA_1' ? 'Falta (1/3)' :
-                     currentStatus === 'FALTA_2' ? 'Falta (2/3)' :
-                     isSlotPast ? 'Slot Concluído' :
-                     `Aguardando Horário (${(party.slot_start || '').slice(0, 5)})`}
-                  </span>
-                </>
-              )}
+            <p className={`text-lg font-bold flex items-center ${statusColors[currentStatus]?.split(' ')[2] || ''}`}>
+              {currentStatus === 'EFFICIENT' && <TrendingUp size={20} className="mr-2 text-green-400" />}
+              {currentStatus === 'SUBOPTIMAL' && <Clock size={20} className="mr-2 text-yellow-400" />}
+              {(currentStatus === 'FALTA_1' || currentStatus === 'FALTA_2') && <AlertTriangle size={20} className="mr-2 text-orange-400" />}
+              {currentStatus === 'GHOST_SLOT' && <AlertTriangle size={20} className="mr-2 text-red-400" />}
+              <span>
+                {currentStatus === 'EFFICIENT' ? 'Caçando Ativamente' :
+                 currentStatus === 'SUBOPTIMAL' ? 'Ociosidade Parcial' :
+                 currentStatus === 'FALTA_1' ? 'Falta (1/3)' :
+                 currentStatus === 'FALTA_2' ? 'Falta (2/3)' :
+                 currentStatus === 'GHOST_SLOT' ? 'Slot Abandonado (Ghost)' : 'Aguardando Slot'}
+              </span>
             </p>
           </div>
           <div>
