@@ -26,7 +26,7 @@ import { runAuditBank } from './jobs/auditBank.js';
 import { runProcessAutoInvites } from './jobs/processAutoInvites.js';
 import { checkForUpdates } from './updater.js';
 import { applySelfHealingPatch } from './selfHeal.js';
-import { closeBrowser } from './lib/rubinotScraper.js';
+import { closeBrowser, isInMaintenance } from './lib/rubinotScraper.js';
 
 applySelfHealingPatch();
 
@@ -151,6 +151,15 @@ const processTask = async (task) => {
   });
 
   const executeTask = async () => {
+    // Pular jobs de scraping quando o site estiver em manutenção
+    const scraperJobs = ['FETCH_GUILD', 'FETCH_ONLINES', 'FETCH_RIVALS', 'FETCH_ROSTER_SHARD',
+                         'FETCH_HIGHSCORE_MONK', 'FETCH_HIGHSCORE_PALADIN', 'FETCH_HIGHSCORE_DRUID',
+                         'FETCH_HIGHSCORE_KNIGHT', 'FETCH_HIGHSCORE_SORCERER', 'FETCH_DEATHS', 'FETCH_KILLSTATS'];
+    if (isInMaintenance() && scraperJobs.includes(task.task_type)) {
+      console.warn(`[WORKER] 🔧 Site em manutenção — pulando ${task.task_type}.`);
+      return;
+    }
+
     switch (task.task_type) {
       case 'FETCH_GUILD':
         await runFetchGuild();

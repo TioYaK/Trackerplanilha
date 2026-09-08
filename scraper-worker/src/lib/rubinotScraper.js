@@ -58,6 +58,36 @@ async function isCloudflareBlocked(page) {
     }
 }
 
+// ─── Detecção de Manutenção ───────────────────────────────────────────────────
+let _maintenanceMode = false;
+let _maintenanceUntil = 0; // timestamp — evita checar a cada segundo
+
+function isInMaintenance() { return _maintenanceMode; }
+
+function checkMaintenanceHtml(html) {
+    if (!html) return false;
+    return html.includes('Maintenance Mode') ||
+           html.includes('Server is under maintenance') ||
+           html.includes("We'll Be Right Back") ||
+           html.includes('maintenance mode');
+}
+
+function setMaintenanceMode(active) {
+    if (active && !_maintenanceMode) {
+        console.warn('[Scraper] 🔧 Site em MANUTENÇÃO detectado. Pausando todos os jobs de scraping...');
+        _maintenanceMode = true;
+        // Re-checa após 3 minutos automaticamente
+        _maintenanceUntil = Date.now() + 3 * 60 * 1000;
+        setTimeout(() => {
+            _maintenanceMode = false;
+            console.log('[Scraper] ⏰ Verificando se manutenção terminou...');
+        }, 3 * 60 * 1000);
+    } else if (!active && _maintenanceMode) {
+        console.log('[Scraper] ✅ Site voltou da manutenção!');
+        _maintenanceMode = false;
+    }
+}
+
 // ─── Gerenciamento do Browser ─────────────────────────────────────────────────
 async function closeBrowser() {
     try {
@@ -158,6 +188,14 @@ async function safeGoto(page, url, { timeout = 30000 } = {}) {
     } catch (e) {
         console.warn(`[Scraper] Timeout/erro ao navegar para ${url}: ${e.message}`);
     }
+
+    // Checar manutenção antes de tudo
+    const html = await page.content().catch(() => '');
+    if (checkMaintenanceHtml(html)) {
+        setMaintenanceMode(true);
+        return null;
+    }
+    setMaintenanceMode(false); // site respondeu normalmente, sair do modo manutenção se estava ativo
 
     if (await isCloudflareBlocked(page)) {
         console.log('[Scraper] Challenge do Cloudflare detectado. Tentando resolver...');
@@ -1048,5 +1086,6 @@ export {
     scrapeRubinotCharacterPage,
     closeBrowser,
     scrapeOnlines,
-    fetchRubinotApi
+    fetchRubinotApi,
+    isInMaintenance
 };
