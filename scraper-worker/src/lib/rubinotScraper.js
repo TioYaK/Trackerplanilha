@@ -89,36 +89,21 @@ const SCRAPER_PROFILE_DIR = path.join(process.cwd(), 'worker_profiles', 'scraper
 async function initBrowser() {
     if (globalBrowser) return;
     console.log('[Scraper] Abrindo browser...');
-    const chromeExe = findChrome();
+    const chromeExe = findUniversalChrome();
 
     if (!fs.existsSync(SCRAPER_PROFILE_DIR)) {
         fs.mkdirSync(SCRAPER_PROFILE_DIR, { recursive: true });
     }
 
-    const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
-    for (const lf of lockFiles) {
-        const lockPath = path.join(SCRAPER_PROFILE_DIR, lf);
-        if (fs.existsSync(lockPath)) {
-            try { fs.unlinkSync(lockPath); } catch {}
-        }
-    }
+    cleanStaleLocks(SCRAPER_PROFILE_DIR);
 
     const launchOpts = {
         headless: true,
         userDataDir: SCRAPER_PROFILE_DIR,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-gpu',
-            '--disable-dev-shm-usage',
+        args: getLeanChromeArgs([
             '--window-size=1920,1080',
-            '--disable-blink-features=AutomationControlled',
-            '--disk-cache-size=10485760',
-            '--media-cache-size=10485760',
-            '--disable-application-cache',
-            '--disable-gpu-program-cache',
-            '--disable-gpu-shader-disk-cache'
-        ],
+            '--disable-gpu',
+        ]),
         ignoreDefaultArgs: ['--enable-automation']
     };
     if (chromeExe) launchOpts.executablePath = chromeExe;
