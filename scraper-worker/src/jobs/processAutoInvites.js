@@ -355,6 +355,20 @@ export async function runProcessAutoInvites() {
         console.log(`[AutoInvite] 🔑 Efetuando login no RubinOT (${world}) com a conta: ${leaderAcc.account_name}...`);
         const loggedIn = await loginRubinot(page, leaderAcc.account_name, leaderAcc.password);
 
+        if (loggedIn === 'MAINTENANCE') {
+          console.warn('[AutoInvite] 🔧 RubinOT em manutenção. Abortando lote e aguardando o site voltar...');
+          await browser.close().catch(() => {});
+          // Atualiza a mensagem de todos os pendentes para "Site em manutenção"
+          await supabase.from('guild_invites_queue')
+            .update({ error_message: 'Site em manutenção', updated_at: new Date().toISOString() })
+            .eq('status', 'IN_PROGRESS');
+          await supabase.from('guild_invites_queue')
+            .update({ status: 'PENDING', updated_at: new Date().toISOString() })
+            .eq('status', 'IN_PROGRESS');
+          releaseLock();
+          return; // Para tudo
+        }
+
         if (!loggedIn) {
           const errMsg = `Falha ao realizar login na conta '${leaderAcc.account_name}' no RubinOT.`;
           console.error(`[AutoInvite] ❌ ${errMsg} O sistema tentará novamente no próximo ciclo.`);
@@ -364,9 +378,9 @@ export async function runProcessAutoInvites() {
           for (const inv of invites) {
             await updateSheetIfApplicable(inv, { statusD: 'Pendente', statusF: 'Site Lento (Aguardando Retentativa)' });
           }
-          await browser.close();
-          continue; // Pula para o próximo mundo
         }
+        await browser.close();
+        continue; // Pula para o próximo mundo
 
         // Processar cada convite deste mundo
         for (const invite of invites) {
@@ -424,8 +438,14 @@ async function loginRubinot(page, accountName, password) {
       await page.goto('https://rubinot.com.br/login', { waitUntil: 'networkidle2', timeout: 30000 }).catch(e =>
         console.error('[AutoInvite] Aviso de timeout no /login, prosseguindo...'));
 
-      // Verificar se já está logado (o perfil do Chrome pode ter a sessão salva)
+      // Verificar se o site está em manutenção
       const contentAfterNav = await page.content();
+      if (contentAfterNav.includes('Maintenance Mode') || contentAfterNav.includes('Server is under maintenance') || contentAfterNav.includes("We'll Be Right Back")) {
+        console.warn('[AutoInvite] 🔧 Site em manutenção! Pausando processamento...');
+        return 'MAINTENANCE';
+      }
+
+      // Verificar se já está logado (o perfil do Chrome pode ter a sessão salva)
       const alreadyLoggedIn = contentAfterNav.includes('Minha Conta') || contentAfterNav.includes('>Sair<') || contentAfterNav.includes('Logado como');
       if (alreadyLoggedIn) {
         console.log(`[AutoInvite] ✅ Sessão já ativa para ${accountName} (cookie salvo).`);
