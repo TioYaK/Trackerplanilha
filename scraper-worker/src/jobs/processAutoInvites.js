@@ -404,11 +404,19 @@ export async function runProcessAutoInvites() {
             console.error(`[AutoInvite] ❌ Falha (${invite.character_name}): ${result.reason}`);
             
             const isTempError = result.reason.includes('timeout') || 
-                                result.reason.includes('Formul') || result.reason.includes('Input de convite') || result.reason.includes('503');
+                                result.reason.includes('Formul') || 
+                                result.reason.includes('Input de convite') || 
+                                result.reason.includes('503') ||
+                                result.reason.includes('Cloudflare') ||
+                                result.reason.includes('Turnstile');
 
             if (isTempError) {
-               // Erro temporário (site engasgou) - Mantém pendente para o próximo ciclo!
-               console.log(`[AutoInvite] 🔄 Retentativa agendada para '${invite.character_name}' devido a lentidão do site.`);
+               // Erro temporário (site engasgou ou Cloudflare) - Mantém pendente para o próximo ciclo!
+               console.log(`[AutoInvite] 🔄 Retentativa agendada para '${invite.character_name}' (${result.reason}).`);
+               await supabase
+                 .from('guild_invites_queue')
+                 .update({ status: 'PENDING', error_message: result.reason, updated_at: new Date().toISOString() })
+                 .eq('id', invite.id);
                await updateSheetIfApplicable(invite, { statusD: 'Pendente', statusF: 'Site Lento (Aguardando Retentativa)' });
             } else {
                // Erro definitivo (já tem guilda, não existe, etc) - Falha e encerra
