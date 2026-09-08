@@ -24,6 +24,7 @@ import { runFetchRosterShard } from './jobs/fetchRosterShards.js';
 import { runSendDiscordReport } from './jobs/sendDiscordReport.js';
 import { runAuditBank } from './jobs/auditBank.js';
 import { runProcessAutoInvites } from './jobs/processAutoInvites.js';
+import { runArchiveSessions } from './jobs/archiveSessions.js';
 import { checkForUpdates } from './updater.js';
 import { applySelfHealingPatch } from './selfHeal.js';
 import { closeBrowser, isInMaintenance } from './lib/rubinotScraper.js';
@@ -543,6 +544,11 @@ supabase
   setInterval(() => {
     runProcessAutoInvites();
   }, 60000);
+
+  // Fechamento e arquivamento de sessões inativas a cada 10 min
+  setInterval(() => {
+    runCloseSessions().catch(err => console.error('[CLOSE_SESSIONS] Erro:', err.message));
+  }, 10 * 60 * 1000);
 
 // GATILHO DE ALARMES GERAIS (DESKTOP E WEB PUSH NOTIFICATIONS)
 const processedAlarms = new Set();
