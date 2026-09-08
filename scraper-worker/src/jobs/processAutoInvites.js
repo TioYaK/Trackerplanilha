@@ -424,6 +424,14 @@ async function loginRubinot(page, accountName, password) {
       await page.goto('https://rubinot.com.br/login', { waitUntil: 'networkidle2', timeout: 30000 }).catch(e =>
         console.error('[AutoInvite] Aviso de timeout no /login, prosseguindo...'));
 
+      // Verificar se já está logado (o perfil do Chrome pode ter a sessão salva)
+      const contentAfterNav = await page.content();
+      const alreadyLoggedIn = contentAfterNav.includes('Minha Conta') || contentAfterNav.includes('>Sair<') || contentAfterNav.includes('Logado como');
+      if (alreadyLoggedIn) {
+        console.log(`[AutoInvite] ✅ Sessão já ativa para ${accountName} (cookie salvo).`);
+        return true;
+      }
+
       // Esperar o campo de email aparecer (React pode demorar a montar)
       const emailSelector = 'input[type="email"], input[name="email"], input[id="email"]';
       await page.waitForSelector(emailSelector, { timeout: 8000 }).catch(() => {});
@@ -452,7 +460,7 @@ async function loginRubinot(page, accountName, password) {
         return false;
       }
 
-      // Verificar se está logado (quando logado aparecem "Minha Conta" e "Sair")
+      // Verificar se está logado após submeter
       const pageContent = await page.content();
       const isLoggedIn = pageContent.includes('Minha Conta') || pageContent.includes('>Sair<') || pageContent.includes('Logado como');
 
