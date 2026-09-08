@@ -420,12 +420,14 @@ export async function runProcessAutoInvites() {
  */
 async function loginRubinot(page, accountName, password) {
     try {
-      await page.goto('https://rubinot.com.br/login', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(e =>
+      await page.goto('https://rubinot.com.br/login', { waitUntil: 'networkidle2', timeout: 30000 }).catch(e =>
         console.error('[AutoInvite] Aviso de timeout no /login, prosseguindo...'));
-      await new Promise(r => setTimeout(r, 2000));
 
-      // Tentar preencher o formulário de login visualmente (mais confiável que API)
-      const emailInput = await page.$('input[type="email"], input[name="email"], input[id="email"]');
+      // Esperar o campo de email aparecer (React pode demorar a montar)
+      const emailSelector = 'input[type="email"], input[name="email"], input[id="email"]';
+      await page.waitForSelector(emailSelector, { timeout: 8000 }).catch(() => {});
+
+      const emailInput = await page.$(emailSelector);
       const passInput  = await page.$('input[type="password"], input[name="password"], input[id="password"]');
 
       if (emailInput && passInput) {
@@ -441,29 +443,12 @@ async function loginRubinot(page, accountName, password) {
           if (btn) btn.click();
         });
 
-        await new Promise(r => setTimeout(r, 3000));
-        await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+        await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
+        await new Promise(r => setTimeout(r, 2000));
       } else {
-        // Fallback: API do NextAuth
-        await page.evaluate(async (email, pass) => {
-          try {
-            const csrfRes = await fetch('/api/auth/csrf');
-            const csrfData = await csrfRes.json();
-            const params = new URLSearchParams();
-            params.append('email', email);
-            params.append('password', pass);
-            params.append('csrfToken', csrfData.csrfToken);
-            params.append('json', 'true');
-            await fetch('/api/auth/callback/credentials', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: params.toString()
-            });
-          } catch(e) {}
-        }, accountName, password);
-        await new Promise(r => setTimeout(r, 1500));
-        await page.reload({ waitUntil: 'networkidle2' });
-        await new Promise(r => setTimeout(r, 1000));
+        console.error(`[AutoInvite] ⚠️ Campos de login não encontrados para ${accountName}. Tentando screenshot...`);
+        await page.screenshot({ path: 'C:/Users/YaKe/.gemini/antigravity/brain/4e6b1053-e550-48e6-b21f-3295a1f5ee45/scratch/debug_login_form.png' });
+        return false;
       }
 
       // Verificar se está logado (quando logado aparecem "Minha Conta" e "Sair")
