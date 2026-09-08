@@ -265,13 +265,6 @@ export async function runProcessAutoInvites() {
     console.log(`[AutoInvite] 📋 Encontrados ${pendingInvites.length} convites para processar.`);
 
     // 2. Marcar como IN_PROGRESS
-    // Matar processos Chrome órfãos de sessões anteriores que crasharam
-    try {
-      const { execSync } = await import('child_process');
-      execSync('taskkill /F /IM chrome.exe /T 2>nul', { stdio: 'ignore' });
-      await new Promise(r => setTimeout(r, 1000));
-    } catch {}
-
     const filteredInvites = pendingInvites.filter(i => (i.world || '').toLowerCase() !== 'malveria');
       if (filteredInvites.length === 0) { console.log('[AutoInvite] Apenas convites de mundos ignorados (Malveria). Pulando.'); releaseLock(); return; }
     const inviteIds = filteredInvites.map(i => i.id);
