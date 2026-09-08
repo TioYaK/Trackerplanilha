@@ -230,7 +230,7 @@ export default function InviteRequest({ isPublic = false }) {
                   )}
                   <td className="py-2 px-4">{getStatusBadge(inv.status, inv.error_message)}</td>
                   <td className="py-2 px-4 text-xs text-gray-400 max-w-[200px] truncate" title={inv.error_message || ''}>
-                    {inv.status === 'PENDING' ? 'Aguardando admin...' : inv.error_message || 'OK'}
+                    {inv.status === 'PENDING' ? (inv.world === 'Malveria' ? 'Aguardando admin...' : 'Na fila...') : inv.status === 'SUCCESS' ? '—' : inv.error_message || 'OK'}
                   </td>
                   {!isPublic && (
                     <td className="py-2 px-4 text-center">
