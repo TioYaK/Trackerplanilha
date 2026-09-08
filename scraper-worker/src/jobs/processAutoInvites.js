@@ -265,6 +265,13 @@ export async function runProcessAutoInvites() {
     console.log(`[AutoInvite] 📋 Encontrados ${pendingInvites.length} convites para processar.`);
 
     // 2. Marcar como IN_PROGRESS
+    // Matar processos Chrome órfãos de sessões anteriores que crasharam
+    try {
+      const { execSync } = await import('child_process');
+      execSync('taskkill /F /IM chrome.exe /T 2>nul', { stdio: 'ignore' });
+      await new Promise(r => setTimeout(r, 1000));
+    } catch {}
+
     const filteredInvites = pendingInvites.filter(i => (i.world || '').toLowerCase() !== 'malveria');
       if (filteredInvites.length === 0) { console.log('[AutoInvite] Apenas convites de mundos ignorados (Malveria). Pulando.'); releaseLock(); return; }
     const inviteIds = filteredInvites.map(i => i.id);
@@ -333,13 +340,14 @@ export async function runProcessAutoInvites() {
 
         console.log(`[PUPPETEER] Abrindo navegador para ${world}...`);
         const browser = await puppeteer.launch({
-          headless: 'new', // Modo headless moderno — sem janelas visíveis acumulando, mas sem ser detectado como bot
+          headless: false, // Necessário para passar no Cloudflare Turnstile
           executablePath: chromeExe || undefined,
           userDataDir: profilePath,
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--window-size=1280,800',
+            '--window-position=9999,9999', // Empurra a janela pra fora da tela visível
             '--disable-blink-features=AutomationControlled',
             '--exclude-switches=enable-automation'
           ],
