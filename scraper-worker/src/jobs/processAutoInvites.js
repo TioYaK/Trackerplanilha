@@ -241,16 +241,21 @@ export async function runProcessAutoInvites() {
     // 0. Sincronizar planilha do Google
     await syncGoogleSheetInvites();
 
-    const fiveMinsAgo = new Date(Date.now() - 5 * 60000).toISOString();
-    await supabase.from('guild_invites_queue').update({ status: 'PENDING' }).eq('status', 'IN_PROGRESS').lt('updated_at', fiveMinsAgo);
+    // Destrava convites que ficaram presos em IN_PROGRESS há mais de 3 minutos
+    const staleTime = new Date(Date.now() - 3 * 60000).toISOString();
+    await supabase.from('guild_invites_queue')
+      .update({ status: 'PENDING', error_message: null })
+      .eq('status', 'IN_PROGRESS')
+      .lt('updated_at', staleTime);
 
-    // 1. Buscar convites pendentes
+    // 1. Buscar convites pendentes (ignorando mundos em espera como Malveria)
     const { data: pendingInvites, error: fetchErr } = await supabase
       .from('guild_invites_queue')
       .select('*')
       .eq('status', 'PENDING')
+      .not('world', 'ilike', 'malveria')
       .order('created_at', { ascending: true })
-      .limit(15);
+      .limit(30);
 
     if (fetchErr) {
       console.error('[AutoInvite] Erro ao consultar fila de convites:', fetchErr.message);
@@ -258,28 +263,26 @@ export async function runProcessAutoInvites() {
     }
 
     if (!pendingInvites || pendingInvites.length === 0) {
-      console.log('[AutoInvite] ✨ Nenhum convite pendente.');
+      console.log('[AutoInvite] ✨ Nenhum convite pendente para mundos ativos.');
       return;
     }
 
     console.log(`[AutoInvite] 📋 Encontrados ${pendingInvites.length} convites para processar.`);
 
-    // 2. Marcar como IN_PROGRESS
-    const filteredInvites = pendingInvites.filter(i => (i.world || '').toLowerCase() !== 'malveria');
-      if (filteredInvites.length === 0) { console.log('[AutoInvite] Apenas convites de mundos ignorados (Malveria). Pulando.'); releaseLock(); return; }
-    const inviteIds = filteredInvites.map(i => i.id);
+    // 2. Marcar como IN_PROGRESS e limpar mensagens de erro antigas
+    const inviteIds = pendingInvites.map(i => i.id);
     await supabase
       .from('guild_invites_queue')
-      .update({ status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
+      .update({ status: 'IN_PROGRESS', error_message: null, updated_at: new Date().toISOString() })
       .in('id', inviteIds);
 
-    for (const inv of filteredInvites) {
+    for (const inv of pendingInvites) {
       await updateSheetIfApplicable(inv, { statusD: 'Processando', workerE: `Worker-${inv.world || 'Auto'}` });
     }
 
     // 3. Agrupar por Mundo/Servidor
     const invitesByWorld = {};
-    for (const invite of filteredInvites) {
+    for (const invite of pendingInvites) {
       const worldKey = (invite.world || 'Auroria').trim();
       if (!invitesByWorld[worldKey]) invitesByWorld[worldKey] = [];
       invitesByWorld[worldKey].push(invite);
@@ -356,15 +359,12 @@ export async function runProcessAutoInvites() {
         const loggedIn = await loginRubinot(page, leaderAcc.account_name, leaderAcc.password);
 
         if (loggedIn === 'MAINTENANCE') {
-          console.warn('[AutoInvite] 🔧 RubinOT em manutenção. Abortando lote e aguardando o site voltar...');
+          console.warn('[AutoInvite] 🔧 RubinOT em manutenção. Revertendo lote e aguardando o site voltar...');
           await browser.close().catch(() => {});
-          // Atualiza a mensagem de todos os pendentes para "Site em manutenção"
+          const currentWorldInviteIds = invites.map(i => i.id);
           await supabase.from('guild_invites_queue')
-            .update({ error_message: 'Site em manutenção', updated_at: new Date().toISOString() })
-            .eq('status', 'IN_PROGRESS');
-          await supabase.from('guild_invites_queue')
-            .update({ status: 'PENDING', updated_at: new Date().toISOString() })
-            .eq('status', 'IN_PROGRESS');
+            .update({ status: 'PENDING', error_message: 'Site em manutenção', updated_at: new Date().toISOString() })
+            .in('id', currentWorldInviteIds);
           releaseLock();
           return; // Para tudo
         }
@@ -373,14 +373,15 @@ export async function runProcessAutoInvites() {
           const errMsg = `Falha ao realizar login na conta '${leaderAcc.account_name}' no RubinOT.`;
           console.error(`[AutoInvite] ❌ ${errMsg} O sistema tentará novamente no próximo ciclo.`);
 
-          // Em vez de falhar todos, apenas pula este mundo. 
-          // Como não atualizamos o Supabase, eles continuarão PENDING e serão tentados novamente em 30s.
           for (const inv of invites) {
             await updateSheetIfApplicable(inv, { statusD: 'Pendente', statusF: 'Site Lento (Aguardando Retentativa)' });
+            await supabase.from('guild_invites_queue')
+              .update({ status: 'PENDING', error_message: errMsg, updated_at: new Date().toISOString() })
+              .eq('id', inv.id);
           }
+          await browser.close().catch(() => {});
+          continue; // Pula para o próximo mundo
         }
-        await browser.close();
-        continue; // Pula para o próximo mundo
 
         // Processar cada convite deste mundo
         for (const invite of invites) {
@@ -388,8 +389,8 @@ export async function runProcessAutoInvites() {
           if (guildTarget.toLowerCase() === 'shell') guildTarget = leaderAcc.guild_name || 'Shellpatrocina';
           console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}' (${world})...`);
 
-          console.log(`[AutoInvite] Aguardando 1 minuto para não sobrecarregar o site...`);
-          await new Promise(r => setTimeout(r, 60000));
+          console.log(`[AutoInvite] Aguardando 4 segundos entre convites...`);
+          await new Promise(r => setTimeout(r, 4000));
           const result = await inviteCharacter(page, world, guildTarget, invite.character_name);
 
           if (result.success) {
