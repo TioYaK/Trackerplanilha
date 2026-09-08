@@ -266,7 +266,7 @@ export async function runProcessAutoInvites() {
 
     // 2. Marcar como IN_PROGRESS
     const filteredInvites = pendingInvites.filter(i => (i.world || '').toLowerCase() !== 'malveria');
-    if (filteredInvites.length === 0) { console.log('[AutoInvite] Apenas convites de mundos ignorados (Malveria). Pulando.'); isProcessing = false; return; }
+      if (filteredInvites.length === 0) { console.log('[AutoInvite] Apenas convites de mundos ignorados (Malveria). Pulando.'); releaseLock(); return; }
     const inviteIds = filteredInvites.map(i => i.id);
     await supabase
       .from('guild_invites_queue')
