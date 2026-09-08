@@ -3,6 +3,12 @@ import { supabase } from '../lib/supabase';
 import { Clock, TrendingUp, AlertTriangle, Users, Info } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+const toMinutes = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
 export default function PartyDashboard({ party, onPlayerClick }) {
   const [membersData, setMembersData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -121,11 +127,30 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
       // 4. Monta o mapa histórico por dia do Server Save
       const historyMap = {};
+      const sMin = toMinutes(party.slot_start);
+      let eMin = toMinutes(party.slot_end);
+      if (eMin <= sMin) eMin += 1440;
+      // Janela de tolerância: 2 horas antes do início até 2.5 horas após o término do slot
+      const winStart = sMin - 120;
+      const winEnd = eMin + 150;
+
       logs.forEach(log => {
         const date = parseDate(log.session_end);
         const startDate = parseDate(log.session_start) || date;
         const dxp = parseInt(log.xp_gained || 0, 10);
         if (dxp <= 0 || !date) return;
+
+        // Se a party tem horário planilhado, ignora caçadas solo que ocorreram totalmente fora da janela da party
+        if (party.slot_start && party.slot_end) {
+          const startBrt = new Date(startDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+          const endBrt = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+          const startM = startBrt.getHours() * 60 + startBrt.getMinutes();
+          let endM = endBrt.getHours() * 60 + endBrt.getMinutes();
+          if (endM < startM) endM += 1440;
+
+          const inWindow = (startM >= winStart && startM <= winEnd) || (endM >= winStart && endM <= winEnd);
+          if (!inWindow) return; // Não junta caçadas solo aleatórias (ex: membro jogando de manhã) na telemetria da party
+        }
 
         const dayStr = getTibiaDay(date);
 
@@ -269,25 +294,12 @@ export default function PartyDashboard({ party, onPlayerClick }) {
     GHOST_SLOT: 'border-red-500 bg-red-500/10 text-red-400',
     DEFAULT: 'border-tibia-border bg-tibia-card text-gray-400'
   };
-  const now = new Date();
-  const brtTime = new Intl.DateTimeFormat('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(now);
-  const [currentHour, currentMinute] = brtTime.split(':').map(Number);
-  const currentTotalMinutes = currentHour * 60 + currentMinute;
-
-  const toMinutes = (timeStr) => {
-    if (!timeStr || typeof timeStr !== 'string') return 0;
-    const [h, m] = timeStr.split(':').map(Number);
-    return (h || 0) * 60 + (m || 0);
-  };
+  const nowBrt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const currentTotalMinutes = nowBrt.getHours() * 60 + nowBrt.getMinutes();
 
   const startMin = toMinutes(party.slot_start);
   let endMin = toMinutes(party.slot_end);
-  if (endMin < startMin) endMin += 1440;
+  if (endMin <= startMin) endMin += 1440;
   let currentMin = currentTotalMinutes;
   if (currentMin < startMin && endMin > 1440) currentMin += 1440;
   const isSlotActive = currentMin >= startMin && currentMin <= endMin;

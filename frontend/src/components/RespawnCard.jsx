@@ -13,15 +13,8 @@ export default function RespawnCard({ party, onPlayerClick, onPartyClick, isAdmi
   };
 
   // Checagem de horário ativo em BRT
-  const now = new Date();
-  const brtTime = new Intl.DateTimeFormat('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(now);
-  const [currentHour, currentMinute] = brtTime.split(':').map(Number);
-  const currentTotalMinutes = currentHour * 60 + currentMinute;
+  const nowBrt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const currentTotalMinutes = nowBrt.getHours() * 60 + nowBrt.getMinutes();
 
   const toMinutes = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return 0;
@@ -31,7 +24,7 @@ export default function RespawnCard({ party, onPlayerClick, onPartyClick, isAdmi
 
   const startMin = toMinutes(party.slot_start);
   let endMin = toMinutes(party.slot_end);
-  if (endMin < startMin) endMin += 1440;
+  if (endMin <= startMin) endMin += 1440;
   let currentMin = currentTotalMinutes;
   if (currentMin < startMin && endMin > 1440) currentMin += 1440;
   const isSlotActive = currentMin >= startMin && currentMin <= endMin;
