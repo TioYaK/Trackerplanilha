@@ -12,8 +12,35 @@ export default function RespawnCard({ party, onPlayerClick, onPartyClick, isAdmi
     DEFAULT:    'border-tibia-border bg-tibia-card',
   };
 
+  // Checagem de horário ativo em BRT
+  const now = new Date();
+  const brtTime = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(now);
+  const [currentHour, currentMinute] = brtTime.split(':').map(Number);
+  const currentTotalMinutes = currentHour * 60 + currentMinute;
+
+  const toMinutes = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  const startMin = toMinutes(party.slot_start);
+  let endMin = toMinutes(party.slot_end);
+  if (endMin < startMin) endMin += 1440;
+  let currentMin = currentTotalMinutes;
+  if (currentMin < startMin && endMin > 1440) currentMin += 1440;
+  const isSlotActive = currentMin >= startMin && currentMin <= endMin;
+  const isSlotPast = currentMin > endMin;
+
   const currentStatus = party.status || 'DEFAULT';
-  const colorClass = statusColors[currentStatus] ?? statusColors.DEFAULT;
+  const colorClass = isSlotActive 
+    ? (statusColors[currentStatus] ?? statusColors.DEFAULT)
+    : (currentStatus === 'GHOST_SLOT' ? statusColors.GHOST_SLOT : statusColors.DEFAULT);
   const missCount = party.miss_count || 0;
 
   // Badge de faltas: só aparece para admin
@@ -33,31 +60,55 @@ export default function RespawnCard({ party, onPlayerClick, onPartyClick, isAdmi
     </span>
   ) : null;
 
-  const statusLabel = {
-    EFFICIENT:  'Caçando Ativamente',
-    SUBOPTIMAL: 'Ociosidade Parcial',
-    FALTA_1:    'Falta (1/3)',
-    FALTA_2:    'Falta (2/3)',
-    GHOST_SLOT: 'Slot Fantasma (Abandono)',
-    DEFAULT:    'Aguardando Slot',
-  }[currentStatus] ?? 'Aguardando Slot';
+  let statusLabel = 'Aguardando Slot';
+  let statusIcon = <Clock size={16} className="text-gray-400" />;
+  let statusTextColor = 'text-gray-400';
 
-  const statusIcon = {
-    EFFICIENT:  <TrendingUp size={16} className="text-green-400" />,
-    SUBOPTIMAL: <Clock size={16} className="text-yellow-400" />,
-    FALTA_1:    <AlertTriangle size={16} className="text-orange-400" />,
-    FALTA_2:    <AlertTriangle size={16} className="text-orange-500" />,
-    GHOST_SLOT: <AlertTriangle size={16} className="text-red-400" />,
-  }[currentStatus] ?? null;
-
-  const statusTextColor = {
-    EFFICIENT:  'text-green-400',
-    SUBOPTIMAL: 'text-yellow-400',
-    FALTA_1:    'text-orange-400',
-    FALTA_2:    'text-orange-400',
-    GHOST_SLOT: 'text-red-400',
-    DEFAULT:    'text-gray-400',
-  }[currentStatus] ?? 'text-gray-400';
+  if (isSlotActive) {
+    if (currentStatus === 'EFFICIENT') {
+      statusLabel = 'Caçando Ativamente';
+      statusIcon = <TrendingUp size={16} className="text-green-400" />;
+      statusTextColor = 'text-green-400';
+    } else if (currentStatus === 'SUBOPTIMAL') {
+      statusLabel = 'Ociosidade Parcial';
+      statusIcon = <Clock size={16} className="text-yellow-400" />;
+      statusTextColor = 'text-yellow-400';
+    } else if (currentStatus === 'FALTA_1') {
+      statusLabel = 'Falta (1/3)';
+      statusIcon = <AlertTriangle size={16} className="text-orange-400" />;
+      statusTextColor = 'text-orange-400';
+    } else if (currentStatus === 'FALTA_2') {
+      statusLabel = 'Falta (2/3)';
+      statusIcon = <AlertTriangle size={16} className="text-orange-500" />;
+      statusTextColor = 'text-orange-500';
+    } else if (currentStatus === 'GHOST_SLOT') {
+      statusLabel = 'Slot Fantasma (Abandono)';
+      statusIcon = <AlertTriangle size={16} className="text-red-400" />;
+      statusTextColor = 'text-red-400';
+    }
+  } else {
+    if (currentStatus === 'GHOST_SLOT') {
+      statusLabel = 'Slot Fantasma (Abandono)';
+      statusIcon = <AlertTriangle size={16} className="text-red-400" />;
+      statusTextColor = 'text-red-400';
+    } else if (currentStatus === 'FALTA_1') {
+      statusLabel = 'Falta (1/3)';
+      statusIcon = <AlertTriangle size={16} className="text-orange-400" />;
+      statusTextColor = 'text-orange-400';
+    } else if (currentStatus === 'FALTA_2') {
+      statusLabel = 'Falta (2/3)';
+      statusIcon = <AlertTriangle size={16} className="text-orange-500" />;
+      statusTextColor = 'text-orange-500';
+    } else if (currentStatus === 'EFFICIENT' && isSlotPast) {
+      statusLabel = 'Slot Concluído';
+      statusIcon = <TrendingUp size={16} className="text-gray-400" />;
+      statusTextColor = 'text-gray-300';
+    } else {
+      statusLabel = 'Aguardando Slot';
+      statusIcon = <Clock size={16} className="text-gray-400" />;
+      statusTextColor = 'text-gray-400';
+    }
+  }
 
   const handleEditNote = async (e) => {
     e.stopPropagation();

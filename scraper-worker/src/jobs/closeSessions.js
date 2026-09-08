@@ -1,5 +1,15 @@
 import { supabase } from '../db.js';
 
+const parseUtcDate = (dStr) => {
+  if (!dStr) return null;
+  if (dStr instanceof Date) return dStr;
+  if (typeof dStr !== 'string') return new Date(dStr);
+  if (!dStr.endsWith('Z') && !dStr.includes('+') && !dStr.includes('-', 10)) {
+    return new Date(dStr + 'Z');
+  }
+  return new Date(dStr);
+};
+
 export const runCloseSessions = async () => {
   console.log(`[JOB] Verificando Sessões inativas (Edge Computing)...`);
 
@@ -37,8 +47,8 @@ export const runCloseSessions = async () => {
 
       // Só cria uma historical session se o jogador realmente caçou (ganhou XP)
       if (xpGained > 0) {
-        let startTime = player.session_start_time ? new Date(player.session_start_time) : null;
-        const endTime = new Date(player.last_active || Date.now());
+        let startTime = parseUtcDate(player.session_start_time);
+        const endTime = parseUtcDate(player.last_active) || new Date();
 
         // Se startTime for nulo, inválido ou tiver mais de 12 horas de diferença (ex: dias atrás),
         // calcula uma duração razoável baseada na caçada (ex: 2 horas antes do término)
