@@ -28,6 +28,7 @@ import { runArchiveSessions } from './jobs/archiveSessions.js';
 import { checkForUpdates } from './updater.js';
 import { applySelfHealingPatch } from './selfHeal.js';
 import { closeBrowser, isInMaintenance } from './lib/rubinotScraper.js';
+import { cleanStalePuppeteerProfiles } from './lib/cleanupTemp.js';
 
 applySelfHealingPatch();
 
@@ -399,6 +400,12 @@ setInterval(async () => {
 setInterval(async () => {
   await runAuditBank();
 }, 60 * 60 * 1000); // Checa a cada 1 hora
+
+// Limpeza periódica de perfis temporários órfãos do Puppeteer (evita encher o disco)
+setTimeout(() => cleanStalePuppeteerProfiles(10), 10000);
+setInterval(() => {
+  cleanStalePuppeteerProfiles(15);
+}, 30 * 60 * 1000); // Checa a cada 30 minutos
 
 // ==========================================
 // SERVIDOR ADMIN LOCAL (Forçar TS3 Sync)
