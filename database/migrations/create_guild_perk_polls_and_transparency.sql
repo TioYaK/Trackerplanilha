@@ -2,17 +2,25 @@
 -- SISTEMA DE PERKS DA GUILDA: TRANSPARÊNCIA FINANCEIRA & VOTAÇÕES DE UPGRADES
 -- ========================================================================================
 
--- 1. Tabela de Gastos / Investimentos em Upgrades de Perks
+-- 1. Tabela de Gastos / Investimentos em Upgrades de Perks e Câmbio de Moedas
 CREATE TABLE IF NOT EXISTS public.guild_perk_expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     description TEXT NOT NULL,
     amount NUMERIC NOT NULL,
     currency TEXT NOT NULL DEFAULT 'RC',
+    converted_amount NUMERIC,
+    converted_currency TEXT,
+    category TEXT NOT NULL DEFAULT 'UPGRADE', -- 'UPGRADE', 'EXCHANGE'
     spent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     registered_by TEXT NOT NULL DEFAULT 'ADMIN',
     proof_notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Suporte retroativo para tabelas já existentes
+ALTER TABLE public.guild_perk_expenses ADD COLUMN IF NOT EXISTS converted_amount NUMERIC;
+ALTER TABLE public.guild_perk_expenses ADD COLUMN IF NOT EXISTS converted_currency TEXT;
+ALTER TABLE public.guild_perk_expenses ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'UPGRADE';
 
 -- 2. Tabela de Votações / Enquetes de Perks da Guilda
 CREATE TABLE IF NOT EXISTS public.guild_perk_polls (

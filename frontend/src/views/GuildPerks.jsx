@@ -56,6 +56,9 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     description: '',
     amount: '',
     currency: 'RC',
+    has_conversion: false,
+    converted_amount: '',
+    converted_currency: 'KK',
     proof_notes: ''
   });
 
@@ -210,19 +213,37 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
 
     let totalRcOut = 0;
     let totalKkOut = 0;
+    let totalRcConvertedIn = 0;
+    let totalKkConvertedIn = 0;
+
     expenses.forEach(e => {
       const amt = Number(e.amount) || 0;
       const curr = (e.currency || 'RC').toUpperCase();
       if (curr === 'RC') totalRcOut += amt;
       else if (curr === 'KK') totalKkOut += amt;
+
+      // Se houve conversão de moedas (ex: trocou RC por Gold, gerando saldo em KK)
+      if (e.converted_amount) {
+        const convAmt = Number(e.converted_amount) || 0;
+        const convCurr = (e.converted_currency || (curr === 'RC' ? 'KK' : 'RC')).toUpperCase();
+        if (convCurr === 'RC') totalRcConvertedIn += convAmt;
+        else if (convCurr === 'KK') totalKkConvertedIn += convAmt;
+      }
     });
 
-    const rcBalance = Math.round((totalRcIn - totalRcOut) * 100) / 100;
-    const kkBalance = Math.round((totalKkIn - totalKkOut) * 100) / 100;
+    const effectiveRcIn = totalRcIn + totalRcConvertedIn;
+    const effectiveKkIn = totalKkIn + totalKkConvertedIn;
+
+    const rcBalance = Math.round((effectiveRcIn - totalRcOut) * 100) / 100;
+    const kkBalance = Math.round((effectiveKkIn - totalKkOut) * 100) / 100;
 
     return {
       totalRcIn: Math.round(totalRcIn * 100) / 100,
       totalKkIn: Math.round(totalKkIn * 100) / 100,
+      totalRcConvertedIn: Math.round(totalRcConvertedIn * 100) / 100,
+      totalKkConvertedIn: Math.round(totalKkConvertedIn * 100) / 100,
+      effectiveRcIn: Math.round(effectiveRcIn * 100) / 100,
+      effectiveKkIn: Math.round(effectiveKkIn * 100) / 100,
       totalRcOut: Math.round(totalRcOut * 100) / 100,
       totalKkOut: Math.round(totalKkOut * 100) / 100,
       rcBalance,
@@ -575,22 +596,40 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     }
   };
 
-  // Ações de Transparência: Registrar Gasto / Investimento de Perk
+  // Ações de Transparência: Registrar Gasto / Investimento de Perk ou Câmbio
   const handleCreateExpense = async (e) => {
     e.preventDefault();
     const amountNum = parseFloat(expenseForm.amount);
     if (!expenseForm.description.trim() || isNaN(amountNum) || amountNum <= 0) {
-      alert('Preencha a descrição e um valor numérico positivo para o investimento.');
+      alert('Preencha a descrição e um valor numérico positivo para a saída.');
       return;
     }
+
+    const hasConversion = Boolean(expenseForm.has_conversion);
+    let convertedAmountNum = null;
+    let targetConvertedCurr = null;
+
+    if (hasConversion) {
+      convertedAmountNum = parseFloat(expenseForm.converted_amount);
+      if (isNaN(convertedAmountNum) || convertedAmountNum <= 0) {
+        alert('Informe um valor convertido positivo válido (ex: quantidade de Gold recebida).');
+        return;
+      }
+      targetConvertedCurr = (expenseForm.converted_currency || (expenseForm.currency === 'RC' ? 'KK' : 'RC')).toUpperCase();
+    }
+
     setAdminActionLoading(true);
     try {
+      const sourceCurr = (expenseForm.currency || 'RC').toUpperCase();
       const { error } = await supabase
         .from('guild_perk_expenses')
         .insert({
           description: expenseForm.description.trim(),
           amount: amountNum,
-          currency: (expenseForm.currency || 'RC').toUpperCase(),
+          currency: sourceCurr,
+          converted_amount: convertedAmountNum,
+          converted_currency: targetConvertedCurr,
+          category: hasConversion ? 'EXCHANGE' : 'UPGRADE',
           proof_notes: expenseForm.proof_notes.trim() || null,
           registered_by: 'ADMIN'
         });
@@ -598,16 +637,26 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
 
       await supabase.from('guild_perk_audit_logs').insert({
         character_name: 'SISTEMA/ADMIN',
-        event_type: 'EXPENSE_REGISTERED',
+        event_type: hasConversion ? 'CURRENCY_EXCHANGED' : 'EXPENSE_REGISTERED',
         actor: 'ADMIN',
-        details: `Registrado investimento em perk: ${expenseForm.description} (${amountNum} ${(expenseForm.currency || 'RC').toUpperCase()}).`
+        details: hasConversion
+          ? `Registrado câmbio de moeda: ${expenseForm.description} (-${amountNum} ${sourceCurr} ➔ +${convertedAmountNum} ${targetConvertedCurr}).`
+          : `Registrado investimento em perk: ${expenseForm.description} (${amountNum} ${sourceCurr}).`
       });
 
-      setExpenseForm({ description: '', amount: '', currency: 'RC', proof_notes: '' });
+      setExpenseForm({
+        description: '',
+        amount: '',
+        currency: 'RC',
+        has_conversion: false,
+        converted_amount: '',
+        converted_currency: 'KK',
+        proof_notes: ''
+      });
       setExpenseModalOpen(false);
       fetchAllData();
     } catch (err) {
-      alert('Erro ao registrar investimento: ' + err.message);
+      alert('Erro ao registrar lançamento: ' + err.message);
     } finally {
       setAdminActionLoading(false);
     }
@@ -1544,6 +1593,16 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                 <CheckCircle2 size={13} className="text-green-400" />
                 {payments.length} transferências de cotas recebidas
               </p>
+              {(financialStats.totalKkConvertedIn > 0 || financialStats.totalRcConvertedIn > 0) && (
+                <div className="mt-2 pt-2 border-t border-tibia-border/30 text-[11px] text-amber-300 flex items-center gap-1">
+                  <RefreshCw size={11} className="text-amber-400" />
+                  <span>
+                    Saldo gerado por câmbio:{' '}
+                    {financialStats.totalKkConvertedIn > 0 && <strong>+{financialStats.totalKkConvertedIn.toLocaleString('pt-BR')} KK </strong>}
+                    {financialStats.totalRcConvertedIn > 0 && <strong>+{financialStats.totalRcConvertedIn.toLocaleString('pt-BR')} RC</strong>}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Card 2: Total Investido em Perks */}
@@ -1562,7 +1621,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               </div>
               <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
                 <Sparkles size={13} className="text-amber-400" />
-                {expenses.length} melhorias de perks adquiridas
+                {expenses.length} melhorias / câmbios executados
               </p>
             </div>
 
@@ -1596,7 +1655,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               <div className="flex items-center justify-between mb-4 border-b border-tibia-border/40 pb-3">
                 <h4 className="text-base font-medieval text-red-400 flex items-center gap-2">
                   <TrendingDown size={18} className="text-red-400" />
-                  Investimentos em Perks (Saídas)
+                  Investimentos & Câmbios em Perks (Saídas)
                 </h4>
                 <span className="text-xs text-gray-400 font-mono">
                   {expenses.length} registros
@@ -1613,15 +1672,28 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                     <div key={exp.id} className="p-3.5 rounded-lg bg-black/60 border border-tibia-border/40 hover:border-red-500/40 transition-all text-xs flex flex-col justify-between gap-2">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="font-bold text-white text-sm">{exp.description}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-bold text-white text-sm">{exp.description}</p>
+                            {exp.converted_amount && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                                <RefreshCw size={10} /> Câmbio
+                              </span>
+                            )}
+                          </div>
                           {exp.proof_notes && (
                             <p className="text-gray-400 text-xs mt-0.5">{exp.proof_notes}</p>
                           )}
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <span className="font-black text-red-400 text-sm">
+                          <span className="font-black text-red-400 text-sm block">
                             - {Number(exp.amount).toLocaleString('pt-BR')} {exp.currency}
                           </span>
+                          {exp.converted_amount && (
+                            <span className="font-bold text-green-400 text-xs mt-0.5 flex items-center justify-end gap-1">
+                              <ArrowRight size={11} />
+                              <span>+ {Number(exp.converted_amount).toLocaleString('pt-BR')} {exp.converted_currency || (exp.currency === 'RC' ? 'KK' : 'RC')}</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-gray-500 border-t border-tibia-border/20 pt-2">
@@ -2301,26 +2373,26 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         </div>
       )}
 
-      {/* MODAL: Registrar Upgrade / Gasto (Admin) */}
+      {/* MODAL: Registrar Upgrade / Gasto ou Câmbio (Admin) */}
       {expenseModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-tibia-card border-2 border-amber-500 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <h4 className="text-lg font-medieval text-yellow-500 flex items-center gap-2">
               <TrendingDown className="text-amber-400" size={18} />
-              Registrar Upgrade ou Gasto de Perk
+              Registrar Saída ou Câmbio de Moedas
             </h4>
             <p className="text-xs text-gray-300">
-              Registre a compra de itens, ativação de perks ou investimentos debitados do caixa da guilda.
+              Registre a compra de itens, ativação de perks ou trocas de moeda (ex: converter RC em Gold).
             </p>
 
             <form onSubmit={handleCreateExpense} className="space-y-3">
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
-                  Descrição do Upgrade / Investimento
+                  Descrição do Lançamento
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Upgrade Perk de XP Nível 2"
+                  placeholder="Ex: Upgrade Perk XP Nível 2 ou Troca de 50 RC por Gold"
                   value={expenseForm.description}
                   onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
                   className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
@@ -2330,12 +2402,12 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">Valor Gasto</label>
+                  <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">Valor Gasto / Debitado</label>
                   <input
                     type="number"
                     step="any"
                     min="0.01"
-                    placeholder="Ex: 100"
+                    placeholder="Ex: 50"
                     value={expenseForm.amount}
                     onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
                     className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
@@ -2343,10 +2415,17 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">Moeda</label>
+                  <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">Moeda Debitada</label>
                   <select
                     value={expenseForm.currency}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, currency: e.target.value })}
+                    onChange={(e) => {
+                      const newCurr = e.target.value;
+                      setExpenseForm({
+                        ...expenseForm,
+                        currency: newCurr,
+                        converted_currency: newCurr === 'RC' ? 'KK' : 'RC'
+                      });
+                    }}
                     className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
                   >
                     <option value="RC">RC (Rubin Coins)</option>
@@ -2355,11 +2434,78 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                 </div>
               </div>
 
+              {/* Seção de Conversão / Câmbio de Moedas */}
+              <div className="bg-black/60 border border-tibia-border/50 rounded-lg p-3 space-y-2.5">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={expenseForm.has_conversion}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setExpenseForm({
+                        ...expenseForm,
+                        has_conversion: checked,
+                        converted_currency: expenseForm.currency === 'RC' ? 'KK' : 'RC'
+                      });
+                    }}
+                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <RefreshCw size={13} className="text-amber-400" />
+                    Houve conversão de moeda? (Câmbio)
+                  </span>
+                </label>
+
+                {expenseForm.has_conversion && (
+                  <div className="space-y-2 pt-2 border-t border-tibia-border/40">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-300 mb-1 uppercase">
+                          Valor Convertido / Recebido
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0.01"
+                          placeholder="Ex: 15"
+                          value={expenseForm.converted_amount}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, converted_amount: e.target.value })}
+                          className="w-full bg-black/80 border border-green-500/60 rounded px-3 py-1.5 text-sm text-white focus:border-green-400 focus:outline-none"
+                          required={expenseForm.has_conversion}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-300 mb-1 uppercase">
+                          Moeda Convertida
+                        </label>
+                        <select
+                          value={expenseForm.converted_currency}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, converted_currency: e.target.value })}
+                          className="w-full bg-black/80 border border-green-500/60 rounded px-3 py-1.5 text-sm text-white focus:border-green-400 focus:outline-none"
+                        >
+                          <option value="KK">KK (Gold / Milhões)</option>
+                          <option value="RC">RC (Rubin Coins)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {expenseForm.amount && expenseForm.converted_amount && Number(expenseForm.amount) > 0 && Number(expenseForm.converted_amount) > 0 && (
+                      <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center justify-between">
+                        <span>Taxa Efetiva de Câmbio:</span>
+                        <strong className="font-mono">
+                          1 {expenseForm.currency} = {(Number(expenseForm.converted_amount) / Number(expenseForm.amount)).toFixed(3)} {expenseForm.converted_currency}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">Observações / Comprovante</label>
                 <input
                   type="text"
-                  placeholder="Ex: Itens adquiridos no NPC de Venore"
+                  placeholder="Ex: Câmbio realizado via Market no RubinOT"
                   value={expenseForm.proof_notes}
                   onChange={(e) => setExpenseForm({ ...expenseForm, proof_notes: e.target.value })}
                   className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
@@ -2372,7 +2518,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                   disabled={adminActionLoading}
                   className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded transition-all"
                 >
-                  Confirmar Investimento
+                  Confirmar Lançamento
                 </button>
                 <button
                   type="button"
