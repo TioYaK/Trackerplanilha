@@ -374,7 +374,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
     StatusIcon = Clock;
   }
 
-  const chartData = membersData.map(m => ({ name: m.name.split(' ')[0], xp: m.totalXpGained }));
+  const chartData = membersData.map(m => ({ name: (m?.name || '').split(' ')[0] || 'Member', xp: Number(m?.totalXpGained) || 0 }));
   const formatXpAxis = (tick) => formatXp(tick);
 
   return (

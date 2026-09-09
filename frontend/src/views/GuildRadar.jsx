@@ -91,7 +91,7 @@ export default function GuildRadar() {
 
   const getVocationColor = (voc) => {
     if (!voc) return 'text-gray-400';
-    const v = voc.toLowerCase();
+    const v = String(voc).toLowerCase();
     if (v.includes('knight')) return 'text-blue-400';
     if (v.includes('paladin')) return 'text-yellow-400';
     if (v.includes('druid')) return 'text-green-400';

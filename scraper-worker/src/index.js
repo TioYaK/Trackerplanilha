@@ -106,7 +106,7 @@ const fetchTask = async () => {
       query = query.eq('locked_at', task.locked_at);
     }
 
-    const { data: updatedTask, error: updateError } = await query.select().single();
+    const { data: updatedTask, error: updateError } = await query.select().maybeSingle();
 
     if (updateError || !updatedTask) {
       return null; // Outro worker pegou
@@ -157,14 +157,21 @@ const requeueTask = async (task) => {
 // ESTATÍSTICAS E HEARTBEAT
 // ==========================================
 let sessionStats = {};
+let isProcessingTask = false;
 
 const processTask = async (task) => {
+  if (isProcessingTask) {
+    console.warn(`[WORKER] ⚠️ Ignorando processamento concorrente: já está executando uma tarefa.`);
+    return;
+  }
+  isProcessingTask = true;
   const ts = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   console.log(`\n[WORKER] ▶ [${ts}] Processando: ${task.task_type} (ID: ${task.id})`);
   const startTime = Date.now();
 
+  let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => { reject(new Error('CRITICAL_TIMEOUT')); }, 10 * 60 * 1000);
+    timeoutId = setTimeout(() => { reject(new Error('CRITICAL_TIMEOUT')); }, 10 * 60 * 1000);
   });
 
   const executeTask = async () => {
@@ -262,6 +269,9 @@ const processTask = async (task) => {
         .update({ status: 'PENDING', worker_id: null, locked_at: null })
         .eq('id', task.id);
     }
+  } finally {
+    clearTimeout(timeoutId);
+    isProcessingTask = false;
   }
 };
 
@@ -315,7 +325,7 @@ const loop = async () => {
       .from('worker_config')
       .select('min_worker_version')
       .eq('id', 1)
-      .single();
+      .maybeSingle();
 
     if (settings?.min_worker_version) {
       const minVersion = settings.min_worker_version;
@@ -463,14 +473,16 @@ supabase
        const lockTime = new Date(payload.new.locked_at).getTime();
        if (lockTime <= Date.now()) {
           console.log('\n[REALTIME] ⚡ Comando de Sincronização Forçada Recebido! Fila acelerada...');
-          if (true) {
-            // Invoca o worker imediatamente
+          if (!isProcessingTask) {
+            // Invoca o worker imediatamente se não estiver ocupado
             fetchTask().then(task => {
                if (task) {
                   emptyCycles = 0;
                   processTask(task);
                }
             });
+          } else {
+            console.log('[REALTIME] Worker ocupado executando outra tarefa. Fila será consumida em seguida.');
           }
        }
     }
@@ -486,7 +498,11 @@ supabase
     .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_invites_queue' }, (payload) => {
       if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && payload.new.status === 'PENDING')) {
         console.log('\n[REALTIME] Gatilho acionado (Novo invite ou Reprocessamento)!');
-        runProcessAutoInvites();
+        if (!isProcessingTask) {
+          runProcessAutoInvites().catch(err => console.error('[AutoInvite] Erro no gatilho realtime:', err.message));
+        } else {
+          console.log('[REALTIME] Worker ocupado. O convite será processado pelo ciclo regular.');
+        }
       }
     })
     .subscribe();
@@ -495,7 +511,11 @@ supabase
     .channel('maker_validation')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maker_validation_queue' }, (payload) => {
      console.log('\n[REALTIME] Novo maker recebido para validar!');
-     runValidateMakers();
+     if (!isProcessingTask) {
+       runValidateMakers().catch(err => console.error('[ValidateMakers] Erro no gatilho realtime:', err.message));
+     } else {
+       console.log('[REALTIME] Worker ocupado. A validação será processada pelo ciclo regular.');
+     }
   })
   .subscribe();
 

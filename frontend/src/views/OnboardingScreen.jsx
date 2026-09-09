@@ -83,7 +83,7 @@ export default function OnboardingScreen() {
         const { data: jobInfo, error: jobErr } = await supabase.from('maker_validation_queue').insert({
           character_name: makerName,
           user_id: user.id
-        }).select().single();
+        }).select().maybeSingle();
 
         if (jobErr) throw jobErr;
 

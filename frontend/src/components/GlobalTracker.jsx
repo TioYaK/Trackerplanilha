@@ -300,7 +300,7 @@ export default function GlobalTracker() {
           }
 
           let xpVal = 0;
-          const str = p.delta_xp.toString().toUpperCase().replace(/,/g, '.');
+          const str = String(p.delta_xp || '0').toUpperCase().replace(/,/g, '.');
           if (str.endsWith('M')) xpVal = parseFloat(str) * 1000000;
           else if (str.endsWith('K')) xpVal = parseFloat(str) * 1000;
           else xpVal = parseFloat(str) || 0;

@@ -317,7 +317,7 @@ export default function AdminPanel({ currentVisibleTabs }) {
                         u.status === 'pending' ? 'bg-yellow-900/50 text-yellow-400' :
                         'bg-red-900/50 text-red-400'
                       }`}>
-                        {u.status.toUpperCase()}
+                        {(u.status || 'pending').toUpperCase()}
                       </span>
                     </td>
                     <td className="p-3">
