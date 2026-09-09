@@ -4,7 +4,9 @@ import { parseUtcDate, toBrtDateStr } from '../lib/tibiaUtils';
 import { 
   Shield, Award, Sparkles, Clock, AlertTriangle, CheckCircle2, 
   XCircle, Coins, Users, Search, Copy, Check, FileText, 
-  RefreshCw, Sliders, Calendar, Skull, UserCheck, UserX, AlertCircle, ArrowRight
+  RefreshCw, Sliders, Calendar, Skull, UserCheck, UserX, AlertCircle, ArrowRight,
+  Landmark, CheckSquare, Plus, Trash2, PieChart, Vote, DollarSign, TrendingUp, TrendingDown,
+  CheckCircle
 } from 'lucide-react';
 
 export default function GuildPerks({ isPublic = false, isAdmin = false }) {
@@ -46,6 +48,31 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [adminActionLoading, setAdminActionLoading] = useState(false);
 
+  // Transparência Financeira & Gastos
+  const [payments, setPayments] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({
+    description: '',
+    amount: '',
+    currency: 'RC',
+    proof_notes: ''
+  });
+
+  // Votações de Prioridade de Perks
+  const [polls, setPolls] = useState([]);
+  const [votes, setVotes] = useState([]);
+  const [pollModalOpen, setPollModalOpen] = useState(false);
+  const [pollForm, setPollForm] = useState({
+    title: '',
+    description: '',
+    options: ['', '']
+  });
+  const [votingCharName, setVotingCharName] = useState('');
+  const [selectedPollOption, setSelectedPollOption] = useState({}); // { [pollId]: optionId }
+  const [votingFeedback, setVotingFeedback] = useState({}); // { [pollId]: { type: 'success' | 'error', text: '' } }
+  const [pollFilter, setPollFilter] = useState('ALL'); // 'ALL', 'OPEN', 'CLOSED'
+
   // 1. Carrega dados do sistema
   const fetchAllData = useCallback(async () => {
     setLoading(true);
@@ -79,6 +106,49 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         .limit(50);
 
       setAuditLogs(aData || []);
+
+      // 1.4 Histórico de Pagamentos de Cotas
+      try {
+        const { data: payData, error: payErr } = await supabase
+          .from('guild_perk_payments')
+          .select('*')
+          .order('transaction_date', { ascending: false });
+        if (!payErr && payData) setPayments(payData);
+      } catch (e) {
+        console.warn('Tabela guild_perk_payments não disponível:', e.message);
+      }
+
+      // 1.5 Gastos / Investimentos em Perks
+      try {
+        const { data: expData, error: expErr } = await supabase
+          .from('guild_perk_expenses')
+          .select('*')
+          .order('spent_at', { ascending: false });
+        if (!expErr && expData) setExpenses(expData);
+      } catch (e) {
+        console.warn('Tabela guild_perk_expenses não disponível:', e.message);
+      }
+
+      // 1.6 Enquetes / Votações e Opções
+      try {
+        const { data: pData, error: pErr } = await supabase
+          .from('guild_perk_polls')
+          .select('*, options:guild_perk_poll_options(*)')
+          .order('created_at', { ascending: false });
+        if (!pErr && pData) setPolls(pData);
+      } catch (e) {
+        console.warn('Tabela guild_perk_polls não disponível:', e.message);
+      }
+
+      // 1.7 Registro de Votos
+      try {
+        const { data: vData, error: vErr } = await supabase
+          .from('guild_perk_poll_votes')
+          .select('*');
+        if (!vErr && vData) setVotes(vData);
+      } catch (e) {
+        console.warn('Tabela guild_perk_poll_votes não disponível:', e.message);
+      }
     } catch (err) {
       console.warn('Tabelas de perks ainda não prontas no Supabase:', err.message);
     } finally {
@@ -93,6 +163,11 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     const channel = supabase.channel('guild_perks_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_perk_members' }, () => fetchAllData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_perk_settings' }, () => fetchAllData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_perk_payments' }, () => fetchAllData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_perk_expenses' }, () => fetchAllData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_perk_polls' }, () => fetchAllData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_perk_poll_options' }, () => fetchAllData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_perk_poll_votes' }, () => fetchAllData())
       .subscribe();
 
     return () => {
@@ -121,6 +196,34 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
   const inactivityAlerts = useMemo(() => {
     return members.filter(m => m.status === 'INACTIVITY_ALERT' || (m.status === 'ACTIVE' && (m.last_7d_xp || 0) <= 0));
   }, [members]);
+
+  // Cálculos Financeiros do Caixa & Transparência
+  const financialStats = useMemo(() => {
+    let totalRcIn = 0;
+    let totalKkIn = 0;
+    payments.forEach(p => {
+      const amt = Number(p.amount) || 0;
+      if (p.currency === 'RC') totalRcIn += amt;
+      else if (p.currency === 'KK') totalKkIn += amt;
+    });
+
+    let totalRcOut = 0;
+    let totalKkOut = 0;
+    expenses.forEach(e => {
+      const amt = Number(e.amount) || 0;
+      if (e.currency === 'RC') totalRcOut += amt;
+      else if (e.currency === 'KK') totalKkOut += amt;
+    });
+
+    return {
+      totalRcIn,
+      totalKkIn,
+      totalRcOut,
+      totalKkOut,
+      rcBalance: totalRcIn - totalRcOut,
+      kkBalance: totalKkIn - totalKkOut
+    };
+  }, [payments, expenses]);
 
   // Copiar nome do char Bank
   const handleCopyBank = () => {
@@ -467,6 +570,290 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     }
   };
 
+  // Ações de Transparência: Registrar Gasto / Investimento de Perk
+  const handleCreateExpense = async (e) => {
+    e.preventDefault();
+    if (!expenseForm.description.trim() || !expenseForm.amount) {
+      alert('Preencha a descrição e o valor do investimento.');
+      return;
+    }
+    setAdminActionLoading(true);
+    try {
+      const amountNum = parseFloat(expenseForm.amount);
+      const { error } = await supabase
+        .from('guild_perk_expenses')
+        .insert({
+          description: expenseForm.description.trim(),
+          amount: amountNum,
+          currency: expenseForm.currency,
+          proof_notes: expenseForm.proof_notes.trim() || null,
+          registered_by: 'ADMIN'
+        });
+      if (error) throw error;
+
+      await supabase.from('guild_perk_audit_logs').insert({
+        character_name: 'SISTEMA/ADMIN',
+        event_type: 'EXPENSE_REGISTERED',
+        actor: 'ADMIN',
+        details: `Registrado investimento em perk: ${expenseForm.description} (${amountNum} ${expenseForm.currency}).`
+      });
+
+      setExpenseForm({ description: '', amount: '', currency: 'RC', proof_notes: '' });
+      setExpenseModalOpen(false);
+      fetchAllData();
+    } catch (err) {
+      alert('Erro ao registrar investimento: ' + err.message);
+    } finally {
+      setAdminActionLoading(false);
+    }
+  };
+
+  // Ações de Transparência: Excluir Registro de Gasto (Admin)
+  const handleDeleteExpense = async (expense) => {
+    if (!confirm(`Deseja excluir o registro de investimento "${expense.description}" (${expense.amount} ${expense.currency})?`)) return;
+    setAdminActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('guild_perk_expenses')
+        .delete()
+        .eq('id', expense.id);
+      if (error) throw error;
+
+      await supabase.from('guild_perk_audit_logs').insert({
+        character_name: 'SISTEMA/ADMIN',
+        event_type: 'EXPENSE_DELETED',
+        actor: 'ADMIN',
+        details: `Excluído registro de investimento: ${expense.description} (${expense.amount} ${expense.currency}).`
+      });
+
+      fetchAllData();
+    } catch (err) {
+      alert('Erro ao excluir registro: ' + err.message);
+    } finally {
+      setAdminActionLoading(false);
+    }
+  };
+
+  // Funções de Votação: Manipular Opções no Formulário
+  const handleAddPollOption = () => {
+    setPollForm(prev => ({
+      ...prev,
+      options: [...prev.options, '']
+    }));
+  };
+
+  const handlePollOptionChange = (index, value) => {
+    setPollForm(prev => {
+      const newOpts = [...prev.options];
+      newOpts[index] = value;
+      return { ...prev, options: newOpts };
+    });
+  };
+
+  const handleRemovePollOption = (index) => {
+    if (pollForm.options.length <= 2) return;
+    setPollForm(prev => ({
+      ...prev,
+      options: prev.options.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Ações de Votação: Criar Nova Enquete (Admin)
+  const handleCreatePoll = async (e) => {
+    e.preventDefault();
+    const validOptions = pollForm.options.map(o => o.trim()).filter(Boolean);
+    if (!pollForm.title.trim()) {
+      alert('Informe o título da votação.');
+      return;
+    }
+    if (validOptions.length < 2) {
+      alert('Adicione pelo menos 2 opções para a votação.');
+      return;
+    }
+    setAdminActionLoading(true);
+    try {
+      // 1. Cria enquete
+      const { data: pollData, error: pollErr } = await supabase
+        .from('guild_perk_polls')
+        .insert({
+          title: pollForm.title.trim(),
+          description: pollForm.description.trim() || null,
+          status: 'OPEN',
+          created_by: 'ADMIN'
+        })
+        .select()
+        .single();
+      if (pollErr) throw pollErr;
+
+      // 2. Insere opções
+      const optionsToInsert = validOptions.map(title => ({
+        poll_id: pollData.id,
+        title,
+        votes_count: 0
+      }));
+      const { error: optErr } = await supabase
+        .from('guild_perk_poll_options')
+        .insert(optionsToInsert);
+      if (optErr) throw optErr;
+
+      // 3. Log Forense
+      await supabase.from('guild_perk_audit_logs').insert({
+        character_name: 'SISTEMA/ADMIN',
+        event_type: 'POLL_CREATED',
+        actor: 'ADMIN',
+        details: `Criada nova votação de perks: "${pollForm.title}" com ${validOptions.length} opções.`
+      });
+
+      setPollForm({ title: '', description: '', options: ['', ''] });
+      setPollModalOpen(false);
+      fetchAllData();
+    } catch (err) {
+      alert('Erro ao criar votação: ' + err.message);
+    } finally {
+      setAdminActionLoading(false);
+    }
+  };
+
+  // Ações de Votação: Registrar Voto de Membro
+  const handleCastVote = async (pollId) => {
+    const selectedOptId = selectedPollOption[pollId];
+    const char = (votingCharName || charName).trim();
+
+    if (!char) {
+      setVotingFeedback(prev => ({
+        ...prev,
+        [pollId]: { type: 'error', text: 'Informe o nome do seu personagem para votar.' }
+      }));
+      return;
+    }
+    if (!selectedOptId) {
+      setVotingFeedback(prev => ({
+        ...prev,
+        [pollId]: { type: 'error', text: 'Selecione uma das opções acima para votar.' }
+      }));
+      return;
+    }
+
+    // Validação de Voto Único
+    const alreadyVoted = votes.some(v => 
+      v.poll_id === pollId && v.character_name.toLowerCase() === char.toLowerCase()
+    );
+
+    if (alreadyVoted) {
+      setVotingFeedback(prev => ({
+        ...prev,
+        [pollId]: { type: 'error', text: `O personagem "${char}" já registrou voto nesta enquete! Limite de 1 voto por personagem.` }
+      }));
+      return;
+    }
+
+    setAdminActionLoading(true);
+    try {
+      // 1. Insere voto
+      const { error: vErr } = await supabase
+        .from('guild_perk_poll_votes')
+        .insert({
+          poll_id: pollId,
+          option_id: selectedOptId,
+          character_name: char
+        });
+      if (vErr) {
+        if (vErr.message && vErr.message.includes('unique_vote_per_char_poll')) {
+          throw new Error(`O personagem "${char}" já votou nesta enquete.`);
+        }
+        throw vErr;
+      }
+
+      // 2. Incrementa votes_count
+      const targetPoll = polls.find(p => p.id === pollId);
+      const targetOpt = targetPoll?.options?.find(o => o.id === selectedOptId);
+      if (targetOpt) {
+        await supabase
+          .from('guild_perk_poll_options')
+          .update({ votes_count: (targetOpt.votes_count || 0) + 1 })
+          .eq('id', selectedOptId);
+      }
+
+      setVotingFeedback(prev => ({
+        ...prev,
+        [pollId]: { type: 'success', text: `Voto computado com sucesso para ${char}!` }
+      }));
+
+      fetchAllData();
+    } catch (err) {
+      setVotingFeedback(prev => ({
+        ...prev,
+        [pollId]: { type: 'error', text: err.message }
+      }));
+    } finally {
+      setAdminActionLoading(false);
+    }
+  };
+
+  // Ações de Votação: Encerrar Votação e Declarar Vencedor (Admin)
+  const handleClosePoll = async (poll) => {
+    if (!confirm(`Deseja encerrar a votação "${poll.title}"? Não serão aceitos novos votos.`)) return;
+    setAdminActionLoading(true);
+    try {
+      const pollOpts = poll.options || [];
+      const optsWithCounts = pollOpts.map(opt => {
+        const count = votes.filter(v => v.option_id === opt.id).length || opt.votes_count || 0;
+        return { ...opt, computedVotes: count };
+      });
+      optsWithCounts.sort((a, b) => b.computedVotes - a.computedVotes);
+      const topOpt = optsWithCounts[0];
+      const winnerTitle = topOpt && topOpt.computedVotes > 0 ? topOpt.title : 'Sem votos suficientes';
+
+      const { error } = await supabase
+        .from('guild_perk_polls')
+        .update({
+          status: 'CLOSED',
+          winner_option_title: winnerTitle
+        })
+        .eq('id', poll.id);
+      if (error) throw error;
+
+      await supabase.from('guild_perk_audit_logs').insert({
+        character_name: 'SISTEMA/ADMIN',
+        event_type: 'POLL_CLOSED',
+        actor: 'ADMIN',
+        details: `Votação "${poll.title}" encerrada. Vencedora: ${winnerTitle}.`
+      });
+
+      fetchAllData();
+    } catch (err) {
+      alert('Erro ao encerrar votação: ' + err.message);
+    } finally {
+      setAdminActionLoading(false);
+    }
+  };
+
+  // Ações de Votação: Excluir Votação (Admin)
+  const handleDeletePoll = async (poll) => {
+    if (!confirm(`CONFIRMAÇÃO: Deseja EXCLUIR permanentemente a votação "${poll.title}"?`)) return;
+    setAdminActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('guild_perk_polls')
+        .delete()
+        .eq('id', poll.id);
+      if (error) throw error;
+
+      await supabase.from('guild_perk_audit_logs').insert({
+        character_name: 'SISTEMA/ADMIN',
+        event_type: 'POLL_DELETED',
+        actor: 'ADMIN',
+        details: `Excluída votação de perks: "${poll.title}".`
+      });
+
+      fetchAllData();
+    } catch (err) {
+      alert('Erro ao excluir votação: ' + err.message);
+    } finally {
+      setAdminActionLoading(false);
+    }
+  };
+
   // Renderizadores de Status Badges
   const renderStatusBadge = (status) => {
     switch (status) {
@@ -676,6 +1063,35 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         >
           <FileText size={14} />
           <span>Histórico & Auditoria</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('transparency')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'transparency'
+              ? 'bg-amber-500 text-black shadow-md'
+              : 'bg-black/40 text-gray-300 hover:text-white border border-tibia-border/40'
+          }`}
+        >
+          <Landmark size={14} />
+          <span>Transparência & Caixa</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('polls')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'polls'
+              ? 'bg-amber-500 text-black shadow-md'
+              : 'bg-black/40 text-gray-300 hover:text-white border border-tibia-border/40'
+          }`}
+        >
+          <Vote size={14} />
+          <span>Votações de Perks</span>
+          {polls.filter(p => p.status === 'OPEN').length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-green-500 text-black font-black">
+              {polls.filter(p => p.status === 'OPEN').length}
+            </span>
+          )}
         </button>
 
         {/* Abas Exclusivas do Administrador */}
@@ -1065,6 +1481,483 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         </div>
       )}
 
+      {/* ABA 5: Transparência & Caixa da Guilda */}
+      {activeTab === 'transparency' && (
+        <div className="space-y-6">
+          {/* Header da Aba */}
+          <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-6 shadow-inner flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-medieval text-yellow-500 flex items-center gap-2">
+                <Landmark className="text-amber-400" size={22} />
+                Transparência & Caixa da Guilda
+              </h3>
+              <p className="text-xs text-gray-400 mt-1 max-w-2xl">
+                Prestação de contas 100% aberta e auditável. Veja todas as contribuições dos membros e cada investimento realizado na aquisição e upgrade das perks da guilda.
+              </p>
+            </div>
+
+            {isAdmin && (
+              <button
+                onClick={() => setExpenseModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded-lg transition-all shadow-md flex-shrink-0"
+              >
+                <Plus size={16} />
+                <span>Registrar Upgrade / Gasto</span>
+              </button>
+            )}
+          </div>
+
+          {/* 3 KPI Cards Financeiros */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Card 1: Total Arrecadado */}
+            <div className="bg-black/50 border border-tibia-border/60 p-5 rounded-xl shadow-lg relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Arrecadado (Entradas)</span>
+                <span className="p-2 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20">
+                  <TrendingUp size={18} />
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-3">
+                <span className="text-2xl font-black text-green-400">{financialStats.totalRcIn.toLocaleString('pt-BR')} RC</span>
+                {financialStats.totalKkIn > 0 && (
+                  <span className="text-lg font-bold text-gray-300">+ {financialStats.totalKkIn.toLocaleString('pt-BR')} KK</span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
+                <CheckCircle2 size={13} className="text-green-400" />
+                {payments.length} transferências de cotas recebidas
+              </p>
+            </div>
+
+            {/* Card 2: Total Investido em Perks */}
+            <div className="bg-black/50 border border-tibia-border/60 p-5 rounded-xl shadow-lg relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Investido em Upgrades (Saídas)</span>
+                <span className="p-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20">
+                  <TrendingDown size={18} />
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-3">
+                <span className="text-2xl font-black text-red-400">{financialStats.totalRcOut.toLocaleString('pt-BR')} RC</span>
+                {financialStats.totalKkOut > 0 && (
+                  <span className="text-lg font-bold text-gray-300">+ {financialStats.totalKkOut.toLocaleString('pt-BR')} KK</span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
+                <Sparkles size={13} className="text-amber-400" />
+                {expenses.length} melhorias de perks adquiridas
+              </p>
+            </div>
+
+            {/* Card 3: Saldo Disponível em Caixa */}
+            <div className="bg-gradient-to-br from-amber-950/40 via-black/60 to-black/60 border-2 border-amber-500/50 p-5 rounded-xl shadow-lg relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Saldo Líquido em Caixa</span>
+                <span className="p-2 rounded-lg bg-amber-500/20 text-yellow-400 border border-amber-500/40">
+                  <Coins size={18} />
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-3">
+                <span className={`text-2xl font-black ${financialStats.rcBalance >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {financialStats.rcBalance.toLocaleString('pt-BR')} RC
+                </span>
+                <span className={`text-lg font-bold ${financialStats.kkBalance >= 0 ? 'text-white' : 'text-red-400'}`}>
+                  + {financialStats.kkBalance.toLocaleString('pt-BR')} KK
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
+                <Shield size={13} className="text-amber-400" />
+                Fundo de reserva para as próximas perks
+              </p>
+            </div>
+          </div>
+
+          {/* Duas Tabelas: Saídas (Investimentos) e Entradas (Pagamentos) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Tabela de Saídas / Upgrades */}
+            <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-5 shadow-inner">
+              <div className="flex items-center justify-between mb-4 border-b border-tibia-border/40 pb-3">
+                <h4 className="text-base font-medieval text-red-400 flex items-center gap-2">
+                  <TrendingDown size={18} className="text-red-400" />
+                  Investimentos em Perks (Saídas)
+                </h4>
+                <span className="text-xs text-gray-400 font-mono">
+                  {expenses.length} registros
+                </span>
+              </div>
+
+              {expenses.length === 0 ? (
+                <div className="text-center py-10 text-gray-500 text-xs italic">
+                  Nenhum registro de gasto ou upgrade cadastrado ainda.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                  {expenses.map((exp) => (
+                    <div key={exp.id} className="p-3.5 rounded-lg bg-black/60 border border-tibia-border/40 hover:border-red-500/40 transition-all text-xs flex flex-col justify-between gap-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-bold text-white text-sm">{exp.description}</p>
+                          {exp.proof_notes && (
+                            <p className="text-gray-400 text-xs mt-0.5">{exp.proof_notes}</p>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className="font-black text-red-400 text-sm">
+                            - {Number(exp.amount).toLocaleString('pt-BR')} {exp.currency}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-gray-500 border-t border-tibia-border/20 pt-2">
+                        <span>{toBrtDateStr(exp.spent_at || exp.created_at)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">Por: {exp.registered_by}</span>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDeleteExpense(exp)}
+                              disabled={adminActionLoading}
+                              className="text-red-400 hover:text-red-300 p-1 hover:bg-red-950/40 rounded transition-colors"
+                              title="Excluir Registro"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Tabela de Entradas / Cotas Recebidas */}
+            <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-5 shadow-inner">
+              <div className="flex items-center justify-between mb-4 border-b border-tibia-border/40 pb-3">
+                <h4 className="text-base font-medieval text-green-400 flex items-center gap-2">
+                  <TrendingUp size={18} className="text-green-400" />
+                  Cotas & Mensalidades Recebidas (Entradas)
+                </h4>
+                <span className="text-xs text-gray-400 font-mono">
+                  {payments.length} transferências
+                </span>
+              </div>
+
+              {payments.length === 0 ? (
+                <div className="text-center py-10 text-gray-500 text-xs italic">
+                  Nenhuma cota registrada no sistema ainda.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                  {payments.map((p) => (
+                    <div key={p.id} className="p-3.5 rounded-lg bg-black/60 border border-tibia-border/40 hover:border-green-500/40 transition-all text-xs flex flex-col justify-between gap-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-bold text-white text-sm flex items-center gap-2">
+                            <span>{p.character_name}</span>
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">
+                              Cota Paga
+                            </span>
+                          </p>
+                          {p.proof_url_or_notes && (
+                            <p className="text-gray-400 text-xs mt-0.5">{p.proof_url_or_notes}</p>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className="font-black text-green-400 text-sm">
+                            + {Number(p.amount).toLocaleString('pt-BR')} {p.currency}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-gray-500 border-t border-tibia-border/20 pt-2">
+                        <span>Data: {toBrtDateStr(p.transaction_date || p.created_at)}</span>
+                        <span>Válido até: <strong className="text-gray-300">{toBrtDateStr(p.cycle_end)}</strong></span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ABA 6: Votações de Prioridade de Perks */}
+      {activeTab === 'polls' && (
+        <div className="space-y-6">
+          {/* Header da Aba */}
+          <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-6 shadow-inner flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-medieval text-yellow-500 flex items-center gap-2">
+                <Vote className="text-amber-400" size={22} />
+                Votações de Prioridade de Perks
+              </h3>
+              <p className="text-xs text-gray-400 mt-1 max-w-2xl">
+                Decisão coletiva da guilda: escolha quais novos bônus ou melhorias devem ser ativados primeiro. Cada personagem participante tem direito a 1 voto por enquete.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {isAdmin && (
+                <button
+                  onClick={() => setPollModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded-lg transition-all shadow-md"
+                >
+                  <Plus size={16} />
+                  <span>Criar Nova Votação</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filtros de Votação */}
+          <div className="flex items-center gap-2 border-b border-tibia-border/40 pb-2">
+            <button
+              onClick={() => setPollFilter('ALL')}
+              className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+                pollFilter === 'ALL'
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-black/40 text-gray-400 hover:text-white border border-tibia-border/30'
+              }`}
+            >
+              Todas ({polls.length})
+            </button>
+            <button
+              onClick={() => setPollFilter('OPEN')}
+              className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${
+                pollFilter === 'OPEN'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-black/40 text-green-400/70 hover:text-green-400 border border-tibia-border/30'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Abertas ({polls.filter(p => p.status === 'OPEN').length})
+            </button>
+            <button
+              onClick={() => setPollFilter('CLOSED')}
+              className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+                pollFilter === 'CLOSED'
+                  ? 'bg-gray-600 text-white'
+                  : 'bg-black/40 text-gray-400 hover:text-white border border-tibia-border/30'
+              }`}
+            >
+              Encerradas ({polls.filter(p => p.status === 'CLOSED').length})
+            </button>
+          </div>
+
+          {/* Lista de Votações */}
+          {polls.filter(p => pollFilter === 'ALL' || p.status === pollFilter).length === 0 ? (
+            <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-12 text-center text-gray-500 italic">
+              Nenhuma enquete encontrada para o filtro selecionado.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {polls
+                .filter(p => pollFilter === 'ALL' || p.status === pollFilter)
+                .map((poll) => {
+                  const isOpen = poll.status === 'OPEN';
+                  const pollVotesList = votes.filter(v => v.poll_id === poll.id);
+                  const totalPollVotes = pollVotesList.length || poll.options?.reduce((acc, opt) => acc + (opt.votes_count || 0), 0) || 0;
+                  const feedback = votingFeedback[poll.id];
+
+                  // Opções com votos calculados
+                  const opts = (poll.options || []).map(opt => {
+                    const optVotes = pollVotesList.length > 0 
+                      ? pollVotesList.filter(v => v.option_id === opt.id).length 
+                      : (opt.votes_count || 0);
+                    const pct = totalPollVotes > 0 ? Math.round((optVotes / totalPollVotes) * 100) : 0;
+                    return { ...opt, computedVotes: optVotes, pct };
+                  });
+
+                  return (
+                    <div 
+                      key={poll.id} 
+                      className={`bg-black/50 border rounded-xl p-6 shadow-xl relative transition-all ${
+                        isOpen ? 'border-amber-500/60 shadow-amber-950/20' : 'border-tibia-border/60 opacity-90'
+                      }`}
+                    >
+                      {/* Topo do Card */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-tibia-border/40 pb-4 mb-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            {isOpen ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-green-500/20 text-green-400 border border-green-500/30">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse" />
+                                Votação Aberta
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                                <CheckCircle size={12} className="mr-1" />
+                                Votação Encerrada
+                              </span>
+                            )}
+                            <span className="text-xs text-gray-400">
+                              {toBrtDateStr(poll.created_at)}
+                            </span>
+                          </div>
+
+                          <h4 className="text-lg font-medieval text-yellow-400">
+                            {poll.title}
+                          </h4>
+                          {poll.description && (
+                            <p className="text-xs text-gray-300 mt-1 max-w-2xl">
+                              {poll.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 self-start sm:self-center">
+                          <div className="px-3 py-1.5 bg-black/60 border border-tibia-border/40 rounded text-center">
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Total de Votos</span>
+                            <span className="text-base font-black text-white">{totalPollVotes}</span>
+                          </div>
+
+                          {isAdmin && (
+                            <div className="flex items-center gap-1.5">
+                              {isOpen && (
+                                <button
+                                  onClick={() => handleClosePoll(poll)}
+                                  disabled={adminActionLoading}
+                                  className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-black font-bold text-xs rounded transition-all shadow"
+                                  title="Encerrar Votação e Declarar Vencedor"
+                                >
+                                  Encerrar
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeletePoll(poll)}
+                                disabled={adminActionLoading}
+                                className="p-1.5 bg-red-950/40 hover:bg-red-900 border border-red-500/40 text-red-300 rounded transition-all"
+                                title="Excluir Votação"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Vencedor Declarado (se houver) */}
+                      {(!isOpen || poll.winner_option_title) && (
+                        <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-amber-500/20 border border-amber-500/50 rounded-lg p-3.5 mb-5 flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-amber-500/20 text-yellow-400 border border-amber-500/40">
+                            <Award size={20} />
+                          </div>
+                          <div>
+                            <span className="text-[11px] uppercase font-black text-amber-400 tracking-wider block">
+                              🏆 Opção Vencedora Definida
+                            </span>
+                            <span className="text-base font-bold text-white">
+                              {poll.winner_option_title || 'Aguardando apuração final'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Lista de Opções & Barras de Progresso */}
+                      <div className="space-y-3 mb-5">
+                        {opts.map((opt) => {
+                          const isSelected = selectedPollOption[poll.id] === opt.id;
+                          return (
+                            <div
+                              key={opt.id}
+                              onClick={() => isOpen && setSelectedPollOption(prev => ({ ...prev, [poll.id]: opt.id }))}
+                              className={`relative p-3 rounded-lg border transition-all overflow-hidden ${
+                                isOpen ? 'cursor-pointer' : 'cursor-default'
+                              } ${
+                                isSelected
+                                  ? 'bg-amber-950/30 border-amber-500 ring-1 ring-amber-500'
+                                  : 'bg-black/60 border-tibia-border/40 hover:border-tibia-border/80'
+                              }`}
+                            >
+                              {/* Barra de Progresso de Fundo */}
+                              <div
+                                className="absolute left-0 top-0 bottom-0 bg-amber-500/15 transition-all duration-500 ease-out pointer-events-none"
+                                style={{ width: `${opt.pct}%` }}
+                              />
+
+                              <div className="relative z-10 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                  {isOpen && (
+                                    <input
+                                      type="radio"
+                                      name={`poll_${poll.id}`}
+                                      checked={isSelected}
+                                      onChange={() => setSelectedPollOption(prev => ({ ...prev, [poll.id]: opt.id }))}
+                                      className="accent-amber-500 w-4 h-4 cursor-pointer"
+                                    />
+                                  )}
+                                  <div>
+                                    <p className="font-bold text-white text-sm">{opt.title}</p>
+                                    {opt.description && (
+                                      <p className="text-xs text-gray-400">{opt.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="text-right flex-shrink-0">
+                                  <span className="text-sm font-black text-amber-400 font-mono">
+                                    {opt.pct}%
+                                  </span>
+                                  <span className="text-[11px] text-gray-400 block">
+                                    {opt.computedVotes} {opt.computedVotes === 1 ? 'voto' : 'votos'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Área de Votação (Apenas se Enquete Aberta) */}
+                      {isOpen && (
+                        <div className="bg-black/70 border border-tibia-border/60 rounded-lg p-4">
+                          <h5 className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <Vote size={14} className="text-amber-400" />
+                            Registrar seu Voto
+                          </h5>
+
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                            <input
+                              type="text"
+                              placeholder="Nome do seu personagem..."
+                              value={votingCharName}
+                              onChange={(e) => setVotingCharName(e.target.value)}
+                              className="flex-1 bg-black/90 border border-tibia-border/80 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
+                            />
+
+                            <button
+                              onClick={() => handleCastVote(poll.id)}
+                              disabled={adminActionLoading}
+                              className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded transition-all shadow-md flex items-center justify-center gap-2 flex-shrink-0"
+                            >
+                              <Check size={14} />
+                              <span>Confirmar Voto</span>
+                            </button>
+                          </div>
+
+                          {feedback && (
+                            <div className={`mt-3 p-2.5 rounded text-xs flex items-center gap-2 ${
+                              feedback.type === 'success'
+                                ? 'bg-green-950/40 border border-green-500/40 text-green-300'
+                                : 'bg-red-950/40 border border-red-500/40 text-red-300'
+                            }`}>
+                              {feedback.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                              <span>{feedback.text}</span>
+                            </div>
+                          )}
+
+                          <p className="text-[11px] text-gray-500 mt-2">
+                            * Regra: Máximo de 1 voto por personagem. Todos os votos são auditados e gravados com registro de data/hora.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ABAS DO ADMINISTRADOR */}
 
       {/* ADMIN ABA 1: Solicitações Pendentes */}
@@ -1364,6 +2257,195 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                 Cancelar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Registrar Upgrade / Gasto (Admin) */}
+      {expenseModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-tibia-card border-2 border-amber-500 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h4 className="text-lg font-medieval text-yellow-500 flex items-center gap-2">
+              <TrendingDown className="text-amber-400" size={18} />
+              Registrar Upgrade ou Gasto de Perk
+            </h4>
+            <p className="text-xs text-gray-300">
+              Registre a compra de itens, ativação de perks ou investimentos debitados do caixa da guilda.
+            </p>
+
+            <form onSubmit={handleCreateExpense} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
+                  Descrição do Upgrade / Investimento
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Upgrade Perk de XP Nível 2"
+                  value={expenseForm.description}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">Valor Gasto</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0.01"
+                    placeholder="Ex: 100"
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">Moeda</label>
+                  <select
+                    value={expenseForm.currency}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, currency: e.target.value })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
+                  >
+                    <option value="RC">RC (Rubin Coins)</option>
+                    <option value="KK">KK (Gold / Milhões)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">Observações / Comprovante</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Itens adquiridos no NPC de Venore"
+                  value={expenseForm.proof_notes}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, proof_notes: e.target.value })}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={adminActionLoading}
+                  className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded transition-all"
+                >
+                  Confirmar Investimento
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExpenseModalOpen(false)}
+                  className="px-4 py-2 bg-black/60 hover:bg-black/80 border border-tibia-border/60 text-gray-300 rounded text-xs"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Criar Nova Votação (Admin) */}
+      {pollModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-tibia-card border-2 border-amber-500 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <h4 className="text-lg font-medieval text-yellow-500 flex items-center gap-2">
+              <Vote className="text-amber-400" size={18} />
+              Criar Nova Votação de Prioridade
+            </h4>
+            <p className="text-xs text-gray-300">
+              Defina a pergunta e as opções de perks que os membros da guilda irão votar.
+            </p>
+
+            <form onSubmit={handleCreatePoll} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
+                  Título da Votação / Pergunta
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Qual Perk devemos evoluir no próximo ciclo?"
+                  value={pollForm.title}
+                  onChange={(e) => setPollForm({ ...pollForm, title: e.target.value })}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
+                  Descrição / Contexto (Opcional)
+                </label>
+                <textarea
+                  rows="2"
+                  placeholder="Ex: Arrecadamos fundos suficientes para 1 perk tier 2 ou 2 perks tier 1. Votem na sua preferência."
+                  value={pollForm.description}
+                  onChange={(e) => setPollForm({ ...pollForm, description: e.target.value })}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-gray-300 uppercase">
+                    Opções de Voto (Mínimo 2)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddPollOption}
+                    className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
+                  >
+                    <Plus size={13} />
+                    Adicionar Opção
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {pollForm.options.map((opt, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 font-mono w-5 text-right">{idx + 1}.</span>
+                      <input
+                        type="text"
+                        placeholder={`Opção ${idx + 1} (ex: Bônus de XP +3%)`}
+                        value={opt}
+                        onChange={(e) => handlePollOptionChange(idx, e.target.value)}
+                        className="flex-1 bg-black/80 border border-tibia-border/60 rounded px-3 py-1.5 text-sm text-white focus:border-amber-400 focus:outline-none"
+                        required
+                      />
+                      {pollForm.options.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePollOption(idx)}
+                          className="p-1.5 text-red-400 hover:text-red-300 rounded hover:bg-red-950/40"
+                          title="Remover Opção"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-tibia-border/40">
+                <button
+                  type="submit"
+                  disabled={adminActionLoading}
+                  className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded transition-all"
+                >
+                  Publicar Votação
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPollModalOpen(false)}
+                  className="px-4 py-2 bg-black/60 hover:bg-black/80 border border-tibia-border/60 text-gray-300 rounded text-xs"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
