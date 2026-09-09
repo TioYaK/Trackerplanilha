@@ -7,3 +7,5 @@ loop.bat
 run_worker.vbs
 run_worker.bat
 *.html
+*.lock
+.*.lock
