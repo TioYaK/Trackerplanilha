@@ -48,11 +48,46 @@ export const runFetchOnlines = async () => {
       console.log(`[JOB] Rastreador de Makers: ${loggedIn.length} Logins, ${loggedOut.length} Logouts registrados.`);
     }
 
-    // Atualiza status online dos Hunteds
-    const { data: huntedList } = await supabase.from('hunted_list').select('id, name, is_online');
+    // Atualiza status online dos Hunteds & Radar Tático
+    const { data: huntedList } = await supabase.from('hunted_list').select('id, name, reason, is_online');
     const onlineSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
 
     if (huntedList && huntedList.length > 0) {
+      // Detecta novos logins de alvos (estavam offline e acabaram de logar)
+      const newlyOnlineHunteds = huntedList.filter(h => h.name && onlineSet.has(h.name.toLowerCase()) && !h.is_online);
+
+      if (newlyOnlineHunteds.length > 0) {
+        const huntedNames = newlyOnlineHunteds.map(h => h.name).join(', ');
+        console.log(`\n[TACTICAL RADAR] 🚨 ALERTA: ${newlyOnlineHunteds.length} Alvo(s) Hunted/Rival detectados ONLINE: ${huntedNames}`);
+
+        // Disparo para Webhook do Discord (se configurado)
+        try {
+          const { data: webhookConfig } = await supabase.from('webhook_settings').select('discord_url').eq('id', 1).maybeSingle();
+          if (webhookConfig && webhookConfig.discord_url) {
+            const axios = (await import('axios')).default;
+            const targetDetails = newlyOnlineHunteds.map(h => `• **${h.name}** \`[${h.reason || 'Hunted'}]\``).join('\n');
+            await axios.post(webhookConfig.discord_url, {
+              username: 'Radar Tático (BattleStorm)',
+              avatar_url: 'https://rubinot.com.br/favicon.ico',
+              embeds: [{
+                title: '🚨 [RADAR TÁTICO] ALVO INIMIGO DETECTADO ONLINE!',
+                description: `O radar de satélite detectou a conexão imediata de alvos na lista negra:\n\n${targetDetails}\n\n*Preparem as traps e posicionem os scouts!*`,
+                color: 15158332, // Vermelho de Alerta
+                fields: [
+                  { name: 'Mundo', value: 'Auroria', inline: true },
+                  { name: 'Total Online', value: `${onlinePlayers.length} players`, inline: true },
+                  { name: 'Horário', value: new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: true }
+                ],
+                footer: { text: 'Auroria Telemetry Radar • Sistema de Defesa Automatizado' },
+                timestamp: new Date().toISOString()
+              }]
+            }).catch(e => console.warn('[JOB] Erro ao enviar webhook do radar tático:', e.message));
+          }
+        } catch (e) {
+          console.warn('[JOB] Erro na integração Discord do radar:', e.message);
+        }
+      }
+
       const huntedOnlineIds = huntedList
         .filter(h => h.name && onlineSet.has(h.name.toLowerCase()))
         .map(h => h.id);

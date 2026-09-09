@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldAlert, Crosshair, UserPlus, Clock, Trash2, Skull } from 'lucide-react';
+import { ShieldAlert, Crosshair, UserPlus, Clock, Trash2, Skull, Volume2, VolumeX, Radio } from 'lucide-react';
 import { parseUtcDate } from '../lib/tibiaUtils';
+import { soundFX } from '../lib/soundEffects';
 
 export default function RadarHunters({ isAdmin }) {
   const [huntedList, setHuntedList] = useState([]);
@@ -9,11 +10,37 @@ export default function RadarHunters({ isAdmin }) {
   const [newName, setNewName] = useState('');
   const [newReason, setNewReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(soundFX.isEnabled());
+  const [activeAlert, setActiveAlert] = useState(null);
 
   useEffect(() => {
     fetchHunted();
     const interval = setInterval(fetchHunted, 30000); // Poll a cada 30s
-    return () => clearInterval(interval);
+
+    // Assinatura em tempo real para detectar logins de hunteds instantaneamente
+    const channel = supabase
+      .channel('radar_hunteds_live')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'hunted_list' }, (payload) => {
+        const { new: newRow, old: oldRow } = payload;
+        if (newRow && oldRow && newRow.is_online && !oldRow.is_online) {
+          soundFX.playEnemyAlert();
+          setActiveAlert({
+            name: newRow.name,
+            reason: newRow.reason || 'Inimigo da Guilda',
+            time: new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+          });
+          setTimeout(() => {
+            setActiveAlert(null);
+          }, 9000);
+        }
+        fetchHunted();
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const [xpData, setXpData] = useState({});
@@ -105,6 +132,11 @@ export default function RadarHunters({ isAdmin }) {
     }
   };
 
+  const handleToggleAudio = () => {
+    const newState = soundFX.toggle();
+    setAudioEnabled(newState);
+  };
+
   if (loading) {
     return <div className="p-8 text-center text-tibia-primary font-medieval">Carregando Radar...</div>;
   }
@@ -113,15 +145,56 @@ export default function RadarHunters({ isAdmin }) {
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto w-full animate-fade-in">
-      <div className="flex items-center gap-4 mb-8 border-b border-red-900/30 pb-4">
-        <Crosshair className="text-red-500 w-10 h-10" />
-        <div>
-          <h2 className="text-4xl font-medieval text-red-500 tracking-wider">Radar de Hunteds</h2>
-          <p className="text-gray-400 font-sans mt-1">
-            Monitoramento em tempo real de inimigos e membros de guildas rivais.
-          </p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-red-900/30 pb-4">
+        <div className="flex items-center gap-4">
+          <Crosshair className="text-red-500 w-10 h-10" />
+          <div>
+            <h2 className="text-4xl font-medieval text-red-500 tracking-wider">Radar de Hunteds</h2>
+            <p className="text-gray-400 font-sans mt-1">
+              Monitoramento em tempo real de inimigos e membros de guildas rivais com Alarme Tático.
+            </p>
+          </div>
         </div>
+
+        {/* CONTROLE DE ALERTA SONORO (PILAR III) */}
+        <button
+          onClick={handleToggleAudio}
+          className={`flex items-center px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
+            audioEnabled 
+              ? 'bg-red-950/70 border-red-500 text-red-300 shadow-lg shadow-red-950/50 animate-pulse' 
+              : 'bg-black/60 border-tibia-border text-gray-400 hover:text-white'
+          }`}
+          title={audioEnabled ? 'Sonar tático ativo (clique para mutar)' : 'Sonar tático silenciado (clique para ativar)'}
+        >
+          {audioEnabled ? <Volume2 size={16} className="mr-2 text-red-400" /> : <VolumeX size={16} className="mr-2" />}
+          {audioEnabled ? 'Sonar Ativo (Som Ligado)' : 'Sonar Mudo (Som Desligado)'}
+        </button>
       </div>
+
+      {/* BANNER DE INVASÃO / ALERTA AO VIVO (PILAR III) */}
+      {activeAlert && (
+        <div className="mb-6 p-4 bg-gradient-to-r from-red-950/95 via-red-900/90 to-red-950/95 border-2 border-red-500 rounded-lg shadow-2xl animate-bounce flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-600 rounded-full animate-ping">
+              <Crosshair size={22} className="text-white" />
+            </div>
+            <div>
+              <h4 className="text-lg font-medieval text-white flex items-center gap-2">
+                🚨 ALVO INIMIGO ONLINE: <span className="text-yellow-300 font-bold">{activeAlert.name}</span>
+              </h4>
+              <p className="text-xs text-red-200">
+                Motivo: {activeAlert.reason} • Conectado às {activeAlert.time} (Alerta Tático Sonoro Disparado)
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setActiveAlert(null)}
+            className="px-3 py-1 bg-black/50 hover:bg-black/80 border border-red-400/40 rounded text-xs text-red-200"
+          >
+            Dispensar
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
