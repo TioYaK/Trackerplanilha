@@ -9,6 +9,7 @@ import { supabase } from './db.js';
 import { exec } from 'child_process';
 import os from 'os';
 import fs from 'fs';
+import notifier from 'node-notifier';
 import { runFetchGuild } from './jobs/fetchGuild.js';
 import { runFetchOnlines } from './jobs/fetchOnlines.js';
 import { runFetchHighscores } from './jobs/fetchHighscores.js';
@@ -25,6 +26,7 @@ import { runSendDiscordReport } from './jobs/sendDiscordReport.js';
 import { runAuditBank } from './jobs/auditBank.js';
 import { runProcessAutoInvites } from './jobs/processAutoInvites.js';
 import { runArchiveSessions } from './jobs/archiveSessions.js';
+import { runValidateMakers } from './jobs/validateMakers.js';
 import { checkForUpdates } from './updater.js';
 import { applySelfHealingPatch } from './selfHeal.js';
 import { closeBrowser, isInMaintenance } from './lib/rubinotScraper.js';
@@ -478,10 +480,6 @@ supabase
       console.log('[REALTIME] 📡 Inscrito para receber comandos de Sincronização em Tempo Real.');
     }
   });
-import { runValidateMakers } from './jobs/validateMakers.js';
-
-import notifier from 'node-notifier';
-
 
   supabase
     .channel('guild_invites')

@@ -13,7 +13,7 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
   const [areas, setAreas] = useState([]);
 
   // Extrai as categorias dinâmicas das parties atuais E as categorias oficiais
-  const dynamicCategories = Array.from(new Set([...areas.map(a => a.name), ...parties.map(p => p.category)])).sort();
+  const dynamicCategories = Array.from(new Set([...areas.map(a => a?.name), ...parties.map(p => p?.category)])).filter(Boolean).sort();
 
   // Se a aba ativa atual não existe mais, seleciona a primeira disponível
   useEffect(() => {

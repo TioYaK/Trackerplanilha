@@ -131,23 +131,29 @@ export const runBankSync = async () => {
         
         const currentMonth = new Date().toISOString().slice(0, 7); // "2026-08"
 
-        // 1. Busca os pagamentos que o robô já registrou este mês
+        // 1. Busca os pagamentos já registrados este mês (por qualquer admin ou bot)
         const { data: existing } = await supabase.from('guild_bank_payments')
             .select('character_name')
-            .eq('payment_month', currentMonth)
-            .eq('admin_name', 'TS3_Sync');
+            .eq('payment_month', currentMonth);
 
-        const existingNames = new Set(existing?.map(e => e.character_name) || []);
+        const existingNames = new Set(existing?.map(e => e.character_name.toLowerCase()) || []);
 
-        // 2. Filtra apenas os usuários do TS que AINDA NÃO estão no banco
-        const inserts = paidUsers
-            .filter(u => !existingNames.has(u.Char_Extraido))
-            .map(u => ({
-                character_name: u.Char_Extraido,
-                payment_month: currentMonth,
-                amount: 250, // O user disse que é 250rc
-                admin_name: 'TS3_Sync'
-            }));
+        // 2. Filtra apenas os usuários do TS que AINDA NÃO estão no banco (deduplicando dentro do próprio lote)
+        const seenInBatch = new Set();
+        const inserts = [];
+        
+        for (const u of paidUsers) {
+            const lower = u.Char_Extraido.toLowerCase();
+            if (!existingNames.has(lower) && !seenInBatch.has(lower)) {
+                seenInBatch.add(lower);
+                inserts.push({
+                    character_name: u.Char_Extraido,
+                    payment_month: currentMonth,
+                    amount: 250,
+                    admin_name: 'TS3_Sync'
+                });
+            }
+        }
 
         if (inserts.length > 0) {
             const { error } = await supabase.from('guild_bank_payments').insert(inserts);

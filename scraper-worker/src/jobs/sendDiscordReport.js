@@ -23,13 +23,14 @@ export const runSendDiscordReport = async () => {
         // 1. Coleta de Dados (Macro)
         // ===================================
         const { data: census } = await supabase.from('view_macro_census').select('*').single();
-        const { data: parties } = await supabase.from('parties_planilhadas').select('id').eq('date_str', todayStr);
+        const { count: partiesCount } = await supabase.from('parties_planilhadas').select('*', { count: 'exact', head: true });
         
         let report = `📰 **RELATÓRIO DIÁRIO DE GUILDA** 📰\n\n`;
         
         report += `📊 **CENSO MACRO:**\n`;
-        report += `- Membros Ativos Hoje: ${census?.ativos_7_dias || 0}\n`;
-        report += `- Total de PTs Agendadas: ${parties?.length || 0} PTs\n\n`;
+        report += `- Total de Membros: ${census?.total_members || 0}\n`;
+        report += `- Membros Ativos (7 dias): ${census?.active_members || 0}\n`;
+        report += `- Total de PTs Agendadas: ${partiesCount || 0} PTs\n\n`;
 
         // ===================================
         // 2. Coleta de Dados (Rushadores)

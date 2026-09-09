@@ -18,7 +18,7 @@ export const checkForUpdates = async () => {
                         if (oldHash && newHash && oldHash !== newHash) {
                             console.log(`[UPDATER] 🚀 Nova versão detectada no GitHub (${oldHash.slice(0, 7)} -> ${newHash.slice(0, 7)})!`);
                             console.log('[UPDATER] Atualizando código com git reset --hard...');
-                            exec('git reset --hard origin/main && git clean -fd', () => {
+                            exec('git reset --hard origin/main', () => {
                                 console.log('[UPDATER] Executando npm install e reiniciando...');
                                 exec('npm install', () => {
                                     console.log('[UPDATER] ✅ Atualização concluída. Reiniciando processo...');

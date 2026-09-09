@@ -88,8 +88,14 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
       const lastSSTime = getLastSS();
 
-      const orFilterName = party.members.map(m => 'name.ilike.' + m).join(',');
-      const orFilterChar = party.members.map(m => 'character_name.ilike.' + m).join(',');
+      const validMembers = (party.members || []).filter(m => m && typeof m === 'string' && m.trim().length > 0);
+      if (validMembers.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      const orFilterName = validMembers.map(m => 'name.ilike.' + m.trim()).join(',');
+      const orFilterChar = validMembers.map(m => 'character_name.ilike.' + m.trim()).join(',');
 
       // 1. Busca histórico de sessões
       let logs = [];
@@ -193,12 +199,12 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
       // 5. Calcula estatísticas individuais dos membros
       const memberStats = {};
-      party.members.forEach(m => {
+      validMembers.forEach(m => {
         memberStats[m.toLowerCase()] = { name: m, totalXpGained: 0, level: '?', lastSeen: null, isOnlineRoster: false };
       });
       
       guildData.forEach(g => {
-        const m = memberStats[g.name.toLowerCase()];
+        const m = memberStats[g.name?.toLowerCase()];
         if (m) {
           if (g.level) m.level = g.level;
           if (g.is_online !== undefined && g.is_online !== null) {
@@ -210,7 +216,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       // Checa se há XP no Server Save de hoje
       let todayHasXp = false;
       currentStates.forEach(state => {
-        const m = memberStats[state.character_name.toLowerCase()];
+        const m = memberStats[state.character_name?.toLowerCase()];
         if (m) {
           m.level = state.level || m.level;
           const lastActive = parseDate(state.last_active);
@@ -231,7 +237,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       logs.forEach(log => {
         const date = parseDate(log.session_end);
         const dxp = parseInt(log.xp_gained || 0, 10);
-        const m = memberStats[log.character_name.toLowerCase()];
+        const m = memberStats[log.character_name?.toLowerCase()];
         if (date && date.getTime() >= lastSSTime && m && dxp > 0) {
           m.totalXpGained += dxp;
           m.level = log.end_level || m.level;
@@ -245,7 +251,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       if (!todayHasXp && chartDataArr.length > 0) {
         const lastHunt = chartDataArr[chartDataArr.length - 1];
         activeLabel = `Rendimento Individual (Última Hunt - ${lastHunt.day})`;
-        party.members.forEach(mName => {
+        validMembers.forEach(mName => {
           const mKey = mName.toLowerCase();
           const lastXp = lastHunt.memberXp[mKey] || 0;
           if (memberStats[mKey]) {

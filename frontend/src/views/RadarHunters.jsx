@@ -37,10 +37,11 @@ export default function RadarHunters({ isAdmin }) {
             const xpMap = {};
             for (let i = 0; i < names.length; i += 100) {
               const chunk = names.slice(i, i + 100);
+              const orChar = chunk.map(n => 'character_name.ilike.' + n.trim()).join(',');
               const { data: states } = await supabase
                 .from('current_character_state')
                 .select('character_name, xp_total, session_start_xp, last_active')
-                .in('character_name', chunk);
+                .or(orChar);
 
               if (states) {
                 states.forEach(state => {

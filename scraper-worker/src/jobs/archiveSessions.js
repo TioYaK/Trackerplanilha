@@ -72,6 +72,24 @@ export const runArchiveSessions = async () => {
       resetCount += chunk.length;
     }
     console.log(`[ARCHIVE] ✅ ${resetCount} registros de session_start_xp resetados para o novo SS.`);
+
+    // ── 3. Limpeza de Retenção (Guardian do Banco Supabase - 500MB Limit) ────
+    try {
+      const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+      const { error: purgeErr } = await supabase
+        .from('login_events')
+        .delete()
+        .lt('event_time', fourteenDaysAgo);
+      if (!purgeErr) {
+        console.log('[ARCHIVE] 🧹 Limpeza de login_events anteriores a 14 dias concluída.');
+      }
+
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.from('guild_strikes').delete().lt('expires_at', thirtyDaysAgo);
+    } catch (cleanErr) {
+      console.warn('[ARCHIVE] Aviso na limpeza de retenção:', cleanErr.message);
+    }
+
     console.log('[ARCHIVE] ✔ Arquivamento concluído.');
 
   } catch (err) {
