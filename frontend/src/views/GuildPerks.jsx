@@ -203,25 +203,30 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     let totalKkIn = 0;
     payments.forEach(p => {
       const amt = Number(p.amount) || 0;
-      if (p.currency === 'RC') totalRcIn += amt;
-      else if (p.currency === 'KK') totalKkIn += amt;
+      const curr = (p.currency || 'RC').toUpperCase();
+      if (curr === 'RC') totalRcIn += amt;
+      else if (curr === 'KK') totalKkIn += amt;
     });
 
     let totalRcOut = 0;
     let totalKkOut = 0;
     expenses.forEach(e => {
       const amt = Number(e.amount) || 0;
-      if (e.currency === 'RC') totalRcOut += amt;
-      else if (e.currency === 'KK') totalKkOut += amt;
+      const curr = (e.currency || 'RC').toUpperCase();
+      if (curr === 'RC') totalRcOut += amt;
+      else if (curr === 'KK') totalKkOut += amt;
     });
 
+    const rcBalance = Math.round((totalRcIn - totalRcOut) * 100) / 100;
+    const kkBalance = Math.round((totalKkIn - totalKkOut) * 100) / 100;
+
     return {
-      totalRcIn,
-      totalKkIn,
-      totalRcOut,
-      totalKkOut,
-      rcBalance: totalRcIn - totalRcOut,
-      kkBalance: totalKkIn - totalKkOut
+      totalRcIn: Math.round(totalRcIn * 100) / 100,
+      totalKkIn: Math.round(totalKkIn * 100) / 100,
+      totalRcOut: Math.round(totalRcOut * 100) / 100,
+      totalKkOut: Math.round(totalKkOut * 100) / 100,
+      rcBalance,
+      kkBalance
     };
   }, [payments, expenses]);
 
@@ -573,19 +578,19 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
   // Ações de Transparência: Registrar Gasto / Investimento de Perk
   const handleCreateExpense = async (e) => {
     e.preventDefault();
-    if (!expenseForm.description.trim() || !expenseForm.amount) {
-      alert('Preencha a descrição e o valor do investimento.');
+    const amountNum = parseFloat(expenseForm.amount);
+    if (!expenseForm.description.trim() || isNaN(amountNum) || amountNum <= 0) {
+      alert('Preencha a descrição e um valor numérico positivo para o investimento.');
       return;
     }
     setAdminActionLoading(true);
     try {
-      const amountNum = parseFloat(expenseForm.amount);
       const { error } = await supabase
         .from('guild_perk_expenses')
         .insert({
           description: expenseForm.description.trim(),
           amount: amountNum,
-          currency: expenseForm.currency,
+          currency: (expenseForm.currency || 'RC').toUpperCase(),
           proof_notes: expenseForm.proof_notes.trim() || null,
           registered_by: 'ADMIN'
         });
@@ -595,7 +600,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         character_name: 'SISTEMA/ADMIN',
         event_type: 'EXPENSE_REGISTERED',
         actor: 'ADMIN',
-        details: `Registrado investimento em perk: ${expenseForm.description} (${amountNum} ${expenseForm.currency}).`
+        details: `Registrado investimento em perk: ${expenseForm.description} (${amountNum} ${(expenseForm.currency || 'RC').toUpperCase()}).`
       });
 
       setExpenseForm({ description: '', amount: '', currency: 'RC', proof_notes: '' });
@@ -670,6 +675,11 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       alert('Adicione pelo menos 2 opções para a votação.');
       return;
     }
+    const uniqueOptions = Array.from(new Set(validOptions));
+    if (uniqueOptions.length < 2) {
+      alert('As opções de voto devem ser distintas entre si.');
+      return;
+    }
     setAdminActionLoading(true);
     try {
       // 1. Cria enquete
@@ -686,7 +696,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       if (pollErr) throw pollErr;
 
       // 2. Insere opções
-      const optionsToInsert = validOptions.map(title => ({
+      const optionsToInsert = uniqueOptions.map(title => ({
         poll_id: pollData.id,
         title,
         votes_count: 0
@@ -694,14 +704,17 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       const { error: optErr } = await supabase
         .from('guild_perk_poll_options')
         .insert(optionsToInsert);
-      if (optErr) throw optErr;
+      if (optErr) {
+        await supabase.from('guild_perk_polls').delete().eq('id', pollData.id);
+        throw optErr;
+      }
 
       // 3. Log Forense
       await supabase.from('guild_perk_audit_logs').insert({
         character_name: 'SISTEMA/ADMIN',
         event_type: 'POLL_CREATED',
         actor: 'ADMIN',
-        details: `Criada nova votação de perks: "${pollForm.title}" com ${validOptions.length} opções.`
+        details: `Criada nova votação de perks: "${pollForm.title}" com ${uniqueOptions.length} opções.`
       });
 
       setPollForm({ title: '', description: '', options: ['', ''] });
@@ -802,7 +815,11 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       });
       optsWithCounts.sort((a, b) => b.computedVotes - a.computedVotes);
       const topOpt = optsWithCounts[0];
-      const winnerTitle = topOpt && topOpt.computedVotes > 0 ? topOpt.title : 'Sem votos suficientes';
+      let winnerTitle = topOpt && topOpt.computedVotes > 0 ? topOpt.title : 'Sem votos suficientes';
+
+      if (optsWithCounts.length > 1 && optsWithCounts[0].computedVotes > 0 && optsWithCounts[0].computedVotes === optsWithCounts[1].computedVotes) {
+        winnerTitle = `Empate: ${optsWithCounts[0].title} & ${optsWithCounts[1].title} (${optsWithCounts[0].computedVotes} votos cada)`;
+      }
 
       const { error } = await supabase
         .from('guild_perk_polls')
@@ -1908,48 +1925,71 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                       </div>
 
                       {/* Área de Votação (Apenas se Enquete Aberta) */}
-                      {isOpen && (
-                        <div className="bg-black/70 border border-tibia-border/60 rounded-lg p-4">
-                          <h5 className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <Vote size={14} className="text-amber-400" />
-                            Registrar seu Voto
-                          </h5>
+                      {isOpen && (() => {
+                        const activeVoterChar = (votingCharName || charName).trim();
+                        const existingVote = activeVoterChar 
+                          ? votes.find(v => v.poll_id === poll.id && v.character_name.toLowerCase() === activeVoterChar.toLowerCase()) 
+                          : null;
+                        const votedOpt = existingVote ? poll.options?.find(o => o.id === existingVote.option_id) : null;
 
-                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                            <input
-                              type="text"
-                              placeholder="Nome do seu personagem..."
-                              value={votingCharName}
-                              onChange={(e) => setVotingCharName(e.target.value)}
-                              className="flex-1 bg-black/90 border border-tibia-border/80 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
-                            />
+                        return (
+                          <div className="bg-black/70 border border-tibia-border/60 rounded-lg p-4">
+                            <h5 className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                              <Vote size={14} className="text-amber-400" />
+                              Registrar seu Voto
+                            </h5>
 
-                            <button
-                              onClick={() => handleCastVote(poll.id)}
-                              disabled={adminActionLoading}
-                              className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded transition-all shadow-md flex items-center justify-center gap-2 flex-shrink-0"
-                            >
-                              <Check size={14} />
-                              <span>Confirmar Voto</span>
-                            </button>
+                            {existingVote ? (
+                              <div className="p-3 rounded-lg bg-green-950/40 border border-green-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                                <div className="flex items-center gap-2 text-green-300">
+                                  <CheckCircle2 size={16} className="text-green-400 flex-shrink-0" />
+                                  <span>
+                                    Voto computado para <strong>{existingVote.character_name}</strong>
+                                    {votedOpt ? <> na opção: <strong className="text-white">"{votedOpt.title}"</strong></> : '.'}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] text-green-400/80 font-mono self-end sm:self-auto">
+                                  {toBrtDateStr(existingVote.voted_at)}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                                <input
+                                  type="text"
+                                  placeholder="Nome do seu personagem..."
+                                  value={votingCharName}
+                                  onChange={(e) => setVotingCharName(e.target.value)}
+                                  className="flex-1 bg-black/90 border border-tibia-border/80 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
+                                />
+
+                                <button
+                                  onClick={() => handleCastVote(poll.id)}
+                                  disabled={adminActionLoading}
+                                  className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded transition-all shadow-md flex items-center justify-center gap-2 flex-shrink-0"
+                                >
+                                  <Check size={14} />
+                                  <span>Confirmar Voto</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {feedback && (
+                              <div className={`mt-3 p-2.5 rounded text-xs flex items-center gap-2 ${
+                                feedback.type === 'success'
+                                  ? 'bg-green-950/40 border border-green-500/40 text-green-300'
+                                  : 'bg-red-950/40 border border-red-500/40 text-red-300'
+                              }`}>
+                                {feedback.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                                <span>{feedback.text}</span>
+                              </div>
+                            )}
+
+                            <p className="text-[11px] text-gray-500 mt-2">
+                              * Regra: Máximo de 1 voto por personagem. Todos os votos são auditados e gravados com registro de data/hora.
+                            </p>
                           </div>
-
-                          {feedback && (
-                            <div className={`mt-3 p-2.5 rounded text-xs flex items-center gap-2 ${
-                              feedback.type === 'success'
-                                ? 'bg-green-950/40 border border-green-500/40 text-green-300'
-                                : 'bg-red-950/40 border border-red-500/40 text-red-300'
-                            }`}>
-                              {feedback.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                              <span>{feedback.text}</span>
-                            </div>
-                          )}
-
-                          <p className="text-[11px] text-gray-500 mt-2">
-                            * Regra: Máximo de 1 voto por personagem. Todos os votos são auditados e gravados com registro de data/hora.
-                          </p>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   );
                 })}

@@ -54,3 +54,10 @@ ALTER TABLE public.guild_perk_expenses DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.guild_perk_polls DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.guild_perk_poll_options DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.guild_perk_poll_votes DISABLE ROW LEVEL SECURITY;
+
+-- 5. Registro do Job de Auditoria Recorrente na fila de tarefas do Worker (a cada 30 min)
+INSERT INTO public.task_queue (task_type, status)
+SELECT 'AUDIT_GUILD_PERKS', 'PENDING'
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.task_queue WHERE task_type = 'AUDIT_GUILD_PERKS'
+);

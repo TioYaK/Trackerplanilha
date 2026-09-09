@@ -175,6 +175,7 @@ const completeTask = async (task) => {
     CLOSE_SESSIONS: 900,       // 15m (Encerramento de hunts inativas)
     FETCH_BAZAAR: 900,         // 15m (Sniper de Bazaar 4x mais frequente)
     FETCH_TRANSFERS: 1800,     // 30m (Detecção de jogadores transferidos)
+    AUDIT_GUILD_PERKS: 1800,   // 30m (Auditoria de 7d XP e fila de cargos de Perks)
     FETCH_GUILD: 3600,         // 1h (Membros e cargos oficiais)
   };
 
