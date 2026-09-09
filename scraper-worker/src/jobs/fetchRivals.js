@@ -12,36 +12,39 @@ export const runFetchRivals = async () => {
     if (!members || members.length === 0) return;
 
     // Busca os hunteds atuais para nao duplicar
-    const { data: currentHunted } = await supabase.from('hunted_list').select('id, name');
-    const huntedMap = new Map();
-    if (currentHunted) {
-        currentHunted.forEach(h => {
-          if (h && h.name) huntedMap.set(h.name.toLowerCase(), h);
-        });
-    }
+    const { data: currentHunted } = await supabase.from('hunted_list').select('name');
+    const huntedSet = new Set((currentHunted || []).filter(h => h && h.name).map(h => h.name.toLowerCase()));
 
-    let addedCount = 0;
     const now = new Date().toISOString();
+    const toInsert = [];
 
     for (const m of members) {
-        if (!m || !m.name) continue;
-        const lowerName = m.name.toLowerCase();
-        if (huntedMap.has(lowerName)) {
-           continue;
-        }
+      if (!m || !m.name) continue;
+      const lowerName = m.name.toLowerCase();
+      if (huntedSet.has(lowerName)) {
+        continue;
+      }
 
-        const { error } = await supabase.from('hunted_list').insert({
-            name: m.name,
-            reason: 'Guilda Rival (' + rivalName + ')',
-            added_by: 'Sistema (Bot)',
-            is_online: m.status === 'Online',
-            last_seen: m.status === 'Online' ? now : null
-        });
-
-        if (!error) addedCount++;
+      toInsert.push({
+        name: m.name,
+        reason: 'Guilda Rival (' + rivalName + ')',
+        added_by: 'Sistema (Bot)',
+        is_online: m.status === 'Online',
+        last_seen: m.status === 'Online' ? now : null
+      });
+      huntedSet.add(lowerName); // evita duplicatas dentro da própria lista retornada
     }
 
-    console.log('[JOB] Novos membros da guilda rival adicionados a Lista Negra: ' + addedCount);
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('hunted_list').insert(toInsert);
+      if (error) {
+        console.warn('[JOB] Erro ao inserir membros da guilda rival:', error.message);
+      } else {
+        console.log(`[JOB] Novos membros da guilda rival adicionados a Lista Negra: ${toInsert.length}`);
+      }
+    } else {
+      console.log('[JOB] Nenhum novo membro da guilda rival para adicionar.');
+    }
   } catch (error) {
     console.error('[JOB] Erro fetchRivals:', error.message);
   }

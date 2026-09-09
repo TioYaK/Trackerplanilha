@@ -26,18 +26,17 @@ export const runFetchDeaths = async () => {
         const { data: guildData } = await supabase.from('guild_members').select('name');
         const { data: huntedData } = await supabase.from('hunted_list').select('name');
         
-        const guildNames = (guildData || []).filter(m => m && m.name).map(m => m.name.toLowerCase());
-        const huntedNames = (huntedData || []).filter(h => h && h.name).map(h => h.name.toLowerCase());
+        const guildSet = new Set((guildData || []).filter(m => m && m.name).map(m => m.name.toLowerCase()));
+        const huntedSet = new Set((huntedData || []).filter(h => h && h.name).map(h => h.name.toLowerCase()));
 
-        let count = 0;
-        
+        const records = [];
         for (const death of deathsArray.slice(0, 50)) { // últimas 50
             const pName = death.name || death.victim || death.player_name || death.character_name;
             if (!pName) continue;
             
             const pNameLower = pName.toLowerCase();
-            const isGuild = guildNames.includes(pNameLower);
-            const isHunted = huntedNames.includes(pNameLower);
+            const isGuild = guildSet.has(pNameLower);
+            const isHunted = huntedSet.has(pNameLower);
             
             let deathTime = new Date();
             if (death.death_time || death.time || death.timestamp) {
@@ -60,22 +59,26 @@ export const runFetchDeaths = async () => {
                 }
             }
             
-            const record = {
+            records.push({
                 character_name: pName,
                 level: death.level || death.player_level || 0,
                 killed_by: death.killedBy || death.killed_by || death.info || death.reason || 'Unknown',
                 death_time: deathTime.toISOString(),
                 is_guild_member: isGuild,
                 is_hunted: isHunted
-            };
-
-            const { error } = await supabase.from('recent_deaths').insert(record);
-            if (!error) {
-                count++;
-            }
+            });
         }
         
-        console.log(`[JOB] Deaths finalizado. Salvos ${count} registros inéditos.`);
+        if (records.length > 0) {
+            const { error } = await supabase
+                .from('recent_deaths')
+                .upsert(records, { onConflict: 'character_name,death_time', ignoreDuplicates: true });
+            if (error) {
+                console.warn('[JOB] Erro ao salvar lote de mortes:', error.message);
+            } else {
+                console.log(`[JOB] Deaths finalizado. Lote de ${records.length} mortes processado.`);
+            }
+        }
     } catch (e) {
         console.error('[JOB] Erro crítico no FetchDeaths:', e);
     }
