@@ -11,6 +11,7 @@ import { findUniversalChrome, getLeanChromeArgs, cleanStaleLocks } from './stora
 let globalBrowser  = null;
 let guildPage      = null;
 let highscoresPage = null;
+let apiPage        = null;
 let isRestarting   = false;
 let cfRestartCount = 0;
 const MAX_CF_RESTARTS = 3;
@@ -18,6 +19,11 @@ const MAX_CF_RESTARTS = 3;
 // locks para evitar concorrência/navegações simultâneas na mesma página/aba do Puppeteer
 let guildPageLock = Promise.resolve();
 let highscoresPageLock = Promise.resolve();
+let apiPageLock = Promise.resolve();
+
+// ─── Micro-Cache em Memória (TTL 30s) para requisições de API ────────────────
+const _apiCache = new Map();
+const API_CACHE_TTL = 30 * 1000;
 
 // ─── Detecção de Cloudflare ───────────────────────────────────────────────────
 async function isCloudflareBlocked(page) {
@@ -77,11 +83,26 @@ function setMaintenanceMode(active) {
 // ─── Gerenciamento do Browser ─────────────────────────────────────────────────
 async function closeBrowser() {
     try {
+        if (apiPage)        { await apiPage.close().catch(() => {}); apiPage = null; }
         if (guildPage)      { await guildPage.close().catch(() => {}); guildPage = null; }
         if (highscoresPage) { await highscoresPage.close().catch(() => {}); highscoresPage = null; }
         if (globalBrowser)  { await globalBrowser.close().catch(() => {}); globalBrowser = null; }
+        _apiCache.clear();
     } catch (e) {
         console.error('[Scraper] Erro ao fechar browser:', e.message);
+    }
+}
+
+async function recycleBrowserPages() {
+    try {
+        console.log('[Scraper] 🧹 Reciclando abas do browser para liberar memória...');
+        if (apiPage)        { await apiPage.close().catch(() => {}); apiPage = null; }
+        if (guildPage)      { await guildPage.close().catch(() => {}); guildPage = null; }
+        if (highscoresPage) { await highscoresPage.close().catch(() => {}); highscoresPage = null; }
+        _apiCache.clear();
+        console.log('[Scraper] ✅ Abas recicladas com sucesso.');
+    } catch (e) {
+        console.warn('[Scraper] Erro ao reciclar abas:', e.message);
     }
 }
 
@@ -101,7 +122,7 @@ async function initBrowser() {
     const launchOpts = {
         headless: true,
         userDataDir: SCRAPER_PROFILE_DIR,
-        protocolTimeout: 60000,
+        protocolTimeout: 90000,
         args: getLeanChromeArgs([
             '--window-size=1920,1080',
             '--disable-gpu',
@@ -116,6 +137,8 @@ async function initBrowser() {
         globalBrowser  = null;
         guildPage      = null;
         highscoresPage = null;
+        apiPage        = null;
+        _apiCache.clear();
     });
     console.log('[Scraper] 🌐 Browser iniciado.');
 }
@@ -172,6 +195,21 @@ async function getHighscorePage() {
         await highscoresPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
     }
     return highscoresPage;
+}
+
+async function getApiPage() {
+    await initBrowser();
+    if (!apiPage || apiPage.isClosed()) {
+        apiPage = await globalBrowser.newPage();
+        await blockHeavyAssets(apiPage);
+        await apiPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        try {
+            await safeGoto(apiPage, 'https://rubinot.com.br/deaths', { timeout: 20000 });
+        } catch (e) {
+            console.warn('[Scraper API] Aviso ao inicializar apiPage:', e.message);
+        }
+    }
+    return apiPage;
 }
 
 // ─── Navegação com proteção Cloudflare ───────────────────────────────────────
@@ -1062,20 +1100,37 @@ async function scrapeOnlines(world = 'Auroria') {
     }
 }
 
-// ─── API FETCH (Next.js bypass) ───────────────────────────────────────────────
+// ─── API FETCH (Next.js bypass com aba isolada e micro-cache) ─────────────────
 async function fetchRubinotApi(endpoint) {
+    if (!endpoint) return null;
+
+    // 1. Checagem de Micro-Cache em Memória (TTL 30s)
+    const cached = _apiCache.get(endpoint);
+    if (cached && Date.now() < cached.expiresAt) {
+        return cached.data;
+    }
+
+    // 2. Lock sequencial exclusivo para a aba de API
+    let release;
+    const nextLock = new Promise(r => release = r);
+    const prevLock = apiPageLock;
+    apiPageLock = apiPageLock.then(() => nextLock);
+    await prevLock;
+
     try {
         await initBrowser();
-        const page = await getGuildPage();
+        const page = await getApiPage();
         const currentUrl = page.url();
         if (!currentUrl || !currentUrl.includes('rubinot.com.br')) {
-            const html = await safeGoto(page, 'https://rubinot.com.br/deaths');
-            if (!html) throw new Error('Cloudflare bloqueou o acesso.');
+            const html = await safeGoto(page, 'https://rubinot.com.br/deaths', { timeout: 20000 });
+            if (!html) throw new Error('Cloudflare bloqueou o acesso à API.');
         }
-        const data = await page.evaluate(async (url) => {
+
+        // Executa fetch interno com timeout estrito de 10s via Promise.race
+        const fetchPromise = page.evaluate(async (url) => {
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
                 const res = await fetch(url, { signal: controller.signal });
                 clearTimeout(timeoutId);
                 if (!res.ok) return null;
@@ -1086,10 +1141,34 @@ async function fetchRubinotApi(endpoint) {
                 return null;
             }
         }, endpoint);
+
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('CDP evaluation timeout (10s)')), 10000)
+        );
+
+        const data = await Promise.race([fetchPromise, timeoutPromise]);
+
+        if (data) {
+            _apiCache.set(endpoint, { data, expiresAt: Date.now() + API_CACHE_TTL });
+            if (_apiCache.size > 200) {
+                const now = Date.now();
+                for (const [k, v] of _apiCache.entries()) {
+                    if (now > v.expiresAt) _apiCache.delete(k);
+                }
+            }
+        }
+
         return data;
     } catch (e) {
         console.error('[Scraper API] Erro ao buscar', endpoint, e.message);
+        // Se a aba de API falhar ou travar o CDP, descarta para a próxima recriar do zero
+        if (apiPage) {
+            await apiPage.close().catch(() => {});
+            apiPage = null;
+        }
         return null;
+    } finally {
+        release();
     }
 }
 
@@ -1101,6 +1180,7 @@ export {
     fetchRubinotEveCharacter,
     scrapeRubinotCharacterPage,
     closeBrowser,
+    recycleBrowserPages,
     scrapeOnlines,
     fetchRubinotApi,
     isInMaintenance

@@ -31,7 +31,7 @@ import { runArchiveSessions } from './jobs/archiveSessions.js';
 import { runValidateMakers } from './jobs/validateMakers.js';
 import { checkForUpdates } from './updater.js';
 import { applySelfHealingPatch } from './selfHeal.js';
-import { closeBrowser, isInMaintenance } from './lib/rubinotScraper.js';
+import { closeBrowser, isInMaintenance, recycleBrowserPages } from './lib/rubinotScraper.js';
 import { runFullStorageMaintenance, getDiskHealth, cleanWorkerProfileCaches } from './lib/storageGuardian.js';
 
 applySelfHealingPatch();
@@ -166,6 +166,7 @@ let sessionStats = {};
 let isProcessingTask = false;
 let currentTaskType = 'IDLE';
 let totalTasksCompleted = 0;
+let tasksSinceRecycle = 0;
 
 const processTask = async (task) => {
   if (isProcessingTask) {
@@ -258,6 +259,16 @@ const processTask = async (task) => {
 
     await requeueTask(task);
     totalTasksCompleted++;
+    tasksSinceRecycle++;
+
+    if (tasksSinceRecycle >= 100) {
+      tasksSinceRecycle = 0;
+      await recycleBrowserPages();
+      cleanWorkerProfileCaches();
+      if (global.gc) {
+        try { global.gc(); } catch {}
+      }
+    }
   } catch (error) {
     console.error(`[WORKER] ❌ Falha na tarefa ${task.task_type}:`, error.message);
 
@@ -495,6 +506,12 @@ setTimeout(() => runFullStorageMaintenance(), 5000);
 setInterval(() => {
   runFullStorageMaintenance();
 }, 30 * 60 * 1000); // Checa a cada 30 minutos
+
+// Reciclagem preventiva de memória e abas a cada 2 horas
+setInterval(async () => {
+  await recycleBrowserPages();
+  cleanWorkerProfileCaches();
+}, 2 * 60 * 60 * 1000);
 
 // ==========================================
 // SERVIDOR ADMIN LOCAL (Forçar TS3 Sync)
