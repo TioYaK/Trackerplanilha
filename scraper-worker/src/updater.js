@@ -1,7 +1,11 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { supabase } from './db.js';
+
+const WORKER_ROOT = fileURLToPath(new URL('../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 // Versão atual do Worker (você deve subir isso no build_exe.js)
 export const CURRENT_VERSION = 2;
@@ -10,17 +14,20 @@ export const checkForUpdates = async () => {
     // Se não estiver rodando como EXE compilado, usa o Git Pull blindado
     if (!process.pkg) {
         return new Promise((resolve) => {
-            exec('git rev-parse HEAD', (err1, currentHead) => {
+            exec('git rev-parse HEAD', { cwd: REPO_ROOT }, (err1, currentHead) => {
+                if (err1) return resolve(false);
                 const oldHash = currentHead ? currentHead.trim() : '';
-                exec('git fetch origin main', (err2) => {
-                    exec('git rev-parse origin/main', (err3, remoteHead) => {
+                exec('git fetch origin main', { cwd: REPO_ROOT }, (err2) => {
+                    if (err2) return resolve(false);
+                    exec('git rev-parse origin/main', { cwd: REPO_ROOT }, (err3, remoteHead) => {
+                        if (err3) return resolve(false);
                         const newHash = remoteHead ? remoteHead.trim() : '';
                         if (oldHash && newHash && oldHash !== newHash) {
                             console.log(`[UPDATER] 🚀 Nova versão detectada no GitHub (${oldHash.slice(0, 7)} -> ${newHash.slice(0, 7)})!`);
                             console.log('[UPDATER] Atualizando código com git reset --hard...');
-                            exec('git reset --hard origin/main', () => {
+                            exec('git reset --hard origin/main', { cwd: REPO_ROOT }, () => {
                                 console.log('[UPDATER] Executando npm install e reiniciando...');
-                                exec('npm install', () => {
+                                exec('npm install', { cwd: WORKER_ROOT }, () => {
                                     console.log('[UPDATER] ✅ Atualização concluída. Reiniciando processo...');
                                     process.exit(0);
                                 });
