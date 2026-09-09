@@ -148,9 +148,9 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         const dxp = parseInt(log.xp_gained || 0, 10);
         if (dxp <= 0 || !date) return;
 
-        // Se a duração for excessiva (> 4 horas), ignora: é botting/treino solo overnight, não hunt de party
+        // Se a duração for excessiva (> 5 horas), ignora: é botting/treino solo overnight, não hunt de party
         const durationMins = log.duration_minutes || ((date - startDate) / 60000);
-        if (durationMins > 240) return;
+        if (durationMins > 300) return;
 
         // Se a party tem horário planilhado, ignora caçadas solo fora da janela do slot
         if (party.slot_start && party.slot_end) {
