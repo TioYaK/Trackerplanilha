@@ -127,7 +127,8 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
     }
     
     const scoredMembers = members.map(m => {
-       const pStrikes = strikesData ? strikesData.filter(s => s.character_name === m.name).length : 0;
+       const mNameLower = (m.name || '').toLowerCase();
+       const pStrikes = strikesData ? strikesData.filter(s => (s.character_name || '').toLowerCase() === mNameLower).length : 0;
        const xpScore = Math.min(50, (m.xp_gained_24h || 0) / 10000000); // 1 pt per 10M, cap 50
        let score = 50 + xpScore - (pStrikes * 30);
        if (score > 100) score = 100;
@@ -165,9 +166,11 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
 
   const onlineCount = members.filter(m => m.is_online).length;
 
-  // Matchmaker Logic
-  const minShare = Math.floor(mmLevel * 0.66);
-  const maxShare = Math.ceil(mmLevel / 0.66);
+  // Matchmaker Logic - Regra Oficial da CipSoft:
+  // Nível mínimo que compartilha com L: Math.ceil(L * 2 / 3)
+  // Nível máximo que compartilha com L: Math.floor(L * 1.5)
+  const minShare = Math.ceil((mmLevel * 2) / 3);
+  const maxShare = Math.floor(mmLevel * 1.5);
   const mmCandidates = members.filter(m => m.is_online && m.level >= minShare && m.level <= maxShare);
   
   const isVoc = (v, target) => formatVocation(v).toLowerCase().includes(target.toLowerCase());
@@ -235,7 +238,7 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
             <Crosshair size={24} className="mr-2" />
             Matchmaker (Buscador de PT)
           </h3>
-          <p className="text-sm text-gray-400 mb-6">Insira o seu Level e encontre jogadores online agora mesmo compatíveis com sua faixa de share (x0.66 a /0.66).</p>
+          <p className="text-sm text-gray-400 mb-6">Insira o seu Level e encontre jogadores online agora mesmo compatíveis com sua faixa de share oficial (2/3 ao 1.5x do seu nível).</p>
           
           <div className="flex items-center mb-6">
             <span className="text-white mr-4 font-bold">Meu Level:</span>

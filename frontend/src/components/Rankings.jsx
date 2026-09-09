@@ -97,26 +97,37 @@ export default function Rankings({ isAdmin }) {
         const uniqueChecks = Array.from(membersToCheck).map(m => JSON.parse(m));
         const names = uniqueChecks.map(m => m.member);
         
-        const { data: rosterData } = await supabase
-          .from('view_guild_roster')
-          .select('name, xp_gained_24h, level')
-          .in('name', names);
-          
+        const [rosterRes, statesRes] = await Promise.all([
+          supabase.from('view_guild_roster').select('name, xp_gained_24h, level').in('name', names),
+          supabase.from('current_character_state').select('character_name, xp_total, session_start_xp').in('character_name', names)
+        ]);
+
+        const rosterData = rosterRes.data;
+        const statesData = statesRes.data;
+        const stateMap = new Map();
+        (statesData || []).forEach(s => {
+          const delta = Math.max(0, Number(s.xp_total || 0) - Number(s.session_start_xp || s.xp_total || 0));
+          if (s.character_name) stateMap.set(s.character_name.toLowerCase(), delta);
+        });
+
         if (rosterData) {
           uniqueChecks.forEach(mInfo => {
-             const mNameLower = (mInfo.member || '').toLowerCase();
-             const rosterMem = rosterData.find(r => (r.name || '').toLowerCase() === mNameLower);
-             if (rosterMem && (!rosterMem.xp_gained_24h || rosterMem.xp_gained_24h === 0)) {
-               const hasStrike = strikesData.some(s => (s.character_name || '').toLowerCase() === mNameLower && s.reason?.includes('GHOST_SLOT'));
-               if (!hasStrike) {
-                  detectedGhosts.push({
-                    name: mInfo.member,
-                    level: rosterMem.level,
-                    hunt: mInfo.party.hunt_name,
-                    slot: `${mInfo.party.slot_start} - ${mInfo.party.slot_end}`
-                  });
-               }
-             }
+            const mNameLower = (mInfo.member || '').toLowerCase();
+            const rosterMem = rosterData.find(r => (r.name || '').toLowerCase() === mNameLower);
+            const activeXp = stateMap.get(mNameLower) || 0;
+            const totalXp = (rosterMem?.xp_gained_24h || 0) + activeXp;
+
+            if (rosterMem && totalXp <= 0) {
+              const hasStrike = strikesData.some(s => (s.character_name || '').toLowerCase() === mNameLower && s.reason?.includes('GHOST_SLOT'));
+              if (!hasStrike) {
+                detectedGhosts.push({
+                  name: mInfo.member,
+                  level: rosterMem.level,
+                  hunt: mInfo.party.hunt_name,
+                  slot: `${mInfo.party.slot_start} - ${mInfo.party.slot_end}`
+                });
+              }
+            }
           });
         }
       }

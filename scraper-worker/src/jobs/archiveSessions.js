@@ -35,9 +35,12 @@ export const runArchiveSessions = async () => {
         toInsert.push({
           character_name: state.character_name,
           xp_gained: xpGained,
+          session_start: state.session_start_time || state.last_active || new Date().toISOString(),
           // Usa last_active como hora real do fim da caçada
           session_end: state.last_active || new Date().toISOString(),
           end_level: state.level || null,
+          end_xp_total: state.xp_total || null,
+          created_at: new Date().toISOString()
         });
       }
     }

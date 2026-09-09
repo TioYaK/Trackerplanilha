@@ -62,14 +62,21 @@ export default function RadarHunters({ isAdmin }) {
          const names = data.filter(h => h.is_online).map(h => h.name);
          if (names.length > 0) {
             const xpMap = {};
+            const chunks = [];
             for (let i = 0; i < names.length; i += 100) {
-              const chunk = names.slice(i, i + 100);
+              chunks.push(names.slice(i, i + 100));
+            }
+
+            const chunkPromises = chunks.map(chunk => {
               const orChar = chunk.map(n => `character_name.ilike."${n.trim().replace(/"/g, '')}"`).join(',');
-              const { data: states } = await supabase
+              return supabase
                 .from('current_character_state')
                 .select('character_name, xp_total, session_start_xp, last_active')
                 .or(orChar);
+            });
 
+            const results = await Promise.all(chunkPromises);
+            results.forEach(({ data: states }) => {
               if (states) {
                 states.forEach(state => {
                   const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
@@ -81,9 +88,13 @@ export default function RadarHunters({ isAdmin }) {
                   }
                 });
               }
-            }
+            });
             setXpData(xpMap);
+         } else {
+            setXpData({});
          }
+      } else {
+        setXpData({});
       }
     } catch (e) {
       console.error('Erro ao buscar hunteds:', e.message);
@@ -107,7 +118,7 @@ export default function RadarHunters({ isAdmin }) {
       });
 
       if (error) {
-        if (error.code === '23505') alert('Esse personagem jǭ estǭ na lista!');
+        if (error.code === '23505') alert('Esse personagem já está na lista!');
         else alert('Erro ao adicionar: ' + error.message);
       } else {
         setNewName('');

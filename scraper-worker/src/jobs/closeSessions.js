@@ -15,8 +15,9 @@ export const runCloseSessions = async () => {
 
   try {
     const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // 1. Paginamos todos os jogadores com atividade registrada
+    // 1. Paginamos todos os jogadores com atividade recente (últimos 7 dias) que ficaram inativos há mais de 30 min
     let allInactive = [];
     let page = 0;
     while (true) {
@@ -24,6 +25,7 @@ export const runCloseSessions = async () => {
         .from('current_character_state')
         .select('*')
         .lt('last_active', thirtyMinsAgo)
+        .gte('last_active', sevenDaysAgo)
         .not('xp_total', 'is', null)
         .range(page * 1000, (page + 1) * 1000 - 1);
 

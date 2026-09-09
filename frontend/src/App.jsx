@@ -161,7 +161,7 @@ export default function App() {
     switch (currentView) {
       case 'live':    return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
       case 'roster':  return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
-      case 'attendance': return <WarAttendance />;
+      case 'attendance': return <WarAttendance onPlayerClick={handlePlayerClick} />;
       case 'respawns': return <RespawnTracker isAdmin={isAdmin} />;
       case 'invite': return <InviteRequest />;
       case 'bazaar': return <BazaarSniper />;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Clock, ShieldAlert, CheckCircle, Search, Calendar } from 'lucide-react';
 
-export default function WarAttendance() {
+export default function WarAttendance({ onPlayerClick }) {
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -48,6 +48,10 @@ export default function WarAttendance() {
     return `${h}h ${m}m`;
   };
 
+  const confirmedCount = attendanceData.filter(d => d.minutes_online >= 120).length;
+  const partialCount = attendanceData.filter(d => d.minutes_online > 0 && d.minutes_online < 120).length;
+  const totalTracked = attendanceData.length;
+
   return (
     <div className="p-6 h-[calc(100vh-64px)] overflow-y-auto bg-black text-gray-200">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -57,8 +61,21 @@ export default function WarAttendance() {
             Atividade Diária (Horas Online)
           </h1>
           <p className="text-gray-400 mt-1">
-            Monitoramento de tempo ativo diário dos membros da Guilda.
+            Monitoramento de tempo ativo diário dos membros da Guilda com carimbo no Server Save.
           </p>
+        </div>
+
+        {/* Chips de Resumo */}
+        <div className="flex gap-3">
+          <span className="bg-green-950/40 border border-green-700/50 text-green-400 text-xs px-3 py-1.5 rounded-full font-bold">
+            ✅ Presença (2h+): {confirmedCount}
+          </span>
+          <span className="bg-yellow-950/40 border border-yellow-700/50 text-yellow-400 text-xs px-3 py-1.5 rounded-full font-bold">
+            ⏳ Parcial (&lt;2h): {partialCount}
+          </span>
+          <span className="bg-blue-950/40 border border-blue-700/50 text-blue-400 text-xs px-3 py-1.5 rounded-full font-bold">
+            🛡️ Total: {totalTracked}
+          </span>
         </div>
       </div>
 
@@ -115,7 +132,12 @@ export default function WarAttendance() {
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
                       <span className="text-gray-500 font-mono w-4">{idx + 1}.</span>
-                      <span className="font-bold text-white text-lg">{row.character_name}</span>
+                      <span
+                        onClick={() => onPlayerClick && onPlayerClick(row.character_name)}
+                        className="font-bold text-white text-lg cursor-pointer hover:text-tibia-primary hover:underline transition-colors"
+                      >
+                        {row.character_name}
+                      </span>
                     </div>
                   </td>
                   <td className="p-4 text-center font-mono text-lg text-blue-400">

@@ -34,26 +34,44 @@ export default function RespawnCard({ party = {}, onPlayerClick, onPartyClick, i
     </span>
   ) : null;
 
-  const isSlotActive = isSlotActiveNow(party.slot_start, party.slot_end);
+  const hasScheduledSlot = Boolean(party.slot_start && party.slot_end && typeof party.slot_start === 'string' && typeof party.slot_end === 'string');
+  const isSlotActive = hasScheduledSlot ? isSlotActiveNow(party.slot_start, party.slot_end) : false;
+
   const toMinutes = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return 0;
     const [h, m] = timeStr.split(':').map(Number);
     return (h || 0) * 60 + (m || 0);
   };
+
   const nowBrt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   const currentTotalMinutes = nowBrt.getHours() * 60 + nowBrt.getMinutes();
-  const startMin = toMinutes(party.slot_start);
-  let endMin = toMinutes(party.slot_end);
-  if (endMin <= startMin) endMin += 1440;
-  let currentMin = currentTotalMinutes;
-  if (currentMin < startMin && endMin > 1440) currentMin += 1440;
-  const isSlotPast = currentMin > endMin;
+
+  let isSlotPast = false;
+  if (hasScheduledSlot) {
+    const startMin = toMinutes(party.slot_start);
+    let endMin = toMinutes(party.slot_end);
+    if (endMin <= startMin) endMin += 1440;
+    let currentMin = currentTotalMinutes;
+    if (currentMin < startMin && endMin > 1440) currentMin += 1440;
+    
+    // Se o slot começou após o Server Save (>= 10:00 BRT / 600 min) e agora é de madrugada antes do SS (< 10:00 BRT),
+    // o slot de ontem à noite já foi concluído para este ciclo de SS.
+    if (startMin >= 600 && currentTotalMinutes < 600) {
+      isSlotPast = true;
+    } else {
+      isSlotPast = currentMin > endMin;
+    }
+  }
 
   let statusLabel = 'Aguardando Slot';
   let statusIcon = null;
   let statusTextColor = 'text-gray-400';
 
-  if (isSlotActive) {
+  if (!hasScheduledSlot) {
+    statusLabel = 'Horário Flexível';
+    statusIcon = <Clock size={16} className="text-gray-400" />;
+    statusTextColor = 'text-gray-400';
+  } else if (isSlotActive) {
     if (currentStatus === 'EFFICIENT') {
       statusLabel = 'Caçando Ativamente';
       statusIcon = <TrendingUp size={16} className="text-green-400" />;
@@ -146,7 +164,7 @@ export default function RespawnCard({ party = {}, onPlayerClick, onPartyClick, i
         <div className="flex flex-col items-end shrink-0 ml-2">
           <span className="text-sm font-semibold bg-black/30 px-3 py-1 rounded-full text-gray-300">
             <Clock size={14} className="inline mr-1" />
-            {party.slot_start} - {party.slot_end}
+            {party.slot_start && party.slot_end ? `${party.slot_start} - ${party.slot_end}` : 'Horário Flexível'}
           </span>
           {isAdmin && (
             <button onClick={handleEditNote} className="mt-2 text-xs text-gray-500 hover:text-blue-400 flex items-center gap-1">

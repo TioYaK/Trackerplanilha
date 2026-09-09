@@ -106,7 +106,9 @@ export const runFetchHighscores = async (vocationStr) => {
       const VOCATION_MAP = {
         '1': 'Master Sorcerer', '2': 'Elder Druid', '3': 'Royal Paladin', '4': 'Elite Knight',
         '5': 'Master Sorcerer', '6': 'Elder Druid', '7': 'Royal Paladin', '8': 'Elite Knight',
-        'Druid': 'Elder Druid', 'Knight': 'Elite Knight', 'Sorcerer': 'Master Sorcerer', 'Paladin': 'Royal Paladin'
+        '9': 'Monk', '10': 'Exalted Monk',
+        'Druid': 'Elder Druid', 'Knight': 'Elite Knight', 'Sorcerer': 'Master Sorcerer', 'Paladin': 'Royal Paladin',
+        'Monk': 'Monk', 'Exalted Monk': 'Exalted Monk'
       };
       const rawVoc = player.vocation || voc;
       const normalizedVoc = VOCATION_MAP[rawVoc] || rawVoc;

@@ -31,50 +31,107 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     if (!playerName) return;
     setLoading(true);
 
-    // Fetch Custom Avatar from profiles
-    try {
-      const { data: userProfile } = await supabase
-        .from('profiles')
-        .select('avatar_url')
-        .ilike('main_character', playerName)
-        .maybeSingle();
-      if (userProfile?.avatar_url) {
-        setPlayerAvatar(userProfile.avatar_url);
-      } else {
-        setPlayerAvatar(null);
-      }
-    } catch (e) {
-      setPlayerAvatar(null);
-    }
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Fetch Player Level & Vocation from guild_members with fallback to current_character_state
-    let memberData = null;
-    const { data: gMembers } = await supabase
+    // Execução paralela de todas as consultas para eliminar waterfalls
+    const fetchProfileP = supabase
+      .from('profiles')
+      .select('avatar_url')
+      .ilike('main_character', playerName)
+      .maybeSingle();
+
+    const fetchGMembersP = supabase
       .from('guild_members')
       .select('level, vocation, is_online')
       .ilike('name', playerName);
 
-    if (gMembers && gMembers.length > 0) {
-      const validG = gMembers.find(g => g.level !== null && g.level !== undefined) || gMembers[0];
-      if (validG && validG.level) {
-        memberData = validG;
-      }
-    }
-
-    const { data: cData } = await supabase
+    const fetchCDataP = supabase
       .from('current_character_state')
       .select('xp_total, session_start_xp, level, vocation, last_active')
       .ilike('character_name', playerName)
       .maybeSingle();
 
-    // Check latest login/logout event for accurate online status
-    const { data: lastLoginEvent } = await supabase
+    const fetchLoginP = supabase
       .from('login_events')
       .select('event_type, event_time')
       .ilike('character_name', playerName)
       .order('event_time', { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    // Consulta única consolidada de 14 dias para sessões
+    const fetchSessionsP = supabase
+      .from('historical_sessions')
+      .select('*')
+      .ilike('character_name', playerName)
+      .gte('session_end', fourteenDaysAgo)
+      .order('session_end', { ascending: true });
+
+    const fetchDeathsP = supabase
+      .from('recent_deaths')
+      .select('level, killed_by, death_time')
+      .ilike('character_name', playerName)
+      .gte('death_time', fourteenDaysAgo)
+      .order('death_time', { ascending: false });
+
+    const fetchStrikesP = supabase
+      .from('player_strikes')
+      .select('*')
+      .ilike('character_name', playerName)
+      .gte('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+
+    const fetchSquadP = async () => {
+      let squadData = [];
+      let pageSquad = 0;
+      while (true) {
+        const { data } = await supabase
+          .from('parties_planilhadas')
+          .select('members')
+          .range(pageSquad * 1000, (pageSquad + 1) * 1000 - 1);
+        if (!data || data.length === 0) break;
+        squadData.push(...data);
+        if (data.length < 1000) break;
+        pageSquad++;
+      }
+      return squadData;
+    };
+
+    const [
+      profileRes,
+      gMembersRes,
+      cDataRes,
+      loginRes,
+      sessionsRes,
+      deathsRes,
+      strikesRes,
+      squadData
+    ] = await Promise.all([
+      fetchProfileP,
+      fetchGMembersP,
+      fetchCDataP,
+      fetchLoginP,
+      fetchSessionsP,
+      fetchDeathsP,
+      fetchStrikesP,
+      fetchSquadP()
+    ]);
+
+    // Avatar customizado
+    setPlayerAvatar(profileRes?.data?.avatar_url || null);
+
+    // Dados de Membro
+    const gMembers = gMembersRes?.data;
+    let memberData = null;
+    if (gMembers && gMembers.length > 0) {
+      const validG = gMembers.find(g => g.level !== null && g.level !== undefined) || gMembers[0];
+      if (validG && validG.level) memberData = validG;
+    }
+
+    const cData = cDataRes?.data;
+    const lastLoginEvent = loginRes?.data;
 
     let isOnline = false;
     const nowMs = Date.now();
@@ -91,7 +148,6 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       } else if (lastLoginEvent.event_type === 'LOGIN') {
         const loginDate = parseUtcDate(lastLoginEvent.event_time);
         const loginDiff = loginDate ? (nowMs - loginDate.getTime()) : Infinity;
-        // Se o login foi nas últimas 24h e o membro consta online ou tem atividade recente
         isOnline = (loginDiff >= 0 && loginDiff < 24 * 60 * 60 * 1000) && (memberData ? Boolean(memberData.is_online) : isRecentlyActive);
       }
     } else {
@@ -114,30 +170,15 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       currentDelta = Number(cData.xp_total) - Number(cData.session_start_xp);
     }
 
-    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: boundsData } = await supabase
-      .from('historical_sessions')
-      .select('session_start, session_end, end_xp_total, end_level, xp_gained')
-      .ilike('character_name', playerName)
-      .gte('session_end', fourteenDaysAgo)
-      .order('session_end', { ascending: true });
-
-    if (currentXP === 0 && boundsData && boundsData.length > 0) {
+    const boundsData = sessionsRes?.data || [];
+    if (currentXP === 0 && boundsData.length > 0) {
       currentXP = Number(boundsData[boundsData.length - 1].end_xp_total || 0);
     }
 
-    // History of Level Up / Down & Deaths
-    const { data: deathsData } = await supabase
-      .from('recent_deaths')
-      .select('level, killed_by, death_time')
-      .ilike('character_name', playerName)
-      .gte('death_time', fourteenDaysAgo)
-      .order('death_time', { ascending: false });
-
+    // Histórico de Mortes e Mudança de Level
+    const deathsData = deathsRes?.data || [];
     let lvlHist = [];
-
-    // Add deaths from recent_deaths
-    (deathsData || []).forEach(d => {
+    deathsData.forEach(d => {
       const fromLvl = Number(d.level) || 0;
       const toLvl = Math.max(1, fromLvl - 1);
       lvlHist.push({
@@ -149,9 +190,8 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       });
     });
 
-    // Add level transitions from historical_sessions
     let prevLevel = null;
-    (boundsData || []).forEach(log => {
+    boundsData.forEach(log => {
       if (prevLevel !== null && log.end_level && log.end_level !== prevLevel) {
         lvlHist.push({
           type: log.end_level > prevLevel ? 'UP' : 'DOWN',
@@ -167,9 +207,9 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     lvlHist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     setLevelHistory(lvlHist);
 
-    // Heatmap Logic (14 days)
+    // Heatmap (14 dias)
     const dailyMap = {};
-    (boundsData || []).forEach(log => {
+    boundsData.forEach(log => {
       const d = parseUtcDate(log.session_start || log.session_end);
       const dayStr = toBrtDateStr(d);
       if (!dayStr) return;
@@ -191,17 +231,17 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     }
     setHeatmap(hData);
 
-    // Prediction Logic (14 days)
-    const totalXp14d = (boundsData || []).reduce((acc, log) => acc + (Number(log.xp_gained) || 0), 0) + currentDelta;
+    // Previsão de Up (14 dias)
+    const totalXp14d = boundsData.reduce((acc, log) => acc + (Number(log.xp_gained) || 0), 0) + currentDelta;
     let daysSpan = 1;
-    if (boundsData && boundsData.length > 0) {
+    if (boundsData.length > 0) {
       const oldestTime = parseUtcDate(boundsData[0].session_start || boundsData[0].session_end).getTime();
       const msPassed = Date.now() - oldestTime;
       daysSpan = Math.min(14, Math.max(1, msPassed / (1000 * 60 * 60 * 24)));
     }
 
     const avgXpPerDay = totalXp14d > 0 ? Math.floor(totalXp14d / Math.max(1, daysSpan)) : 0;
-    const currentLevel = memberData?.level || cData?.level || (boundsData && boundsData.length > 0 ? boundsData[boundsData.length - 1].end_level : null);
+    const currentLevel = memberData?.level || cData?.level || (boundsData.length > 0 ? boundsData[boundsData.length - 1].end_level : null);
 
     if (currentLevel) {
       let nextMilestone = Math.ceil((currentLevel + 1) / 100) * 100;
@@ -230,16 +270,9 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       setPrediction(null);
     }
 
-    // Fetch sessions from last 48h for telemetry
-    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    const { data: teleData } = await supabase
-      .from('historical_sessions')
-      .select('*')
-      .ilike('character_name', playerName)
-      .gte('session_end', fortyEightHoursAgo)
-      .order('session_end', { ascending: true });
-
-    if (teleData && teleData.length > 0) {
+    // Telemetria 48h (Filtrada em memória a partir de boundsData)
+    const teleData = boundsData.filter(s => s.session_end && s.session_end >= fortyEightHoursAgo);
+    if (teleData.length > 0) {
       let accumulatedXP = 0;
       const chartData = [];
       teleData.forEach(log => {
@@ -290,31 +323,11 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       setTelemetry([]);
     }
 
-    // Fetch strikes
-    const { data: strikesData } = await supabase
-      .from('player_strikes')
-      .select('*')
-      .ilike('character_name', playerName)
-      .gte('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false });
+    // Strikes
+    setStrikes(strikesRes?.data || []);
 
-    if (strikesData) setStrikes(strikesData);
-
-    // Fetch frequent squad (Panelinhas) - case-insensitive
-    let squadData = [];
-    let pageSquad = 0;
-    while(true) {
-        const { data } = await supabase
-          .from('parties_planilhadas')
-          .select('members')
-          .range(pageSquad*1000, (pageSquad+1)*1000-1);
-        if (!data || data.length === 0) break;
-        squadData.push(...data);
-        if (data.length < 1000) break;
-        pageSquad++;
-    }
-
-    if (squadData) {
+    // Panelinhas (Frequent Squad)
+    if (squadData && squadData.length > 0) {
       const mates = {};
       const targetLower = playerName.toLowerCase().trim();
       squadData.forEach(p => {
@@ -335,17 +348,11 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
       setFrequentSquad(rankedMates);
     }
 
-    // Build Routine from last 7 days
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: logs } = await supabase
-      .from('historical_sessions')
-      .select('session_start, session_end, xp_gained')
-      .ilike('character_name', playerName)
-      .gte('session_end', sevenDaysAgo);
-
+    // Rotina horária dos últimos 7 dias (Filtrada em memória a partir de boundsData)
+    const logs7d = boundsData.filter(s => s.session_end && s.session_end >= sevenDaysAgo);
     const hourMap = new Array(24).fill(0);
-    if (logs && logs.length > 0) {
-      logs.forEach(l => {
+    if (logs7d.length > 0) {
+      logs7d.forEach(l => {
         let xp = Number(l.xp_gained || 0);
         if (!xp || xp <= 0) return;
 

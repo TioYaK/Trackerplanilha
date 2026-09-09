@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import HeaderMetrics from '../components/HeaderMetrics';
 import RespawnCard from '../components/RespawnCard';
 import GlobalAuditFeed from '../components/GlobalAuditFeed';
@@ -12,8 +12,10 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
 
   const [areas, setAreas] = useState([]);
 
-  // Extrai as categorias dinâmicas das parties atuais E as categorias oficiais
-  const dynamicCategories = Array.from(new Set([...areas.map(a => a?.name), ...parties.map(p => p?.category)])).filter(Boolean).sort();
+  // Extrai as categorias dinâmicas das parties atuais E as categorias oficiais (Memoizado)
+  const dynamicCategories = useMemo(() => {
+    return Array.from(new Set([...areas.map(a => a?.name), ...parties.map(p => p?.category)])).filter(Boolean).sort();
+  }, [areas, parties]);
 
   // Se a aba ativa atual não existe mais, seleciona a primeira disponível
   useEffect(() => {
@@ -22,7 +24,7 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
     }
   }, [dynamicCategories, activeTab]);
 
-  const fetchParties = async () => {
+  const fetchParties = useCallback(async () => {
     setLoading(true);
 
     const fetchAreasP = supabase.from('respawn_areas').select('name').order('name');
@@ -57,16 +59,15 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
       setParties([]);
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     fetchParties();
     
-    // Assinatura Real-time para atualização automática sem polling (Item 3)
+    // Assinatura Real-time para atualização automática sem polling
     const channel = supabase
       .channel('live_dashboard_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parties_planilhadas' }, payload => {
-        console.log('Realtime Update:', payload);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parties_planilhadas' }, () => {
         fetchParties();
       })
       .subscribe();
@@ -74,7 +75,11 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchParties]);
+
+  const currentTabParties = useMemo(() => {
+    return parties.filter(p => p && p.category === activeTab);
+  }, [parties, activeTab]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
@@ -120,16 +125,14 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {parties.filter(p => p && p.category === activeTab).length === 0 && (
+          {currentTabParties.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center py-16 bg-white/5 rounded-lg border border-tibia-border border-dashed">
               <p className="text-gray-400 font-medium">Nenhuma party agendada para {activeTab} hoje.</p>
             </div>
           )}
-          {parties
-            .filter(p => p && p.category === activeTab)
-            .map(party => (
-              <RespawnCard key={party.id} party={party} onPlayerClick={onPlayerClick} onPartyClick={onPartyClick} isAdmin={isAdmin} />
-            ))}
+          {currentTabParties.map(party => (
+            <RespawnCard key={party.id} party={party} onPlayerClick={onPlayerClick} onPartyClick={onPartyClick} isAdmin={isAdmin} />
+          ))}
         </div>
       )}
 

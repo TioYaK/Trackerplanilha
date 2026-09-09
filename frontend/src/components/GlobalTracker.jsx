@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users, DollarSign, Clock, Network, FileText } from 'lucide-react';
 import { formatVocation } from '../lib/tibiaUtils';
 
-export default function GlobalTracker() {
+export default function GlobalTracker({ onPlayerClick }) {
   const [census, setCensus] = useState({ total_members: 0, active_members: 0 });
   const [barData, setBarData] = useState([]);
   const [hunters, setHunters] = useState(0);
@@ -57,7 +57,7 @@ export default function GlobalTracker() {
     if (deaths.length > 0) {
       report += `💀 **MURO DAS LAMENTAÇÕES (Piores Mortes):**\n`;
       deaths.slice(0,3).forEach((d) => {
-        report += `- ${d.name} perdeu ${(d.xp_gained_24h / 1000000).toFixed(1)}M XP\n`;
+        report += `- ${d.name} perdeu ${Math.abs(d.xp_gained_24h / 1000000).toFixed(1)}M XP\n`;
       });
       report += `\n`;
     }
@@ -807,7 +807,12 @@ export default function GlobalTracker() {
               {deaths.length > 0 ? deaths.map((d, i) => (
                 <div key={i} className="bg-black/50 p-3 rounded border border-gray-800">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-bold text-gray-300">{d.name}</span>
+                    <span
+                      onClick={() => onPlayerClick && onPlayerClick(d.name)}
+                      className="text-sm font-bold text-gray-300 cursor-pointer hover:text-red-400 hover:underline transition-colors"
+                    >
+                      {d.name}
+                    </span>
                     <span className="text-sm font-black text-red-600">{(d.xp_gained_24h / 1000000).toFixed(1)}M XP</span>
                   </div>
                   <div className="text-xs text-gray-600 text-right">Lvl {d.level} - {d.vocation}</div>
@@ -891,7 +896,12 @@ export default function GlobalTracker() {
               {topSolos.length > 0 ? topSolos.map((solo, i) => (
                 <div key={i} className="bg-black/40 p-4 rounded-lg border border-gray-800 flex flex-col justify-center items-center text-center">
                   <div className="w-10 h-10 bg-yellow-500/20 text-yellow-500 rounded-full flex items-center justify-center font-bold text-lg mb-2">#{i + 1}</div>
-                  <span className="font-bold text-white block mb-1 truncate w-full">{solo.name}</span>
+                  <span
+                    onClick={() => onPlayerClick && onPlayerClick(solo.name)}
+                    className="font-bold text-white block mb-1 truncate w-full cursor-pointer hover:text-tibia-primary hover:underline transition-colors"
+                  >
+                    {solo.name}
+                  </span>
                   <span className="text-green-400 font-black text-sm block">+{(solo.xp_gained_24h / 1000000).toFixed(1)}M XP</span>
                   <span className="text-xs text-gray-500 block mt-1">Lvl {solo.level} - {solo.vocation}</span>
                 </div>

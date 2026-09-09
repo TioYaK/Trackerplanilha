@@ -147,8 +147,8 @@ export default function PlanilhaManager({ isAdmin }) {
       leader_name: p.leader_name,
       respawn_category: p.respawn_category,
       hunt_name: p.hunt_name || '',
-      slot_start: p.slot_start.substring(0, 5),
-      slot_end: p.slot_end.substring(0, 5),
+      slot_start: (p.slot_start || '').substring(0, 5),
+      slot_end: (p.slot_end || '').substring(0, 5),
       members: p.members ? p.members.join(', ') : ''
     });
     setEditingId(p.id);

@@ -150,11 +150,19 @@ export default function ProfileModal({ onClose }) {
         throw new Error('Você precisa registrar pelo menos 1 maker no servidor Auroria (obrigatório).');
       }
 
-      const { data: allProfiles, error: profErr } = await supabase
-        .from('profiles')
-        .select('id, main_character, makers');
-        
-      if (profErr) throw profErr;
+      let allProfiles = [];
+      let page = 0;
+      while (true) {
+        const { data: pData, error: profErr } = await supabase
+          .from('profiles')
+          .select('id, main_character, makers')
+          .range(page * 1000, (page + 1) * 1000 - 1);
+        if (profErr) throw profErr;
+        if (!pData || pData.length === 0) break;
+        allProfiles.push(...pData);
+        if (pData.length < 1000) break;
+        page++;
+      }
 
       for (const makerName of auroriaMakersList) {
         for (const p of allProfiles) {
@@ -165,8 +173,9 @@ export default function ProfileModal({ onClose }) {
           if (p.id !== user.id) {
             const pMakers = p.makers || {};
             for (const srv of Object.keys(pMakers)) {
-              const list = typeof pMakers[srv] === 'string' ? pMakers[srv].split(',') : [];
-              if (list.some(m => m.trim().toLowerCase() === makerName.toLowerCase())) {
+              const val = pMakers[srv];
+              const list = typeof val === 'string' ? val.split(',') : (Array.isArray(val) ? val : []);
+              if (list.some(m => m && typeof m === 'string' && m.trim().toLowerCase() === makerName.toLowerCase())) {
                 throw new Error(`O personagem "${makerName}" já está registrado como Maker do jogador ${p.main_character || 'Outro Jogador'}.`);
               }
             }

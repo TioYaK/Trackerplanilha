@@ -42,32 +42,52 @@ export default function GuildBank({ isAdmin }) {
       return;
     }
 
-    // Pagamentos
-    let pData = [];
-    let pPage = 0;
-    while(true) {
-        const { data } = await supabase.from('guild_bank_payments').select('*').eq('payment_month', selectedMonth).range(pPage*1000, (pPage+1)*1000-1);
+    const fetchPaymentsP = async () => {
+      let pData = [];
+      let pPage = 0;
+      while (true) {
+        const { data } = await supabase
+          .from('guild_bank_payments')
+          .select('*')
+          .eq('payment_month', selectedMonth)
+          .range(pPage * 1000, (pPage + 1) * 1000 - 1);
         if (!data || data.length === 0) break;
         pData.push(...data);
         if (data.length < 1000) break;
         pPage++;
-    }
-      
-    // Membros
-    let allRoster = [];
-    let page = 0;
-    while(true) {
-      const { data } = await supabase.from('guild_members').select('*').range(page*1000, (page+1)*1000-1);
-      if (!data || data.length === 0) break;
-      allRoster.push(...data);
-      if (data.length < 1000) break;
-      page++;
-    }
-    setPayments(pData);
-    setRoster(allRoster);
+      }
+      return pData;
+    };
 
-    // Transações
-    const { data: txData } = await supabase.from('guild_bank_transactions').select('*').order('created_at', { ascending: false });
+    const fetchRosterP = async () => {
+      let allRoster = [];
+      let page = 0;
+      while (true) {
+        const { data } = await supabase
+          .from('guild_members')
+          .select('*')
+          .range(page * 1000, (page + 1) * 1000 - 1);
+        if (!data || data.length === 0) break;
+        allRoster.push(...data);
+        if (data.length < 1000) break;
+        page++;
+      }
+      return allRoster;
+    };
+
+    const fetchTxP = supabase
+      .from('guild_bank_transactions')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    const [pData, allRoster, { data: txData }] = await Promise.all([
+      fetchPaymentsP(),
+      fetchRosterP(),
+      fetchTxP
+    ]);
+
+    setPayments(pData || []);
+    setRoster(allRoster || []);
     if (txData) setTransactions(txData);
     
     setLoading(false);
@@ -127,7 +147,7 @@ export default function GuildBank({ isAdmin }) {
     );
   }
 
-  const filteredRoster = roster.filter(m => (m.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())).slice(0, 100);
+  const filteredRoster = roster.filter(m => (m.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()));
   const totalCount = roster.length;
   const paidCount = payments.length;
   const tcTotal = paidCount * 250; // 250 TC por mensalidade
