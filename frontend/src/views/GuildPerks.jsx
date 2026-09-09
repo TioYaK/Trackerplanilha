@@ -6,16 +6,29 @@ import {
   XCircle, Coins, Users, Search, Copy, Check, FileText, 
   RefreshCw, Sliders, Calendar, Skull, UserCheck, UserX, AlertCircle, ArrowRight,
   Landmark, CheckSquare, Plus, Trash2, PieChart, Vote, DollarSign, TrendingUp, TrendingDown,
-  CheckCircle
+  CheckCircle, Globe
 } from 'lucide-react';
 
+import { WORLDS_CONFIG, WORLD_GUILD_MAP } from '../lib/guildPerksConfig';
+export { WORLDS_CONFIG, WORLD_GUILD_MAP };
+
+
 export default function GuildPerks({ isPublic = false, isAdmin = false }) {
-  // Configurações do Sistema de Perks
+  // Configurações Multi-Servidor
+  const [allSettings, setAllSettings] = useState({});
+  const [selectedWorld, setSelectedWorld] = useState(() => {
+    return localStorage.getItem('guild_perks_selected_world') || 'Auroria';
+  });
+  const [settingsTargetWorld, setSettingsTargetWorld] = useState('Auroria');
+
+  // Configurações do Sistema de Perks (Ativas para o mundo selecionado)
   const [settings, setSettings] = useState({
+    world: 'Auroria',
+    guild_name: 'Shellpatrocina',
     cycle_days: 30,
     fee_amount: 50,
     fee_currency: 'RC',
-    bank_recipient: 'Bank Rubin',
+    bank_recipient: 'Bank Rubin Auroria',
     max_slots: 25,
     term_text: 'Prezado membro, o acesso às perks da guilda é restrito e encarece o custo de evolução para toda a guilda. Ao ingressar, você se compromete a contribuir com a cota acordada e manter atividade regular no servidor (mínimo de XP semanal). Membros inativos por 7 dias ou inadimplentes estão sujeitos a rebaixamento de cargo.',
     min_weekly_xp: 1
@@ -30,7 +43,10 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
 
   // Formulário de Solicitação
   const [charName, setCharName] = useState('');
-  const [world, setWorld] = useState('Auroria');
+  const [world, setWorld] = useState(() => {
+    const saved = localStorage.getItem('guild_perks_selected_world');
+    return (saved && saved !== 'ALL') ? saved : 'Auroria';
+  });
   const [agreedTerm, setAgreedTerm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [requestFeedback, setRequestFeedback] = useState(null); // { type: 'success' | 'error', message: '' }
@@ -59,6 +75,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     has_conversion: false,
     converted_amount: '',
     converted_currency: 'KK',
+    world: 'Auroria',
     proof_notes: ''
   });
 
@@ -69,7 +86,8 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
   const [pollForm, setPollForm] = useState({
     title: '',
     description: '',
-    options: ['', '']
+    options: ['', ''],
+    world: 'Auroria'
   });
   const [votingCharName, setVotingCharName] = useState('');
   const [selectedPollOption, setSelectedPollOption] = useState({}); // { [pollId]: optionId }
@@ -80,17 +98,26 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1.1 Configurações
+      // 1.1 Configurações Multi-Servidor
       const { data: sData } = await supabase
         .from('guild_perk_settings')
-        .select('*')
-        .eq('id', 1)
-        .maybeSingle();
+        .select('*');
 
-      if (sData) {
-        setSettings(sData);
-        setPaymentAmount(sData.fee_amount || 50);
-        setPaymentCurrency(sData.fee_currency || 'RC');
+      if (sData && sData.length > 0) {
+        const mapped = {};
+        sData.forEach(s => {
+          const w = (s.world || 'auroria').toLowerCase();
+          mapped[w] = s;
+        });
+        setAllSettings(mapped);
+
+        const activeTarget = (selectedWorld === 'ALL' ? 'auroria' : selectedWorld).toLowerCase();
+        const activeCfg = mapped[activeTarget] || mapped['auroria'] || sData[0];
+        if (activeCfg) {
+          setSettings(activeCfg);
+          setPaymentAmount(activeCfg.fee_amount || 50);
+          setPaymentCurrency(activeCfg.fee_currency || 'RC');
+        }
       }
 
       // 1.2 Membros participantes
@@ -178,33 +205,78 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     };
   }, [fetchAllData]);
 
-  const worldGuildMap = {
-    'Auroria': 'Shellpatrocina',
-    'Belaria': 'Battlestorm Belaria',
-    'Bellum': 'Battlestorm Bellum',
-    'Tenebrium': 'Battlestorm Retro',
-    'Vesperia': 'Battlestorm Vesperia',
-    'Malveria': 'Battlestorm Malveria'
+  const worldGuildMap = WORLD_GUILD_MAP;
+
+  // Helper para obter char bank de um mundo específico
+  const getWorldBank = useCallback((wName) => {
+    const wKey = (wName || 'Auroria').toLowerCase();
+    if (allSettings[wKey]?.bank_recipient) {
+      return allSettings[wKey].bank_recipient;
+    }
+    const cfg = WORLDS_CONFIG.find(w => w.world.toLowerCase() === wKey);
+    return cfg?.defaultBank || `Bank Rubin ${wName || 'Auroria'}`;
+  }, [allSettings]);
+
+  // Helper para alternar o servidor selecionado
+  const handleSelectWorld = (newWorld) => {
+    setSelectedWorld(newWorld);
+    localStorage.setItem('guild_perks_selected_world', newWorld);
+    if (newWorld !== 'ALL') {
+      setWorld(newWorld);
+      setSettingsTargetWorld(newWorld);
+      const activeCfg = allSettings[newWorld.toLowerCase()];
+      if (activeCfg) {
+        setSettings(activeCfg);
+        setPaymentAmount(activeCfg.fee_amount || 50);
+        setPaymentCurrency(activeCfg.fee_currency || 'RC');
+      }
+    }
   };
 
-  // Cálculos de Vagas e Atividade
+  // Filtro de Membros por Mundo
+  const filteredMembers = useMemo(() => {
+    if (selectedWorld === 'ALL') return members;
+    return members.filter(m => (m.world || 'Auroria').toLowerCase() === selectedWorld.toLowerCase());
+  }, [members, selectedWorld]);
+
+  // Cálculos de Vagas e Atividade (baseados no mundo selecionado)
   const activeMembers = useMemo(() => {
-    return members.filter(m => m.status === 'ACTIVE' || m.status === 'INACTIVITY_ALERT');
-  }, [members]);
+    return filteredMembers.filter(m => m.status === 'ACTIVE' || m.status === 'INACTIVITY_ALERT');
+  }, [filteredMembers]);
 
   const pendingMembers = useMemo(() => {
-    return members.filter(m => m.status === 'PENDING_APPROVAL');
-  }, [members]);
+    return filteredMembers.filter(m => m.status === 'PENDING_APPROVAL');
+  }, [filteredMembers]);
 
   const inactivityAlerts = useMemo(() => {
-    return members.filter(m => m.status === 'INACTIVITY_ALERT' || (m.status === 'ACTIVE' && (m.last_7d_xp || 0) <= 0));
-  }, [members]);
+    return filteredMembers.filter(m => m.status === 'INACTIVITY_ALERT' || (m.status === 'ACTIVE' && (m.last_7d_xp || 0) <= 0));
+  }, [filteredMembers]);
 
-  // Cálculos Financeiros do Caixa & Transparência
+  // Filtro Financeiro por Mundo (100% Isolado por Servidor)
+  const filteredPayments = useMemo(() => {
+    if (selectedWorld === 'ALL') return payments;
+    return payments.filter(p => (p.world || 'Auroria').toLowerCase() === selectedWorld.toLowerCase());
+  }, [payments, selectedWorld]);
+
+  const filteredExpenses = useMemo(() => {
+    if (selectedWorld === 'ALL') return expenses;
+    return expenses.filter(e => (e.world || 'Auroria').toLowerCase() === selectedWorld.toLowerCase());
+  }, [expenses, selectedWorld]);
+
+  // Filtro de Votações por Mundo
+  const filteredPolls = useMemo(() => {
+    if (selectedWorld === 'ALL') return polls;
+    return polls.filter(p => {
+      const pw = (p.world || 'Auroria').toLowerCase();
+      return pw === selectedWorld.toLowerCase() || pw === 'all' || pw === 'global';
+    });
+  }, [polls, selectedWorld]);
+
+  // Cálculos Financeiros do Caixa & Transparência (Isolados por Servidor)
   const financialStats = useMemo(() => {
     let totalRcIn = 0;
     let totalKkIn = 0;
-    payments.forEach(p => {
+    filteredPayments.forEach(p => {
       const amt = Number(p.amount) || 0;
       const curr = (p.currency || 'RC').toUpperCase();
       if (curr === 'RC') totalRcIn += amt;
@@ -216,7 +288,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     let totalRcConvertedIn = 0;
     let totalKkConvertedIn = 0;
 
-    expenses.forEach(e => {
+    filteredExpenses.forEach(e => {
       const amt = Number(e.amount) || 0;
       const curr = (e.currency || 'RC').toUpperCase();
       if (curr === 'RC') totalRcOut += amt;
@@ -249,17 +321,20 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       rcBalance,
       kkBalance
     };
-  }, [payments, expenses]);
+  }, [filteredPayments, filteredExpenses]);
 
   // Copiar nome do char Bank
   const handleCopyBank = () => {
-    if (!settings.bank_recipient) return;
+    const targetRecipient = selectedWorld !== 'ALL' 
+      ? getWorldBank(selectedWorld) 
+      : (settings.bank_recipient || getWorldBank(world));
+    if (!targetRecipient) return;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(settings.bank_recipient);
+        navigator.clipboard.writeText(targetRecipient);
       } else {
         const el = document.createElement('textarea');
-        el.value = settings.bank_recipient;
+        el.value = targetRecipient;
         document.body.appendChild(el);
         el.select();
         document.execCommand('copy');
@@ -524,19 +599,31 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       const baseDate = currentExpiry > now ? currentExpiry : now;
       const newExpiry = new Date(baseDate.getTime() + (settings.cycle_days || 30) * 86400000);
 
-      // 1. Registra pagamento
-      const { error: pErr } = await supabase
-        .from('guild_perk_payments')
-        .insert({
-          perk_member_id: selectedForPayment.id,
-          character_name: selectedForPayment.character_name,
-          amount: Number(paymentAmount) || settings.fee_amount,
-          currency: paymentCurrency || settings.fee_currency,
-          cycle_start: baseDate.toISOString(),
-          cycle_end: newExpiry.toISOString(),
-          proof_url_or_notes: paymentNotes || 'Pagamento confirmado pelo Admin',
-          verified_by: 'ADMIN'
-        });
+      // 1. Registra pagamento com isolamento por mundo
+      const targetWorld = selectedForPayment.world || 'Auroria';
+      const targetGuild = WORLD_GUILD_MAP[targetWorld] || 'Shellpatrocina';
+
+      const paymentPayload = {
+        perk_member_id: selectedForPayment.id,
+        character_name: selectedForPayment.character_name,
+        amount: Number(paymentAmount) || settings.fee_amount,
+        currency: paymentCurrency || settings.fee_currency,
+        cycle_start: baseDate.toISOString(),
+        cycle_end: newExpiry.toISOString(),
+        proof_url_or_notes: paymentNotes || 'Pagamento confirmado pelo Admin',
+        verified_by: 'ADMIN',
+        world: targetWorld,
+        guild_name: targetGuild
+      };
+
+      let { error: pErr } = await supabase.from('guild_perk_payments').insert(paymentPayload);
+      if (pErr && pErr.message?.includes('world')) {
+        const fb = { ...paymentPayload };
+        delete fb.world;
+        delete fb.guild_name;
+        const res = await supabase.from('guild_perk_payments').insert(fb);
+        pErr = res.error;
+      }
 
       if (pErr) throw pErr;
 
@@ -555,7 +642,8 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         character_name: selectedForPayment.character_name,
         event_type: 'PAYMENT_CONFIRMED',
         actor: 'ADMIN',
-        details: `Registrado pagamento de ${paymentAmount} ${paymentCurrency}. Vigência estendida até ${toBrtDateStr(newExpiry)} (+${settings.cycle_days} dias).`
+        world: targetWorld,
+        details: `Registrado pagamento de ${paymentAmount} ${paymentCurrency} (${targetWorld}). Vigência estendida até ${toBrtDateStr(newExpiry)} (+${settings.cycle_days} dias).`
       });
 
       setSelectedForPayment(null);
@@ -568,26 +656,42 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     }
   };
 
-  // Salvar Configurações Gerais (Admin)
+  // Salvar Configurações Gerais por Servidor (Admin)
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     setAdminActionLoading(true);
     try {
-      const { error } = await supabase
+      const targetWorld = settingsTargetWorld || (selectedWorld !== 'ALL' ? selectedWorld : 'Auroria');
+      const targetGuild = WORLD_GUILD_MAP[targetWorld] || 'Guild';
+
+      const payload = {
+        world: targetWorld,
+        guild_name: targetGuild,
+        cycle_days: parseInt(settings.cycle_days, 10) || 30,
+        fee_amount: Number(settings.fee_amount) || 50,
+        fee_currency: settings.fee_currency || 'RC',
+        bank_recipient: settings.bank_recipient || `Bank Rubin ${targetWorld}`,
+        max_slots: parseInt(settings.max_slots, 10) || 25,
+        term_text: settings.term_text,
+        updated_at: new Date().toISOString()
+      };
+
+      // Tenta salvar por world
+      let { error } = await supabase
         .from('guild_perk_settings')
-        .upsert({
-          id: 1,
-          cycle_days: parseInt(settings.cycle_days, 10) || 30,
-          fee_amount: Number(settings.fee_amount) || 50,
-          fee_currency: settings.fee_currency || 'RC',
-          bank_recipient: settings.bank_recipient || 'Bank Rubin',
-          max_slots: parseInt(settings.max_slots, 10) || 25,
-          term_text: settings.term_text,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(payload, { onConflict: 'world' });
+
+      // Fallback para id=1 caso a tabela ainda não tenha constraint de world
+      if (error) {
+        const fb = { ...payload, id: 1 };
+        delete fb.world;
+        delete fb.guild_name;
+        const res = await supabase.from('guild_perk_settings').upsert(fb);
+        error = res.error;
+      }
 
       if (error) throw error;
-      alert('Configurações atualizadas com sucesso!');
+      alert(`Configurações de ${targetWorld} (${targetGuild}) salvas com sucesso!`);
       fetchAllData();
     } catch (err) {
       alert('Erro ao salvar configurações: ' + err.message);
@@ -596,7 +700,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     }
   };
 
-  // Ações de Transparência: Registrar Gasto / Investimento de Perk ou Câmbio
+  // Ações de Transparência: Registrar Gasto / Investimento de Perk ou Câmbio (Isolado por Servidor)
   const handleCreateExpense = async (e) => {
     e.preventDefault();
     const amountNum = parseFloat(expenseForm.amount);
@@ -621,27 +725,44 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     setAdminActionLoading(true);
     try {
       const sourceCurr = (expenseForm.currency || 'RC').toUpperCase();
-      const { error } = await supabase
+      const targetWorld = expenseForm.world || (selectedWorld !== 'ALL' ? selectedWorld : 'Auroria');
+      const targetGuild = WORLD_GUILD_MAP[targetWorld] || 'Shellpatrocina';
+
+      const expensePayload = {
+        description: expenseForm.description.trim(),
+        amount: amountNum,
+        currency: sourceCurr,
+        converted_amount: convertedAmountNum,
+        converted_currency: targetConvertedCurr,
+        category: hasConversion ? 'EXCHANGE' : 'UPGRADE',
+        world: targetWorld,
+        guild_name: targetGuild,
+        proof_notes: expenseForm.proof_notes.trim() || null,
+        registered_by: 'ADMIN'
+      };
+
+      let { error } = await supabase
         .from('guild_perk_expenses')
-        .insert({
-          description: expenseForm.description.trim(),
-          amount: amountNum,
-          currency: sourceCurr,
-          converted_amount: convertedAmountNum,
-          converted_currency: targetConvertedCurr,
-          category: hasConversion ? 'EXCHANGE' : 'UPGRADE',
-          proof_notes: expenseForm.proof_notes.trim() || null,
-          registered_by: 'ADMIN'
-        });
+        .insert(expensePayload);
+
+      if (error && error.message?.includes('world')) {
+        const fb = { ...expensePayload };
+        delete fb.world;
+        delete fb.guild_name;
+        const res = await supabase.from('guild_perk_expenses').insert(fb);
+        error = res.error;
+      }
+
       if (error) throw error;
 
       await supabase.from('guild_perk_audit_logs').insert({
         character_name: 'SISTEMA/ADMIN',
         event_type: hasConversion ? 'CURRENCY_EXCHANGED' : 'EXPENSE_REGISTERED',
         actor: 'ADMIN',
+        world: targetWorld,
         details: hasConversion
-          ? `Registrado câmbio de moeda: ${expenseForm.description} (-${amountNum} ${sourceCurr} ➔ +${convertedAmountNum} ${targetConvertedCurr}).`
-          : `Registrado investimento em perk: ${expenseForm.description} (${amountNum} ${sourceCurr}).`
+          ? `[${targetWorld}] Registrado câmbio de moeda: ${expenseForm.description} (-${amountNum} ${sourceCurr} ➔ +${convertedAmountNum} ${targetConvertedCurr}).`
+          : `[${targetWorld}] Registrado investimento em perk: ${expenseForm.description} (${amountNum} ${sourceCurr}).`
       });
 
       setExpenseForm({
@@ -651,6 +772,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         has_conversion: false,
         converted_amount: '',
         converted_currency: 'KK',
+        world: selectedWorld !== 'ALL' ? selectedWorld : 'Auroria',
         proof_notes: ''
       });
       setExpenseModalOpen(false);
@@ -731,17 +853,33 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     }
     setAdminActionLoading(true);
     try {
-      // 1. Cria enquete
-      const { data: pollData, error: pollErr } = await supabase
+      // 1. Cria enquete associada ao servidor
+      const targetPollWorld = pollForm.world || (selectedWorld !== 'ALL' ? selectedWorld : 'ALL');
+      const targetGuild = targetPollWorld === 'ALL' ? 'Global' : (WORLD_GUILD_MAP[targetPollWorld] || 'Guild');
+
+      const pollInsertPayload = {
+        title: pollForm.title.trim(),
+        description: pollForm.description.trim() || null,
+        status: 'OPEN',
+        created_by: 'ADMIN',
+        world: targetPollWorld,
+        guild_name: targetGuild
+      };
+
+      let { data: pollData, error: pollErr } = await supabase
         .from('guild_perk_polls')
-        .insert({
-          title: pollForm.title.trim(),
-          description: pollForm.description.trim() || null,
-          status: 'OPEN',
-          created_by: 'ADMIN'
-        })
+        .insert(pollInsertPayload)
         .select()
         .single();
+
+      if (pollErr && pollErr.message?.includes('world')) {
+        const fallbackPoll = { ...pollInsertPayload };
+        delete fallbackPoll.world;
+        delete fallbackPoll.guild_name;
+        const res = await supabase.from('guild_perk_polls').insert(fallbackPoll).select().single();
+        pollData = res.data;
+        pollErr = res.error;
+      }
       if (pollErr) throw pollErr;
 
       // 2. Insere opções
@@ -763,10 +901,11 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         character_name: 'SISTEMA/ADMIN',
         event_type: 'POLL_CREATED',
         actor: 'ADMIN',
-        details: `Criada nova votação de perks: "${pollForm.title}" com ${uniqueOptions.length} opções.`
+        world: targetPollWorld,
+        details: `[${targetPollWorld}] Criada nova votação de perks: "${pollForm.title}" com ${uniqueOptions.length} opções.`
       });
 
-      setPollForm({ title: '', description: '', options: ['', ''] });
+      setPollForm({ title: '', description: '', options: ['', ''], world: selectedWorld !== 'ALL' ? selectedWorld : 'Auroria' });
       setPollModalOpen(false);
       fetchAllData();
     } catch (err) {
@@ -1012,19 +1151,98 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
           </div>
         </div>
 
-        {/* 4 Cards de Parâmetros Globais */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        {/* Seletor de Servidor / Guilda (100% Isolado por Servidor) */}
+        <div className="mt-6 p-3 rounded-xl bg-black/60 border border-tibia-border/80 shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1 pb-2.5 mb-2.5 border-b border-tibia-border/30 text-xs">
+            <span className="font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2 text-xs">
+              <Globe size={15} className="text-amber-400" />
+              Selecione o Servidor da Guilda:
+            </span>
+            <span className="text-xs text-amber-400 font-semibold flex items-center gap-1.5">
+              {selectedWorld === 'ALL' ? (
+                <>
+                  <Globe size={13} className="text-cyan-400" />
+                  <span>Visão Consolidada de Toda a Aliança</span>
+                </>
+              ) : (
+                <>
+                  <span>{WORLDS_CONFIG.find(w => w.world.toLowerCase() === selectedWorld.toLowerCase())?.icon || '🛡️'}</span>
+                  <span>{selectedWorld}</span>
+                  <span className="text-gray-400 font-normal">({WORLD_GUILD_MAP[selectedWorld] || 'Guild'})</span>
+                </>
+              )}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+            {WORLDS_CONFIG.map((w) => {
+              const isSelected = selectedWorld.toLowerCase() === w.world.toLowerCase();
+              const countInWorld = members.filter(m => (m.world || 'Auroria').toLowerCase() === w.world.toLowerCase() && (m.status === 'ACTIVE' || m.status === 'INACTIVITY_ALERT')).length;
+              return (
+                <button
+                  key={w.world}
+                  type="button"
+                  onClick={() => handleSelectWorld(w.world)}
+                  className={`px-3 py-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-between gap-1.5 ${
+                    isSelected
+                      ? 'bg-amber-500/20 border-amber-500 text-yellow-400 shadow-lg shadow-amber-500/10'
+                      : 'bg-black/40 border-tibia-border/50 text-gray-400 hover:text-white hover:border-gray-500'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="text-sm flex-shrink-0">{w.icon}</span>
+                    <div className="text-left truncate">
+                      <div className="leading-tight font-bold">{w.world}</div>
+                      <div className="text-[10px] text-gray-400 truncate">{w.guild}</div>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0 ${
+                    isSelected ? 'bg-amber-500 text-black' : 'bg-white/10 text-gray-300'
+                  }`}>
+                    {countInWorld}
+                  </span>
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => handleSelectWorld('ALL')}
+              className={`px-3 py-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-between gap-1.5 ${
+                selectedWorld === 'ALL'
+                  ? 'bg-amber-500/20 border-amber-500 text-yellow-400 shadow-lg shadow-amber-500/10'
+                  : 'bg-black/40 border-tibia-border/50 text-gray-400 hover:text-white hover:border-gray-500'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <Globe size={15} className="text-cyan-400 flex-shrink-0" />
+                <div className="text-left truncate">
+                  <div className="leading-tight font-bold">Todos</div>
+                  <div className="text-[10px] text-gray-400 truncate">Aliança Geral</div>
+                </div>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0 ${
+                selectedWorld === 'ALL' ? 'bg-amber-500 text-black' : 'bg-white/10 text-gray-300'
+              }`}>
+                {members.filter(m => m.status === 'ACTIVE' || m.status === 'INACTIVITY_ALERT').length}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4 Cards de Parâmetros do Servidor Selecionado */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
           {/* Card 1: Membros Ativos */}
           <div className="bg-black/50 border border-tibia-border/60 p-4 rounded-lg">
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Membros com Perks</span>
+              <span>{selectedWorld === 'ALL' ? 'Total na Aliança' : `Membros (${selectedWorld})`}</span>
               <Users size={15} className="text-blue-400" />
             </p>
             <p className="text-2xl font-black text-white mt-1">
               {activeMembers.length} <span className="text-sm font-normal text-gray-400">participantes</span>
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              Com cargo e bônus ativos
+              {selectedWorld === 'ALL' ? 'Todas as guildas ativas' : `Guilda ${WORLD_GUILD_MAP[selectedWorld] || ''}`}
             </p>
           </div>
 
@@ -1038,7 +1256,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               {settings.fee_amount} <span className="text-sm font-normal text-gray-300">{settings.fee_currency}</span>
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              Contribuição de manutenção
+              {selectedWorld === 'ALL' ? 'Padrão por ciclo' : `Manutenção ${selectedWorld}`}
             </p>
           </div>
 
@@ -1059,12 +1277,12 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
           {/* Card 4: Destinatário do Bank */}
           <div className="bg-black/50 border border-tibia-border/60 p-4 rounded-lg">
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Personagem Bank</span>
+              <span>Char Bank ({selectedWorld === 'ALL' ? 'Servidor' : selectedWorld})</span>
               <Shield size={15} className="text-yellow-500" />
             </p>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-lg font-bold text-white truncate mr-2" title={settings.bank_recipient}>
-                {settings.bank_recipient}
+              <span className="text-lg font-bold text-white truncate mr-2" title={selectedWorld !== 'ALL' ? getWorldBank(selectedWorld) : (settings.bank_recipient || 'Bank Rubin')}>
+                {selectedWorld !== 'ALL' ? getWorldBank(selectedWorld) : (settings.bank_recipient || 'Bank Rubin')}
               </span>
               <button
                 onClick={handleCopyBank}
@@ -1330,7 +1548,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               <h4 className="font-bold text-white uppercase text-[11px] tracking-wider">Regras Obrigatórias:</h4>
               <ul className="list-disc list-inside space-y-1.5 text-gray-400 pl-1">
                 <li><strong className="text-white">Regra de Atividade:</strong> O membro deve gerar XP regularmente. Ficar 7 dias consecutivos com 0 XP gera alerta imediato de inatividade e possível rebaixamento de cargo in-game.</li>
-                <li><strong className="text-white">Regra da Cota de Manutenção:</strong> Contribuição de <strong>{settings.fee_amount} {settings.fee_currency}</strong> a cada ciclo de <strong>{settings.cycle_days} dias</strong> transferida para o char Bank (<span className="text-amber-400 font-bold">{settings.bank_recipient}</span>).</li>
+                <li><strong className="text-white">Regra da Cota de Manutenção:</strong> Contribuição de <strong>{(allSettings[world.toLowerCase()] || settings).fee_amount} {(allSettings[world.toLowerCase()] || settings).fee_currency}</strong> a cada ciclo de <strong>{(allSettings[world.toLowerCase()] || settings).cycle_days} dias</strong> transferida para o char Bank de <strong>{world}</strong> (<span className="text-amber-400 font-bold">{getWorldBank(world)}</span>).</li>
                 <li><strong className="text-white">Veredito do Admin:</strong> Em caso de viagem ou imprevistos, o membro deve notificar a liderança para receber carência temporária antes do vencimento.</li>
               </ul>
             </div>
@@ -1379,12 +1597,11 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                   onChange={(e) => setWorld(e.target.value)}
                   className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
                 >
-                  <option value="Auroria">Auroria</option>
-                  <option value="Belaria">Belaria</option>
-                  <option value="Bellum">Bellum</option>
-                  <option value="Tenebrium">Tenebrium</option>
-                  <option value="Vesperia">Vesperia</option>
-                  <option value="Malveria">Malveria</option>
+                  {WORLDS_CONFIG.map(w => (
+                    <option key={w.world} value={w.world}>
+                      {w.icon} {w.world} - {w.guild}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1397,7 +1614,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                     className="mt-0.5 rounded border-tibia-border bg-black text-amber-500 focus:ring-0 cursor-pointer"
                   />
                   <span>
-                    Concordo em contribuir com a cota de <strong>{settings.fee_amount} {settings.fee_currency}</strong> e manter XP regular nos últimos 7 dias.
+                    Concordo em contribuir com a cota de <strong>{(allSettings[world.toLowerCase()] || settings).fee_amount} {(allSettings[world.toLowerCase()] || settings).fee_currency}</strong> e manter XP regular nos últimos 7 dias.
                   </span>
                 </label>
               </div>
@@ -1553,12 +1770,17 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
           {/* Header da Aba */}
           <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-6 shadow-inner flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
-              <h3 className="text-xl font-medieval text-yellow-500 flex items-center gap-2">
+              <h3 className="text-xl font-medieval text-yellow-500 flex items-center gap-2 flex-wrap">
                 <Landmark className="text-amber-400" size={22} />
-                Transparência & Caixa da Guilda
+                <span>Transparência & Caixa</span>
+                <span className="text-xs font-sans font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {selectedWorld === 'ALL' ? '🌐 Consolidado Aliança' : `${selectedWorld} (${WORLD_GUILD_MAP[selectedWorld] || 'Guild'})`}
+                </span>
               </h3>
               <p className="text-xs text-gray-400 mt-1 max-w-2xl">
-                Prestação de contas 100% aberta e auditável. Veja todas as contribuições dos membros e cada investimento realizado na aquisição e upgrade das perks da guilda.
+                {selectedWorld === 'ALL'
+                  ? 'Balanço financeiro consolidado de todas as guildas da aliança. Exibe todas as entradas e saídas de todos os servidores.'
+                  : `Balanço financeiro exclusivo do servidor ${selectedWorld}. Todas as cotas e investimentos abaixo pertencem à guilda ${WORLD_GUILD_MAP[selectedWorld] || ''}.`}
               </p>
             </div>
 
@@ -1591,7 +1813,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               </div>
               <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
                 <CheckCircle2 size={13} className="text-green-400" />
-                {payments.length} transferências de cotas recebidas
+                {filteredPayments.length} transferências de cotas recebidas
               </p>
               {(financialStats.totalKkConvertedIn > 0 || financialStats.totalRcConvertedIn > 0) && (
                 <div className="mt-2 pt-2 border-t border-tibia-border/30 text-[11px] text-amber-300 flex items-center gap-1">
@@ -1621,7 +1843,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               </div>
               <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
                 <Sparkles size={13} className="text-amber-400" />
-                {expenses.length} melhorias / câmbios executados
+                {filteredExpenses.length} melhorias / câmbios executados
               </p>
             </div>
 
@@ -1658,22 +1880,27 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                   Investimentos & Câmbios em Perks (Saídas)
                 </h4>
                 <span className="text-xs text-gray-400 font-mono">
-                  {expenses.length} registros
+                  {filteredExpenses.length} registros
                 </span>
               </div>
 
-              {expenses.length === 0 ? (
+              {filteredExpenses.length === 0 ? (
                 <div className="text-center py-10 text-gray-500 text-xs italic">
                   Nenhum registro de gasto ou upgrade cadastrado ainda.
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                  {expenses.map((exp) => (
+                  {filteredExpenses.map((exp) => (
                     <div key={exp.id} className="p-3.5 rounded-lg bg-black/60 border border-tibia-border/40 hover:border-red-500/40 transition-all text-xs flex flex-col justify-between gap-2">
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-bold text-white text-sm">{exp.description}</p>
+                            {exp.world && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/10 text-gray-300 border border-white/20">
+                                {exp.world}
+                              </span>
+                            )}
                             {exp.converted_amount && (
                               <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
                                 <RefreshCw size={10} /> Câmbio
@@ -1726,22 +1953,27 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                   Cotas & Mensalidades Recebidas (Entradas)
                 </h4>
                 <span className="text-xs text-gray-400 font-mono">
-                  {payments.length} transferências
+                  {filteredPayments.length} transferências
                 </span>
               </div>
 
-              {payments.length === 0 ? (
+              {filteredPayments.length === 0 ? (
                 <div className="text-center py-10 text-gray-500 text-xs italic">
                   Nenhuma cota registrada no sistema ainda.
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                  {payments.map((p) => (
+                  {filteredPayments.map((p) => (
                     <div key={p.id} className="p-3.5 rounded-lg bg-black/60 border border-tibia-border/40 hover:border-green-500/40 transition-all text-xs flex flex-col justify-between gap-2">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="font-bold text-white text-sm flex items-center gap-2">
+                          <p className="font-bold text-white text-sm flex items-center gap-2 flex-wrap">
                             <span>{p.character_name}</span>
+                            {p.world && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/10 text-gray-300 border border-white/20">
+                                {p.world}
+                              </span>
+                            )}
                             <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">
                               Cota Paga
                             </span>
@@ -1807,7 +2039,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                   : 'bg-black/40 text-gray-400 hover:text-white border border-tibia-border/30'
               }`}
             >
-              Todas ({polls.length})
+              Todas ({filteredPolls.length})
             </button>
             <button
               onClick={() => setPollFilter('OPEN')}
@@ -1818,7 +2050,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              Abertas ({polls.filter(p => p.status === 'OPEN').length})
+              Abertas ({filteredPolls.filter(p => p.status === 'OPEN').length})
             </button>
             <button
               onClick={() => setPollFilter('CLOSED')}
@@ -1828,18 +2060,18 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                   : 'bg-black/40 text-gray-400 hover:text-white border border-tibia-border/30'
               }`}
             >
-              Encerradas ({polls.filter(p => p.status === 'CLOSED').length})
+              Encerradas ({filteredPolls.filter(p => p.status === 'CLOSED').length})
             </button>
           </div>
 
           {/* Lista de Votações */}
-          {polls.filter(p => pollFilter === 'ALL' || p.status === pollFilter).length === 0 ? (
+          {filteredPolls.filter(p => pollFilter === 'ALL' || p.status === pollFilter).length === 0 ? (
             <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-12 text-center text-gray-500 italic">
-              Nenhuma enquete encontrada para o filtro selecionado.
+              Nenhuma enquete encontrada para o servidor selecionado ({selectedWorld === 'ALL' ? 'Todos' : selectedWorld}).
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6">
-              {polls
+              {filteredPolls
                 .filter(p => pollFilter === 'ALL' || p.status === pollFilter)
                 .map((poll) => {
                   const isOpen = poll.status === 'OPEN';
@@ -1866,7 +2098,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                       {/* Topo do Card */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-tibia-border/40 pb-4 mb-4">
                         <div>
-                          <div className="flex items-center gap-2 mb-1.5">
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                             {isOpen ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-green-500/20 text-green-400 border border-green-500/30">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse" />
@@ -1878,6 +2110,9 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                                 Votação Encerrada
                               </span>
                             )}
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                              {poll.world === 'ALL' ? '🌐 Global' : `${WORLDS_CONFIG.find(w => w.world.toLowerCase() === poll.world?.toLowerCase())?.icon || '🛡️'} ${poll.world || 'Auroria'}`}
+                            </span>
                             <span className="text-xs text-gray-400">
                               {toBrtDateStr(poll.created_at)}
                             </span>
@@ -2197,6 +2432,43 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
           </div>
 
           <form onSubmit={handleSaveSettings} className="space-y-4">
+            {/* Seletor de Servidor a Configurar */}
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5">
+              <label className="block text-xs font-bold text-amber-300 uppercase flex items-center gap-1.5">
+                <Globe size={15} className="text-amber-400" />
+                Selecione o Servidor para Configurar:
+              </label>
+              <select
+                value={settingsTargetWorld}
+                onChange={(e) => {
+                  const target = e.target.value;
+                  setSettingsTargetWorld(target);
+                  const active = allSettings[target.toLowerCase()];
+                  if (active) {
+                    setSettings(active);
+                  } else {
+                    const cfg = WORLDS_CONFIG.find(w => w.world.toLowerCase() === target.toLowerCase());
+                    setSettings(prev => ({
+                      ...prev,
+                      world: target,
+                      guild_name: cfg?.guild || WORLD_GUILD_MAP[target] || 'Guild',
+                      bank_recipient: cfg?.defaultBank || `Bank Rubin ${target}`
+                    }));
+                  }
+                }}
+                className="w-full bg-black/90 border border-amber-500/60 rounded px-3 py-2 text-sm text-yellow-300 font-bold focus:outline-none"
+              >
+                {WORLDS_CONFIG.map(w => (
+                  <option key={w.world} value={w.world}>
+                    {w.icon} {w.world} - {w.guild} ({getWorldBank(w.world)})
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-400">
+                Os parâmetros abaixo (Char Bank, Cota e Ciclo) serão salvos exclusivamente para <strong>{settingsTargetWorld} ({WORLD_GUILD_MAP[settingsTargetWorld] || ''})</strong>.
+              </p>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
                 Duração do Ciclo (Dias)
@@ -2243,7 +2515,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
 
             <div>
               <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
-                Nome do Personagem Bank Recebedor
+                Nome do Personagem Bank Recebedor ({settingsTargetWorld})
               </label>
               <input
                 type="text"
@@ -2256,9 +2528,10 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
             <button
               type="submit"
               disabled={adminActionLoading}
-              className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded transition-all shadow-md mt-4"
+              className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded transition-all shadow-md mt-4 flex items-center justify-center gap-2"
             >
-              Salvar Alterações
+              <Check size={16} />
+              <span>Salvar Alterações de {settingsTargetWorld}</span>
             </button>
           </form>
         </div>
@@ -2386,6 +2659,23 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
             </p>
 
             <form onSubmit={handleCreateExpense} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
+                  Servidor / Guilda de Destino
+                </label>
+                <select
+                  value={expenseForm.world || (selectedWorld !== 'ALL' ? selectedWorld : 'Auroria')}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, world: e.target.value })}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-yellow-300 font-bold focus:outline-none"
+                >
+                  {WORLDS_CONFIG.map(w => (
+                    <option key={w.world} value={w.world}>
+                      {w.icon} {w.world} - {w.guild}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
                   Descrição do Lançamento
@@ -2546,6 +2836,24 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
             </p>
 
             <form onSubmit={handleCreatePoll} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
+                  Servidor / Guilda da Votação
+                </label>
+                <select
+                  value={pollForm.world || (selectedWorld !== 'ALL' ? selectedWorld : 'ALL')}
+                  onChange={(e) => setPollForm({ ...pollForm, world: e.target.value })}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-yellow-300 font-bold focus:outline-none"
+                >
+                  <option value="ALL">🌐 Todas as Guildas (Global / Aliança Geral)</option>
+                  {WORLDS_CONFIG.map(w => (
+                    <option key={w.world} value={w.world}>
+                      {w.icon} {w.world} - {w.guild}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
                   Título da Votação / Pergunta

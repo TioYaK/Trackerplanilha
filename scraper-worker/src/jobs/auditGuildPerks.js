@@ -14,14 +14,18 @@ export const runAuditGuildPerks = async () => {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // 1. Busca configurações vigentes
-    const { data: settings } = await supabase
+    // 1. Busca configurações vigentes (suporte multi-servidor)
+    const { data: allSettings } = await supabase
       .from('guild_perk_settings')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle();
+      .select('*');
 
-    const minXpThreshold = settings?.min_weekly_xp || 1;
+    const settingsByWorld = {};
+    if (allSettings && allSettings.length > 0) {
+      allSettings.forEach(s => {
+        if (s.world) settingsByWorld[s.world.toLowerCase()] = s;
+      });
+    }
+    const defaultSettings = allSettings?.find(s => s.id === 1) || allSettings?.[0] || {};
 
     // 2. Busca todos os membros sob acompanhamento
     const { data: perkMembers, error: mErr } = await supabase
@@ -41,6 +45,9 @@ export const runAuditGuildPerks = async () => {
 
       for (const member of perkMembers) {
         const charKey = member.character_name.toLowerCase();
+        const memberWorld = (member.world || 'Auroria').toLowerCase();
+        const memberSettings = settingsByWorld[memberWorld] || defaultSettings;
+        const minXpThreshold = memberSettings?.min_weekly_xp || 1;
 
         // 2.1 Calcula XP arquivada nos últimos 7 dias
         const { data: sessions } = await supabase
@@ -78,6 +85,7 @@ export const runAuditGuildPerks = async () => {
             newStatus = 'INACTIVITY_ALERT';
             auditEvent = {
               character_name: member.character_name,
+              world: member.world || 'Auroria',
               event_type: 'INACTIVITY_FLAGGED',
               actor: 'WORKER',
               details: `Alerta disparado: 0 XP gerada nos últimos 7 dias. Encaminhado para a Mesa de Veredito do Admin.`
@@ -89,6 +97,7 @@ export const runAuditGuildPerks = async () => {
             newStatus = isFeeExpired ? 'FEE_EXPIRED' : 'ACTIVE';
             auditEvent = {
               character_name: member.character_name,
+              world: member.world || 'Auroria',
               event_type: 'ACTIVITY_RESTORED',
               actor: 'WORKER',
               details: `Atividade recuperada (+${(total7dXp / 1000000).toFixed(1)}M XP nos últimos 7 dias). Alerta revogado.`
@@ -100,6 +109,7 @@ export const runAuditGuildPerks = async () => {
           newStatus = 'FEE_EXPIRED';
           auditEvent = {
             character_name: member.character_name,
+            world: member.world || 'Auroria',
             event_type: 'FEE_EXPIRED',
             actor: 'WORKER',
             details: `Vencimento da cota do ciclo atingido. Aguardando renovação financeira.`
@@ -149,6 +159,7 @@ export const runAuditGuildPerks = async () => {
           character_name: item.character_name,
           event_type: 'ROLE_EXECUTED',
           actor: 'WORKER',
+          world: item.world || 'Auroria',
           details: `Comando in-game "${item.action}" processado com sucesso pelo robô.`
         });
       }
