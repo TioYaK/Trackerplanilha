@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Clock, TrendingUp, AlertTriangle, Users, Info, CheckCircle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Clock, TrendingUp, AlertTriangle, Users, Info, CheckCircle, RotateCcw } from 'lucide-react';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { parseUtcDate, isSlotActiveNow } from '../lib/tibiaUtils';
 
 const toMinutes = (timeStr) => {
@@ -17,6 +17,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   const [historyRange, setHistoryRange] = useState('week'); // 'week' ou 'month'
   const [historyChartData, setHistoryChartData] = useState([]);
   const [sessionLabel, setSessionLabel] = useState('Rendimento Individual (Hoje / SS)');
+  const [selectedHuntDay, setSelectedHuntDay] = useState(null);
 
   const formatXp = (raw) => {
     if (!raw && raw !== 0) return '0';
@@ -137,9 +138,9 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       const sMin = toMinutes(party.slot_start);
       let eMin = toMinutes(party.slot_end);
       if (eMin <= sMin) eMin += 1440;
-      // Janela de tolerância: 2 horas antes do início até 2.5 horas após o término do slot
-      const winStart = sMin - 120;
-      const winEnd = eMin + 150;
+      // Janela de tolerância calibrada: inicia até 45 min antes do slot, ou durante o slot
+      const winStart = sMin - 45;
+      const winEnd = eMin + 45;
 
       logs.forEach(log => {
         const date = parseDate(log.session_end);
@@ -147,7 +148,11 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         const dxp = parseInt(log.xp_gained || 0, 10);
         if (dxp <= 0 || !date) return;
 
-        // Se a party tem horário planilhado, ignora caçadas solo que ocorreram totalmente fora da janela da party
+        // Se a duração for excessiva (> 4 horas), ignora: é botting/treino solo overnight, não hunt de party
+        const durationMins = log.duration_minutes || ((date - startDate) / 60000);
+        if (durationMins > 240) return;
+
+        // Se a party tem horário planilhado, ignora caçadas solo fora da janela do slot
         if (party.slot_start && party.slot_end) {
           const startBrt = new Date(startDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
           const endBrt = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -155,11 +160,12 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           let endM = endBrt.getHours() * 60 + endBrt.getMinutes();
           if (endM < startM) endM += 1440;
 
-          const inWindow = (startM >= winStart && startM <= winEnd) || (endM >= winStart && endM <= winEnd);
-          if (!inWindow) return; // Não junta caçadas solo aleatórias (ex: membro jogando de manhã) na telemetria da party
+          const inWindow = (startM >= winStart && startM <= winEnd) || (startM <= sMin && endM >= sMin);
+          if (!inWindow) return;
         }
 
-        const dayStr = getTibiaDay(date);
+        // Atribui o dia pelo INÍCIO da caçada para não empurrar hunts noturnas para o dia seguinte
+        const dayStr = getTibiaDay(startDate);
 
         if (!historyMap[dayStr]) {
           historyMap[dayStr] = {
@@ -167,7 +173,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             totalXp: 0,
             start: startDate,
             end: date,
-            rawDate: date,
+            rawDate: startDate,
             memberXp: {}
           };
         }
@@ -180,8 +186,13 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         historyMap[dayStr].memberXp[charKey] = (historyMap[dayStr].memberXp[charKey] || 0) + dxp;
       });
 
-      // Converte historyMap para array do gráfico
+      // Converte historyMap para array do gráfico, filtrando apenas hunts reais de party (2+ membros ou líder)
       const chartDataArr = Object.values(historyMap)
+        .filter(h => {
+          const activeCount = Object.keys(h.memberXp).length;
+          const hasLeader = party.leader_name && h.memberXp[party.leader_name.toLowerCase()] > 0;
+          return activeCount >= 2 || hasLeader;
+        })
         .sort((a, b) => a.rawDate - b.rawDate)
         .map(h => {
            const diffMins = Math.max(1, (h.end - h.start) / (1000 * 60));
@@ -197,7 +208,36 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         });
       setHistoryChartData(chartDataArr);
 
-      // 5. Calcula estatísticas individuais dos membros
+      // 5. Determina qual Hunt exibir (Ao Vivo, Selecionada ou Última Gravada)
+      const isSlotActive = isSlotActiveNow(party.slot_start, party.slot_end);
+      const todayDayStr = getTibiaDay(new Date());
+      const todayHunt = chartDataArr.find(h => h.day === todayDayStr);
+      const lastHunt = chartDataArr.length > 0 ? chartDataArr[chartDataArr.length - 1] : null;
+
+      let activeHunt = null;
+      if (selectedHuntDay) {
+        activeHunt = chartDataArr.find(h => h.day === selectedHuntDay) || lastHunt;
+      }
+
+      let activeLabel = 'Rendimento Individual (Hoje / SS)';
+      let isShowingLive = false;
+
+      if (isSlotActive) {
+        // Slot acontecendo agora
+        activeLabel = 'Rendimento Individual (Caçando Agora)';
+        isShowingLive = true;
+      } else if (activeHunt) {
+        activeLabel = `Rendimento Individual (${activeHunt.day})`;
+      } else if (todayHunt) {
+        activeLabel = `Rendimento Individual (Hoje - ${todayHunt.day})`;
+        activeHunt = todayHunt;
+      } else if (lastHunt) {
+        activeLabel = `Rendimento Individual (Última Hunt - ${lastHunt.day})`;
+        activeHunt = lastHunt;
+      }
+      setSessionLabel(activeLabel);
+
+      // 6. Calcula estatísticas individuais dos membros
       const memberStats = {};
       validMembers.forEach(m => {
         memberStats[m.toLowerCase()] = { name: m, totalXpGained: 0, level: '?', lastSeen: null, isOnlineRoster: false };
@@ -213,8 +253,6 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         }
       });
 
-      // Checa se há XP no Server Save de hoje
-      let todayHasXp = false;
       currentStates.forEach(state => {
         const m = memberStats[state.character_name?.toLowerCase()];
         if (m) {
@@ -223,43 +261,47 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           if (lastActive && (!m.lastSeen || lastActive > m.lastSeen)) {
              m.lastSeen = lastActive;
           }
-          
-          if (lastActive && lastActive.getTime() >= lastSSTime) {
+        }
+      });
+
+      if (isShowingLive) {
+        // Se a party está caçando agora, soma os deltas em tempo real
+        currentStates.forEach(state => {
+          const m = memberStats[state.character_name?.toLowerCase()];
+          if (m) {
+            const lastActive = parseDate(state.last_active);
+            if (lastActive && lastActive.getTime() >= lastSSTime) {
               const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
-              if (deltaXp > 0) {
-                 m.totalXpGained += deltaXp;
-                 todayHasXp = true;
-              }
+              if (deltaXp > 0) m.totalXpGained += deltaXp;
+            }
           }
-        }
-      });
+        });
 
-      logs.forEach(log => {
-        const date = parseDate(log.session_end);
-        const dxp = parseInt(log.xp_gained || 0, 10);
-        const m = memberStats[log.character_name?.toLowerCase()];
-        if (date && date.getTime() >= lastSSTime && m && dxp > 0) {
-          m.totalXpGained += dxp;
-          m.level = log.end_level || m.level;
-          if (!m.lastSeen || date > m.lastSeen) m.lastSeen = date;
-          todayHasXp = true;
-        }
-      });
-
-      // Se a party AINDA NÃO caçou no Server Save de hoje, puxa o rendimento da última hunt gravada!
-      let activeLabel = 'Rendimento Individual (Hoje / SS)';
-      if (!todayHasXp && chartDataArr.length > 0) {
-        const lastHunt = chartDataArr[chartDataArr.length - 1];
-        activeLabel = `Rendimento Individual (Última Hunt - ${lastHunt.day})`;
+        logs.forEach(log => {
+          const date = parseDate(log.session_end);
+          const startDate = parseDate(log.session_start) || date;
+          const dxp = parseInt(log.xp_gained || 0, 10);
+          const m = memberStats[log.character_name?.toLowerCase()];
+          if (date && date.getTime() >= lastSSTime && m && dxp > 0) {
+            const startBrt = new Date(startDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+            const startM = startBrt.getHours() * 60 + startBrt.getMinutes();
+            if (startM >= winStart && startM <= winEnd) {
+              m.totalXpGained += dxp;
+              m.level = log.end_level || m.level;
+              if (!m.lastSeen || date > m.lastSeen) m.lastSeen = date;
+            }
+          }
+        });
+      } else if (activeHunt) {
+        // Exibe exatamente a hunt selecionada/última realizada
         validMembers.forEach(mName => {
           const mKey = mName.toLowerCase();
-          const lastXp = lastHunt.memberXp[mKey] || 0;
+          const xp = activeHunt.memberXp[mKey] || 0;
           if (memberStats[mKey]) {
-            memberStats[mKey].totalXpGained = lastXp;
+            memberStats[mKey].totalXpGained = xp;
           }
         });
       }
-      setSessionLabel(activeLabel);
 
       const nowMs = Date.now();
       const processedMembers = Object.values(memberStats).map(m => {
@@ -276,13 +318,14 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       processedMembers.sort((a, b) => b.totalXpGained - a.totalXpGained);
       setMembersData(processedMembers);
 
-      // 6. Horário Real (Telemetria)
-      if (chartDataArr.length > 0) {
-        const lastHunt = chartDataArr[chartDataArr.length - 1];
-        if (lastHunt.singlePing) {
-          setActualHuntTime({ single: `${lastHunt.start} (${lastHunt.day})` });
+      // 7. Horário Real (Telemetria)
+      if (isShowingLive) {
+        setActualHuntTime({ start: party.slot_start?.slice(0, 5) || '--:--', end: 'Agora', day: 'Hoje' });
+      } else if (activeHunt) {
+        if (activeHunt.singlePing) {
+          setActualHuntTime({ single: `${activeHunt.start} (${activeHunt.day})` });
         } else {
-          setActualHuntTime({ start: lastHunt.start, end: lastHunt.end, day: lastHunt.day });
+          setActualHuntTime({ start: activeHunt.start, end: activeHunt.end, day: activeHunt.day });
         }
       } else {
         setActualHuntTime(null);
@@ -295,7 +338,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
     
     const interval = setInterval(fetchPartyData, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [party, historyRange]);
+  }, [party, historyRange, selectedHuntDay]);
 
   if (!party) return <div>Nenhuma party selecionada.</div>;
 
@@ -434,7 +477,20 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 bg-tibia-card border border-tibia-border rounded-lg shadow-xl overflow-hidden">
-            <div className="p-4 bg-black/40 border-b border-tibia-border"><h3 className="font-bold text-white">{sessionLabel}</h3></div>
+            <div className="p-4 bg-black/40 border-b border-tibia-border flex justify-between items-center">
+              <div className="flex items-center">
+                <h3 className="font-bold text-white">{sessionLabel}</h3>
+                {selectedHuntDay && (
+                  <button 
+                    onClick={() => setSelectedHuntDay(null)}
+                    className="ml-3 text-xs bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/40 px-2 py-0.5 rounded inline-flex items-center transition-colors"
+                    title="Voltar para a última hunt gravada"
+                  >
+                    <RotateCcw size={11} className="mr-1" /> Mais Recente
+                  </button>
+                )}
+              </div>
+            </div>
             <table className="w-full text-left text-sm text-gray-300">
               <thead className="bg-black/20 text-gray-400 uppercase font-semibold">
                 <tr><th className="px-6 py-3">Membro</th><th className="px-6 py-3">Level</th><th className="px-6 py-3">Status</th><th className="px-6 py-3 text-right">XP Contribuída</th></tr>
@@ -487,16 +543,33 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                  <div className="w-full h-full flex items-center justify-center text-gray-500 italic">Nenhum registro de caça neste período.</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={historyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <BarChart 
+                    data={historyChartData} 
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    onClick={(state) => {
+                      if (state && state.activePayload && state.activePayload.length) {
+                        const clickedDay = state.activePayload[0].payload.day;
+                        setSelectedHuntDay(prev => prev === clickedDay ? null : clickedDay);
+                      }
+                    }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                     <XAxis dataKey="day" stroke="#888" tick={{fill: '#888', fontSize: 12}} />
                     <YAxis stroke="#888" tickFormatter={formatXpAxis} tick={{fill: '#888', fontSize: 12}} width={60} />
                     <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
-                    <Bar dataKey="totalXp" fill="#b9935a" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="totalXp" radius={[4, 4, 0, 0]} cursor="pointer">
+                      {historyChartData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.day === (selectedHuntDay || historyChartData[historyChartData.length - 1]?.day) ? '#f59e0b' : '#785b30'} 
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
+            <p className="text-xs text-gray-500 pb-3 italic text-center">💡 Clique em qualquer barra do histórico para auditar o rendimento e membros daquela hunt.</p>
           </div>
 
         </div>
