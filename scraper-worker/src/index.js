@@ -49,6 +49,42 @@ if (fs.existsSync(ID_FILE)) {
   fs.writeFileSync(ID_FILE, WORKER_ID);
 }
 
+// ─── Ring Buffer para Terminal Remoto (C2) ──────────────────────────────────
+const MAX_RECENT_LOGS = 120;
+const recentLogs = [];
+const origLog = console.log;
+const origErr = console.error;
+const origWarn = console.warn;
+
+function pushRecentLog(level, args) {
+  try {
+    const ts = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const text = args.map(arg => {
+      if (typeof arg === 'object') {
+        try { return JSON.stringify(arg); } catch { return String(arg); }
+      }
+      return String(arg);
+    }).join(' ');
+    // Remove caracteres ANSI de cores do terminal se houver
+    const cleanText = text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+    recentLogs.push(`[${ts}] [${level}] ${cleanText}`);
+    if (recentLogs.length > MAX_RECENT_LOGS) recentLogs.shift();
+  } catch {}
+}
+
+console.log = (...args) => {
+  pushRecentLog('INFO', args);
+  origLog(...args);
+};
+console.error = (...args) => {
+  pushRecentLog('ERROR', args);
+  origErr(...args);
+};
+console.warn = (...args) => {
+  pushRecentLog('WARN', args);
+  origWarn(...args);
+};
+
 const POLL_INTERVAL = 5000;       // 5 segundos entre ciclos vazios
 const LOCK_TIMEOUT_MINUTES = 5;
 const UPDATE_CHECK_INTERVAL = 10 * 60 * 1000; // Mínimo 10 min entre git pulls
@@ -167,6 +203,11 @@ let isProcessingTask = false;
 let currentTaskType = 'IDLE';
 let totalTasksCompleted = 0;
 let tasksSinceRecycle = 0;
+let totalExecutionTimeMs = 0;
+let totalTasksCompletedCount = 0;
+let lastWorkerError = null;
+let currentTerminalLogs = '';
+let currentTerminalLogsUpdatedAt = null;
 
 const processTask = async (task) => {
   if (isProcessingTask) {
@@ -251,6 +292,9 @@ const processTask = async (task) => {
     const duration = Date.now() - startTime;
     console.log(`[WORKER] ✅ ${task.task_type} concluída em ${(duration / 1000).toFixed(1)}s`);
 
+    totalExecutionTimeMs += duration;
+    totalTasksCompletedCount++;
+
     if (!sessionStats[task.task_type]) {
       sessionStats[task.task_type] = { count: 0, duration: 0 };
     }
@@ -271,6 +315,11 @@ const processTask = async (task) => {
     }
   } catch (error) {
     console.error(`[WORKER] ❌ Falha na tarefa ${task.task_type}:`, error.message);
+    lastWorkerError = {
+      task: task.task_type,
+      message: error.message || 'Erro desconhecido',
+      timestamp: new Date().toISOString()
+    };
 
     if (error.message === 'CRITICAL_TIMEOUT' || error.message.includes('Cloudflare')) {
       console.warn('[WORKER] ⏰ Timeout crítico/Cloudflare! Pausando ESTE WORKER por 1 hora para evitar ban de IP...');
@@ -300,7 +349,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.7.0';
+const WORKER_VERSION = '1.8.0';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -393,6 +442,7 @@ const sendHeartbeat = async () => {
     const disk = getDiskHealth();
     const memoryMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
     const uptimeSec = Math.round((Date.now() - new Date(WORKER_STARTED).getTime()) / 1000);
+    const avgDuration = totalTasksCompletedCount > 0 ? Math.round(totalExecutionTimeMs / totalTasksCompletedCount) : null;
     const metadata = {
       ...WORKER_METADATA,
       disk_free_gb: disk.freeGb,
@@ -404,6 +454,10 @@ const sendHeartbeat = async () => {
       tasks_completed: totalTasksCompleted,
       memory_mb: memoryMb,
       uptime_seconds: uptimeSec,
+      avg_task_duration_ms: avgDuration,
+      last_error: lastWorkerError,
+      terminal_logs: currentTerminalLogs,
+      terminal_logs_updated_at: currentTerminalLogsUpdatedAt,
     };
 
     await supabase.from('worker_heartbeats').upsert({
@@ -636,7 +690,37 @@ const processC2Command = async (cmd) => {
             .update({ status: 'PENDING', locked_at: null, worker_id: null })
             .eq('task_type', requestedTask);
        }
-    }
+    } else if (cmd.command === 'FETCH_LOGS') {
+        console.log('[C2 COMMAND] 📄 Transmitindo logs recentes do terminal para o Dashboard...');
+        currentTerminalLogs = recentLogs.join('\n');
+        currentTerminalLogsUpdatedAt = new Date().toISOString();
+        const disk = getDiskHealth();
+        const memoryMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
+        const uptimeSec = Math.round((Date.now() - new Date(WORKER_STARTED).getTime()) / 1000);
+        const avgDuration = totalTasksCompletedCount > 0 ? Math.round(totalExecutionTimeMs / totalTasksCompletedCount) : null;
+        await supabase
+          .from('worker_heartbeats')
+          .update({
+            metadata: {
+              ...WORKER_METADATA,
+              disk_free_gb: disk.freeGb,
+              disk_total_gb: disk.totalGb,
+              disk_percent_free: disk.percentFree,
+              disk_warning: disk.isLowDisk,
+              disk_text: disk.text,
+              current_task: isProcessingTask ? currentTaskType : 'IDLE',
+              tasks_completed: totalTasksCompleted,
+              memory_mb: memoryMb,
+              uptime_seconds: uptimeSec,
+              avg_task_duration_ms: avgDuration,
+              last_error: lastWorkerError,
+              terminal_logs: currentTerminalLogs,
+              terminal_logs_updated_at: currentTerminalLogsUpdatedAt,
+            }
+          })
+          .eq('worker_id', WORKER_ID);
+        console.log('[C2 COMMAND] 📄 Logs remotos transmitidos com sucesso.');
+     }
 
     console.log(`[C2 COMMAND] ✅ Comando ${cmd.command} executado com sucesso.`);
   } catch (e) {

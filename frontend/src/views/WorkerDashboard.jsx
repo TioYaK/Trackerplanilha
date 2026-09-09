@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Server, Activity, HardDrive, Cpu, Terminal, RefreshCw, PowerOff, MessageSquare, Clock, ShieldAlert, User, Database, Zap, Trash2, XCircle, Play, CheckCircle2 } from 'lucide-react';
+import { 
+  Server, Activity, HardDrive, Cpu, Terminal, RefreshCw, PowerOff, 
+  MessageSquare, Clock, ShieldAlert, User, Database, Zap, Trash2, 
+  XCircle, Play, CheckCircle2, AlertTriangle, Copy, Check, X, 
+  Layers, ShieldCheck, ListOrdered
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -8,12 +13,32 @@ export default function WorkerDashboard() {
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sendingCmd, setSendingCmd] = useState(null);
+  const [queueMetrics, setQueueMetrics] = useState({
+    pending: 0,
+    inProgress: 0,
+    totalCompleted: 0,
+  });
+  const [activeLogWorker, setActiveLogWorker] = useState(null);
+  const [fetchingLogs, setFetchingLogs] = useState(false);
+  const [copiedLogs, setCopiedLogs] = useState(false);
+  const terminalEndRef = useRef(null);
 
   useEffect(() => {
     fetchWorkers();
-    const interval = setInterval(fetchWorkers, 10000);
+    fetchQueueMetrics();
+    const interval = setInterval(() => {
+      fetchWorkers();
+      fetchQueueMetrics();
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Rolagem automática para o fim do terminal quando abrir logs
+  useEffect(() => {
+    if (activeLogWorker && terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeLogWorker?.metadata?.terminal_logs]);
 
   const fetchWorkers = async () => {
     try {
@@ -24,6 +49,11 @@ export default function WorkerDashboard() {
         
       if (!error && data) {
         setWorkers(data);
+        // Atualiza o worker ativo de logs se o modal estiver aberto
+        if (activeLogWorker) {
+          const updated = data.find(w => w.worker_id === activeLogWorker.worker_id);
+          if (updated) setActiveLogWorker(updated);
+        }
       }
     } catch (err) {
       console.error('Erro ao buscar workers:', err);
@@ -32,7 +62,33 @@ export default function WorkerDashboard() {
     }
   };
 
-  const sendCommand = async (workerId, command, payload = {}) => {
+  const fetchQueueMetrics = async () => {
+    try {
+      const [{ count: pendingCount }, { count: inProgressCount }] = await Promise.all([
+        supabase.from('task_queue').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
+        supabase.from('task_queue').select('*', { count: 'exact', head: true }).eq('status', 'IN_PROGRESS'),
+      ]);
+
+      // Soma tarefas concluídas por todos os workers
+      const { data: hbData } = await supabase.from('worker_heartbeats').select('metadata');
+      let totalCompleted = 0;
+      if (hbData) {
+        hbData.forEach(h => {
+          totalCompleted += (h.metadata?.tasks_completed || 0);
+        });
+      }
+
+      setQueueMetrics({
+        pending: pendingCount || 0,
+        inProgress: inProgressCount || 0,
+        totalCompleted,
+      });
+    } catch (err) {
+      console.error('Erro ao buscar métricas da fila:', err);
+    }
+  };
+
+  const sendCommand = async (workerId, command, payload = {}, silent = false) => {
     setSendingCmd(workerId);
     try {
       const { error } = await supabase
@@ -45,12 +101,61 @@ export default function WorkerDashboard() {
         });
 
       if (error) throw error;
-      alert(`Comando ${command} enviado com sucesso para ${workerId}!`);
+      if (!silent) {
+        alert(`Comando ${command} enviado com sucesso para ${workerId}!`);
+      }
     } catch (err) {
-      alert(`Falha ao enviar comando: ${err.message}`);
+      if (!silent) {
+        alert(`Falha ao enviar comando: ${err.message}`);
+      } else {
+        console.error(`Falha silenciosa no comando ${command}:`, err.message);
+      }
     } finally {
       setSendingCmd(null);
     }
+  };
+
+  const handleOpenLogs = async (worker) => {
+    setActiveLogWorker(worker);
+    setFetchingLogs(true);
+    // Solicita os logs mais recentes
+    await sendCommand(worker.worker_id, 'FETCH_LOGS', {}, true);
+    setTimeout(async () => {
+      const { data } = await supabase
+        .from('worker_heartbeats')
+        .select('*')
+        .eq('worker_id', worker.worker_id)
+        .maybeSingle();
+      if (data) {
+        setActiveLogWorker(data);
+      }
+      setFetchingLogs(false);
+    }, 1200);
+  };
+
+  const handleRefreshLogs = async () => {
+    if (!activeLogWorker) return;
+    setFetchingLogs(true);
+    await sendCommand(activeLogWorker.worker_id, 'FETCH_LOGS', {}, true);
+    setTimeout(async () => {
+      const { data } = await supabase
+        .from('worker_heartbeats')
+        .select('*')
+        .eq('worker_id', activeLogWorker.worker_id)
+        .maybeSingle();
+      if (data) {
+        setActiveLogWorker(data);
+        setWorkers(prev => prev.map(w => w.worker_id === data.worker_id ? data : w));
+      }
+      setFetchingLogs(false);
+    }, 1500);
+  };
+
+  const handleCopyLogs = () => {
+    if (!activeLogWorker?.metadata?.terminal_logs) return;
+    navigator.clipboard.writeText(activeLogWorker.metadata.terminal_logs);
+    setCopiedLogs(true);
+    setTimeout(() => setCopiedLogs(false), 2000);
   };
 
   const handleForceUpdateAll = async () => {
@@ -109,19 +214,42 @@ export default function WorkerDashboard() {
     return `${mins}m`;
   };
 
+  const renderLogLine = (line, idx) => {
+    let colorClass = 'text-gray-300';
+    if (line.includes('[ERROR]') || line.includes('❌') || line.includes('Falha') || line.includes('Error')) {
+      colorClass = 'text-rose-400 font-semibold bg-rose-950/20';
+    } else if (line.includes('[WARN]') || line.includes('⚠️') || line.includes('Aviso')) {
+      colorClass = 'text-amber-300';
+    } else if (line.includes('✅') || line.includes('✔') || line.includes('concluída')) {
+      colorClass = 'text-emerald-400';
+    } else if (line.includes('[WORKER]') || line.includes('[C2 COMMAND]')) {
+      colorClass = 'text-sky-300 font-semibold';
+    } else if (line.includes('[JOB]') || line.includes('[SHARD]') || line.includes('[Scraper]')) {
+      colorClass = 'text-purple-300';
+    }
+    return (
+      <div key={idx} className={`py-0.5 px-2 rounded hover:bg-white/5 font-mono text-[11px] leading-relaxed break-all ${colorClass}`}>
+        {line}
+      </div>
+    );
+  };
+
   if (loading) {
     return <div className="p-8 text-center text-gray-400">Carregando painel C2...</div>;
   }
 
+  const onlineWorkersCount = workers.filter(w => w.last_ping && new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000).length;
+
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in relative">
-      <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
+      {/* HEADER C2 */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-tibia-border pb-4">
         <div>
           <h2 className="text-4xl font-medieval text-gradient-gold mb-2 flex items-center">
             <Terminal className="mr-3 text-green-500" size={36} />
             Worker C2 Dashboard
           </h2>
-          <p className="text-gray-400">Painel de Comando e Controle da Rede Neural (SuperAdmin)</p>
+          <p className="text-gray-400">Painel de Comando, Controle e Diagnóstico Remoto da Rede Neural</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -129,19 +257,73 @@ export default function WorkerDashboard() {
             className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 border border-blue-400 text-sm transition-all"
           >
             <RefreshCw size={16} className="mr-2" />
-            ⚡ Forçar Atualização em Todos
+            ⚡ Atualizar Todos os Nós
           </button>
-          <div className="bg-black/60 border border-tibia-border p-3 rounded-lg text-sm text-gray-300">
-            Total Nodes: <span className="text-green-400 font-bold">{workers.length}</span>
+        </div>
+      </div>
+
+      {/* CARDS DE THROUGHPUT E SAÚDE DA REDE (PILAR II) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-tibia-card border border-tibia-border p-4 rounded-lg shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-green-950/60 border border-green-700/50 rounded-lg text-green-400">
+            <Server size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Nós na Rede</p>
+            <p className="text-xl font-bold text-white">
+              <span className="text-green-400">{onlineWorkersCount}</span>
+              <span className="text-gray-500 text-sm"> / {workers.length} online</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-tibia-card border border-tibia-border p-4 rounded-lg shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-amber-950/60 border border-amber-700/50 rounded-lg text-amber-400">
+            <Play size={24} className="animate-pulse" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Em Execução</p>
+            <p className="text-xl font-bold text-amber-300 font-mono">
+              {queueMetrics.inProgress} tarefas
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-tibia-card border border-tibia-border p-4 rounded-lg shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-sky-950/60 border border-sky-700/50 rounded-lg text-sky-400">
+            <ListOrdered size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Fila Aguardando</p>
+            <p className="text-xl font-bold text-sky-300 font-mono">
+              {queueMetrics.pending} tarefas
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-tibia-card border border-tibia-border p-4 rounded-lg shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-purple-950/60 border border-purple-700/50 rounded-lg text-purple-400">
+            <Zap size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Tarefas Concluídas</p>
+            <p className="text-xl font-bold text-yellow-400 font-mono">
+              {queueMetrics.totalCompleted} total
+            </p>
           </div>
         </div>
       </div>
 
+      {/* LISTA DE WORKERS */}
       <div className="grid grid-cols-1 gap-6">
         {workers.map(w => {
           const isOnline = w.last_ping ? new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000 : false;
+          const lastError = w.metadata?.last_error;
+          const avgDuration = w.metadata?.avg_task_duration_ms;
+
           return (
             <div key={w.worker_id} className={`bg-tibia-card border ${isOnline ? 'border-green-900/50' : 'border-red-900/50'} p-6 rounded-lg shadow-xl`}>
+              {/* CABEÇALHO DO CARD */}
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center">
                   <Server size={24} className={`mr-3 ${isOnline ? 'text-green-400' : 'text-red-400'}`} />
@@ -173,8 +355,9 @@ export default function WorkerDashboard() {
                 </div>
               </div>
 
+              {/* METADADOS DO WORKER */}
               {w.metadata && (
-                <div className="flex flex-col gap-3 mb-6 bg-black/40 p-4 rounded border border-white/5 text-sm">
+                <div className="flex flex-col gap-3 mb-4 bg-black/40 p-4 rounded border border-white/5 text-sm">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div>
                       <p className="text-gray-500 text-xs">CPU</p>
@@ -203,12 +386,14 @@ export default function WorkerDashboard() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-gray-500 text-xs">Versão</p>
-                      <p className="text-gray-300">v{w.version}</p>
+                      <p className="text-gray-500 text-xs">Versão do Worker</p>
+                      <p className="text-gray-300 font-mono text-xs flex items-center">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">v{w.version}</span>
+                      </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-white/5 items-center">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 border-t border-white/5 items-center">
                     <div>
                       <p className="text-gray-500 text-xs mb-1">Status de Execução</p>
                       {w.metadata.current_task && w.metadata.current_task !== 'IDLE' ? (
@@ -231,14 +416,50 @@ export default function WorkerDashboard() {
                       </p>
                     </div>
                     <div>
+                      <p className="text-gray-500 text-xs mb-1">Tempo Médio / Tarefa</p>
+                      <p className="text-sky-300 font-mono text-xs flex items-center">
+                        <Clock size={12} className="mr-1 text-sky-400" />
+                        {avgDuration ? `${(avgDuration / 1000).toFixed(1)}s` : 'Calculando...'}
+                      </p>
+                    </div>
+                    <div>
                       <p className="text-gray-500 text-xs mb-1">Localidade do Host</p>
-                      <p className="text-gray-300 truncate">{w.location || 'N/A'}</p>
+                      <p className="text-gray-300 truncate text-xs">{w.location || 'N/A'}</p>
                     </div>
                   </div>
+
+                  {/* TELEMETRIA DE ERROS (PILAR II) */}
+                  {lastError ? (
+                    <div className="mt-2 text-xs bg-rose-950/40 border border-rose-800/40 text-rose-300 p-2.5 rounded flex items-center gap-2">
+                      <AlertTriangle size={15} className="text-rose-400 shrink-0" />
+                      <div className="flex-1 truncate">
+                        <span className="font-bold text-rose-400 mr-1.5">Último Erro [{lastError.task}]:</span>
+                        <span className="font-mono text-rose-200">{lastError.message}</span>
+                      </div>
+                      <span className="text-gray-400 text-[10px] whitespace-nowrap">
+                        {formatDistanceToNow(new Date(lastError.timestamp), { addSuffix: true, locale: ptBR })}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs bg-emerald-950/20 border border-emerald-800/20 text-emerald-400/80 px-2.5 py-1.5 rounded flex items-center gap-1.5">
+                      <ShieldCheck size={13} className="text-emerald-400" />
+                      <span>Zero falhas registradas no ciclo operacional atual</span>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* AÇÕES DE CONTROLE REMOTO */}
               <div className="flex flex-wrap gap-2.5 mt-4 border-t border-tibia-border pt-4">
+                {/* BOTÃO VER LOGS (PILAR II) */}
+                <button 
+                  onClick={() => handleOpenLogs(w)}
+                  className="flex items-center px-3.5 py-1.5 bg-sky-900/40 hover:bg-sky-900/60 text-sky-300 border border-sky-700/60 rounded transition-colors text-xs font-bold shadow-sm"
+                  title="Abre o terminal remoto com visualização de logs ao vivo deste nó"
+                >
+                  <Terminal size={14} className="mr-1.5 text-sky-400" />
+                  Ver Logs Remotos
+                </button>
                 <button 
                   disabled={sendingCmd === w.worker_id}
                   onClick={() => handleForceTask(w.worker_id)}
@@ -311,6 +532,90 @@ export default function WorkerDashboard() {
           );
         })}
       </div>
+
+      {/* MODAL DE TERMINAL REMOTO (C2 PILAR II) */}
+      {activeLogWorker && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0c0d12] border border-green-500/40 w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+            {/* CABEÇALHO DO MODAL */}
+            <div className="bg-black/80 px-6 py-4 border-b border-green-500/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-950/60 border border-green-500/50 rounded text-green-400">
+                  <Terminal size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    Terminal Remoto: <span className="font-mono text-green-400">{activeLogWorker.worker_id}</span>
+                    {activeLogWorker.metadata?.owner && (
+                      <span className="text-xs bg-tibia-primary/20 text-tibia-primary px-2 py-0.5 rounded border border-tibia-primary/30">
+                        {activeLogWorker.metadata.owner}
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                    <Clock size={11} />
+                    {activeLogWorker.metadata?.terminal_logs_updated_at ? (
+                      <>Última sincronização: {formatDistanceToNow(new Date(activeLogWorker.metadata.terminal_logs_updated_at), { addSuffix: true, locale: ptBR })}</>
+                    ) : (
+                      'Nenhum log requisitado ainda'
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* BOTÕES DE CONTROLE DO TERMINAL */}
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={fetchingLogs}
+                  onClick={handleRefreshLogs}
+                  className="flex items-center px-3 py-1.5 bg-green-900/40 hover:bg-green-800/60 text-green-300 border border-green-700/60 rounded text-xs font-bold transition-colors"
+                  title="Requisita os últimos logs via comando C2 em tempo real"
+                >
+                  <RefreshCw size={13} className={`mr-1.5 ${fetchingLogs ? 'animate-spin' : ''}`} />
+                  {fetchingLogs ? 'Requisitando...' : 'Atualizar'}
+                </button>
+                <button
+                  onClick={handleCopyLogs}
+                  className="flex items-center px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 rounded text-xs font-bold transition-colors"
+                  title="Copiar logs para a área de transferência"
+                >
+                  {copiedLogs ? <Check size={13} className="mr-1.5 text-green-400" /> : <Copy size={13} className="mr-1.5" />}
+                  {copiedLogs ? 'Copiado!' : 'Copiar'}
+                </button>
+                <button
+                  onClick={() => setActiveLogWorker(null)}
+                  className="p-1.5 text-gray-400 hover:text-white rounded hover:bg-white/10 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* JANELA DO TERMINAL */}
+            <div className="flex-1 overflow-y-auto p-4 bg-black/95 font-mono text-xs text-gray-300 space-y-0.5 select-text">
+              {activeLogWorker.metadata?.terminal_logs ? (
+                activeLogWorker.metadata.terminal_logs.split('\n').map((line, idx) => renderLogLine(line, idx))
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <Terminal size={36} className="mx-auto mb-3 opacity-40 text-green-500" />
+                  <p>Aguardando transmissão de logs do nó remoto...</p>
+                  <p className="text-xs text-gray-600 mt-1">Clique em "Atualizar" se o worker estiver ativo.</p>
+                </div>
+              )}
+              <div ref={terminalEndRef} />
+            </div>
+
+            {/* RODAPÉ DO TERMINAL */}
+            <div className="bg-black/90 px-6 py-2.5 border-t border-white/5 flex items-center justify-between text-[11px] text-gray-500">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                C2 Live Link Ativo (Ring Buffer de 120 eventos)
+              </span>
+              <span>Worker OS: {activeLogWorker.metadata?.os || 'Desconhecido'}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
