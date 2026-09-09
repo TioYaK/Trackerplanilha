@@ -5,7 +5,7 @@ export const runSendDiscordReport = async () => {
     try {
         console.log('[JOB] Preparando Relatório Diário para o Discord...');
 
-        const { data: webhook } = await supabase.from('webhook_settings').select('*').eq('id', 1).single();
+        const { data: webhook } = await supabase.from('webhook_settings').select('*').eq('id', 1).maybeSingle();
         if (!webhook || !webhook.discord_url) {
             console.log('[JOB] Nenhum webhook configurado. Pulando...');
             return;

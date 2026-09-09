@@ -46,7 +46,10 @@ export default function ActiveClaimsSidebar() {
   }, []);
 
   const formatUptime = (startTime) => {
-    const diff = Math.floor((new Date() - new Date(startTime)) / 60000);
+    if (!startTime) return '0m';
+    const parsed = new Date(startTime).getTime();
+    if (isNaN(parsed)) return '0m';
+    const diff = Math.max(0, Math.floor((Date.now() - parsed) / 60000));
     if (diff < 60) return `${diff}m`;
     const h = Math.floor(diff / 60);
     const m = diff % 60;
@@ -73,7 +76,7 @@ export default function ActiveClaimsSidebar() {
         <div className="flex items-center gap-2">
           <Swords className="text-tibia-gold" size={20} />
           <h2 className="text-tibia-gold font-bold">Hunts Ativas</h2>
-          <span className="bg-tibia-gold/20 text-tibia-gold px-2 py-0.5 rounded-full text-|l font-bold">
+          <span className="bg-tibia-gold/20 text-tibia-gold px-2 py-0.5 rounded-full text-xs font-bold">
             {claims.length}
           </span>
         </div>

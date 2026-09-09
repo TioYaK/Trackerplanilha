@@ -158,7 +158,7 @@ export default function ProfileModal({ onClose }) {
 
       for (const makerName of auroriaMakersList) {
         for (const p of allProfiles) {
-          if (p.main_character.toLowerCase() === makerName.toLowerCase() && p.id !== user.id) {
+          if (p.main_character && p.main_character.toLowerCase() === makerName.toLowerCase() && p.id !== user.id) {
             throw new Error(`O personagem "${makerName}" já é o Main Character do jogador ${p.main_character}.`);
           }
           
@@ -167,7 +167,7 @@ export default function ProfileModal({ onClose }) {
             for (const srv of Object.keys(pMakers)) {
               const list = typeof pMakers[srv] === 'string' ? pMakers[srv].split(',') : [];
               if (list.some(m => m.trim().toLowerCase() === makerName.toLowerCase())) {
-                throw new Error(`O personagem "${makerName}" já está registrado como Maker do jogador ${p.main_character}.`);
+                throw new Error(`O personagem "${makerName}" já está registrado como Maker do jogador ${p.main_character || 'Outro Jogador'}.`);
               }
             }
           }

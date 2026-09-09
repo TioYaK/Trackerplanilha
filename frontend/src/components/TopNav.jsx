@@ -140,9 +140,9 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
                       }`}
                     >
                       <span className={`${currentView === itemId ? 'text-tibia-highlight' : 'text-gray-400'}`}>
-                        {viewsData[itemId].icon}
+                        {viewsData[itemId]?.icon}
                       </span>
-                      <span>{viewsData[itemId].label}</span>
+                      <span>{viewsData[itemId]?.label}</span>
                     </button>
                   ))}
                 </div>
@@ -247,8 +247,8 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
                           : 'text-gray-300 hover:bg-white/10'
                       }`}
                     >
-                      {viewsData[itemId].icon}
-                      <span>{viewsData[itemId].label}</span>
+                      {viewsData[itemId]?.icon}
+                      <span>{viewsData[itemId]?.label}</span>
                     </button>
                   ))}
                 </div>

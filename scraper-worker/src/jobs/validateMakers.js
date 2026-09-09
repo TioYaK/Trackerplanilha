@@ -13,7 +13,7 @@ export const runValidateMakers = async () => {
     if (!queue || queue.length === 0) return;
 
     // 2. Fetch Rules
-    const { data: rules } = await supabase.from('maker_rules').select('*').limit(1).single();
+    const { data: rules } = await supabase.from('maker_rules').select('*').limit(1).maybeSingle();
 
     for (const job of queue) {
       try {

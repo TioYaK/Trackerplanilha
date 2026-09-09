@@ -21,12 +21,12 @@ export const runFetchBazaar = async () => {
 
     // Pega lista de hunteds
     const { data: huntedList } = await supabase.from('hunted_list').select('name');
-    const huntedNames = new Set((huntedList || []).map(h => h.name.toLowerCase()));
+    const huntedNames = new Set((huntedList || []).filter(h => h && h.name).map(h => h.name.toLowerCase()));
 
     const alertsToInsert = [];
 
     for (const auc of auctions) {
-      const isHunted = huntedNames.has(auc.name.toLowerCase());
+      const isHunted = auc.name ? huntedNames.has(auc.name.toLowerCase()) : false;
       const isSnipingOp = auc.level >= 500 && auc.currentValue <= 2000;
 
       if (isHunted || isSnipingOp) {

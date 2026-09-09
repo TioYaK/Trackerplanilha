@@ -106,7 +106,7 @@ export default function InviteRequest({ isPublic = false }) {
   };
 
   const filteredInvites = recentInvites.filter(inv => {
-    const matchName = inv.character_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchName = (inv.character_name || '').toLowerCase().includes((searchTerm || '').toLowerCase());
     const matchStatus = statusFilter === 'ALL' || inv.status === statusFilter;
     return matchName && matchStatus;
   });

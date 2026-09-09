@@ -121,11 +121,11 @@ export default function GlobalTracker() {
           const stateMap = new Map();
           allStates.forEach(s => {
             const activeXp = Math.max(0, (s.xp_total || 0) - (s.session_start_xp || s.xp_total || 0));
-            if (activeXp > 0) stateMap.set(s.character_name.toLowerCase(), activeXp);
+            if (activeXp > 0 && s.character_name) stateMap.set(s.character_name.toLowerCase(), activeXp);
           });
 
           return allRoster.map(m => {
-            const activeXp = stateMap.get(m.name.toLowerCase()) || 0;
+            const activeXp = m.name ? (stateMap.get(m.name.toLowerCase()) || 0) : 0;
             return { ...m, xp_gained_24h: (m.xp_gained_24h || 0) + activeXp };
           });
         };

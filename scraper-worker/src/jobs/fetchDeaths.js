@@ -26,8 +26,8 @@ export const runFetchDeaths = async () => {
         const { data: guildData } = await supabase.from('guild_members').select('name');
         const { data: huntedData } = await supabase.from('hunted_list').select('name');
         
-        const guildNames = (guildData || []).map(m => m.name.toLowerCase());
-        const huntedNames = (huntedData || []).map(h => h.name.toLowerCase());
+        const guildNames = (guildData || []).filter(m => m && m.name).map(m => m.name.toLowerCase());
+        const huntedNames = (huntedData || []).filter(h => h && h.name).map(h => h.name.toLowerCase());
 
         let count = 0;
         

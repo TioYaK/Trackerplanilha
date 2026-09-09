@@ -42,14 +42,14 @@ export const runFetchHighscores = async (vocationStr) => {
         if (p.leader_name) allGuildMembers.push({ name: p.leader_name });
         if (Array.isArray(p.members)) {
           p.members.forEach(m => {
-            if (m) allGuildMembers.push({ name: m });
+            if (m && typeof m === 'string') allGuildMembers.push({ name: m.trim() });
           });
         }
       });
     }
 
-    const memberNames = new Set(allGuildMembers.map(m => m.name.toLowerCase()));
-    const relevantPlayers = players.filter(p => memberNames.has(p.name.toLowerCase()));
+    const memberNames = new Set(allGuildMembers.filter(m => m && m.name).map(m => m.name.toLowerCase()));
+    const relevantPlayers = players.filter(p => p && p.name && memberNames.has(p.name.toLowerCase()));
     
     if (relevantPlayers.length === 0) {
       console.log(`[JOB] Nenhum membro relevante encontrado nos highscores.`);

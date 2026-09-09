@@ -29,7 +29,7 @@ import { supabase } from './lib/supabase';
 // Tabs padrão visíveis quando não há configuração no banco
 const DEFAULT_VISIBLE_TABS = [
   'live', 'radar', 'roster', 'planilha', 'contribute',
-  'bank', 'market', 'loot', 'tracker', 'extreme', 'respawns', 'respawns'
+  'bank', 'market', 'loot', 'tracker', 'extreme', 'respawns'
 ];
 
 export default function App() {
@@ -160,7 +160,7 @@ export default function App() {
             <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} />
           </div>
         );
-      default: return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} />;
+      default: return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
     }
   };
 

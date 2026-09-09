@@ -18,7 +18,7 @@ export const runFetchRosterShard = async (shardId) => {
     else regexFilter = /.*/; // Fallback to all if something weird happens
 
     // Filter members for this shard
-    const shardMembers = members.filter(m => regexFilter.test(m.name.trim()));
+    const shardMembers = members.filter(m => m && m.name && regexFilter.test(m.name.trim()));
     if (shardMembers.length === 0) return;
 
     // Prioriza os membros que nunca foram atualizados ou que foram atualizados há mais tempo
@@ -29,14 +29,17 @@ export const runFetchRosterShard = async (shardId) => {
     const stateMap = new Map();
     if (states) {
       states.forEach(s => {
+        if (!s || !s.character_name) return;
         const time = s.updated_at ? new Date(s.updated_at).getTime() : 0;
         stateMap.set(s.character_name.toLowerCase(), time);
       });
     }
 
     shardMembers.sort((a, b) => {
-      const ta = stateMap.get(a.name.toLowerCase()) || 0;
-      const tb = stateMap.get(b.name.toLowerCase()) || 0;
+      const nameA = (a?.name || '').toLowerCase();
+      const nameB = (b?.name || '').toLowerCase();
+      const ta = stateMap.get(nameA) || 0;
+      const tb = stateMap.get(nameB) || 0;
       return ta - tb;
     });
 
@@ -51,7 +54,7 @@ export const runFetchRosterShard = async (shardId) => {
         if (charData) {
           const { data: existing } = await supabase.from('current_character_state')
             .select('xp_total, session_start_xp, session_start_time')
-            .eq('character_name', member.name)
+            .ilike('character_name', member.name)
             .maybeSingle();
 
           let xpValue = 0;

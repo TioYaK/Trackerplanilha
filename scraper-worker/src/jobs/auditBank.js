@@ -15,7 +15,7 @@ export const runAuditBank = async () => {
         // Verifica se a auditoria já rodou neste mês para não duplicar strikes
         const monthKey = `${brazilTime.getFullYear()}-${brazilTime.getMonth() + 1}`;
         
-        const { data: config } = await supabase.from('webhook_settings').select('last_bank_audit').single().catch(() => ({ data: null }));
+        const { data: config } = await supabase.from('webhook_settings').select('last_bank_audit').eq('id', 1).maybeSingle();
         if (config?.last_bank_audit === monthKey) {
             return;
         }

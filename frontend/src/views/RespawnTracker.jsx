@@ -17,8 +17,8 @@ export default function RespawnTracker({ isAdmin }) {
   }, []);
 
   const filteredRespawns = respawns.filter(r => 
-    r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    r.id.toLowerCase().includes(searchTerm.toLowerCase())
+    (r.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    String(r.id || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
