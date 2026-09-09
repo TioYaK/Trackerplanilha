@@ -131,9 +131,9 @@ export default function BazaarSniper() {
 
                 <div className="flex justify-between items-center bg-black/40 p-2 rounded border border-white/5 mb-3 text-sm">
                   <div className="flex items-center text-blue-400" title="Main Skill">
-                    {(auction.vocation?.includes('Sorcerer') || auction.vocation?.includes('Druid')) ? (
+                    {(formatVocation(auction.vocation).includes('Sorcerer') || formatVocation(auction.vocation).includes('Druid')) ? (
                       <><Wand2 size={14} className="mr-1" /> {auction.mag_level || '?'}</>
-                    ) : auction.vocation?.includes('Paladin') ? (
+                    ) : formatVocation(auction.vocation).includes('Paladin') ? (
                       <><Target size={14} className="mr-1" /> {auction.skills_data?.dist || '?'}</>
                     ) : (
                       <><Sword size={14} className="mr-1" /> {Math.max(auction.skills_data?.sword||0, auction.skills_data?.axe||0, auction.skills_data?.club||0) || '?'}</>
@@ -149,12 +149,12 @@ export default function BazaarSniper() {
 
                 {auction.items_data && auction.items_data.length > 0 && (
                   <div className="flex gap-2 mb-4 bg-black/30 p-2 rounded border border-white/5 overflow-x-auto">
-                    {auction.items_data.slice(0, 5).map(item => (
+                    {auction.items_data.slice(0, 5).map((item, idx) => (
                       <img 
-                        key={item.name} 
-                        src={`https://tibia.fandom.com/wiki/Special:FilePath/${item.name.trim().replace(/ /g, '_')}.gif`} 
-                        alt={item.name} 
-                        title={item.name} 
+                        key={item?.name || idx} 
+                        src={`https://tibia.fandom.com/wiki/Special:FilePath/${item?.name ? String(item.name).trim().replace(/ /g, '_') : ''}.gif`} 
+                        alt={item?.name || 'Item'} 
+                        title={item?.name || ''} 
                         className="w-8 h-8 object-contain drop-shadow-md"
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />

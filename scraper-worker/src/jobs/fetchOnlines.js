@@ -28,11 +28,11 @@ export const runFetchOnlines = async () => {
       try { previousOnlines = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8')); } catch(e){}
     }
     
-    const prevSet = new Set(previousOnlines.map(p => p.toLowerCase()));
-    const currSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
+    const prevSet = new Set(previousOnlines.filter(p => p && typeof p === 'string').map(p => p.toLowerCase()));
+    const currSet = new Set(onlinePlayers.filter(p => p && typeof p === 'string').map(p => p.toLowerCase()));
     
-    const loggedIn = onlinePlayers.filter(p => !prevSet.has(p.toLowerCase()));
-    const loggedOut = previousOnlines.filter(p => !currSet.has(p.toLowerCase()));
+    const loggedIn = onlinePlayers.filter(p => p && typeof p === 'string' && !prevSet.has(p.toLowerCase()));
+    const loggedOut = previousOnlines.filter(p => p && typeof p === 'string' && !currSet.has(p.toLowerCase()));
     
     fs.writeFileSync(CACHE_FILE, JSON.stringify(onlinePlayers));
 
@@ -54,7 +54,7 @@ export const runFetchOnlines = async () => {
 
     if (huntedList && huntedList.length > 0) {
       for (const hunted of huntedList) {
-        const isCurrentlyOnline = onlineSet.has(hunted.name.toLowerCase());
+        const isCurrentlyOnline = hunted.name ? onlineSet.has(hunted.name.toLowerCase()) : false;
         
         // Se o status mudou ou se ele acabou de ser visto online
         if (isCurrentlyOnline) {
@@ -85,15 +85,15 @@ export const runFetchOnlines = async () => {
 
     if (allGuildMembers.length > 0) {
       const activeGuildNames = allGuildMembers
-        .filter(m => onlineSet.has(m.name.toLowerCase()))
+        .filter(m => m && m.name && onlineSet.has(m.name.toLowerCase()))
         .map(m => m.name);
 
       const toSetOnline = allGuildMembers
-        .filter(m => onlineSet.has(m.name.toLowerCase()) && !m.is_online)
+        .filter(m => m && m.name && onlineSet.has(m.name.toLowerCase()) && !m.is_online)
         .map(m => m.name);
 
       const toSetOffline = allGuildMembers
-        .filter(m => !onlineSet.has(m.name.toLowerCase()) && m.is_online)
+        .filter(m => m && m.name && !onlineSet.has(m.name.toLowerCase()) && m.is_online)
         .map(m => m.name);
 
       if (toSetOnline.length > 0) {

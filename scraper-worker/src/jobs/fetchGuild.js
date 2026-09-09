@@ -38,6 +38,7 @@ export const runFetchGuild = async () => {
     // Remove duplicatas pelo nome
     const uniqueMembersMap = new Map();
     members.forEach(m => {
+      if (!m || !m.name) return;
       uniqueMembersMap.set(m.name, {
         name: m.name,
         vocation: formatVocation(m.vocation),
@@ -106,12 +107,12 @@ export const runFetchGuild = async () => {
           .select('name')
           .range(page * 1000, (page + 1) * 1000 - 1);
         if (!dbMembers || dbMembers.length === 0) break;
-        allDbNames.push(...dbMembers.map(m => m.name));
+        allDbNames.push(...dbMembers.filter(m => m && m.name).map(m => m.name));
         page++;
       }
 
       const activeNamesSet = new Set(activeNames.map(n => n.toLowerCase()));
-      const leftGuildNames = allDbNames.filter(name => !activeNamesSet.has(name.toLowerCase()));
+      const leftGuildNames = allDbNames.filter(name => name && !activeNamesSet.has(name.toLowerCase()));
 
       if (leftGuildNames.length > 0) {
         console.log(`[JOB] 🧹 Limpando ${leftGuildNames.length} membros que saíram da guilda...`);

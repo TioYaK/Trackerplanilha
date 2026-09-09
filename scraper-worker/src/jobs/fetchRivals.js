@@ -15,13 +15,16 @@ export const runFetchRivals = async () => {
     const { data: currentHunted } = await supabase.from('hunted_list').select('id, name');
     const huntedMap = new Map();
     if (currentHunted) {
-        currentHunted.forEach(h => huntedMap.set(h.name.toLowerCase(), h));
+        currentHunted.forEach(h => {
+          if (h && h.name) huntedMap.set(h.name.toLowerCase(), h);
+        });
     }
 
     let addedCount = 0;
     const now = new Date().toISOString();
 
     for (const m of members) {
+        if (!m || !m.name) continue;
         const lowerName = m.name.toLowerCase();
         if (huntedMap.has(lowerName)) {
            continue;

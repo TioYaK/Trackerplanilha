@@ -88,6 +88,7 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
     const stateMap = new Map();
     if (states) {
       states.forEach(s => {
+        if (!s || !s.character_name) return;
         const activeXp = Math.max(0, (s.xp_total || 0) - (s.session_start_xp || s.xp_total || 0));
         if (activeXp > 0) {
           stateMap.set(s.character_name.toLowerCase(), activeXp);
@@ -96,7 +97,7 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
     }
 
     const mergedData = allData.map(m => {
-      const activeXp = stateMap.get(m.name.toLowerCase()) || 0;
+      const activeXp = m && m.name ? (stateMap.get(m.name.toLowerCase()) || 0) : 0;
       const totalXp = (m.xp_gained_24h || 0) + activeXp;
       return { ...m, xp_gained_24h: totalXp };
     });
@@ -146,7 +147,7 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
   const itemsPerPage = 50;
 
   const filteredMembers = members.filter(m => {
-    const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (m.name || '').toLowerCase().includes((searchTerm || '').toLowerCase());
     if (filter === 'online') return matchesSearch && m.is_online;
     if (filter === 'offline') return matchesSearch && !m.is_online;
     return matchesSearch;
@@ -398,7 +399,7 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
                       className="px-6 py-3 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline flex items-center gap-3"
                       onClick={() => onPlayerClick && onPlayerClick(m.name)}
                     >
-                      {avatarsMap[m.name.toLowerCase()] ? (
+                      {m.name && avatarsMap[m.name.toLowerCase()] ? (
                         <img 
                           src={avatarsMap[m.name.toLowerCase()]} 
                           alt={m.name}
@@ -406,7 +407,7 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
                         />
                       ) : (
                         <div className="w-7 h-7 rounded-full bg-yellow-900 border border-yellow-600 flex items-center justify-center text-[10px] font-bold text-yellow-500 shrink-0 shadow-inner">
-                          {m.name.charAt(0).toUpperCase()}
+                          {m.name ? m.name.charAt(0).toUpperCase() : '?'}
                         </div>
                       )}
                       <span>{m.name}</span>

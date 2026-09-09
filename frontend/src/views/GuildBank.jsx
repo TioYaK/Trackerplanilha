@@ -127,13 +127,14 @@ export default function GuildBank({ isAdmin }) {
     );
   }
 
-  const filteredRoster = roster.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 100);
+  const filteredRoster = roster.filter(m => (m.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())).slice(0, 100);
   const totalCount = roster.length;
   const paidCount = payments.length;
   const tcTotal = paidCount * 250; // 250 TC por mensalidade
   
   const bankBalance = tcTotal + transactions.reduce((acc, curr) => {
-    return curr.type === 'IN' ? acc + curr.amount_tc : acc - curr.amount_tc;
+    const amt = Number(curr.amount_tc) || 0;
+    return curr.type === 'IN' ? acc + amt : acc - amt;
   }, 0);
 
   return (

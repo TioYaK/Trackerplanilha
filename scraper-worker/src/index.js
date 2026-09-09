@@ -631,7 +631,7 @@ supabase
        }
 
        // Puxa as chaves VAPID
-       const { data: config } = await supabase.from('worker_config').select('vapid_public_key, vapid_private_key').eq('id', 1).single();
+       const { data: config } = await supabase.from('worker_config').select('vapid_public_key, vapid_private_key').eq('id', 1).maybeSingle();
        if (!config || !config.vapid_public_key || !config.vapid_private_key) return;
 
        webpush.setVapidDetails(

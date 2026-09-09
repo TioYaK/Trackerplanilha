@@ -37,13 +37,14 @@ export default function WarAttendance() {
   }, [dateFilter]);
 
   const filtered = attendanceData.filter(d => 
-    d.character_name.toLowerCase().includes(search.toLowerCase())
+    (d.character_name || '').toLowerCase().includes((search || '').toLowerCase())
   );
 
   const formatMinutes = (mins) => {
-    if (mins < 60) return `${mins} min`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
+    const mTotal = Number(mins) || 0;
+    if (mTotal < 60) return `${mTotal} min`;
+    const h = Math.floor(mTotal / 60);
+    const m = mTotal % 60;
     return `${h}h ${m}m`;
   };
 

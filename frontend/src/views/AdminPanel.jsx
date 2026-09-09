@@ -40,7 +40,7 @@ export default function AdminPanel({ currentVisibleTabs }) {
   }, [isSuperAdmin]);
 
   const fetchWebhook = async () => {
-    const { data } = await supabase.from('webhook_settings').select('discord_url').eq('id', 1).single();
+    const { data } = await supabase.from('webhook_settings').select('discord_url').eq('id', 1).maybeSingle();
     if (data) setDiscordWebhook(data.discord_url);
   };
 
@@ -80,7 +80,7 @@ export default function AdminPanel({ currentVisibleTabs }) {
   };
 
   const fetchTabs = async () => {
-    const { data } = await supabase.from('app_settings').select('visible_tabs').eq('id', 1).single();
+    const { data } = await supabase.from('app_settings').select('visible_tabs').eq('id', 1).maybeSingle();
     if (data?.visible_tabs) setTabs(data.visible_tabs);
   };
 
@@ -593,7 +593,7 @@ function MakerRulesPanel() {
   }, []);
 
   const fetchRules = async () => {
-    const { data, error } = await supabase.from('maker_rules').select('*').limit(1).single();
+    const { data, error } = await supabase.from('maker_rules').select('*').limit(1).maybeSingle();
     if (data) setRules(data);
     setLoading(false);
   };

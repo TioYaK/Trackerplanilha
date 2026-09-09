@@ -48,7 +48,7 @@ export default function RadarHunters({ isAdmin }) {
                   const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
                   const activeDate = parseUtcDate(state.last_active);
                   const lastActiveTime = activeDate ? activeDate.getTime() : 0;
-                  if (deltaXp > 0 && lastActiveTime >= oneHourAgoMs && lastActiveTime <= nowMs + 60000) {
+                  if (deltaXp > 0 && lastActiveTime >= oneHourAgoMs && lastActiveTime <= nowMs + 60000 && state.character_name) {
                     const key = state.character_name.toLowerCase();
                     xpMap[key] = (xpMap[key] || 0) + deltaXp;
                   }
@@ -198,7 +198,7 @@ export default function RadarHunters({ isAdmin }) {
                     <th className="p-4 border-b border-tibia-border/50">Motivo</th>
                     <th className="p-4 border-b border-tibia-border/50">Visto por Ǫltimo</th>
                     <th className="p-4 border-b border-tibia-border/50">Atividade (1h)</th>
-                    {isAdmin && <th className="p-4 border-b border-tibia-border/50 text-right">Aes</th>}
+                    {isAdmin && <th className="p-4 border-b border-tibia-border/50 text-right">Ações</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-tibia-border/30">

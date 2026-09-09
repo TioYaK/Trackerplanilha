@@ -22,7 +22,7 @@ export const runSendDiscordReport = async () => {
         // ===================================
         // 1. Coleta de Dados (Macro)
         // ===================================
-        const { data: census } = await supabase.from('view_macro_census').select('*').single();
+        const { data: census } = await supabase.from('view_macro_census').select('*').maybeSingle();
         const { count: partiesCount } = await supabase.from('parties_planilhadas').select('*', { count: 'exact', head: true });
         
         let report = `📰 **RELATÓRIO DIÁRIO DE GUILDA** 📰\n\n`;

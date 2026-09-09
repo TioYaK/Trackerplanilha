@@ -47,7 +47,7 @@ export default function App() {
           .from('app_settings')
           .select('visible_tabs')
           .eq('id', 1)
-          .single();
+          .maybeSingle();
         setVisibleTabs(data?.visible_tabs ?? DEFAULT_VISIBLE_TABS);
       } catch (err) {
         setVisibleTabs(DEFAULT_VISIBLE_TABS);

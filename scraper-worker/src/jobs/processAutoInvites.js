@@ -594,7 +594,7 @@ async function inviteCharacter(page, world, guildName, characterName) {
     
     // Screenshot para debugar qual foi a mensagem real do site
     await page.screenshot({ path: getDebugScreenshotPath('debug_timeout.png') }).catch(() => {});
-    return { success: false, reason: 'Cloudflare bloqueou o POST (Turnstile)ção do convite.' };
+    return { success: false, reason: 'Cloudflare bloqueou a verificação (Turnstile) do convite.' };
   } catch (err) {
     return { success: false, reason: `Erro na navegação: ${err.message}` };
   }

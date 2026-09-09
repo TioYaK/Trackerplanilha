@@ -90,6 +90,7 @@ export default function PlanilhaManager({ isAdmin }) {
 
     // Normaliza nomes: trim, colapsa espaços múltiplos e capitaliza cada palavra
     const normalizeName = (raw) => {
+      if (!raw || typeof raw !== 'string') return '';
       return raw
         .trim()
         .replace(/\s+/g, ' ')
@@ -98,7 +99,7 @@ export default function PlanilhaManager({ isAdmin }) {
         .join(' ');
     };
 
-    const membersArray = formData.members
+    const membersArray = (formData.members || '')
       .split(',')
       .map(m => normalizeName(m))
       .filter(m => m.length > 0);

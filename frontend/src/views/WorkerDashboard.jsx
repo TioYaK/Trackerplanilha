@@ -108,7 +108,7 @@ export default function WorkerDashboard() {
 
       <div className="grid grid-cols-1 gap-6">
         {workers.map(w => {
-          const isOnline = new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000;
+          const isOnline = w.last_ping ? new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000 : false;
           return (
             <div key={w.worker_id} className={`bg-tibia-card border ${isOnline ? 'border-green-900/50' : 'border-red-900/50'} p-6 rounded-lg shadow-xl`}>
               <div className="flex justify-between items-start mb-4">
@@ -137,7 +137,7 @@ export default function WorkerDashboard() {
                   <p className="text-xs text-gray-500">Último Ping</p>
                   <p className="text-sm text-blue-400">
                     <Clock size={12} className="inline mr-1" />
-                    {formatDistanceToNow(new Date(w.last_ping), { addSuffix: true, locale: ptBR })}
+                    {w.last_ping ? formatDistanceToNow(new Date(w.last_ping), { addSuffix: true, locale: ptBR }) : 'Nunca'}
                   </p>
                 </div>
               </div>

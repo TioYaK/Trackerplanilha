@@ -20,6 +20,7 @@ export default function GuildRadar() {
         
         const memberStats = {};
         guildMembers.forEach(m => {
+          if (!m || !m.name) return;
           memberStats[m.name.toLowerCase()] = { 
               ...m, 
               vocation: formatVocation(m.vocation),
@@ -46,7 +47,8 @@ export default function GuildRadar() {
 
         if (states) {
           states.forEach(state => {
-            const m = memberStats[state.character_name?.toLowerCase()];
+            if (!state || !state.character_name) return;
+            const m = memberStats[state.character_name.toLowerCase()];
             if (m) {
               const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
               const activeDate = parseUtcDate(state.last_active);
@@ -81,9 +83,10 @@ export default function GuildRadar() {
   }, []);
 
   const formatXp = (raw) => {
-    if (raw >= 1000000) return (raw / 1000000).toFixed(1) + 'M';
-    if (raw >= 1000) return (raw / 1000).toFixed(1) + 'k';
-    return raw;
+    const val = Number(raw) || 0;
+    if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+    if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
+    return val.toLocaleString();
   };
 
   const getVocationColor = (voc) => {

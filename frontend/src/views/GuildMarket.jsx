@@ -94,8 +94,9 @@ export default function GuildMarket({ isAdmin }) {
   };
 
   const filteredItems = items.filter(item => {
-    const matchesSearch = item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          item.seller_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const sTerm = (searchTerm || '').toLowerCase();
+    const matchesSearch = (item.item_name || '').toLowerCase().includes(sTerm) || 
+                          (item.seller_name || '').toLowerCase().includes(sTerm);
     const matchesCat = categoryFilter === 'All' || item.category === categoryFilter;
     return matchesSearch && matchesCat;
   });
@@ -199,7 +200,7 @@ export default function GuildMarket({ isAdmin }) {
                   </div>
                 </div>
                 
-                {item.seller_name.toLowerCase() === (profile?.main_character || '').toLowerCase() || isAdmin ? (
+                {(item.seller_name || '').toLowerCase() === (profile?.main_character || '').toLowerCase() || isAdmin ? (
                   <button 
                     onClick={() => handleMarkSold(item.id)}
                     className="w-full bg-black/40 hover:bg-green-900/40 text-gray-400 hover:text-green-400 border border-white/5 hover:border-green-500/50 py-2 rounded text-sm transition-colors flex justify-center items-center"

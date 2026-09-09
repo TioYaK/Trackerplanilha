@@ -56,7 +56,7 @@ export default function PushNotificationBell() {
         alert('Notificações desativadas!');
       } else {
         // Subscribe
-        const { data: config } = await supabase.from('worker_config').select('vapid_public_key').eq('id', 1).single();
+        const { data: config } = await supabase.from('worker_config').select('vapid_public_key').eq('id', 1).maybeSingle();
         if (!config || !config.vapid_public_key) {
            alert('Chaves VAPID não configuradas no servidor.');
            setLoading(false);

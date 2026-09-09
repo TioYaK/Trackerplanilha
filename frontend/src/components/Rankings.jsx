@@ -80,13 +80,16 @@ export default function Rankings({ isAdmin }) {
       
       const membersToCheck = new Set();
       partiesData.forEach(p => {
+         if (!p.slot_start || !p.slot_end || typeof p.slot_start !== 'string' || typeof p.slot_end !== 'string' || !p.slot_start.includes(':') || !p.slot_end.includes(':')) return;
          const [sh, sm] = p.slot_start.split(':').map(Number);
          const [eh, em] = p.slot_end.split(':').map(Number);
          const endMins = eh * 60 + em;
          const normEnd = endMins <= 600 ? endMins + 1440 : endMins;
          
-         if (currentNormalized > normEnd && p.members) {
-           p.members.forEach(m => membersToCheck.add(JSON.stringify({ member: m, party: p })));
+         if (currentNormalized > normEnd && p.members && Array.isArray(p.members)) {
+           p.members.forEach(m => {
+             if (m && typeof m === 'string') membersToCheck.add(JSON.stringify({ member: m.trim(), party: p }));
+           });
          }
       });
       
@@ -101,9 +104,10 @@ export default function Rankings({ isAdmin }) {
           
         if (rosterData) {
           uniqueChecks.forEach(mInfo => {
-             const rosterMem = rosterData.find(r => r.name === mInfo.member);
+             const mNameLower = (mInfo.member || '').toLowerCase();
+             const rosterMem = rosterData.find(r => (r.name || '').toLowerCase() === mNameLower);
              if (rosterMem && (!rosterMem.xp_gained_24h || rosterMem.xp_gained_24h === 0)) {
-               const hasStrike = strikesData.some(s => s.character_name === mInfo.member && s.reason.includes('GHOST_SLOT'));
+               const hasStrike = strikesData.some(s => (s.character_name || '').toLowerCase() === mNameLower && s.reason?.includes('GHOST_SLOT'));
                if (!hasStrike) {
                   detectedGhosts.push({
                     name: mInfo.member,
