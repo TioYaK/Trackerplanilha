@@ -22,9 +22,13 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
   const formatXp = (raw) => {
     if (!raw && raw !== 0) return '0';
-    if (raw >= 1000000) return (raw / 1000000).toFixed(1) + 'M';
-    if (raw >= 1000) return (raw / 1000).toFixed(1) + 'k';
-    return raw.toString();
+    const num = Number(raw);
+    if (isNaN(num)) return '0';
+    const sign = num < 0 ? '-' : '';
+    const abs = Math.abs(num);
+    if (abs >= 1000000) return sign + (abs / 1000000).toFixed(1) + 'M';
+    if (abs >= 1000) return sign + (abs / 1000).toFixed(1) + 'k';
+    return sign + abs.toString();
   };
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -92,19 +96,34 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       };
 
       const getTibiaDay = (d) => {
+        const dt = (d instanceof Date) ? d : parseDate(d);
+        if (!dt || isNaN(dt.getTime())) return '';
         // Subtrai 13h do UTC para que a virada virtual ocorra às 10h da manhã (Server Save BRT)
-        const ssDate = new Date(d.getTime() - 13 * 60 * 60 * 1000);
+        const ssDate = new Date(dt.getTime() - 13 * 60 * 60 * 1000);
         return ssDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: '2-digit' });
       };
 
       const formatTime = (d) => {
-        if (!d || !(d instanceof Date) || isNaN(d.getTime())) return '--:--';
-        return d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+        if (!d) return '--:--';
+        const dt = (d instanceof Date) ? d : parseDate(d);
+        if (!dt || isNaN(dt.getTime())) return '--:--';
+        return dt.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
       };
 
       const lastSSTime = getLastSS();
 
-      const validMembers = (party.members || []).filter(m => m && typeof m === 'string' && m.trim().length > 0);
+      const seenMembers = new Set();
+      const validMembers = [];
+      (party.members || []).forEach(m => {
+        if (m && typeof m === 'string' && m.trim().length > 0) {
+          const clean = m.trim();
+          const lower = clean.toLowerCase();
+          if (!seenMembers.has(lower)) {
+            seenMembers.add(lower);
+            validMembers.push(clean);
+          }
+        }
+      });
       if (validMembers.length === 0) {
         setLoading(false);
         return;
@@ -199,6 +218,9 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           if (eMin > 1440 && startM < (winEnd - 1440)) {
             startM += 1440;
             endM += 1440;
+          } else if (winStart < 0 && startM >= (1440 + winStart)) {
+            startM -= 1440;
+            endM -= 1440;
           }
 
           const inWindow = (startM >= winStart && startM <= winEnd) || (startM <= sMin && endM >= sMin);
@@ -236,7 +258,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         .filter(h => {
           const activeCount = Object.keys(h.memberXp).length;
           const hasLeader = party.leader_name && h.memberXp[party.leader_name.toLowerCase()] > 0;
-          return activeCount >= 2 || hasLeader;
+          const isSoloParty = validMembers.length === 1;
+          return activeCount >= 2 || hasLeader || (isSoloParty && activeCount >= 1);
         })
         .sort((a, b) => a.rawDate - b.rawDate)
         .map(h => {
@@ -337,8 +360,14 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           const m = memberStats[log.character_name?.toLowerCase()];
           if (date && date.getTime() >= lastSSTime && m && dxp > 0) {
             const startBrt = new Date(startDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-            const startM = startBrt.getHours() * 60 + startBrt.getMinutes();
-            if (startM >= winStart && startM <= winEnd) {
+            let startM = startBrt.getHours() * 60 + startBrt.getMinutes();
+            if (eMin > 1440 && startM < (winEnd - 1440)) {
+              startM += 1440;
+            } else if (winStart < 0 && startM >= (1440 + winStart)) {
+              startM -= 1440;
+            }
+            const inWindow = (!party.slot_start || !party.slot_end) || (startM >= winStart && startM <= winEnd);
+            if (inWindow) {
               m.totalXpGained += dxp;
               m.level = log.end_level || m.level;
               if (!m.lastSeen || date > m.lastSeen) m.lastSeen = date;
@@ -417,8 +446,19 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         const huntStart = isShowingLive ? new Date(lastSSTime) : parseDate(activeHunt.startRaw || activeHunt.start);
         const huntEnd = isShowingLive ? new Date() : parseDate(activeHunt.endRaw || activeHunt.end);
 
-        // Cruza mortes que ocorreram na janela da hunt (30 min antes do início até 30 min depois do término)
+        const activeMembersWithXp = isShowingLive 
+          ? processedMembers.filter(m => m.totalXpGained > 0)
+          : validMembers.filter(m => (activeHunt.memberXp[m.toLowerCase()] || 0) > 0).map(m => ({
+              name: m,
+              totalXpGained: activeHunt.memberXp[m.toLowerCase()] || 0
+            }));
+
+        const activeCharNamesLower = new Set(activeMembersWithXp.map(m => m.name.toLowerCase()));
+
+        // Cruza mortes que ocorreram na janela da hunt e pertencem a participantes da hunt
         const huntDeaths = (recentDeaths || []).filter(d => {
+          const charName = (d.character_name || '').toLowerCase();
+          if (!activeCharNamesLower.has(charName)) return false;
           const dt = parseDate(d.death_time);
           if (!dt || !huntStart) return false;
           const startBound = huntStart.getTime() - 30 * 60 * 1000;
@@ -427,7 +467,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         });
 
         const casualties = huntDeaths.map(d => {
-          const lvl = Number(d.level) || 1000;
+          const lvl = Number(d.level) || Number(memberStats[d.character_name?.toLowerCase()]?.level) || 1000;
           const estimatedLoss = Math.round((50 / 3 * Math.pow(lvl, 3)) * 0.0012);
           return {
             character_name: d.character_name,
@@ -438,13 +478,6 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             formattedLoss: formatXp(estimatedLoss)
           };
         });
-
-        const activeMembersWithXp = isShowingLive 
-          ? processedMembers.filter(m => m.totalXpGained > 0)
-          : validMembers.filter(m => (activeHunt.memberXp[m.toLowerCase()] || 0) > 0).map(m => ({
-              name: m,
-              totalXpGained: activeHunt.memberXp[m.toLowerCase()] || 0
-            }));
 
         // Calcula a produção bruta real por membro (XP ganho + perdas por mortes no período)
         const memberProduction = activeMembersWithXp.map(m => {
@@ -480,6 +513,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             const hasDeath = m.deaths.length > 0;
             const hasBoost = ratio >= 1.30;
             const isPartial = baselineXp > 0 && (m.grossXp / baselineXp) < 0.50;
+            const signedXp = `${m.totalXpGained > 0 ? '+' : ''}${formatXp(m.totalXpGained)}`;
 
             if (hasDeath) {
               const deathDetails = m.deaths.map(d => `${d.time} para ${d.killed_by}`).join(', ');
@@ -487,25 +521,25 @@ export default function PartyDashboard({ party, onPlayerClick }) {
               multiplierInsights.push({
                 name: m.name,
                 type: 'DEATH',
-                text: `${m.name} (+${formatXp(m.totalXpGained)}): Sofreu ${m.deaths.length} baixa(s) (${deathDetails}) com perda estimada de ~${formatXp(m.totalLoss)} XP. Sem as baixas, teria rendido ~${formatXp(m.grossXp)}${boostTag}.`
+                text: `${m.name} (${signedXp}): Sofreu ${m.deaths.length} baixa(s) (${deathDetails}) com perda estimada de ~${formatXp(m.totalLoss)} XP. Sem as baixas, teria rendido ~${formatXp(m.grossXp)}${boostTag}.`
               });
             } else if (isPartial) {
               multiplierInsights.push({
                 name: m.name,
                 type: 'PARTIAL',
-                text: `${m.name} (+${formatXp(m.totalXpGained)}): Participação parcial ou entrada tardia no slot (${Math.round(ratio * 100)}% da média de tempo da party).`
+                text: `${m.name} (${signedXp}): Participação parcial ou entrada tardia no slot (${Math.round(ratio * 100)}% da média de tempo da party).`
               });
             } else if (hasBoost) {
               multiplierInsights.push({
                 name: m.name,
                 type: 'BOOST',
-                text: `${m.name} (+${formatXp(m.totalXpGained)}): Operou com Stamina Verde (1.5x), Prey de XP ou Store Boost (+${Math.round((ratio - 1) * 100)}% sobre a base regular 100%).`
+                text: `${m.name} (${signedXp}): Operou com Stamina Verde (1.5x), Prey de XP ou Store Boost (+${Math.round((ratio - 1) * 100)}% sobre a base regular 100%).`
               });
             } else {
               multiplierInsights.push({
                 name: m.name,
                 type: 'BASE',
-                text: `${m.name} (+${formatXp(m.totalXpGained)}): Caçou com Stamina Regular / base 100% da party.`
+                text: `${m.name} (${signedXp}): Caçou com Stamina Regular / base 100% da party.`
               });
             }
           });
@@ -518,7 +552,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           }
           return (activeHunt.memberXp[m.toLowerCase()] || 0) <= 0;
         });
-        const quorumPercent = Math.round((activeMembersWithXp.length / validMembers.length) * 100);
+        const quorumPercent = validMembers.length > 0 ? Math.round((activeMembersWithXp.length / validMembers.length) * 100) : 0;
         const totalHuntXp = isShowingLive 
           ? processedMembers.reduce((acc, curr) => acc + curr.totalXpGained, 0)
           : activeHunt.totalXp;
@@ -537,7 +571,9 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           formattedTotal: formatXp(totalHuntXp),
           casualties: casualties,
           multiplierInsights: multiplierInsights,
-          huntHours: isShowingLive ? `${party.slot_start?.slice(0, 5) || '--:--'} - Agora` : `${activeHunt.start} - ${activeHunt.end}`
+          huntHours: isShowingLive 
+            ? `${party.slot_start?.slice(0, 5) || '--:--'} - Agora` 
+            : (activeHunt.singlePing ? `${activeHunt.start} (Pico Isolado)` : `${activeHunt.start} - ${activeHunt.end}`)
         });
       } else {
         setTacticalReport(null);
@@ -562,7 +598,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
     GHOST_SLOT: 'border-red-500 bg-red-500/10 text-red-400',
     DEFAULT: 'border-tibia-border bg-tibia-card text-gray-400'
   };
-  const isSlotActive = isSlotActiveNow(party.slot_start, party.slot_end);
+  const hasScheduledSlot = Boolean(party.slot_start && party.slot_end);
+  const isSlotActive = hasScheduledSlot && isSlotActiveNow(party.slot_start, party.slot_end);
 
   const nowBrt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   const currentTotalMinutes = nowBrt.getHours() * 60 + nowBrt.getMinutes();
@@ -571,12 +608,12 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   if (endMin <= startMin) endMin += 1440;
   let currentMin = currentTotalMinutes;
   if (currentMin < startMin && endMin > 1440) currentMin += 1440;
-  const isSlotPast = currentMin > endMin;
+  const isSlotPast = hasScheduledSlot && currentMin > endMin;
 
   const currentStatus = party.status || 'DEFAULT';
 
-  let displayStatus = 'Aguardando Slot';
-  let statusColorClass = 'text-gray-400';
+  let displayStatus = hasScheduledSlot ? 'Aguardando Slot' : 'Horário Flexível / Livre';
+  let statusColorClass = hasScheduledSlot ? 'text-gray-400' : 'text-blue-400';
   let StatusIcon = Clock;
 
   if (isSlotActive) {
@@ -623,7 +660,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       statusColorClass = 'text-blue-400';
       StatusIcon = CheckCircle;
     }
-  } else {
+  } else if (hasScheduledSlot) {
     displayStatus = 'Aguardando Slot';
     statusColorClass = 'text-gray-400';
     StatusIcon = Clock;
@@ -632,10 +669,24 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   const chartData = membersData.map(m => ({ name: (m?.name || '').split(' ')[0] || 'Member', xp: Number(m?.totalXpGained) || 0 }));
   const formatXpAxis = (tick) => formatXp(tick);
 
-  const currentSelectedDayStr = selectedHuntDay || (historyChartData.length > 0 ? historyChartData[historyChartData.length - 1].day : null);
-  const currentDayIdx = historyChartData.findIndex(h => h.day === currentSelectedDayStr);
-  const prevHuntDay = currentDayIdx > 0 ? historyChartData[currentDayIdx - 1].day : null;
-  const nextHuntDay = currentDayIdx >= 0 && currentDayIdx < historyChartData.length - 1 ? historyChartData[currentDayIdx + 1].day : null;
+  const isCurrentlyLive = selectedHuntDay === 'LIVE' || (!selectedHuntDay && isSlotActive);
+  const currentSelectedDayStr = isCurrentlyLive ? null : (selectedHuntDay || (historyChartData.length > 0 ? historyChartData[historyChartData.length - 1].day : null));
+  const currentDayIdx = currentSelectedDayStr ? historyChartData.findIndex(h => h.day === currentSelectedDayStr) : -1;
+
+  let prevHuntDay = null;
+  let nextHuntDay = null;
+
+  if (isCurrentlyLive) {
+    prevHuntDay = historyChartData.length > 0 ? historyChartData[historyChartData.length - 1].day : null;
+    nextHuntDay = null;
+  } else if (currentDayIdx >= 0) {
+    prevHuntDay = currentDayIdx > 0 ? historyChartData[currentDayIdx - 1].day : null;
+    if (currentDayIdx < historyChartData.length - 1) {
+      nextHuntDay = historyChartData[currentDayIdx + 1].day;
+    } else if (isSlotActive) {
+      nextHuntDay = 'LIVE';
+    }
+  }
 
   return (
     <div className="w-full max-w-7xl mx-auto p-8">
@@ -769,49 +820,62 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                 )}
               </div>
             </div>
-            <table className="w-full text-left text-sm text-gray-300">
-              <thead className="bg-black/20 text-gray-400 uppercase font-semibold">
-                <tr><th className="px-6 py-3">Membro</th><th className="px-6 py-3">Level</th><th className="px-6 py-3">{isShowingLive ? 'Status (Ao Vivo)' : 'Participação'}</th><th className="px-6 py-3 text-right">XP Contribuída</th></tr>
-              </thead>
-              <tbody className="divide-y divide-tibia-border/50">
-                {membersData.map(m => (
-                  <tr key={m.name} className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline" onClick={() => onPlayerClick && onPlayerClick(m.name)}>
-                      {m.name} {m.name === party.leader_name && <span className="ml-2 text-xs bg-yellow-500/20 text-yellow-500 px-1 py-0.5 rounded">Líder</span>}
-                    </td>
-                    <td className="px-6 py-4">{m.level !== '?' ? <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded">Lvl {m.level}</span> : <span className="text-gray-600">?</span>}</td>
-                    <td className="px-6 py-4">
-                      {isShowingLive ? (
-                        m.isOnline ? (
-                          <span className="text-green-400 flex items-center font-medium">
-                            <span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
-                            Caçando
-                          </span>
-                        ) : (
-                          <span className="text-gray-500 flex items-center">
-                            <span className="w-2 h-2 rounded-full bg-gray-600 mr-2"></span>
-                            Offline
-                          </span>
-                        )
-                      ) : (
-                        m.participated ? (
-                          <span className="text-green-400 flex items-center font-medium">
-                            <CheckCircle size={14} className="mr-1.5 text-green-400" />
-                            Presente
-                          </span>
-                        ) : (
-                          <span className="text-yellow-500/80 flex items-center font-medium">
-                            <AlertTriangle size={14} className="mr-1.5 text-yellow-500/70" />
-                            Ausente
-                          </span>
-                        )
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right font-bold text-green-400">+{m.formattedXp}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-300">
+                <thead className="bg-black/20 text-gray-400 uppercase font-semibold">
+                  <tr><th className="px-6 py-3">Membro</th><th className="px-6 py-3">Level</th><th className="px-6 py-3">{isShowingLive ? 'Status (Ao Vivo)' : 'Participação'}</th><th className="px-6 py-3 text-right">XP Contribuída</th></tr>
+                </thead>
+                <tbody className="divide-y divide-tibia-border/50">
+                  {membersData.map(m => {
+                    const isLeader = party.leader_name && m.name.toLowerCase() === party.leader_name.toLowerCase();
+                    return (
+                      <tr key={m.name} className="hover:bg-white/5 transition-colors">
+                        <td className="px-6 py-4 font-medium text-white cursor-pointer hover:text-tibia-primary hover:underline" onClick={() => onPlayerClick && onPlayerClick(m.name)}>
+                          {m.name} {isLeader && <span className="ml-2 text-xs bg-yellow-500/20 text-yellow-500 px-1 py-0.5 rounded">Líder</span>}
+                        </td>
+                        <td className="px-6 py-4">{m.level !== '?' ? <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded font-mono">Lvl {m.level}</span> : <span className="text-gray-600">?</span>}</td>
+                        <td className="px-6 py-4">
+                          {isShowingLive ? (
+                            m.isOnline ? (
+                              <span className="text-green-400 flex items-center font-medium">
+                                <span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
+                                Caçando
+                              </span>
+                            ) : (
+                              <span className="text-gray-500 flex items-center">
+                                <span className="w-2 h-2 rounded-full bg-gray-600 mr-2"></span>
+                                Offline
+                              </span>
+                            )
+                          ) : (
+                            m.participated ? (
+                              <span className="text-green-400 flex items-center font-medium">
+                                <CheckCircle size={14} className="mr-1.5 text-green-400" />
+                                Presente
+                              </span>
+                            ) : (
+                              <span className="text-yellow-500/80 flex items-center font-medium">
+                                <AlertTriangle size={14} className="mr-1.5 text-yellow-500/70" />
+                                Ausente
+                              </span>
+                            )
+                          )}
+                        </td>
+                        <td className={`px-6 py-4 text-right font-bold font-mono ${
+                          m.totalXpGained > 0 
+                            ? 'text-green-400' 
+                            : m.totalXpGained < 0 
+                            ? 'text-red-400' 
+                            : 'text-gray-500'
+                        }`}>
+                          {m.totalXpGained > 0 ? `+${m.formattedXp}` : m.formattedXp}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
           <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl p-6">
             <h3 className="font-bold text-white mb-6">Balanço da Party</h3>
@@ -822,7 +886,11 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                   <XAxis type="number" stroke="#666" tickFormatter={formatXpAxis} />
                   <YAxis dataKey="name" type="category" stroke="#999" width={80} tick={{fill: '#ccc', fontSize: 12}} />
                   <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} formatter={(value) => [`${formatXpAxis(value)} XP`, 'Ganho']} />
-                  <Bar dataKey="xp" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Bar dataKey="xp" radius={[0, 4, 4, 0]} barSize={20}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`bar-${index}`} fill={entry.xp < 0 ? '#ef4444' : '#f59e0b'} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -889,14 +957,14 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                       type="button"
                       disabled={!nextHuntDay}
                       onClick={() => nextHuntDay && setSelectedHuntDay(nextHuntDay)}
-                      title={nextHuntDay ? `Ver dia seguinte (${nextHuntDay})` : 'Sem dia seguinte'}
+                      title={nextHuntDay === 'LIVE' ? 'Ver ao vivo (Agora)' : (nextHuntDay ? `Ver dia seguinte (${nextHuntDay})` : 'Sem dia seguinte')}
                       className={`px-2 py-1 flex items-center transition-colors ${
                         nextHuntDay 
                           ? 'text-gray-300 hover:text-white hover:bg-white/10 cursor-pointer' 
                           : 'text-gray-600 cursor-not-allowed opacity-50'
                       }`}
                     >
-                      <span className="text-[11px] hidden sm:inline">Próximo</span>
+                      <span className="text-[11px] hidden sm:inline">{nextHuntDay === 'LIVE' ? 'Ao Vivo' : 'Próximo'}</span>
                       <ChevronRight size={14} className="ml-0.5" />
                     </button>
                   </div>
@@ -1076,7 +1144,13 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                         {tacticalReport.casualties.map((c, idx) => (
                           <div key={idx} className="p-3 bg-red-950/40 border border-red-500/30 rounded text-xs text-red-200">
                             <div className="flex items-center justify-between font-bold text-white">
-                              <span>{c.character_name} (Lvl {c.level})</span>
+                              <span 
+                                className="cursor-pointer hover:text-amber-400 hover:underline"
+                                onClick={() => onPlayerClick && onPlayerClick(c.character_name)}
+                                title={`Ver perfil de ${c.character_name}`}
+                              >
+                                {c.character_name} (Lvl {c.level})
+                              </span>
                               <span className="text-red-400 font-mono">-{c.formattedLoss} XP</span>
                             </div>
                             <p className="mt-1 text-gray-300">
@@ -1110,7 +1184,12 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2">
                           {tacticalReport.quorum.absent.map(m => (
-                            <span key={m} className="px-2 py-0.5 bg-black/60 border border-yellow-500/40 rounded text-yellow-300 font-mono">
+                            <span 
+                              key={m} 
+                              className="px-2 py-0.5 bg-black/60 border border-yellow-500/40 rounded text-yellow-300 font-mono cursor-pointer hover:bg-yellow-500/20 hover:border-yellow-400 transition-colors"
+                              onClick={() => onPlayerClick && onPlayerClick(m)}
+                              title={`Ver dossiê de ${m}`}
+                            >
                               {m} (0 XP)
                             </span>
                           ))}
