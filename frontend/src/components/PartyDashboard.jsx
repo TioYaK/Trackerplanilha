@@ -10,36 +10,85 @@ const toMinutes = (timeStr) => {
   return (h || 0) * 60 + (m || 0);
 };
 
+const formatXp = (raw) => {
+  if (!raw && raw !== 0) return '0';
+  const num = Number(raw);
+  if (isNaN(num)) return '0';
+  const sign = num < 0 ? '-' : '';
+  const abs = Math.abs(num);
+  if (abs >= 1000000) return sign + (abs / 1000000).toFixed(1) + 'M';
+  if (abs >= 1000) return sign + (abs / 1000).toFixed(1) + 'k';
+  return sign + abs.toString();
+};
+
+// Server Save Logic (10:00 AM BRT = 13:00 UTC)
+const getLastSS = () => {
+  const now = new Date();
+  const ss = new Date(now);
+  if (now.getUTCHours() < 13) {
+    ss.setUTCDate(ss.getUTCDate() - 1);
+  }
+  ss.setUTCHours(13, 0, 0, 0);
+  return ss.getTime();
+};
+
+const getTibiaDay = (d) => {
+  const dt = (d instanceof Date) ? d : parseUtcDate(d);
+  if (!dt || isNaN(dt.getTime())) return '';
+  // Subtrai 13h do UTC para que a virada virtual ocorra às 10h da manhã (Server Save BRT)
+  const ssDate = new Date(dt.getTime() - 13 * 60 * 60 * 1000);
+  return ssDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: '2-digit' });
+};
+
+const formatTime = (d) => {
+  if (!d) return '--:--';
+  const dt = (d instanceof Date) ? d : parseUtcDate(d);
+  if (!dt || isNaN(dt.getTime())) return '--:--';
+  return dt.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+};
+
+const getValidMembers = (members) => {
+  const seen = new Set();
+  const list = [];
+  (members || []).forEach(m => {
+    if (m && typeof m === 'string' && m.trim().length > 0) {
+      const clean = m.trim();
+      const lower = clean.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push(clean);
+      }
+    }
+  });
+  return list;
+};
+
 export default function PartyDashboard({ party, onPlayerClick }) {
-  const [membersData, setMembersData] = useState([]);
+  const [rawDataset, setRawDataset] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [actualHuntTime, setActualHuntTime] = useState(null);
   const [historyRange, setHistoryRange] = useState('week'); // 'week' ou 'month'
+  const [selectedHuntDay, setSelectedHuntDay] = useState(null);
+
+  // Estados derivados da análise forense
+  const [membersData, setMembersData] = useState([]);
+  const [actualHuntTime, setActualHuntTime] = useState(null);
   const [historyChartData, setHistoryChartData] = useState([]);
   const [sessionLabel, setSessionLabel] = useState('Rendimento Individual (Hoje / SS)');
-  const [selectedHuntDay, setSelectedHuntDay] = useState(null);
   const [tacticalReport, setTacticalReport] = useState(null);
-
-  const formatXp = (raw) => {
-    if (!raw && raw !== 0) return '0';
-    const num = Number(raw);
-    if (isNaN(num)) return '0';
-    const sign = num < 0 ? '-' : '';
-    const abs = Math.abs(num);
-    if (abs >= 1000000) return sign + (abs / 1000000).toFixed(1) + 'M';
-    if (abs >= 1000) return sign + (abs / 1000).toFixed(1) + 'k';
-    return sign + abs.toString();
-  };
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       let durationText = '';
       if (data.startRaw && data.endRaw) {
-        const dMins = Math.max(1, Math.round((new Date(data.endRaw) - new Date(data.startRaw)) / 60000));
-        const hours = Math.floor(dMins / 60);
-        const mins = dMins % 60;
-        durationText = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+        const start = parseUtcDate(data.startRaw);
+        const end = parseUtcDate(data.endRaw);
+        if (start && end) {
+          const dMins = Math.max(1, Math.round((end - start) / 60000));
+          const hours = Math.floor(dMins / 60);
+          const mins = dMins % 60;
+          durationText = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+        }
       }
       return (
         <div className="bg-gray-900 border border-tibia-border p-3 rounded shadow-lg text-sm">
@@ -61,532 +110,468 @@ export default function PartyDashboard({ party, onPlayerClick }) {
     setSelectedHuntDay(null);
   }, [party?.id]);
 
+  // Efeito 1: Busca os dados brutos no Supabase com Promise.all concorrente
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchPartyData = async (isBackground = false) => {
       if (!party || !party.members || party.members.length === 0) {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+          setRawDataset(null);
+        }
         return;
       }
+
       if (!isBackground) {
         setLoading(true);
       }
 
-      const daysToFetch = historyRange === 'week' ? 7 : 30;
-      const historyStartDate = new Date(Date.now() - daysToFetch * 24 * 60 * 60 * 1000).toISOString();
-      
-      // Server Save Logic (10:00 AM BRT = 13:00 UTC)
-      const getLastSS = () => {
-        const now = new Date();
-        const ss = new Date(now);
-        if (now.getUTCHours() < 13) {
-          ss.setUTCDate(ss.getUTCDate() - 1);
-        }
-        ss.setUTCHours(13, 0, 0, 0);
-        return ss.getTime();
-      };
-      
-      const parseDate = (dStr) => {
-        if (!dStr) return null;
-        if (dStr instanceof Date) return dStr;
-        if (typeof dStr !== 'string') return new Date(dStr);
-        if (!dStr.endsWith('Z') && !dStr.includes('+') && !dStr.includes('-', 10)) {
-          return new Date(dStr + 'Z');
-        }
-        return new Date(dStr);
-      };
-
-      const getTibiaDay = (d) => {
-        const dt = (d instanceof Date) ? d : parseDate(d);
-        if (!dt || isNaN(dt.getTime())) return '';
-        // Subtrai 13h do UTC para que a virada virtual ocorra às 10h da manhã (Server Save BRT)
-        const ssDate = new Date(dt.getTime() - 13 * 60 * 60 * 1000);
-        return ssDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: '2-digit' });
-      };
-
-      const formatTime = (d) => {
-        if (!d) return '--:--';
-        const dt = (d instanceof Date) ? d : parseDate(d);
-        if (!dt || isNaN(dt.getTime())) return '--:--';
-        return dt.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
-      };
-
-      const lastSSTime = getLastSS();
-
-      const seenMembers = new Set();
-      const validMembers = [];
-      (party.members || []).forEach(m => {
-        if (m && typeof m === 'string' && m.trim().length > 0) {
-          const clean = m.trim();
-          const lower = clean.toLowerCase();
-          if (!seenMembers.has(lower)) {
-            seenMembers.add(lower);
-            validMembers.push(clean);
-          }
-        }
-      });
+      const validMembers = getValidMembers(party.members);
       if (validMembers.length === 0) {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+          setRawDataset(null);
+        }
         return;
       }
 
-      const orFilterName = validMembers.map(m => `name.ilike."${m.trim().replace(/"/g, '')}"`).join(',');
-      const orFilterChar = validMembers.map(m => `character_name.ilike."${m.trim().replace(/"/g, '')}"`).join(',');
+      const daysToFetch = historyRange === 'week' ? 7 : 30;
+      const historyStartDate = new Date(Date.now() - daysToFetch * 24 * 60 * 60 * 1000).toISOString();
+      const orFilterName = validMembers.map(m => `name.ilike."${m.trim().replace(/[",]/g, '')}"`).join(',');
+      const orFilterChar = validMembers.map(m => `character_name.ilike."${m.trim().replace(/[",]/g, '')}"`).join(',');
 
-      // 1. Busca histórico de sessões
-      let logs = [];
-      const { data, error } = await supabase
-        .from('historical_sessions')
-        .select('*')
-        .or(orFilterChar)
-        .gte('session_end', historyStartDate)
-        .order('session_end', { ascending: true });
-        
-      if (!error && data) {
-        logs = data;
-      }
-      
-      // 2. Busca estado atual em tempo real (Edge Computing)
-      let currentStates = [];
-      const { data: states } = await supabase
-        .from('current_character_state')
-        .select('*')
-        .or(orFilterChar);
-        
-      if (states) {
-        currentStates = states;
-      }
-      
-      // 3. Busca levels e dados cadastrais da guilda
-      let guildData = [];
-      const { data: gData } = await supabase
-        .from('guild_members')
-        .select('name, level, is_online')
-        .or(orFilterName);
-        
-      if (gData) {
-        guildData = gData;
-      }
+      try {
+        const [
+          { data: logs },
+          { data: currentStates },
+          { data: guildData },
+          { data: recentDeaths },
+          { data: loginEvents }
+        ] = await Promise.all([
+          supabase.from('historical_sessions').select('*').or(orFilterChar).gte('session_end', historyStartDate).order('session_end', { ascending: true }),
+          supabase.from('current_character_state').select('*').or(orFilterChar),
+          supabase.from('guild_members').select('name, level, is_online').or(orFilterName),
+          supabase.from('recent_deaths').select('character_name, level, killed_by, death_time').or(orFilterChar).gte('death_time', historyStartDate).order('death_time', { ascending: true }),
+          supabase.from('login_events').select('character_name, event_type, event_time').or(orFilterChar).gte('event_time', historyStartDate).order('event_time', { ascending: true })
+        ]);
 
-      // 4. Busca mortes recentes dos membros da party
-      let recentDeaths = [];
-      const { data: dData } = await supabase
-        .from('recent_deaths')
-        .select('character_name, level, killed_by, death_time')
-        .or(orFilterChar)
-        .gte('death_time', historyStartDate)
-        .order('death_time', { ascending: true });
-      if (dData) recentDeaths = dData;
-
-      // 5. Busca histórico de logins dos membros da party
-      let loginEvents = [];
-      const { data: lData } = await supabase
-        .from('login_events')
-        .select('character_name, event_type, event_time')
-        .or(orFilterChar)
-        .gte('event_time', historyStartDate)
-        .order('event_time', { ascending: true });
-      if (lData) loginEvents = lData;
-
-      // 6. Monta o mapa histórico por dia do Server Save
-      const historyMap = {};
-      const sMin = toMinutes(party.slot_start);
-      let eMin = toMinutes(party.slot_end);
-      if (eMin <= sMin) eMin += 1440;
-      // Janela de tolerância calibrada: inicia até 45 min antes do slot, ou durante o slot
-      const winStart = sMin - 45;
-      const winEnd = eMin + 45;
-
-      logs.forEach(log => {
-        const date = parseDate(log.session_end);
-        const startDate = parseDate(log.session_start) || date;
-        const dxp = parseInt(log.xp_gained || 0, 10);
-        if (dxp <= 0 || !date) return;
-
-        // Se a duração for excessiva (> 5 horas), ignora: é botting/treino solo overnight, não hunt de party
-        const durationMins = log.duration_minutes || ((date - startDate) / 60000);
-        if (durationMins > 300) return;
-
-        // Se a party tem horário planilhado, ignora caçadas solo fora da janela do slot
-        if (party.slot_start && party.slot_end) {
-          const startBrt = new Date(startDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-          const endBrt = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-          let startM = startBrt.getHours() * 60 + startBrt.getMinutes();
-          let endM = endBrt.getHours() * 60 + endBrt.getMinutes();
-          if (endM < startM) endM += 1440;
-
-          // Se o slot cruza a meia-noite e a sessão começou nas primeiras horas da madrugada
-          if (eMin > 1440 && startM < (winEnd - 1440)) {
-            startM += 1440;
-            endM += 1440;
-          } else if (winStart < 0 && startM >= (1440 + winStart)) {
-            startM -= 1440;
-            endM -= 1440;
-          }
-
-          const inWindow = (startM >= winStart && startM <= winEnd) || (startM <= sMin && endM >= sMin);
-          if (!inWindow) return;
-        }
-
-        // Atribui o dia pelo INÍCIO da caçada para não empurrar hunts noturnas para o dia seguinte
-        const dayStr = getTibiaDay(startDate);
-
-        if (!historyMap[dayStr]) {
-          historyMap[dayStr] = {
-            day: dayStr,
-            totalXp: 0,
-            start: startDate,
-            end: date,
-            rawDate: startDate,
-            memberXp: {},
-            memberLevels: {}
-          };
-        }
-
-        historyMap[dayStr].totalXp += dxp;
-        if (startDate < historyMap[dayStr].start) historyMap[dayStr].start = startDate;
-        if (date > historyMap[dayStr].end) historyMap[dayStr].end = date;
-        
-        const charKey = (log.character_name || '').toLowerCase();
-        historyMap[dayStr].memberXp[charKey] = (historyMap[dayStr].memberXp[charKey] || 0) + dxp;
-        if (log.end_level) {
-          historyMap[dayStr].memberLevels[charKey] = log.end_level;
-        }
-      });
-
-      // Converte historyMap para array do gráfico, filtrando apenas hunts reais de party (2+ membros ou líder)
-      const chartDataArr = Object.values(historyMap)
-        .filter(h => {
-          const activeCount = Object.keys(h.memberXp).length;
-          const hasLeader = party.leader_name && h.memberXp[party.leader_name.toLowerCase()] > 0;
-          const isSoloParty = validMembers.length === 1;
-          return activeCount >= 2 || hasLeader || (isSoloParty && activeCount >= 1);
-        })
-        .sort((a, b) => a.rawDate - b.rawDate)
-        .map(h => {
-           const diffMins = Math.max(1, (h.end - h.start) / (1000 * 60));
-           return {
-               day: h.day,
-               totalXp: h.totalXp,
-               start: formatTime(h.start),
-               end: formatTime(h.end),
-               startRaw: h.start,
-               endRaw: h.end,
-               singlePing: diffMins < 10,
-               memberXp: h.memberXp,
-               memberLevels: h.memberLevels || {},
-               rawDate: h.rawDate
-           };
-        });
-      setHistoryChartData(chartDataArr);
-
-      // 5. Determina qual Hunt exibir (Ao Vivo, Selecionada ou Última Gravada)
-      const isSlotActive = isSlotActiveNow(party.slot_start, party.slot_end);
-      const todayDayStr = getTibiaDay(new Date());
-      const todayHunt = chartDataArr.find(h => h.day === todayDayStr);
-      const lastHunt = chartDataArr.length > 0 ? chartDataArr[chartDataArr.length - 1] : null;
-
-      let activeHunt = null;
-      let isShowingLive = false;
-      let activeLabel = 'Rendimento Individual (Hoje / SS)';
-
-      if (selectedHuntDay) {
-        if (selectedHuntDay === 'LIVE' && isSlotActive) {
-          isShowingLive = true;
-          activeLabel = 'Rendimento Individual (Caçando Agora - Ao Vivo)';
-        } else {
-          activeHunt = chartDataArr.find(h => h.day === selectedHuntDay) || lastHunt;
-          if (activeHunt) {
-            activeLabel = `Rendimento Individual (${activeHunt.day})`;
-          }
-        }
-      } else {
-        if (isSlotActive) {
-          isShowingLive = true;
-          activeLabel = 'Rendimento Individual (Caçando Agora)';
-        } else if (todayHunt) {
-          activeHunt = todayHunt;
-          activeLabel = `Rendimento Individual (Hoje - ${todayHunt.day})`;
-        } else if (lastHunt) {
-          activeHunt = lastHunt;
-          activeLabel = `Rendimento Individual (Última Hunt - ${lastHunt.day})`;
-        }
-      }
-      setSessionLabel(activeLabel);
-
-      // 6. Calcula estatísticas individuais dos membros
-      const memberStats = {};
-      validMembers.forEach(m => {
-        memberStats[m.toLowerCase()] = { name: m, totalXpGained: 0, level: '?', lastSeen: null, isOnlineRoster: false };
-      });
-      
-      guildData.forEach(g => {
-        const m = memberStats[g.name?.toLowerCase()];
-        if (m) {
-          if (g.level) m.level = g.level;
-          if (g.is_online !== undefined && g.is_online !== null) {
-            m.isOnlineRoster = Boolean(g.is_online);
-          }
-        }
-      });
-
-      currentStates.forEach(state => {
-        const m = memberStats[state.character_name?.toLowerCase()];
-        if (m) {
-          m.level = state.level || m.level;
-          const lastActive = parseDate(state.last_active);
-          if (lastActive && (!m.lastSeen || lastActive > m.lastSeen)) {
-             m.lastSeen = lastActive;
-          }
-        }
-      });
-
-      if (isShowingLive) {
-        // Se a party está caçando agora, soma os deltas em tempo real
-        currentStates.forEach(state => {
-          const m = memberStats[state.character_name?.toLowerCase()];
-          if (m) {
-            const lastActive = parseDate(state.last_active);
-            if (lastActive && lastActive.getTime() >= lastSSTime) {
-              const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
-              if (deltaXp > 0) m.totalXpGained += deltaXp;
-            }
-          }
-        });
-
-        logs.forEach(log => {
-          const date = parseDate(log.session_end);
-          const startDate = parseDate(log.session_start) || date;
-          const dxp = parseInt(log.xp_gained || 0, 10);
-          const m = memberStats[log.character_name?.toLowerCase()];
-          if (date && date.getTime() >= lastSSTime && m && dxp > 0) {
-            const startBrt = new Date(startDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-            let startM = startBrt.getHours() * 60 + startBrt.getMinutes();
-            if (eMin > 1440 && startM < (winEnd - 1440)) {
-              startM += 1440;
-            } else if (winStart < 0 && startM >= (1440 + winStart)) {
-              startM -= 1440;
-            }
-            const inWindow = (!party.slot_start || !party.slot_end) || (startM >= winStart && startM <= winEnd);
-            if (inWindow) {
-              m.totalXpGained += dxp;
-              m.level = log.end_level || m.level;
-              if (!m.lastSeen || date > m.lastSeen) m.lastSeen = date;
-            }
-          }
-        });
-      } else if (activeHunt) {
-        // Exibe exatamente a hunt selecionada/última realizada
-        validMembers.forEach(mName => {
-          const mKey = mName.toLowerCase();
-          const xp = activeHunt.memberXp[mKey] || 0;
-          if (memberStats[mKey]) {
-            memberStats[mKey].totalXpGained = xp;
-            if (activeHunt.memberLevels && activeHunt.memberLevels[mKey]) {
-              memberStats[mKey].level = activeHunt.memberLevels[mKey];
-            }
-          }
-        });
-      }
-
-      const nowMs = Date.now();
-      const processedMembers = Object.values(memberStats).map(m => {
-        const raw = m.totalXpGained;
-        const diff = m.lastSeen ? (nowMs - m.lastSeen.getTime()) : Infinity;
-        const isRecentlyActive = diff >= 0 && diff < 20 * 60 * 1000;
-        return { 
-          ...m, 
-          formattedXp: formatXp(raw), 
-          isOnline: Boolean(m.isOnlineRoster) || isRecentlyActive,
-          participated: raw > 0
-        };
-      });
-
-      processedMembers.sort((a, b) => b.totalXpGained - a.totalXpGained);
-      setMembersData(processedMembers);
-
-      // 7. Horário Real (Telemetria)
-      if (isShowingLive) {
-        setActualHuntTime({ 
-          start: party.slot_start?.slice(0, 5) || '--:--', 
-          end: 'Agora', 
-          day: 'Hoje',
-          xpHour: party.delta_xp || '0'
-        });
-      } else if (activeHunt) {
-        let calculatedXpHour = null;
-        if (activeHunt.startRaw && activeHunt.endRaw) {
-          const sDate = parseDate(activeHunt.startRaw);
-          const eDate = parseDate(activeHunt.endRaw);
-          if (sDate && eDate) {
-            const diffHours = Math.max(0.1, (eDate.getTime() - sDate.getTime()) / (1000 * 3600));
-            if (diffHours > 0 && activeHunt.totalXp > 0) {
-              calculatedXpHour = `${formatXp(Math.round(activeHunt.totalXp / diffHours))}/h`;
-            }
-          }
-        }
-        if (activeHunt.singlePing) {
-          setActualHuntTime({ 
-            single: `${activeHunt.start} (${activeHunt.day})`,
-            xpHour: calculatedXpHour || party.delta_xp || '0'
+        if (!isCancelled) {
+          setRawDataset({
+            logs: logs || [],
+            currentStates: currentStates || [],
+            guildData: guildData || [],
+            recentDeaths: recentDeaths || [],
+            loginEvents: loginEvents || [],
+            lastFetch: Date.now()
           });
-        } else {
-          setActualHuntTime({ 
-            start: activeHunt.start, 
-            end: activeHunt.end, 
-            day: activeHunt.day,
-            xpHour: calculatedXpHour || party.delta_xp || '0'
-          });
+          setLoading(false);
         }
-      } else {
-        setActualHuntTime(null);
+      } catch (err) {
+        console.error('Erro ao carregar telemetria da party:', err);
+        if (!isCancelled) setLoading(false);
       }
-
-      // 8. Gera o Parecer Tático Forense da Hunt
-      if (activeHunt || isShowingLive) {
-        const huntStart = isShowingLive ? new Date(lastSSTime) : parseDate(activeHunt.startRaw || activeHunt.start);
-        const huntEnd = isShowingLive ? new Date() : parseDate(activeHunt.endRaw || activeHunt.end);
-
-        const activeMembersWithXp = isShowingLive 
-          ? processedMembers.filter(m => m.totalXpGained > 0)
-          : validMembers.filter(m => (activeHunt.memberXp[m.toLowerCase()] || 0) > 0).map(m => ({
-              name: m,
-              totalXpGained: activeHunt.memberXp[m.toLowerCase()] || 0
-            }));
-
-        const activeCharNamesLower = new Set(activeMembersWithXp.map(m => m.name.toLowerCase()));
-
-        // Cruza mortes que ocorreram na janela da hunt e pertencem a participantes da hunt
-        const huntDeaths = (recentDeaths || []).filter(d => {
-          const charName = (d.character_name || '').toLowerCase();
-          if (!activeCharNamesLower.has(charName)) return false;
-          const dt = parseDate(d.death_time);
-          if (!dt || !huntStart) return false;
-          const startBound = huntStart.getTime() - 30 * 60 * 1000;
-          const endBound = (huntEnd ? huntEnd.getTime() : huntStart.getTime() + 4 * 3600 * 1000) + 30 * 60 * 1000;
-          return dt.getTime() >= startBound && dt.getTime() <= endBound;
-        });
-
-        const casualties = huntDeaths.map(d => {
-          const lvl = Number(d.level) || Number(memberStats[d.character_name?.toLowerCase()]?.level) || 1000;
-          const estimatedLoss = Math.round((50 / 3 * Math.pow(lvl, 3)) * 0.0012);
-          return {
-            character_name: d.character_name,
-            level: lvl,
-            killed_by: d.killed_by,
-            time: formatTime(parseDate(d.death_time)),
-            estimatedLoss: estimatedLoss,
-            formattedLoss: formatXp(estimatedLoss)
-          };
-        });
-
-        // Calcula a produção bruta real por membro (XP ganho + perdas por mortes no período)
-        const memberProduction = activeMembersWithXp.map(m => {
-          const deaths = casualties.filter(c => c.character_name.toLowerCase() === m.name.toLowerCase());
-          const totalLoss = deaths.reduce((sum, c) => sum + c.estimatedLoss, 0);
-          return {
-            name: m.name,
-            totalXpGained: m.totalXpGained,
-            grossXp: m.totalXpGained + totalLoss,
-            deaths: deaths,
-            totalLoss: totalLoss
-          };
-        });
-
-        let baselineXp = 0;
-        let multiplierInsights = [];
-
-        if (memberProduction.length > 0) {
-          const maxGross = Math.max(...memberProduction.map(m => m.grossXp));
-          
-          // Membros que caçaram o período integral (produção >= 35% do maior da party)
-          // Isso impede que jogadores que caçaram poucos minutos distorçam a baseline da equipe
-          const fullHuntCandidates = memberProduction
-            .filter(m => m.grossXp >= maxGross * 0.35)
-            .sort((a, b) => a.grossXp - b.grossXp);
-
-          const baselineCandidate = fullHuntCandidates.length > 0 ? fullHuntCandidates[0].grossXp : memberProduction[0].grossXp;
-          const isEveryoneBoosted = fullHuntCandidates.length > 0 && fullHuntCandidates.every(m => (m.grossXp / maxGross) >= 0.85 && maxGross > 100000000);
-          baselineXp = isEveryoneBoosted ? Math.round(baselineCandidate / 1.5) : baselineCandidate;
-
-          memberProduction.forEach(m => {
-            const ratio = baselineXp > 0 ? (m.grossXp / baselineXp) : 1;
-            const hasDeath = m.deaths.length > 0;
-            const hasBoost = ratio >= 1.30;
-            const isPartial = baselineXp > 0 && (m.grossXp / baselineXp) < 0.50;
-            const signedXp = `${m.totalXpGained > 0 ? '+' : ''}${formatXp(m.totalXpGained)}`;
-
-            if (hasDeath) {
-              const deathDetails = m.deaths.map(d => `${d.time} para ${d.killed_by}`).join(', ');
-              const boostTag = hasBoost ? ' (operava com Stamina Verde, Prey ou Boost)' : '';
-              multiplierInsights.push({
-                name: m.name,
-                type: 'DEATH',
-                text: `${m.name} (${signedXp}): Sofreu ${m.deaths.length} baixa(s) (${deathDetails}) com perda estimada de ~${formatXp(m.totalLoss)} XP. Sem as baixas, teria rendido ~${formatXp(m.grossXp)}${boostTag}.`
-              });
-            } else if (isPartial) {
-              multiplierInsights.push({
-                name: m.name,
-                type: 'PARTIAL',
-                text: `${m.name} (${signedXp}): Participação parcial ou entrada tardia no slot (${Math.round(ratio * 100)}% da média de tempo da party).`
-              });
-            } else if (hasBoost) {
-              multiplierInsights.push({
-                name: m.name,
-                type: 'BOOST',
-                text: `${m.name} (${signedXp}): Operou com Stamina Verde (1.5x), Prey de XP ou Store Boost (+${Math.round((ratio - 1) * 100)}% sobre a base regular 100%).`
-              });
-            } else {
-              multiplierInsights.push({
-                name: m.name,
-                type: 'BASE',
-                text: `${m.name} (${signedXp}): Caçou com Stamina Regular / base 100% da party.`
-              });
-            }
-          });
-        }
-
-        const absentMembers = validMembers.filter(m => {
-          if (isShowingLive) {
-            const pm = processedMembers.find(p => p.name.toLowerCase() === m.toLowerCase());
-            return !pm || pm.totalXpGained <= 0;
-          }
-          return (activeHunt.memberXp[m.toLowerCase()] || 0) <= 0;
-        });
-        const quorumPercent = validMembers.length > 0 ? Math.round((activeMembersWithXp.length / validMembers.length) * 100) : 0;
-        const totalHuntXp = isShowingLive 
-          ? processedMembers.reduce((acc, curr) => acc + curr.totalXpGained, 0)
-          : activeHunt.totalXp;
-
-        setTacticalReport({
-          day: isShowingLive ? 'Ao Vivo (Hoje)' : activeHunt.day,
-          quorum: {
-            activeCount: activeMembersWithXp.length,
-            totalCount: validMembers.length,
-            percent: quorumPercent,
-            absent: absentMembers
-          },
-          baselineXp: baselineXp,
-          formattedBaseline: formatXp(baselineXp),
-          totalXp: totalHuntXp,
-          formattedTotal: formatXp(totalHuntXp),
-          casualties: casualties,
-          multiplierInsights: multiplierInsights,
-          huntHours: isShowingLive 
-            ? `${party.slot_start?.slice(0, 5) || '--:--'} - Agora` 
-            : (activeHunt.singlePing ? `${activeHunt.start} (Pico Isolado)` : `${activeHunt.start} - ${activeHunt.end}`)
-        });
-      } else {
-        setTacticalReport(null);
-      }
-
-      setLoading(false);
     };
 
     fetchPartyData();
-    
     const interval = setInterval(() => fetchPartyData(true), 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [party, historyRange, selectedHuntDay]);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [party?.id, party?.slot_start, party?.slot_end, historyRange]);
+
+  // Efeito 2: Processamento e Auditoria Forense em Memória (Instantâneo / 0ms)
+  useEffect(() => {
+    if (!rawDataset || !party) return;
+
+    const { logs, currentStates, guildData, recentDeaths } = rawDataset;
+    const validMembers = getValidMembers(party.members);
+    if (validMembers.length === 0) return;
+
+    const lastSSTime = getLastSS();
+
+    // 1. Monta o mapa histórico por dia do Server Save
+    const historyMap = {};
+    const sMin = toMinutes(party.slot_start);
+    let eMin = toMinutes(party.slot_end);
+    if (eMin <= sMin) eMin += 1440;
+    const winStart = sMin - 45;
+    const winEnd = eMin + 45;
+
+    logs.forEach(log => {
+      const date = parseUtcDate(log.session_end);
+      const startDate = parseUtcDate(log.session_start) || date;
+      const dxp = parseInt(log.xp_gained || 0, 10);
+      if (dxp <= 0 || !date) return;
+
+      const durationMins = log.duration_minutes || ((date - startDate) / 60000);
+      if (durationMins > 300) return;
+
+      if (party.slot_start && party.slot_end) {
+        const startBrt = new Date(startDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+        const endBrt = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+        let startM = startBrt.getHours() * 60 + startBrt.getMinutes();
+        let endM = endBrt.getHours() * 60 + endBrt.getMinutes();
+        if (endM < startM) endM += 1440;
+
+        if (eMin > 1440 && startM < (winEnd - 1440)) {
+          startM += 1440;
+          endM += 1440;
+        } else if (winStart < 0 && startM >= (1440 + winStart)) {
+          startM -= 1440;
+          endM -= 1440;
+        }
+
+        const inWindow = (startM >= winStart && startM <= winEnd) || (startM <= sMin && endM >= sMin);
+        if (!inWindow) return;
+      }
+
+      const dayStr = getTibiaDay(startDate);
+
+      if (!historyMap[dayStr]) {
+        historyMap[dayStr] = {
+          day: dayStr,
+          totalXp: 0,
+          start: startDate,
+          end: date,
+          rawDate: startDate,
+          memberXp: {},
+          memberLevels: {}
+        };
+      }
+
+      historyMap[dayStr].totalXp += dxp;
+      if (startDate < historyMap[dayStr].start) historyMap[dayStr].start = startDate;
+      if (date > historyMap[dayStr].end) historyMap[dayStr].end = date;
+      
+      const charKey = (log.character_name || '').toLowerCase();
+      historyMap[dayStr].memberXp[charKey] = (historyMap[dayStr].memberXp[charKey] || 0) + dxp;
+      if (log.end_level) {
+        historyMap[dayStr].memberLevels[charKey] = log.end_level;
+      }
+    });
+
+    const chartDataArr = Object.values(historyMap)
+      .filter(h => {
+        const activeCount = Object.keys(h.memberXp).length;
+        const hasLeader = party.leader_name && h.memberXp[party.leader_name.toLowerCase()] > 0;
+        const isSoloParty = validMembers.length === 1;
+        return activeCount >= 2 || hasLeader || (isSoloParty && activeCount >= 1);
+      })
+      .sort((a, b) => a.rawDate - b.rawDate)
+      .map(h => {
+         const diffMins = Math.max(1, (h.end - h.start) / (1000 * 60));
+         return {
+             day: h.day,
+             totalXp: h.totalXp,
+             start: formatTime(h.start),
+             end: formatTime(h.end),
+             startRaw: h.start,
+             endRaw: h.end,
+             singlePing: diffMins < 10,
+             memberXp: h.memberXp,
+             memberLevels: h.memberLevels || {},
+             rawDate: h.rawDate
+         };
+      });
+    setHistoryChartData(chartDataArr);
+
+    // 2. Determina qual Hunt exibir
+    const hasScheduledSlot = Boolean(party.slot_start && party.slot_end);
+    const isSlotActive = hasScheduledSlot && isSlotActiveNow(party.slot_start, party.slot_end);
+    const todayDayStr = getTibiaDay(new Date());
+    const todayHunt = chartDataArr.find(h => h.day === todayDayStr);
+    const lastHunt = chartDataArr.length > 0 ? chartDataArr[chartDataArr.length - 1] : null;
+
+    let activeHunt = null;
+    let isShowingLive = false;
+    let activeLabel = 'Rendimento Individual (Hoje / SS)';
+
+    if (selectedHuntDay) {
+      if (selectedHuntDay === 'LIVE' && isSlotActive) {
+        isShowingLive = true;
+        activeLabel = 'Rendimento Individual (Caçando Agora - Ao Vivo)';
+      } else {
+        activeHunt = chartDataArr.find(h => h.day === selectedHuntDay) || lastHunt;
+        if (activeHunt) {
+          activeLabel = `Rendimento Individual (${activeHunt.day})`;
+        }
+      }
+    } else {
+      if (isSlotActive) {
+        isShowingLive = true;
+        activeLabel = 'Rendimento Individual (Caçando Agora)';
+      } else if (todayHunt) {
+        activeHunt = todayHunt;
+        activeLabel = `Rendimento Individual (Hoje - ${todayHunt.day})`;
+      } else if (lastHunt) {
+        activeHunt = lastHunt;
+        activeLabel = `Rendimento Individual (Última Hunt - ${lastHunt.day})`;
+      }
+    }
+    setSessionLabel(activeLabel);
+
+    // 3. Calcula estatísticas individuais dos membros
+    const memberStats = {};
+    validMembers.forEach(m => {
+      memberStats[m.toLowerCase()] = { name: m, totalXpGained: 0, level: '?', lastSeen: null, isOnlineRoster: false };
+    });
+    
+    guildData.forEach(g => {
+      const m = memberStats[g.name?.toLowerCase()];
+      if (m) {
+        if (g.level) m.level = g.level;
+        if (g.is_online !== undefined && g.is_online !== null) {
+          m.isOnlineRoster = Boolean(g.is_online);
+        }
+      }
+    });
+
+    currentStates.forEach(state => {
+      const m = memberStats[state.character_name?.toLowerCase()];
+      if (m) {
+        m.level = state.level || m.level;
+        const lastActive = parseUtcDate(state.last_active);
+        if (lastActive && (!m.lastSeen || lastActive > m.lastSeen)) {
+           m.lastSeen = lastActive;
+        }
+      }
+    });
+
+    if (isShowingLive) {
+      currentStates.forEach(state => {
+        const m = memberStats[state.character_name?.toLowerCase()];
+        if (m) {
+          const lastActive = parseUtcDate(state.last_active);
+          if (lastActive && lastActive.getTime() >= lastSSTime) {
+            const deltaXp = Number(state.xp_total || 0) - Number(state.session_start_xp || state.xp_total || 0);
+            if (deltaXp > 0) m.totalXpGained += deltaXp;
+          }
+        }
+      });
+
+      logs.forEach(log => {
+        const date = parseUtcDate(log.session_end);
+        const startDate = parseUtcDate(log.session_start) || date;
+        const dxp = parseInt(log.xp_gained || 0, 10);
+        const m = memberStats[log.character_name?.toLowerCase()];
+        if (date && date.getTime() >= lastSSTime && m && dxp > 0) {
+          const startBrt = new Date(startDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+          let startM = startBrt.getHours() * 60 + startBrt.getMinutes();
+          if (eMin > 1440 && startM < (winEnd - 1440)) {
+            startM += 1440;
+          } else if (winStart < 0 && startM >= (1440 + winStart)) {
+            startM -= 1440;
+          }
+          const inWindow = (!party.slot_start || !party.slot_end) || (startM >= winStart && startM <= winEnd);
+          if (inWindow) {
+            m.totalXpGained += dxp;
+            m.level = log.end_level || m.level;
+            if (!m.lastSeen || date > m.lastSeen) m.lastSeen = date;
+          }
+        }
+      });
+    } else if (activeHunt) {
+      validMembers.forEach(mName => {
+        const mKey = mName.toLowerCase();
+        const xp = activeHunt.memberXp[mKey] || 0;
+        if (memberStats[mKey]) {
+          memberStats[mKey].totalXpGained = xp;
+          if (activeHunt.memberLevels && activeHunt.memberLevels[mKey]) {
+            memberStats[mKey].level = activeHunt.memberLevels[mKey];
+          }
+        }
+      });
+    }
+
+    const nowMs = Date.now();
+    const processedMembers = Object.values(memberStats).map(m => {
+      const raw = m.totalXpGained;
+      const diff = m.lastSeen ? (nowMs - m.lastSeen.getTime()) : Infinity;
+      const isRecentlyActive = diff >= 0 && diff < 20 * 60 * 1000;
+      return { 
+        ...m, 
+        formattedXp: formatXp(raw), 
+        isOnline: Boolean(m.isOnlineRoster) || isRecentlyActive,
+        participated: raw > 0
+      };
+    });
+
+    processedMembers.sort((a, b) => b.totalXpGained - a.totalXpGained);
+    setMembersData(processedMembers);
+
+    // 4. Horário Real (Telemetria)
+    if (isShowingLive) {
+      setActualHuntTime({ 
+        start: party.slot_start?.slice(0, 5) || '--:--', 
+        end: 'Agora', 
+        day: 'Hoje',
+        xpHour: party.delta_xp || '0'
+      });
+    } else if (activeHunt) {
+      let calculatedXpHour = null;
+      if (activeHunt.startRaw && activeHunt.endRaw) {
+        const sDate = parseUtcDate(activeHunt.startRaw);
+        const eDate = parseUtcDate(activeHunt.endRaw);
+        if (sDate && eDate) {
+          const diffHours = Math.max(0.1, (eDate.getTime() - sDate.getTime()) / (1000 * 3600));
+          if (diffHours > 0 && activeHunt.totalXp > 0) {
+            calculatedXpHour = `${formatXp(Math.round(activeHunt.totalXp / diffHours))}/h`;
+          }
+        }
+      }
+      if (activeHunt.singlePing) {
+        setActualHuntTime({ 
+          single: `${activeHunt.start} (${activeHunt.day})`,
+          xpHour: calculatedXpHour || party.delta_xp || '0'
+        });
+      } else {
+        setActualHuntTime({ 
+          start: activeHunt.start, 
+          end: activeHunt.end, 
+          day: activeHunt.day,
+          xpHour: calculatedXpHour || party.delta_xp || '0'
+        });
+      }
+    } else {
+      setActualHuntTime(null);
+    }
+
+    // 5. Gera o Parecer Tático Forense da Hunt
+    if (activeHunt || isShowingLive) {
+      const huntStart = isShowingLive ? new Date(lastSSTime) : parseUtcDate(activeHunt.startRaw || activeHunt.start);
+      const huntEnd = isShowingLive ? new Date() : parseUtcDate(activeHunt.endRaw || activeHunt.end);
+
+      const activeMembersWithXp = isShowingLive 
+        ? processedMembers.filter(m => m.totalXpGained > 0)
+        : validMembers.filter(m => (activeHunt.memberXp[m.toLowerCase()] || 0) > 0).map(m => ({
+            name: m,
+            totalXpGained: activeHunt.memberXp[m.toLowerCase()] || 0
+          }));
+
+      const activeCharNamesLower = new Set(activeMembersWithXp.map(m => m.name.toLowerCase()));
+
+      const huntDeaths = (recentDeaths || []).filter(d => {
+        const charName = (d.character_name || '').toLowerCase();
+        if (!activeCharNamesLower.has(charName)) return false;
+        const dt = parseUtcDate(d.death_time);
+        if (!dt || !huntStart) return false;
+        const startBound = huntStart.getTime() - 30 * 60 * 1000;
+        const endBound = (huntEnd ? huntEnd.getTime() : huntStart.getTime() + 4 * 3600 * 1000) + 30 * 60 * 1000;
+        return dt.getTime() >= startBound && dt.getTime() <= endBound;
+      });
+
+      const casualties = huntDeaths.map(d => {
+        const lvl = Number(d.level) || Number(memberStats[d.character_name?.toLowerCase()]?.level) || 1000;
+        const estimatedLoss = Math.round((50 / 3 * Math.pow(lvl, 3)) * 0.0012);
+        return {
+          character_name: d.character_name,
+          level: lvl,
+          killed_by: d.killed_by,
+          time: formatTime(parseUtcDate(d.death_time)),
+          estimatedLoss: estimatedLoss,
+          formattedLoss: formatXp(estimatedLoss)
+        };
+      });
+
+      const memberProduction = activeMembersWithXp.map(m => {
+        const deaths = casualties.filter(c => c.character_name.toLowerCase() === m.name.toLowerCase());
+        const totalLoss = deaths.reduce((sum, c) => sum + c.estimatedLoss, 0);
+        return {
+          name: m.name,
+          totalXpGained: m.totalXpGained,
+          grossXp: m.totalXpGained + totalLoss,
+          deaths: deaths,
+          totalLoss: totalLoss
+        };
+      });
+
+      let baselineXp = 0;
+      let multiplierInsights = [];
+
+      if (memberProduction.length > 0) {
+        const maxGross = Math.max(...memberProduction.map(m => m.grossXp));
+        
+        const fullHuntCandidates = memberProduction
+          .filter(m => m.grossXp >= maxGross * 0.35)
+          .sort((a, b) => a.grossXp - b.grossXp);
+
+        const baselineCandidate = fullHuntCandidates.length > 0 ? fullHuntCandidates[0].grossXp : memberProduction[0].grossXp;
+        const isEveryoneBoosted = fullHuntCandidates.length > 0 && fullHuntCandidates.every(m => (m.grossXp / maxGross) >= 0.85 && maxGross > 100000000);
+        baselineXp = isEveryoneBoosted ? Math.round(baselineCandidate / 1.5) : baselineCandidate;
+
+        memberProduction.forEach(m => {
+          const ratio = baselineXp > 0 ? (m.grossXp / baselineXp) : 1;
+          const hasDeath = m.deaths.length > 0;
+          const hasBoost = ratio >= 1.30;
+          const isPartial = baselineXp > 0 && (m.grossXp / baselineXp) < 0.50;
+          const signedXp = `${m.totalXpGained > 0 ? '+' : ''}${formatXp(m.totalXpGained)}`;
+
+          if (hasDeath) {
+            const deathDetails = m.deaths.map(d => `${d.time} para ${d.killed_by}`).join(', ');
+            const boostTag = hasBoost ? ' (operava com Stamina Verde, Prey ou Boost)' : '';
+            multiplierInsights.push({
+              name: m.name,
+              type: 'DEATH',
+              text: `${m.name} (${signedXp}): Sofreu ${m.deaths.length} baixa(s) (${deathDetails}) com perda estimada de ~${formatXp(m.totalLoss)} XP. Sem as baixas, teria rendido ~${formatXp(m.grossXp)}${boostTag}.`
+            });
+          } else if (isPartial) {
+            multiplierInsights.push({
+              name: m.name,
+              type: 'PARTIAL',
+              text: `${m.name} (${signedXp}): Participação parcial ou entrada tardia no slot (${Math.round(ratio * 100)}% da média de tempo da party).`
+            });
+          } else if (hasBoost) {
+            multiplierInsights.push({
+              name: m.name,
+              type: 'BOOST',
+              text: `${m.name} (${signedXp}): Operou com Stamina Verde (1.5x), Prey de XP ou Store Boost (+${Math.round((ratio - 1) * 100)}% sobre a base regular 100%).`
+            });
+          } else {
+            multiplierInsights.push({
+              name: m.name,
+              type: 'BASE',
+              text: `${m.name} (${signedXp}): Caçou com Stamina Regular / base 100% da party.`
+            });
+          }
+        });
+      }
+
+      const absentMembers = validMembers.filter(m => {
+        if (isShowingLive) {
+          const pm = processedMembers.find(p => p.name.toLowerCase() === m.toLowerCase());
+          return !pm || pm.totalXpGained <= 0;
+        }
+        return (activeHunt.memberXp[m.toLowerCase()] || 0) <= 0;
+      });
+      const quorumPercent = validMembers.length > 0 ? Math.round((activeMembersWithXp.length / validMembers.length) * 100) : 0;
+      const totalHuntXp = isShowingLive 
+        ? processedMembers.reduce((acc, curr) => acc + curr.totalXpGained, 0)
+        : activeHunt.totalXp;
+
+      setTacticalReport({
+        day: isShowingLive ? 'Ao Vivo (Hoje)' : activeHunt.day,
+        quorum: {
+          activeCount: activeMembersWithXp.length,
+          totalCount: validMembers.length,
+          percent: quorumPercent,
+          absent: absentMembers
+        },
+        baselineXp: baselineXp,
+        formattedBaseline: formatXp(baselineXp),
+        totalXp: totalHuntXp,
+        formattedTotal: formatXp(totalHuntXp),
+        casualties: casualties,
+        multiplierInsights: multiplierInsights,
+        huntHours: isShowingLive 
+          ? `${party.slot_start?.slice(0, 5) || '--:--'} - Agora` 
+          : (activeHunt.singlePing ? `${activeHunt.start} (Pico Isolado)` : `${activeHunt.start} - ${activeHunt.end}`)
+      });
+    } else {
+      setTacticalReport(null);
+    }
+  }, [rawDataset, party, selectedHuntDay]);
 
   if (!party) return <div>Nenhuma party selecionada.</div>;
 
