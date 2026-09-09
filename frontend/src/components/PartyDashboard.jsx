@@ -493,46 +493,54 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       if (memberProduction.length > 0) {
         const maxGross = Math.max(...memberProduction.map(m => m.grossXp));
         
-        const fullHuntCandidates = memberProduction
-          .filter(m => m.grossXp >= maxGross * 0.35)
-          .sort((a, b) => a.grossXp - b.grossXp);
+        // Membros que participaram de forma integral (pelo menos 40% da maior produção bruta)
+        const fullHuntCandidates = memberProduction.filter(m => m.grossXp >= maxGross * 0.40);
+        
+        // Membros íntegros (sem baixas/mortes) para definir o benchmark padrão da hunt
+        const cleanCandidates = fullHuntCandidates.filter(m => m.deaths.length === 0);
+        const benchmarkPool = cleanCandidates.length > 0 ? cleanCandidates : fullHuntCandidates;
 
-        const baselineCandidate = fullHuntCandidates.length > 0 ? fullHuntCandidates[0].grossXp : memberProduction[0].grossXp;
-        const isEveryoneBoosted = fullHuntCandidates.length > 0 && fullHuntCandidates.every(m => (m.grossXp / maxGross) >= 0.85 && maxGross > 100000000);
-        baselineXp = isEveryoneBoosted ? Math.round(baselineCandidate / 1.5) : baselineCandidate;
+        // O benchmark padrão da hunt é a média dos membros íntegros
+        baselineXp = benchmarkPool.length > 0
+          ? Math.round(benchmarkPool.reduce((acc, curr) => acc + curr.grossXp, 0) / benchmarkPool.length)
+          : Math.round(memberProduction.reduce((acc, curr) => acc + curr.grossXp, 0) / memberProduction.length);
 
         memberProduction.forEach(m => {
           const ratio = baselineXp > 0 ? (m.grossXp / baselineXp) : 1;
           const hasDeath = m.deaths.length > 0;
-          const hasBoost = ratio >= 1.30;
-          const isPartial = baselineXp > 0 && (m.grossXp / baselineXp) < 0.50;
+          const isOutlierBoost = ratio >= 1.18; // ~20% acima do padrão médio da equipe
+          const isPartial = ratio < 0.60 && !hasDeath;
           const signedXp = `${m.totalXpGained > 0 ? '+' : ''}${formatXp(m.totalXpGained)}`;
 
           if (hasDeath) {
             const deathDetails = m.deaths.map(d => `${d.time} para ${d.killed_by}`).join(', ');
-            const boostTag = hasBoost ? ' (operava com Stamina Verde, Prey ou Boost)' : '';
+            const grossPercent = Math.round(ratio * 100);
             multiplierInsights.push({
               name: m.name,
               type: 'DEATH',
-              text: `${m.name} (${signedXp}): Sofreu ${m.deaths.length} baixa(s) (${deathDetails}) com perda estimada de ~${formatXp(m.totalLoss)} XP. Sem as baixas, teria rendido ~${formatXp(m.grossXp)}${boostTag}.`
+              tag: 'Baixa em Combate',
+              text: `${m.name} (${signedXp}): Sofreu ${m.deaths.length} baixa(s) (${deathDetails}) com perda estimada de ~${formatXp(m.totalLoss)} XP. Sem as baixas, sua produção bruta alcançou ~${formatXp(m.grossXp)} (${grossPercent}% do padrão da equipe).`
             });
           } else if (isPartial) {
             multiplierInsights.push({
               name: m.name,
               type: 'PARTIAL',
-              text: `${m.name} (${signedXp}): Participação parcial ou entrada tardia no slot (${Math.round(ratio * 100)}% da média de tempo da party).`
+              tag: 'Participação Parcial',
+              text: `${m.name} (${signedXp}): Entrada tardia ou saída antecipada do respawn (${Math.round(ratio * 100)}% da média de tempo da party).`
             });
-          } else if (hasBoost) {
+          } else if (isOutlierBoost) {
             multiplierInsights.push({
               name: m.name,
               type: 'BOOST',
-              text: `${m.name} (${signedXp}): Operou com Stamina Verde (1.5x), Prey de XP ou Store Boost (+${Math.round((ratio - 1) * 100)}% sobre a base regular 100%).`
+              tag: `Prey / Boost (+${Math.round((ratio - 1) * 100)}%)`,
+              text: `${m.name} (${signedXp}): Destaque de rendimento (+${Math.round((ratio - 1) * 100)}% acima do padrão da equipe), operando com Prey de XP ou Store Boost ativo.`
             });
           } else {
             multiplierInsights.push({
               name: m.name,
               type: 'BASE',
-              text: `${m.name} (${signedXp}): Caçou com Stamina Regular / base 100% da party.`
+              tag: 'Rendimento Padrão (100%)',
+              text: `${m.name} (${signedXp}): Caçou em ritmo integral e sincronizado com a equipe (${Math.round(ratio * 100)}% do rendimento padrão).`
             });
           }
         });
@@ -1022,14 +1030,14 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
                 <div className="bg-black/40 border border-tibia-border/60 p-3.5 rounded-lg">
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
-                    <span>XP Base da Hunt</span>
+                    <span>Rendimento Padrão</span>
                     <Zap size={14} className="text-amber-400" />
                   </p>
                   <p className="text-2xl font-black text-amber-400 mt-1">
                     +{tacticalReport.formattedBaseline}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Base linear 100% por membro
+                    Média íntegra por membro
                   </p>
                 </div>
 
@@ -1085,6 +1093,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                                 ? 'bg-green-950/30 border-green-500/30 text-green-200'
                                 : ins.type === 'DEATH'
                                 ? 'bg-red-950/30 border-red-500/30 text-red-200'
+                                : ins.type === 'PARTIAL'
+                                ? 'bg-yellow-950/30 border-yellow-500/30 text-yellow-200'
                                 : 'bg-black/40 border-tibia-border/40 text-gray-300'
                             }`}
                           >
@@ -1095,9 +1105,11 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                                   ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                                   : ins.type === 'DEATH'
                                   ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                  : ins.type === 'PARTIAL'
+                                  ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
                                   : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                               }`}>
-                                {ins.type === 'BOOST' ? 'Stamina Verde / Boost (1.5x)' : ins.type === 'DEATH' ? 'Baixa em Combate' : 'Base 100%'}
+                                {ins.tag || (ins.type === 'BOOST' ? 'Prey / Boost' : ins.type === 'DEATH' ? 'Baixa em Combate' : ins.type === 'PARTIAL' ? 'Participação Parcial' : 'Rendimento Padrão (100%)')}
                               </span>
                             </div>
                             <p className="text-gray-300">{ins.text}</p>
