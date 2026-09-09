@@ -5,6 +5,7 @@ echo.
 
 echo  [1/3] Parando o robo em execucao...
 schtasks /End /TN "AuroriaWorker" 2>nul
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*AuroriaWorker*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" 2>nul
 taskkill /F /IM node.exe /T 2>nul
 taskkill /F /IM wscript.exe /T 2>nul
 

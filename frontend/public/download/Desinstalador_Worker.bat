@@ -31,6 +31,7 @@ powershell -Command "Get-CimInstance Win32_Process -Filter \"name='node.exe'\" |
 powershell -Command "Get-CimInstance Win32_Process -Filter \"name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'puppeteer' -or $_.CommandLine -match '--headless=new' } | Invoke-CimMethod -MethodName Terminate" >nul 2>&1
 
 echo [2/3] Removendo o auto-iniciar do Windows...
+schtasks /Delete /TN "AuroriaWorker" /F >nul 2>&1
 del /F /Q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\StartAuroriaWorker.vbs" >nul 2>&1
 
 echo [3/3] Apagando arquivos e pasta do Tracker...

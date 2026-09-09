@@ -11,25 +11,33 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const CURRENT_VERSION = 2;
 
 export const checkForUpdates = async () => {
-    // Se não estiver rodando como EXE compilado, usa o Git Pull blindado
+    // Se não estiver rodando como EXE compilado, usa o Git Pull blindado 100% invisível
     if (!process.pkg) {
         return new Promise((resolve) => {
-            exec('git rev-parse HEAD', { cwd: REPO_ROOT }, (err1, currentHead) => {
+            exec('git rev-parse HEAD', { cwd: REPO_ROOT, windowsHide: true }, (err1, currentHead) => {
                 if (err1) return resolve(false);
                 const oldHash = currentHead ? currentHead.trim() : '';
-                exec('git fetch origin main', { cwd: REPO_ROOT }, (err2) => {
+                exec('git fetch origin main', { cwd: REPO_ROOT, windowsHide: true }, (err2) => {
                     if (err2) return resolve(false);
-                    exec('git rev-parse origin/main', { cwd: REPO_ROOT }, (err3, remoteHead) => {
+                    exec('git rev-parse origin/main', { cwd: REPO_ROOT, windowsHide: true }, (err3, remoteHead) => {
                         if (err3) return resolve(false);
                         const newHash = remoteHead ? remoteHead.trim() : '';
                         if (oldHash && newHash && oldHash !== newHash) {
                             console.log(`[UPDATER] 🚀 Nova versão detectada no GitHub (${oldHash.slice(0, 7)} -> ${newHash.slice(0, 7)})!`);
-                            console.log('[UPDATER] Atualizando código com git reset --hard...');
-                            exec('git reset --hard origin/main', { cwd: REPO_ROOT }, () => {
-                                console.log('[UPDATER] Executando npm install e reiniciando...');
-                                exec('npm install', { cwd: WORKER_ROOT }, () => {
-                                    console.log('[UPDATER] ✅ Atualização concluída. Reiniciando processo...');
-                                    process.exit(0);
+                            console.log('[UPDATER] Atualizando código silenciosamente com git reset --hard...');
+                            exec('git reset --hard origin/main', { cwd: REPO_ROOT, windowsHide: true }, () => {
+                                exec(`git diff --name-only ${oldHash} ${newHash}`, { cwd: REPO_ROOT, windowsHide: true }, (errDiff, diffFiles) => {
+                                    const needsNpmInstall = diffFiles && diffFiles.includes('package.json');
+                                    if (needsNpmInstall) {
+                                        console.log('[UPDATER] Alterações em dependências detectadas. Executando npm install...');
+                                        exec('npm install --no-audit --no-fund', { cwd: WORKER_ROOT, windowsHide: true }, () => {
+                                            console.log('[UPDATER] ✅ Atualização concluída. Reiniciando processo...');
+                                            process.exit(0);
+                                        });
+                                    } else {
+                                        console.log('[UPDATER] ✅ Código atualizado. Reiniciando processo...');
+                                        process.exit(0);
+                                    }
                                 });
                             });
                             return;
@@ -92,7 +100,8 @@ del "%~f0"
             const child = spawn('cmd.exe', ['/c', batPath], {
                 detached: true,
                 stdio: 'ignore',
-                cwd: process.cwd()
+                cwd: process.cwd(),
+                windowsHide: true
             });
             child.unref();
 
