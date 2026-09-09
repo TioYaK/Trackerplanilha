@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Clock, TrendingUp, AlertTriangle, Users, Info, CheckCircle, RotateCcw } from 'lucide-react';
+import { Clock, TrendingUp, AlertTriangle, Users, Info, CheckCircle, RotateCcw, Shield, Zap, Skull, Calendar } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { parseUtcDate, isSlotActiveNow } from '../lib/tibiaUtils';
 
@@ -18,6 +18,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   const [historyChartData, setHistoryChartData] = useState([]);
   const [sessionLabel, setSessionLabel] = useState('Rendimento Individual (Hoje / SS)');
   const [selectedHuntDay, setSelectedHuntDay] = useState(null);
+  const [tacticalReport, setTacticalReport] = useState(null);
 
   const formatXp = (raw) => {
     if (!raw && raw !== 0) return '0';
@@ -43,6 +44,10 @@ export default function PartyDashboard({ party, onPlayerClick }) {
     }
     return null;
   };
+
+  useEffect(() => {
+    setSelectedHuntDay(null);
+  }, [party?.id]);
 
   useEffect(() => {
     const fetchPartyData = async () => {
@@ -133,7 +138,27 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         guildData = gData;
       }
 
-      // 4. Monta o mapa histórico por dia do Server Save
+      // 4. Busca mortes recentes dos membros da party
+      let recentDeaths = [];
+      const { data: dData } = await supabase
+        .from('recent_deaths')
+        .select('character_name, level, killed_by, death_time')
+        .or(orFilterChar)
+        .gte('death_time', historyStartDate)
+        .order('death_time', { ascending: true });
+      if (dData) recentDeaths = dData;
+
+      // 5. Busca histórico de logins dos membros da party
+      let loginEvents = [];
+      const { data: lData } = await supabase
+        .from('login_events')
+        .select('character_name, event_type, event_time')
+        .or(orFilterChar)
+        .gte('event_time', historyStartDate)
+        .order('event_time', { ascending: true });
+      if (lData) loginEvents = lData;
+
+      // 6. Monta o mapa histórico por dia do Server Save
       const historyMap = {};
       const sMin = toMinutes(party.slot_start);
       let eMin = toMinutes(party.slot_end);
@@ -201,6 +226,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                totalXp: h.totalXp,
                start: formatTime(h.start),
                end: formatTime(h.end),
+               startRaw: h.start,
+               endRaw: h.end,
                singlePing: diffMins < 10,
                memberXp: h.memberXp,
                rawDate: h.rawDate
@@ -215,25 +242,30 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       const lastHunt = chartDataArr.length > 0 ? chartDataArr[chartDataArr.length - 1] : null;
 
       let activeHunt = null;
-      if (selectedHuntDay) {
-        activeHunt = chartDataArr.find(h => h.day === selectedHuntDay) || lastHunt;
-      }
-
-      let activeLabel = 'Rendimento Individual (Hoje / SS)';
       let isShowingLive = false;
+      let activeLabel = 'Rendimento Individual (Hoje / SS)';
 
-      if (isSlotActive) {
-        // Slot acontecendo agora
-        activeLabel = 'Rendimento Individual (Caçando Agora)';
-        isShowingLive = true;
-      } else if (activeHunt) {
-        activeLabel = `Rendimento Individual (${activeHunt.day})`;
-      } else if (todayHunt) {
-        activeLabel = `Rendimento Individual (Hoje - ${todayHunt.day})`;
-        activeHunt = todayHunt;
-      } else if (lastHunt) {
-        activeLabel = `Rendimento Individual (Última Hunt - ${lastHunt.day})`;
-        activeHunt = lastHunt;
+      if (selectedHuntDay) {
+        if (selectedHuntDay === 'LIVE' && isSlotActive) {
+          isShowingLive = true;
+          activeLabel = 'Rendimento Individual (Caçando Agora - Ao Vivo)';
+        } else {
+          activeHunt = chartDataArr.find(h => h.day === selectedHuntDay) || lastHunt;
+          if (activeHunt) {
+            activeLabel = `Rendimento Individual (${activeHunt.day})`;
+          }
+        }
+      } else {
+        if (isSlotActive) {
+          isShowingLive = true;
+          activeLabel = 'Rendimento Individual (Caçando Agora)';
+        } else if (todayHunt) {
+          activeHunt = todayHunt;
+          activeLabel = `Rendimento Individual (Hoje - ${todayHunt.day})`;
+        } else if (lastHunt) {
+          activeHunt = lastHunt;
+          activeLabel = `Rendimento Individual (Última Hunt - ${lastHunt.day})`;
+        }
       }
       setSessionLabel(activeLabel);
 
@@ -329,6 +361,107 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         }
       } else {
         setActualHuntTime(null);
+      }
+
+      // 8. Gera o Parecer Tático Forense da Hunt
+      if (activeHunt || isShowingLive) {
+        const huntStart = isShowingLive ? new Date(lastSSTime) : parseDate(activeHunt.startRaw || activeHunt.start);
+        const huntEnd = isShowingLive ? new Date() : parseDate(activeHunt.endRaw || activeHunt.end);
+
+        // Cruza mortes que ocorreram na janela da hunt (com margem de 1h antes até 3h depois do início)
+        const huntDeaths = (recentDeaths || []).filter(d => {
+          const dt = parseDate(d.death_time);
+          if (!dt || !huntStart) return false;
+          const diffHours = (dt.getTime() - huntStart.getTime()) / (1000 * 3600);
+          return diffHours >= -0.5 && diffHours <= 4.5;
+        });
+
+        const casualties = huntDeaths.map(d => {
+          const lvl = Number(d.level) || 1000;
+          const estimatedLoss = Math.round((50 / 3 * Math.pow(lvl, 3)) * 0.0012);
+          return {
+            character_name: d.character_name,
+            level: lvl,
+            killed_by: d.killed_by,
+            time: formatTime(parseDate(d.death_time)),
+            estimatedLoss: estimatedLoss,
+            formattedLoss: formatXp(estimatedLoss)
+          };
+        });
+
+        const activeMembersWithXp = isShowingLive 
+          ? processedMembers.filter(m => m.totalXpGained > 0)
+          : validMembers.filter(m => (activeHunt.memberXp[m.toLowerCase()] || 0) > 0).map(m => ({
+              name: m,
+              totalXpGained: activeHunt.memberXp[m.toLowerCase()] || 0
+            }));
+
+        const memberXpList = [...activeMembersWithXp].sort((a, b) => a.totalXpGained - b.totalXpGained);
+
+        let baselineXp = 0;
+        let multiplierInsights = [];
+
+        if (memberXpList.length > 0) {
+          baselineXp = memberXpList[0].totalXpGained;
+
+          memberXpList.forEach(m => {
+            const death = casualties.find(c => c.character_name.toLowerCase() === m.name.toLowerCase());
+            const ratio = baselineXp > 0 ? (m.totalXpGained / baselineXp) : 1;
+
+            if (death) {
+              const projected = m.totalXpGained + death.estimatedLoss;
+              const hasBoost = baselineXp > 0 && (projected / baselineXp) >= 1.35;
+              multiplierInsights.push({
+                name: m.name,
+                type: 'DEATH',
+                text: `${m.name} (+${formatXp(m.totalXpGained)}): Sofreu uma baixa às ${death.time} para ${death.killed_by} (-~${death.formattedLoss} XP). Sem a baixa, teria fechado em ~${formatXp(projected)}${hasBoost ? ' (operava com Stamina Verde / Bônus)' : ''}.`
+              });
+            } else if (ratio >= 1.35) {
+              multiplierInsights.push({
+                name: m.name,
+                type: 'BOOST',
+                text: `${m.name} (+${formatXp(m.totalXpGained)}): Operou com Stamina Verde (1.5x) ou Bônus Ativo (+${Math.round((ratio - 1) * 100)}% sobre a base da party).`
+              });
+            } else {
+              multiplierInsights.push({
+                name: m.name,
+                type: 'BASE',
+                text: `${m.name} (+${formatXp(m.totalXpGained)}): Caçou com Stamina Regular / base 100% da party.`
+              });
+            }
+          });
+        }
+
+        const absentMembers = validMembers.filter(m => {
+          if (isShowingLive) {
+            const pm = processedMembers.find(p => p.name.toLowerCase() === m.toLowerCase());
+            return !pm || pm.totalXpGained <= 0;
+          }
+          return (activeHunt.memberXp[m.toLowerCase()] || 0) <= 0;
+        });
+        const quorumPercent = Math.round((activeMembersWithXp.length / validMembers.length) * 100);
+        const totalHuntXp = isShowingLive 
+          ? processedMembers.reduce((acc, curr) => acc + curr.totalXpGained, 0)
+          : activeHunt.totalXp;
+
+        setTacticalReport({
+          day: isShowingLive ? 'Ao Vivo (Hoje)' : activeHunt.day,
+          quorum: {
+            activeCount: activeMembersWithXp.length,
+            totalCount: validMembers.length,
+            percent: quorumPercent,
+            absent: absentMembers
+          },
+          baselineXp: baselineXp,
+          formattedBaseline: formatXp(baselineXp),
+          totalXp: totalHuntXp,
+          formattedTotal: formatXp(totalHuntXp),
+          casualties: casualties,
+          multiplierInsights: multiplierInsights,
+          huntHours: isShowingLive ? `${party.slot_start?.slice(0, 5) || '--:--'} - Agora` : `${activeHunt.start} - ${activeHunt.end}`
+        });
+      } else {
+        setTacticalReport(null);
       }
 
       setLoading(false);
@@ -476,6 +609,63 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         <div className="flex justify-center items-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tibia-primary"></div></div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Barra de Filtro por Dia */}
+          {historyChartData.length > 0 && (
+            <div className="lg:col-span-3 flex flex-wrap items-center gap-2 bg-black/40 border border-tibia-border/60 p-3 rounded-lg shadow-inner">
+              <div className="flex items-center text-xs font-bold text-gray-400 uppercase tracking-wider mr-2">
+                <Calendar size={14} className="text-amber-400 mr-1.5" />
+                <span>Filtrar por Dia:</span>
+              </div>
+
+              {isSlotActive && (
+                <button
+                  onClick={() => setSelectedHuntDay('LIVE')}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center transition-all ${
+                    (selectedHuntDay === 'LIVE' || (!selectedHuntDay && isSlotActive))
+                      ? 'bg-green-500/20 text-green-300 border border-green-500 shadow-sm'
+                      : 'bg-black/40 text-gray-400 hover:text-white border border-tibia-border/40'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-green-400 mr-2 animate-pulse"></span>
+                  Ao Vivo (Agora)
+                </button>
+              )}
+
+              {[...historyChartData].reverse().map((h, idx) => {
+                const isLatest = idx === 0;
+                const isSelected = selectedHuntDay === h.day || (!selectedHuntDay && !isSlotActive && isLatest);
+                return (
+                  <button
+                    key={h.day}
+                    onClick={() => setSelectedHuntDay(h.day)}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                      isSelected
+                        ? 'bg-amber-500 text-black font-bold border border-amber-400 shadow-md scale-105'
+                        : 'bg-black/50 text-gray-300 hover:bg-black/80 hover:text-white border border-tibia-border/60'
+                    }`}
+                  >
+                    <span>{h.day}</span>
+                    {isLatest && <span className="ml-1 text-[10px] opacity-75 font-normal">(Última)</span>}
+                    <span className={`ml-1.5 text-[10px] ${isSelected ? 'text-black/80 font-bold' : 'text-amber-400/80 font-mono'}`}>
+                      +{formatXp(h.totalXp)}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {selectedHuntDay && (
+                <button
+                  onClick={() => setSelectedHuntDay(null)}
+                  className="ml-auto text-xs text-gray-400 hover:text-amber-400 flex items-center transition-colors bg-white/5 px-2.5 py-1 rounded border border-white/10"
+                  title="Restaurar visualização automática da última hunt"
+                >
+                  <RotateCcw size={12} className="mr-1.5" />
+                  Restaurar Padrão
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="lg:col-span-2 bg-tibia-card border border-tibia-border rounded-lg shadow-xl overflow-hidden">
             <div className="p-4 bg-black/40 border-b border-tibia-border flex justify-between items-center">
               <div className="flex items-center">
@@ -524,7 +714,213 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             </div>
             <p className="text-xs text-gray-500 mt-4 italic text-center">Membros inativos com XP zerada podem estar offline, em outro servidor ou ausentes na hunt.</p>
           </div>
-          
+
+          {/* Card: Raio-X Tático da Hunt */}
+          {tacticalReport && (
+            <div className="lg:col-span-3 bg-gradient-to-b from-gray-900/90 to-tibia-card border border-amber-500/30 rounded-lg shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="p-4 bg-black/60 border-b border-tibia-border flex flex-wrap justify-between items-center gap-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400">
+                    <Shield size={22} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      Raio-X Tático da Hunt
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Auditoria de Telemetria
+                      </span>
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      Análise forense de rendimento, bônus de stamina, baixas e quórum da equipe.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3 text-xs">
+                  <div className="bg-black/50 border border-tibia-border px-3 py-1.5 rounded text-gray-300 flex items-center">
+                    <Calendar size={13} className="mr-1.5 text-amber-400" />
+                    <span className="text-white font-semibold">{tacticalReport.day}</span>
+                  </div>
+                  <div className="bg-black/50 border border-tibia-border px-3 py-1.5 rounded text-gray-300 flex items-center">
+                    <Clock size={13} className="mr-1.5 text-blue-400" />
+                    <span className="text-white font-semibold">{tacticalReport.huntHours}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 KPIs de Alto Impacto */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-black/20 border-b border-tibia-border/50">
+                <div className="bg-black/40 border border-tibia-border/60 p-3.5 rounded-lg">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Quórum da Party</span>
+                    <Users size={14} className="text-blue-400" />
+                  </p>
+                  <p className="text-2xl font-black text-white mt-1">
+                    {tacticalReport.quorum.activeCount} <span className="text-sm font-normal text-gray-400">/ {tacticalReport.quorum.totalCount}</span>
+                  </p>
+                  <p className={`text-xs mt-1 font-semibold ${
+                    tacticalReport.quorum.percent >= 80 ? 'text-green-400' : 'text-yellow-400'
+                  }`}>
+                    {tacticalReport.quorum.percent}% de presença ativa
+                  </p>
+                </div>
+
+                <div className="bg-black/40 border border-tibia-border/60 p-3.5 rounded-lg">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>XP Base da Hunt</span>
+                    <Zap size={14} className="text-amber-400" />
+                  </p>
+                  <p className="text-2xl font-black text-amber-400 mt-1">
+                    +{tacticalReport.formattedBaseline}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Base linear 100% por membro
+                  </p>
+                </div>
+
+                <div className="bg-black/40 border border-tibia-border/60 p-3.5 rounded-lg">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Produção Coletiva</span>
+                    <TrendingUp size={14} className="text-green-400" />
+                  </p>
+                  <p className="text-2xl font-black text-green-400 mt-1">
+                    +{tacticalReport.formattedTotal}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    XP somada de toda a party
+                  </p>
+                </div>
+
+                <div className="bg-black/40 border border-tibia-border/60 p-3.5 rounded-lg">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Segurança / Baixas</span>
+                    <Skull size={14} className={tacticalReport.casualties.length > 0 ? "text-red-400" : "text-green-400"} />
+                  </p>
+                  <p className={`text-2xl font-black mt-1 ${
+                    tacticalReport.casualties.length > 0 ? 'text-red-400' : 'text-green-400'
+                  }`}>
+                    {tacticalReport.casualties.length === 0 ? '0 Baixas' : `${tacticalReport.casualties.length} Morte${tacticalReport.casualties.length > 1 ? 's' : ''}`}
+                  </p>
+                  <p className={`text-xs mt-1 ${tacticalReport.casualties.length > 0 ? 'text-red-300/80 font-medium' : 'text-green-400/80'}`}>
+                    {tacticalReport.casualties.length === 0 
+                      ? '100% de Sobrevivência' 
+                      : `Perda: ~${formatXp(tacticalReport.casualties.reduce((acc, c) => acc + c.estimatedLoss, 0))} XP`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Diagnósticos Detalhados */}
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Coluna 1: Multiplicadores & Rendimento */}
+                <div className="bg-black/30 border border-tibia-border/60 rounded-lg p-4 flex flex-col justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-white mb-3 flex items-center">
+                      <Zap size={16} className="text-amber-400 mr-2" />
+                      Diagnóstico de Rendimento & Multiplicadores
+                    </h4>
+                    <div className="space-y-2.5">
+                      {tacticalReport.multiplierInsights.length === 0 ? (
+                        <p className="text-xs text-gray-500 italic">Nenhum membro ativo detectado nesta hunt.</p>
+                      ) : (
+                        tacticalReport.multiplierInsights.map((ins, idx) => (
+                          <div 
+                            key={idx} 
+                            className={`p-3 rounded text-xs border leading-relaxed ${
+                              ins.type === 'BOOST' 
+                                ? 'bg-green-950/30 border-green-500/30 text-green-200'
+                                : ins.type === 'DEATH'
+                                ? 'bg-red-950/30 border-red-500/30 text-red-200'
+                                : 'bg-black/40 border-tibia-border/40 text-gray-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-white">{ins.name}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                                ins.type === 'BOOST'
+                                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                  : ins.type === 'DEATH'
+                                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              }`}>
+                                {ins.type === 'BOOST' ? 'Stamina Verde / Boost (1.5x)' : ins.type === 'DEATH' ? 'Baixa em Combate' : 'Base 100%'}
+                              </span>
+                            </div>
+                            <p className="text-gray-300">{ins.text}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-4 italic">
+                    💡 A divergência de XP entre membros da mesma hunt é decorrente de Stamina Verde (50% de bônus nas primeiras 2h), Store Boosts ou mortes.
+                  </p>
+                </div>
+
+                {/* Coluna 2: Incidentes, Mortes e Quórum */}
+                <div className="space-y-6">
+                  {/* Incidentes e Baixas */}
+                  <div className="bg-black/30 border border-tibia-border/60 rounded-lg p-4">
+                    <h4 className="text-sm font-bold text-white mb-3 flex items-center">
+                      <Skull size={16} className="text-red-400 mr-2" />
+                      Ocorrências & Baixas no Respawn
+                    </h4>
+                    {tacticalReport.casualties.length === 0 ? (
+                      <div className="p-3 bg-green-950/20 border border-green-500/20 rounded text-xs text-green-300 flex items-center">
+                        <CheckCircle size={15} className="text-green-400 mr-2 flex-shrink-0" />
+                        Nenhum membro da party sofreu mortes no respawn durante esta sessão.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {tacticalReport.casualties.map((c, idx) => (
+                          <div key={idx} className="p-3 bg-red-950/40 border border-red-500/30 rounded text-xs text-red-200">
+                            <div className="flex items-center justify-between font-bold text-white">
+                              <span>{c.character_name} (Lvl {c.level})</span>
+                              <span className="text-red-400 font-mono">-{c.formattedLoss} XP</span>
+                            </div>
+                            <p className="mt-1 text-gray-300">
+                              Morto às <span className="text-white font-semibold">{c.time}</span> para <span className="text-amber-300 font-semibold">{c.killed_by}</span>.
+                            </p>
+                            <p className="text-[11px] text-red-300/80 mt-1 italic">
+                              A perda de XP reduziu o saldo líquido do jogador no dossiê. O cálculo leva em consideração as 5 bênçãos regulares.
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quórum e Ausências */}
+                  <div className="bg-black/30 border border-tibia-border/60 rounded-lg p-4">
+                    <h4 className="text-sm font-bold text-white mb-3 flex items-center">
+                      <Users size={16} className="text-blue-400 mr-2" />
+                      Auditoria de Presença
+                    </h4>
+                    {tacticalReport.quorum.absent.length === 0 ? (
+                      <div className="p-3 bg-blue-950/20 border border-blue-500/20 rounded text-xs text-blue-300 flex items-center">
+                        <CheckCircle size={15} className="text-blue-400 mr-2 flex-shrink-0" />
+                        Presença perfeita: 100% da party ativa e pontual no slot.
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-yellow-950/30 border border-yellow-500/30 rounded text-xs text-yellow-200">
+                        <div className="font-bold text-yellow-400 flex items-center mb-1">
+                          <AlertTriangle size={14} className="mr-1.5" />
+                          Membro(s) Ausente(s) no Período:
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {tacticalReport.quorum.absent.map(m => (
+                            <span key={m} className="px-2 py-0.5 bg-black/60 border border-yellow-500/40 rounded text-yellow-300 font-mono">
+                              {m} (0 XP)
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Gráfico Histórico Semanal/Mensal */}
           <div className="lg:col-span-3 bg-tibia-card border border-tibia-border rounded-lg shadow-xl overflow-hidden mt-8">
             <div className="p-4 bg-black/40 border-b border-tibia-border flex justify-between items-center">
