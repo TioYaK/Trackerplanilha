@@ -5,6 +5,8 @@ export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
+    this.handleReset = this.handleReset.bind(this);
+    this.handleReload = this.handleReload.bind(this);
   }
 
   static getDerivedStateFromError(error) {
@@ -16,13 +18,14 @@ export default class ErrorBoundary extends React.Component {
     console.error('[ErrorBoundary] Erro interceptado na interface:', error, errorInfo);
   }
 
-  handleReset = () => {
+  handleReset() {
     this.setState({ hasError: false, error: null, errorInfo: null });
-  };
+  }
 
-  handleReload = () => {
+  handleReload() {
     window.location.reload();
-  };
+  }
+
 
   render() {
     if (this.state.hasError) {

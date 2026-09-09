@@ -75,6 +75,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   const [historyChartData, setHistoryChartData] = useState([]);
   const [sessionLabel, setSessionLabel] = useState('Rendimento Individual (Hoje / SS)');
   const [tacticalReport, setTacticalReport] = useState(null);
+  const [isShowingLive, setIsShowingLive] = useState(false);
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -183,7 +184,10 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
   // Efeito 2: Processamento e Auditoria Forense em Memória (Instantâneo / 0ms)
   useEffect(() => {
-    if (!rawDataset || !party) return;
+    if (!rawDataset || !party) {
+      setIsShowingLive(false);
+      return;
+    }
 
     const { logs, currentStates, guildData, recentDeaths } = rawDataset;
     const validMembers = getValidMembers(party.members);
@@ -311,6 +315,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       }
     }
     setSessionLabel(activeLabel);
+    setIsShowingLive(isShowingLive);
 
     // 3. Calcula estatísticas individuais dos membros
     const memberStats = {};
@@ -578,6 +583,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       });
     } else {
       setTacticalReport(null);
+      setIsShowingLive(false);
     }
   }, [rawDataset, party, selectedHuntDay]);
 

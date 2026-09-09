@@ -133,9 +133,9 @@ export default function GuildRadar() {
                  
                  <div className="flex justify-between items-start mb-4">
                     <div>
-                       <h3 className="text-xl font-bold text-white truncate max-w-[200px]" title={h.name}>{h.name}</h3>
-                       <p className={	ext-sm font-semibold }>{h.vocation || 'Unknown'} - Lvl {h.level}</p>
-                    </div>
+                        <h3 className="text-xl font-bold text-white truncate max-w-[200px]" title={h.name}>{h.name}</h3>
+                        <p className="text-sm font-semibold text-gray-400">{h.vocation || 'Unknown'} - Lvl {h.level}</p>
+                     </div>
                     <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded border border-green-500/30 flex items-center animate-pulse">
                        Ativo
                     </span>
@@ -147,10 +147,10 @@ export default function GuildRadar() {
                        <p className="text-lg font-bold text-tibia-highlight">+{formatXp(h.xpLastHour)}</p>
                     </div>
                     <div>
-                       <p className="text-xs text-gray-500 uppercase font-bold">Dura��o</p>
+                       <p className="text-xs text-gray-500 uppercase font-bold">Duração</p>
                        <p className="text-lg font-bold text-gray-300 flex items-center">
                           <Clock size={16} className="mr-1" />
-                          {durationMins > 0 ? ${durationMins}m : 'Agora'}
+                          {durationMins > 0 ? `${durationMins}m` : 'Agora'}
                        </p>
                     </div>
                  </div>
