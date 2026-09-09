@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Activity, Clock, ShieldAlert, DollarSign, Swords } from 'lucide-react';
+import { parseUtcDate } from '../lib/tibiaUtils';
 
 export default function GlobalAuditFeed() {
   const [logs, setLogs] = useState([]);
@@ -47,11 +48,9 @@ export default function GlobalAuditFeed() {
         const { data: parties } = await supabase.from('parties_planilhadas').select('*').order('created_at', { ascending: false }).limit(20);
         if (parties) {
           parties.forEach(p => {
-            // we don't have created_at on parties, so we approximate or just show it if we have a timestamp
-            const dummyDate = p.created_at ? new Date(p.created_at) : new Date(Date.now() - Math.random() * 86400000);
             allLogs.push({
               id: `party-${p.id}`,
-              date: dummyDate, 
+              date: parseUtcDate(p.created_at) || new Date(), 
               type: 'PARTY',
               icon: <Swords size={16} className="text-blue-500" />,
               message: `O admin ${p.created_by || 'Admin'} agendou uma PT para ${p.leader_name} em "${p.hunt_name}" para o slot das ${p.slot_start}.`

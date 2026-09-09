@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-
 import { supabase } from '../lib/supabase';
+import { parseUtcDate } from '../lib/tibiaUtils';
 
 export default function InviteRequest({ isPublic = false }) {
   const [clientId] = useState(() => {
@@ -218,8 +218,15 @@ export default function InviteRequest({ isPublic = false }) {
               ) : filteredInvites.map((inv) => (
                 <tr key={inv.id} className="hover:bg-tibia-bg/50">
                   <td className="py-2 px-4 text-xs">
-                    {new Date(inv.created_at).toLocaleDateString('pt-BR')} <br/>
-                    <span className="text-gray-500">{new Date(inv.created_at).toLocaleTimeString('pt-BR')}</span>
+                    {(() => {
+                      const d = parseUtcDate(inv.created_at) || new Date();
+                      return (
+                        <>
+                          {d.toLocaleDateString('pt-BR')} <br/>
+                          <span className="text-gray-500">{d.toLocaleTimeString('pt-BR')}</span>
+                        </>
+                      );
+                    })()}
                   </td>
                   <td className="py-2 px-4 text-sm font-medium">{inv.character_name}</td>
                   <td className="py-2 px-4 text-xs text-gray-400">{inv.world}</td>

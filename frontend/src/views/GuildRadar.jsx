@@ -33,16 +33,11 @@ export default function GuildRadar() {
         const membersList = guildMembers.map(m => m.name);
         
         const fetchStates = async () => {
-          let allStates = [];
-          for (let i = 0; i < membersList.length; i += 100) {
-            const chunk = membersList.slice(i, i + 100);
-            const { data } = await supabase
-              .from('current_character_state')
-              .select('*')
-              .in('character_name', chunk);
-            if (data) allStates = allStates.concat(data);
-          }
-          return allStates;
+          const { data } = await supabase
+            .from('current_character_state')
+            .select('*')
+            .gte('last_active', twoHoursAgo);
+          return data || [];
         };
 
         const states = await fetchStates();

@@ -76,21 +76,6 @@ export const runFetchGuild = async () => {
       });
     }
 
-    const { data: huntedList } = await supabase.from('hunted_list').select('name');
-    if (huntedList) {
-      huntedList.forEach(h => {
-        if (h.name && !uniqueMembersMap.has(h.name)) {
-          uniqueMembersMap.set(h.name, {
-            name: h.name,
-            vocation: null,
-            level: null,
-            rank: 'Hunted',
-            is_online: false
-          });
-        }
-      });
-    }
-
     const upsertData = Array.from(uniqueMembersMap.values());
 
     // Upsert em chunks para não exceder o payload limit
@@ -108,7 +93,7 @@ export const runFetchGuild = async () => {
       }
     }
 
-    console.log(`[JOB] ✅ ${insertedCount} membros processados (incluindo PTs e Hunteds).`);
+    console.log(`[JOB] ✅ ${insertedCount} membros da guilda processados.`);
 
     // --- PURGE: Remove apenas membros que realmente saíram da guilda ---
     try {

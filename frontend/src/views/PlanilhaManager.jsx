@@ -103,13 +103,15 @@ export default function PlanilhaManager({ isAdmin }) {
       .map(m => normalizeName(m))
       .filter(m => m.length > 0);
 
+    const normalizedLeader = normalizeName(formData.leader_name);
+
     let error;
     if (editingId) {
       const res = await supabase.from('parties_planilhadas').update({
-        party_name: formData.party_name,
-        leader_name: formData.leader_name,
+        party_name: formData.party_name.trim(),
+        leader_name: normalizedLeader,
         respawn_category: formData.respawn_category,
-        hunt_name: formData.hunt_name,
+        hunt_name: formData.hunt_name.trim(),
         slot_start: formData.slot_start,
         slot_end: formData.slot_end,
         members: membersArray
@@ -117,10 +119,10 @@ export default function PlanilhaManager({ isAdmin }) {
       error = res.error;
     } else {
       const res = await supabase.from('parties_planilhadas').insert([{
-        party_name: formData.party_name,
-        leader_name: formData.leader_name,
+        party_name: formData.party_name.trim(),
+        leader_name: normalizedLeader,
         respawn_category: formData.respawn_category,
-        hunt_name: formData.hunt_name,
+        hunt_name: formData.hunt_name.trim(),
         slot_start: formData.slot_start,
         slot_end: formData.slot_end,
         members: membersArray,

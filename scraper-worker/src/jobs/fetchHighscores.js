@@ -99,10 +99,18 @@ export const runFetchHighscores = async (vocationStr) => {
         }
       }
 
+      const VOCATION_MAP = {
+        '1': 'Master Sorcerer', '2': 'Elder Druid', '3': 'Royal Paladin', '4': 'Elite Knight',
+        '5': 'Master Sorcerer', '6': 'Elder Druid', '7': 'Royal Paladin', '8': 'Elite Knight',
+        'Druid': 'Elder Druid', 'Knight': 'Elite Knight', 'Sorcerer': 'Master Sorcerer', 'Paladin': 'Royal Paladin'
+      };
+      const rawVoc = player.vocation || voc;
+      const normalizedVoc = VOCATION_MAP[rawVoc] || rawVoc;
+
       statesToUpsert.push({
         character_name: player.name,
         level: player.level,
-        vocation: player.vocation || voc,
+        vocation: normalizedVoc,
         xp_total: player.experience,
         last_active: last_active,
         session_start_xp: session_start_xp,

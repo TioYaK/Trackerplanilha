@@ -17,7 +17,13 @@ export const runFetchTransfers = async () => {
                 let tDate = new Date();
                 if (t.transferred_at || t.transferredAt) {
                     const rawDate = t.transferred_at || t.transferredAt;
-                    tDate = new Date(Number(rawDate) > 9999999999 ? Number(rawDate) : Number(rawDate) * 1000);
+                    const num = Number(rawDate);
+                    if (!isNaN(num) && num > 0) {
+                        tDate = new Date(num > 9999999999 ? num : num * 1000);
+                    } else {
+                        const parsed = new Date(rawDate);
+                        if (!isNaN(parsed.getTime())) tDate = parsed;
+                    }
                 }
 
                 const record = {
@@ -43,7 +49,13 @@ export const runFetchTransfers = async () => {
                 let tDate = new Date();
                 if (t.transferred_at || t.transferredAt) {
                     const rawDate = t.transferred_at || t.transferredAt;
-                    tDate = new Date(Number(rawDate) > 9999999999 ? Number(rawDate) : Number(rawDate) * 1000);
+                    const num = Number(rawDate);
+                    if (!isNaN(num) && num > 0) {
+                        tDate = new Date(num > 9999999999 ? num : num * 1000);
+                    } else {
+                        const parsed = new Date(rawDate);
+                        if (!isNaN(parsed.getTime())) tDate = parsed;
+                    }
                 }
 
                 const record = {

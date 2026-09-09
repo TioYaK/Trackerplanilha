@@ -30,6 +30,9 @@ export const runFetchBazaar = async () => {
       const isSnipingOp = auc.level >= 500 && auc.currentValue <= 2000;
 
       if (isHunted || isSnipingOp) {
+        let endMs = Number(auc.auctionEnd || 0);
+        if (endMs > 0 && endMs < 9999999999) endMs *= 1000;
+
         alertsToInsert.push({
           auction_id: auc.id,
           character_name: auc.name,
@@ -37,7 +40,7 @@ export const runFetchBazaar = async () => {
           level: auc.level,
           vocation: auc.vocationName || auc.vocation,
           current_bid: auc.currentValue,
-          auction_end: new Date(auc.auctionEnd * 1000).toISOString(),
+          auction_end: endMs > 0 ? new Date(endMs).toISOString() : new Date().toISOString(),
           is_hunted: isHunted,
           is_sniping_opportunity: isSnipingOp,
           skills_data: auc.skills || {},

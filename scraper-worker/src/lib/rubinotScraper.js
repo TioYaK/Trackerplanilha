@@ -1062,22 +1062,29 @@ async function scrapeOnlines(world = 'Auroria') {
 
 // ─── API FETCH (Next.js bypass) ───────────────────────────────────────────────
 async function fetchRubinotApi(endpoint) {
-    let page = null;
     try {
         await initBrowser();
-        page = await globalBrowser.newPage();
-        const html = await safeGoto(page, 'https://rubinot.com.br/deaths');
-        if (!html) throw new Error('Cloudflare bloqueou o acesso.');
+        const page = await getGuildPage();
+        const currentUrl = page.url();
+        if (!currentUrl || !currentUrl.includes('rubinot.com.br')) {
+            const html = await safeGoto(page, 'https://rubinot.com.br/deaths');
+            if (!html) throw new Error('Cloudflare bloqueou o acesso.');
+        }
         const data = await page.evaluate(async (url) => {
-            const res = await fetch(url);
-            return await res.json();
+            try {
+                const res = await fetch(url);
+                if (!res.ok) return null;
+                const contentType = res.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) return null;
+                return await res.json();
+            } catch (err) {
+                return null;
+            }
         }, endpoint);
         return data;
     } catch (e) {
-        console.error('[Scraper API] Erro ao buscar', endpoint, e);
+        console.error('[Scraper API] Erro ao buscar', endpoint, e.message);
         return null;
-    } finally {
-        if (page) await page.close().catch(() => {});
     }
 }
 

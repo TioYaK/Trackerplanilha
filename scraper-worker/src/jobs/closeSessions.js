@@ -98,12 +98,16 @@ export const runCloseSessions = async () => {
     if (statesToReset.length > 0) {
       for (let i = 0; i < statesToReset.length; i += 100) {
         const chunk = statesToReset.slice(i, i + 100);
-        const { error: updateErr } = await supabase
-          .from('current_character_state')
-          .upsert(chunk, { onConflict: 'character_name' });
-        if (updateErr) {
-          console.error(`[JOB] Erro ao resetar current_character_state:`, updateErr.message);
-        }
+        const promises = chunk.map(state =>
+          supabase
+            .from('current_character_state')
+            .update({
+              session_start_xp: state.session_start_xp,
+              session_start_time: state.session_start_time
+            })
+            .eq('character_name', state.character_name)
+        );
+        await Promise.all(promises);
       }
       console.log(`[JOB] ✅ ${statesToReset.length} estados resetados para a próxima hunt.`);
     }

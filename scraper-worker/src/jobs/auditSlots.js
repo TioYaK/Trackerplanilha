@@ -48,9 +48,13 @@ export const runAuditSlots = async () => {
 
     const [currentHour, currentMinute] = brtTime.split(':').map(Number);
     const currentTotalMinutes = currentHour * 60 + currentMinute;
-    const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now);
+    
+    // Server Save Boundary do Tibia (10h BRT = 13h UTC)
+    // A virada oficial do dia ocorre às 10h da manhã no Server Save, não à meia-noite
+    const ssDate = new Date(now.getTime() - 13 * 60 * 60 * 1000);
+    const todayDate = ssDate.toISOString().split('T')[0];
 
-    console.log(`[AUDIT] Horário BRT: ${brtTime} (${currentTotalMinutes} min) | Data: ${todayDate}`);
+    console.log(`[AUDIT] Horário BRT: ${brtTime} (${currentTotalMinutes} min) | Server Save Day: ${todayDate}`);
 
     /** Converte "HH:MM" em minutos totais desde 00:00. */
     const toMinutes = (timeStr) => {
@@ -89,16 +93,27 @@ export const runAuditSlots = async () => {
 
       // Telemetria baseada em Edge Computing (current_character_state)
       const twentyMinsAgo = new Date(now.getTime() - 20 * 60000).toISOString();
+      
+      // Filtra membros válidos e monta query case-insensitive com ilike
+      const validMembers = party.members
+        .filter(m => m && typeof m === 'string' && m.trim().length > 1 && !m.toLowerCase().includes('atualizar'))
+        .map(m => m.trim());
+
+      if (validMembers.length === 0) continue;
+
+      const orChar = validMembers.map(m => `character_name.ilike.${m}`).join(',');
+      const orName = validMembers.map(m => `name.ilike.${m}`).join(',');
+
       const { data: states } = await supabase
         .from('current_character_state')
         .select('character_name, xp_total, session_start_xp, last_active')
-        .in('character_name', party.members);
+        .or(orChar);
 
-      // LOW LEVEL BYPASS: Puxa o status online (last_xp_date)
+      // LOW LEVEL BYPASS: Puxa o status online (last_xp_date e is_online)
       const { data: guildData } = await supabase
         .from('guild_members')
-        .select('name, last_xp_date')
-        .in('name', party.members);
+        .select('name, last_xp_date, is_online')
+        .or(orName);
         
       let isCurrentlyActive = false;
       let totalDelta = 0;
@@ -106,7 +121,7 @@ export const runAuditSlots = async () => {
       // 1. Checa se eles estão ONLINE no site agora (Bypass pra quem tá fora do Rank)
       if (guildData && guildData.length > 0) {
         guildData.forEach(g => {
-          if (g.last_xp_date && g.last_xp_date >= twentyMinsAgo) {
+          if (g.is_online || (g.last_xp_date && g.last_xp_date >= twentyMinsAgo)) {
              isCurrentlyActive = true;
           }
         });
@@ -173,7 +188,7 @@ export const runAuditSlots = async () => {
               const expiresAt = new Date();
               expiresAt.setDate(expiresAt.getDate() + 3);
 
-              const newStrikes = party.members.map((member) => ({
+              const newStrikes = validMembers.map((member) => ({
                 character_name: member,
                 reason: strikeReason,
                 admin_name: 'Robô Xerife',
