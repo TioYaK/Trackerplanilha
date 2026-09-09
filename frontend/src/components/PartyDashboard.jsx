@@ -30,15 +30,23 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      let durationText = '';
+      if (data.startRaw && data.endRaw) {
+        const dMins = Math.max(1, Math.round((new Date(data.endRaw) - new Date(data.startRaw)) / 60000));
+        const hours = Math.floor(dMins / 60);
+        const mins = dMins % 60;
+        durationText = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+      }
       return (
         <div className="bg-gray-900 border border-tibia-border p-3 rounded shadow-lg text-sm">
-          <p className="font-bold text-tibia-primary mb-2">{label}</p>
-          <p className="text-gray-300">XP Total: <span className="text-white font-bold">{formatXp(data.totalXp)}</span></p>
+          <p className="font-bold text-tibia-primary mb-1">{label}</p>
+          <p className="text-gray-300">XP Total: <span className="text-green-400 font-bold">+{formatXp(data.totalXp)}</span></p>
           {data.singlePing ? (
              <p className="text-blue-400 mt-1"><Clock size={12} className="inline mr-1" /> Ping Isolado: {data.start}</p>
           ) : (
-             <p className="text-blue-400 mt-1"><Clock size={12} className="inline mr-1" /> Início: {data.start} | Término: {data.end}</p>
+             <p className="text-blue-400 mt-1"><Clock size={12} className="inline mr-1" /> Horário: {data.start} - {data.end} {durationText && `(${durationText})`}</p>
           )}
+          <p className="text-[10px] text-amber-400/80 mt-1.5 italic">Clique para auditar esta hunt</p>
         </div>
       );
     }
@@ -50,12 +58,14 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   }, [party?.id]);
 
   useEffect(() => {
-    const fetchPartyData = async () => {
+    const fetchPartyData = async (isBackground = false) => {
       if (!party || !party.members || party.members.length === 0) {
         setLoading(false);
         return;
       }
-      setLoading(true);
+      if (!isBackground) {
+        setLoading(true);
+      }
 
       const daysToFetch = historyRange === 'week' ? 7 : 30;
       const historyStartDate = new Date(Date.now() - daysToFetch * 24 * 60 * 60 * 1000).toISOString();
@@ -205,7 +215,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             start: startDate,
             end: date,
             rawDate: startDate,
-            memberXp: {}
+            memberXp: {},
+            memberLevels: {}
           };
         }
 
@@ -215,6 +226,9 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         
         const charKey = (log.character_name || '').toLowerCase();
         historyMap[dayStr].memberXp[charKey] = (historyMap[dayStr].memberXp[charKey] || 0) + dxp;
+        if (log.end_level) {
+          historyMap[dayStr].memberLevels[charKey] = log.end_level;
+        }
       });
 
       // Converte historyMap para array do gráfico, filtrando apenas hunts reais de party (2+ membros ou líder)
@@ -236,6 +250,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                endRaw: h.end,
                singlePing: diffMins < 10,
                memberXp: h.memberXp,
+               memberLevels: h.memberLevels || {},
                rawDate: h.rawDate
            };
         });
@@ -337,6 +352,9 @@ export default function PartyDashboard({ party, onPlayerClick }) {
           const xp = activeHunt.memberXp[mKey] || 0;
           if (memberStats[mKey]) {
             memberStats[mKey].totalXpGained = xp;
+            if (activeHunt.memberLevels && activeHunt.memberLevels[mKey]) {
+              memberStats[mKey].level = activeHunt.memberLevels[mKey];
+            }
           }
         });
       }
@@ -349,7 +367,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         return { 
           ...m, 
           formattedXp: formatXp(raw), 
-          isOnline: Boolean(m.isOnlineRoster) || isRecentlyActive
+          isOnline: Boolean(m.isOnlineRoster) || isRecentlyActive,
+          participated: raw > 0
         };
       });
 
@@ -358,12 +377,36 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
       // 7. Horário Real (Telemetria)
       if (isShowingLive) {
-        setActualHuntTime({ start: party.slot_start?.slice(0, 5) || '--:--', end: 'Agora', day: 'Hoje' });
+        setActualHuntTime({ 
+          start: party.slot_start?.slice(0, 5) || '--:--', 
+          end: 'Agora', 
+          day: 'Hoje',
+          xpHour: party.delta_xp || '0'
+        });
       } else if (activeHunt) {
+        let calculatedXpHour = null;
+        if (activeHunt.startRaw && activeHunt.endRaw) {
+          const sDate = parseDate(activeHunt.startRaw);
+          const eDate = parseDate(activeHunt.endRaw);
+          if (sDate && eDate) {
+            const diffHours = Math.max(0.1, (eDate.getTime() - sDate.getTime()) / (1000 * 3600));
+            if (diffHours > 0 && activeHunt.totalXp > 0) {
+              calculatedXpHour = `${formatXp(Math.round(activeHunt.totalXp / diffHours))}/h`;
+            }
+          }
+        }
         if (activeHunt.singlePing) {
-          setActualHuntTime({ single: `${activeHunt.start} (${activeHunt.day})` });
+          setActualHuntTime({ 
+            single: `${activeHunt.start} (${activeHunt.day})`,
+            xpHour: calculatedXpHour || party.delta_xp || '0'
+          });
         } else {
-          setActualHuntTime({ start: activeHunt.start, end: activeHunt.end, day: activeHunt.day });
+          setActualHuntTime({ 
+            start: activeHunt.start, 
+            end: activeHunt.end, 
+            day: activeHunt.day,
+            xpHour: calculatedXpHour || party.delta_xp || '0'
+          });
         }
       } else {
         setActualHuntTime(null);
@@ -505,7 +548,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
     fetchPartyData();
     
-    const interval = setInterval(fetchPartyData, 5 * 60 * 1000);
+    const interval = setInterval(() => fetchPartyData(true), 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [party, historyRange, selectedHuntDay]);
 
@@ -640,8 +683,12 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold">ΔXP/h Registrado</p>
-            <p className="text-lg font-bold text-white">{party.delta_xp || '0'}</p>
+            <p className="text-xs text-gray-500 uppercase font-bold">
+              {isShowingLive ? 'ΔXP/h Registrado (Ao Vivo)' : 'ΔXP/h da Hunt'}
+            </p>
+            <p className="text-lg font-bold text-white">
+              {actualHuntTime && actualHuntTime.xpHour ? actualHuntTime.xpHour : (party.delta_xp || '0')}
+            </p>
           </div>
         </div>
       </div>
@@ -724,7 +771,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             </div>
             <table className="w-full text-left text-sm text-gray-300">
               <thead className="bg-black/20 text-gray-400 uppercase font-semibold">
-                <tr><th className="px-6 py-3">Membro</th><th className="px-6 py-3">Level</th><th className="px-6 py-3">Status</th><th className="px-6 py-3 text-right">XP Contribuída</th></tr>
+                <tr><th className="px-6 py-3">Membro</th><th className="px-6 py-3">Level</th><th className="px-6 py-3">{isShowingLive ? 'Status (Ao Vivo)' : 'Participação'}</th><th className="px-6 py-3 text-right">XP Contribuída</th></tr>
               </thead>
               <tbody className="divide-y divide-tibia-border/50">
                 {membersData.map(m => (
@@ -733,7 +780,33 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                       {m.name} {m.name === party.leader_name && <span className="ml-2 text-xs bg-yellow-500/20 text-yellow-500 px-1 py-0.5 rounded">Líder</span>}
                     </td>
                     <td className="px-6 py-4">{m.level !== '?' ? <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded">Lvl {m.level}</span> : <span className="text-gray-600">?</span>}</td>
-                    <td className="px-6 py-4">{m.isOnline ? <span className="text-green-400 flex items-center font-medium"><span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>Ativo</span> : <span className="text-gray-500 flex items-center"><span className="w-2 h-2 rounded-full bg-gray-600 mr-2"></span>Inativo</span>}</td>
+                    <td className="px-6 py-4">
+                      {isShowingLive ? (
+                        m.isOnline ? (
+                          <span className="text-green-400 flex items-center font-medium">
+                            <span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
+                            Caçando
+                          </span>
+                        ) : (
+                          <span className="text-gray-500 flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-gray-600 mr-2"></span>
+                            Offline
+                          </span>
+                        )
+                      ) : (
+                        m.participated ? (
+                          <span className="text-green-400 flex items-center font-medium">
+                            <CheckCircle size={14} className="mr-1.5 text-green-400" />
+                            Presente
+                          </span>
+                        ) : (
+                          <span className="text-yellow-500/80 flex items-center font-medium">
+                            <AlertTriangle size={14} className="mr-1.5 text-yellow-500/70" />
+                            Ausente
+                          </span>
+                        )
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-right font-bold text-green-400">+{m.formattedXp}</td>
                   </tr>
                 ))}
@@ -1047,6 +1120,16 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {!tacticalReport && !loading && (
+            <div className="lg:col-span-3 bg-tibia-card border border-tibia-border/60 rounded-lg p-6 text-center shadow-lg">
+              <Shield size={36} className="mx-auto text-gray-500 mb-2 opacity-50" />
+              <h3 className="text-base font-bold text-gray-300">Nenhuma sessão de caça registrada no período selecionado</h3>
+              <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                Assim que a party concluir caçadas dentro do horário planilhado ou iniciar o próximo slot, o robô gerará automaticamente a auditoria tática da hunt.
+              </p>
             </div>
           )}
 
