@@ -1329,7 +1329,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
 
               <h4 className="font-bold text-white uppercase text-[11px] tracking-wider">Regras Obrigatórias:</h4>
               <ul className="list-disc list-inside space-y-1.5 text-gray-400 pl-1">
-                <li><strong className="text-white">Regra da Atividade (Anti-Sangue-Suga):</strong> O membro deve gerar XP regularmente. Ficar 7 dias consecutivos com 0 XP gera alerta imediato de inatividade e possível rebaixamento de cargo in-game.</li>
+                <li><strong className="text-white">Regra de Atividade:</strong> O membro deve gerar XP regularmente. Ficar 7 dias consecutivos com 0 XP gera alerta imediato de inatividade e possível rebaixamento de cargo in-game.</li>
                 <li><strong className="text-white">Regra da Cota de Manutenção:</strong> Contribuição de <strong>{settings.fee_amount} {settings.fee_currency}</strong> a cada ciclo de <strong>{settings.cycle_days} dias</strong> transferida para o char Bank (<span className="text-amber-400 font-bold">{settings.bank_recipient}</span>).</li>
                 <li><strong className="text-white">Veredito do Admin:</strong> Em caso de viagem ou imprevistos, o membro deve notificar a liderança para receber carência temporária antes do vencimento.</li>
               </ul>
