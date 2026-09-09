@@ -103,24 +103,21 @@ $NodeExe = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $NodeExe) { $NodeExe = "C:\Program Files\nodejs\node.exe" }
 
 $IndexJs  = Join-Path $WorkerPath "src\index.js"
-$LoopBat  = Join-Path $WorkerPath "loop.bat"
 $VbsPath  = Join-Path $WorkerPath "run_worker.vbs"
 
-# Cria loop.bat de auto-update e run
-$batLines = @(
-    "@echo off",
-    "cd /d `"$WorkerPath`"",
-    ":loop",
-    "git -C `"$WorkDir`" fetch --all",
-    "git -C `"$WorkDir`" reset --hard origin/main",
-    "`"$NodeExe`" `"$IndexJs`"",
-    "ping 127.0.0.1 -n 15 > nul",
-    "goto loop"
-)
-$batLines | Set-Content -Path $LoopBat -Encoding ASCII
+# Remove loop.bat legado para evitar janelas CMD piscando no Windows
+$oldLoopBat = Join-Path $WorkerPath "loop.bat"
+if (Test-Path $oldLoopBat) { Remove-Item $oldLoopBat -Force -ErrorAction SilentlyContinue }
 
-# Cria VBS invisivel
-$vbsContent = 'Set WshShell = CreateObject("WScript.Shell")' + "`r`n" + 'WshShell.Run "cmd.exe /c ""' + $LoopBat + '""", 0, False'
+# Cria executor VBS 100% invisível (executa Node diretamente em background sem cmd.exe ou loops de bat)
+$vbsContent = @(
+    'Set WshShell = CreateObject("WScript.Shell")',
+    "WshShell.CurrentDirectory = `"$WorkerPath`"",
+    'Do',
+    "    returnVal = WshShell.Run(`"`"`"$NodeExe`"`" `"`"$IndexJs`"`"`", 0, True)",
+    '    WScript.Sleep 5000',
+    'Loop'
+) -join "`r`n"
 $vbsContent | Set-Content -Path $VbsPath -Encoding ASCII
 
 # Registra no Task Scheduler

