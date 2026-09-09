@@ -85,7 +85,7 @@ console.warn = (...args) => {
   origWarn(...args);
 };
 
-const POLL_INTERVAL = 5000;       // 5 segundos entre ciclos vazios
+const POLL_INTERVAL = 3000;       // 3 segundos entre ciclos vazios
 const LOCK_TIMEOUT_MINUTES = 5;
 const UPDATE_CHECK_INTERVAL = 10 * 60 * 1000; // Mínimo 10 min entre git pulls
 
@@ -162,23 +162,23 @@ const fetchTask = async () => {
 };
 
 const completeTask = async (task) => {
-  // Cooldown em SEGUNDOS por tipo de tarefa
+  // Cooldown em SEGUNDOS por tipo de tarefa (Ajuste de Alta Performance)
   const cooldowns = {
-    FETCH_ONLINES: 30,     // 30s
-    FETCH_DEATHS: 30,      // 30s
-    PROCESS_GUILD_INVITES: 30, // 30s
-    FETCH_RIVALS: 60,      // 1m
-    FETCH_GUILD: 3600,     // 1h
-    FETCH_BAZAAR: 3600,    // 1h
-    FETCH_ROSTER_SHARD: 900, // 15m
-    AUDIT_SLOTS: 600,      // 10m
-    FETCH_KILLSTATS: 900,  // 15m
-    FETCH_TRANSFERS: 3600, // 60m
-    CLOSE_SESSIONS: 1800,  // 30m
+    FETCH_DEATHS: 15,          // 15s (Alerta instantâneo de mortes/frags)
+    FETCH_ONLINES: 30,         // 30s (Heatmap, Makers e Radar Tático)
+    PROCESS_GUILD_INVITES: 30, // 30s (Convites de novos membros)
+    FETCH_RIVALS: 60,          // 1m (Espionagem da Guilda Rival)
+    FETCH_ROSTER_SHARD: 300,   // 5m (Rotação completa de 4 shards em 20 min vs 1h)
+    FETCH_KILLSTATS: 300,      // 5m (Micro-cache rápido de estatísticas)
+    AUDIT_SLOTS: 300,          // 5m (Auditoria de Slots de Respawn e Discord)
+    CLOSE_SESSIONS: 900,       // 15m (Encerramento de hunts inativas)
+    FETCH_BAZAAR: 900,         // 15m (Sniper de Bazaar 4x mais frequente)
+    FETCH_TRANSFERS: 1800,     // 30m (Detecção de jogadores transferidos)
+    FETCH_GUILD: 3600,         // 1h (Membros e cargos oficiais)
   };
 
   let cooldownSeconds = cooldowns[task.task_type] ?? 60;
-  if (task.task_type.startsWith('FETCH_HIGHSCORE')) cooldownSeconds = 600; // 10m
+  if (task.task_type.startsWith('FETCH_HIGHSCORE')) cooldownSeconds = 300; // 5m para cada vocação
 
   const nextRun = new Date();
   nextRun.setSeconds(nextRun.getSeconds() + cooldownSeconds);
@@ -422,7 +422,7 @@ const loop = async () => {
   if (task) {
     emptyCycles = 0;
     await processTask(task);
-    setTimeout(loop, 1000);
+    setTimeout(loop, 100); // 100ms para drenar a fila sem ociosidade
   } else {
     emptyCycles++;
 
@@ -759,14 +759,18 @@ supabase
   setInterval(checkPendingCommands, 15000);
   checkPendingCommands();
   
-  // Polling de Seguranca para Invites a cada 60s (roda em paralelo a tarefas longas)
+  // Polling de Seguranca para Invites a cada 60s (executa somente se o worker estiver ocioso)
   setInterval(() => {
-    runProcessAutoInvites();
+    if (!isProcessingTask) {
+      runProcessAutoInvites();
+    }
   }, 60000);
 
-  // Polling de Seguranca para Onlines a cada 45s (mantém presença em tempo real sem travar)
+  // Polling de Seguranca para Onlines a cada 45s (executa somente se o worker estiver ocioso)
   setInterval(() => {
-    runFetchOnlines().catch(err => console.error('[FETCH_ONLINES] Erro no polling de segurança:', err.message));
+    if (!isProcessingTask) {
+      runFetchOnlines().catch(err => console.error('[FETCH_ONLINES] Erro no polling de segurança:', err.message));
+    }
   }, 45000);
 
   // Fechamento e arquivamento de sessões inativas a cada 10 min
