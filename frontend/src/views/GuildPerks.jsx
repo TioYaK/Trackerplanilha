@@ -100,6 +100,15 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
     };
   }, [fetchAllData]);
 
+  const worldGuildMap = {
+    'Auroria': 'Shellpatrocina',
+    'Belaria': 'Battlestorm Belaria',
+    'Bellum': 'Battlestorm Bellum',
+    'Tenebrium': 'Battlestorm Retro',
+    'Vesperia': 'Battlestorm Vesperia',
+    'Malveria': 'Battlestorm Malveria'
+  };
+
   // Cálculos de Vagas e Atividade
   const activeMembers = useMemo(() => {
     return members.filter(m => m.status === 'ACTIVE' || m.status === 'INACTIVITY_ALERT');
@@ -116,9 +125,22 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
   // Copiar nome do char Bank
   const handleCopyBank = () => {
     if (!settings.bank_recipient) return;
-    navigator.clipboard.writeText(settings.bank_recipient);
-    setCopiedBank(true);
-    setTimeout(() => setCopiedBank(false), 2500);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(settings.bank_recipient);
+      } else {
+        const el = document.createElement('textarea');
+        el.value = settings.bank_recipient;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      setCopiedBank(true);
+      setTimeout(() => setCopiedBank(false), 2500);
+    } catch {
+      setCopiedBank(false);
+    }
   };
 
   // Submeter Solicitação
@@ -139,6 +161,8 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
           throw new Error(`O personagem "${cleanChar}" já possui o cargo de Perks ativo!`);
         } else if (existing.status === 'PENDING_APPROVAL') {
           throw new Error(`Já existe uma solicitação em análise para "${cleanChar}". Aguarde o Admin aprovar.`);
+        } else if (existing.status === 'INACTIVITY_ALERT' || existing.status === 'FEE_EXPIRED') {
+          throw new Error(`O personagem "${cleanChar}" já faz parte do sistema (Status: ${existing.status}). Regularize sua cota com a liderança ou gere XP no jogo.`);
         }
       }
 
@@ -154,6 +178,18 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
 
         if (xpLogs && xpLogs.length > 0) {
           recentXp = xpLogs.reduce((acc, curr) => acc + (parseInt(curr.xp_gained, 10) || 0), 0);
+        }
+
+        // Adiciona delta ao vivo caso o jogador esteja caçando agora
+        const { data: liveState } = await supabase
+          .from('current_character_state')
+          .select('session_start_xp, xp_total')
+          .ilike('character_name', cleanChar)
+          .maybeSingle();
+
+        if (liveState && liveState.xp_total && liveState.session_start_xp) {
+          const delta = Number(liveState.xp_total) - Number(liveState.session_start_xp);
+          if (delta > 0) recentXp += delta;
         }
       } catch {}
 
@@ -232,7 +268,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         action: 'PROMOTE_PERK',
         status: 'PENDING',
         world: member.world || 'Auroria',
-        guild_name: 'Shellpatrocina'
+        guild_name: worldGuildMap[member.world] || 'Shellpatrocina'
       });
 
       // 3. Log Forense
@@ -330,7 +366,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
         action: 'DEMOTE_MEMBER',
         status: 'PENDING',
         world: member.world || 'Auroria',
-        guild_name: 'Shellpatrocina'
+        guild_name: worldGuildMap[member.world] || 'Shellpatrocina'
       });
 
       // 3. Log Forense
