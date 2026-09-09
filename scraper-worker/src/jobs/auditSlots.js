@@ -101,8 +101,8 @@ export const runAuditSlots = async () => {
 
       if (validMembers.length === 0) continue;
 
-      const orChar = validMembers.map(m => `character_name.ilike.${m}`).join(',');
-      const orName = validMembers.map(m => `name.ilike.${m}`).join(',');
+      const orChar = validMembers.map(m => `character_name.ilike."${m.replace(/"/g, '')}"`).join(',');
+      const orName = validMembers.map(m => `name.ilike."${m.replace(/"/g, '')}"`).join(',');
 
       const { data: states } = await supabase
         .from('current_character_state')

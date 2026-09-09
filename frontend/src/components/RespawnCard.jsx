@@ -3,7 +3,7 @@ import { Clock, TrendingUp, AlertTriangle, Skull, Edit3, MessageSquare, CheckCir
 import { supabase } from '../lib/supabase';
 import { isSlotActiveNow } from '../lib/tibiaUtils';
 
-export default function RespawnCard({ party, onPlayerClick, onPartyClick, isAdmin }) {
+export default function RespawnCard({ party = {}, onPlayerClick, onPartyClick, isAdmin }) {
   const statusColors = {
     EFFICIENT:  'border-green-500 bg-green-500/10',
     SUBOPTIMAL: 'border-yellow-500 bg-yellow-500/10',
@@ -15,7 +15,7 @@ export default function RespawnCard({ party, onPlayerClick, onPartyClick, isAdmi
 
   const currentStatus = party.status || 'DEFAULT';
   const colorClass = statusColors[currentStatus] ?? statusColors.DEFAULT;
-  const missCount = party.miss_count || 0;
+  const missCount = Number(party.miss_count) || 0;
 
   // Badge de faltas: só aparece para admin
   const missBadge = (isAdmin && missCount > 0) ? (
@@ -167,7 +167,10 @@ export default function RespawnCard({ party, onPlayerClick, onPartyClick, isAdmi
       <div className="mt-4">
         <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Integrantes Esperados</h4>
         <div className="flex flex-wrap gap-2">
-          {party.members?.map((member, idx) => (
+          {(Array.isArray(party.members) 
+            ? party.members 
+            : (typeof party.members === 'string' ? party.members.split(',') : [])
+          ).map(m => (typeof m === 'string' ? m.trim() : '')).filter(Boolean).map((member, idx) => (
             <span
               key={idx}
               onClick={() => onPlayerClick && onPlayerClick(member)}

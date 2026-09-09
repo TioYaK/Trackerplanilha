@@ -31,8 +31,8 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
       let allParties = [];
       let page = 0;
       while(true) {
-          const { data } = await supabase.from('parties_planilhadas').select('*').order('slot_start', { ascending: true }).range(page*1000, (page+1)*1000-1);
-          if (!data || data.length === 0) break;
+          const { data, error } = await supabase.from('parties_planilhadas').select('*').order('slot_start', { ascending: true }).range(page*1000, (page+1)*1000-1);
+          if (error || !data || data.length === 0) break;
           allParties.push(...data);
           if (data.length < 1000) break;
           page++;
@@ -120,13 +120,13 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {parties.filter(p => p.category === activeTab).length === 0 && (
+          {parties.filter(p => p && p.category === activeTab).length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center py-16 bg-white/5 rounded-lg border border-tibia-border border-dashed">
               <p className="text-gray-400 font-medium">Nenhuma party agendada para {activeTab} hoje.</p>
             </div>
           )}
           {parties
-            .filter(p => p.category === activeTab)
+            .filter(p => p && p.category === activeTab)
             .map(party => (
               <RespawnCard key={party.id} party={party} onPlayerClick={onPlayerClick} onPartyClick={onPartyClick} isAdmin={isAdmin} />
             ))}

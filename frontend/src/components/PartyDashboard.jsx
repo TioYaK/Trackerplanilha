@@ -94,8 +94,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         return;
       }
 
-      const orFilterName = validMembers.map(m => 'name.ilike.' + m.trim()).join(',');
-      const orFilterChar = validMembers.map(m => 'character_name.ilike.' + m.trim()).join(',');
+      const orFilterName = validMembers.map(m => `name.ilike."${m.trim().replace(/"/g, '')}"`).join(',');
+      const orFilterChar = validMembers.map(m => `character_name.ilike."${m.trim().replace(/"/g, '')}"`).join(',');
 
       // 1. Busca histórico de sessões
       let logs = [];

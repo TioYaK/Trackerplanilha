@@ -44,6 +44,10 @@ export const runFetchHighscores = async (vocationStr) => {
           p.members.forEach(m => {
             if (m && typeof m === 'string') allGuildMembers.push({ name: m.trim() });
           });
+        } else if (typeof p.members === 'string') {
+          p.members.split(',').forEach(m => {
+            if (m && m.trim()) allGuildMembers.push({ name: m.trim() });
+          });
         }
       });
     }

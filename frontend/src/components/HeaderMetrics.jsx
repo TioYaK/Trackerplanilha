@@ -19,9 +19,9 @@ export default function HeaderMetrics({ parties = [] }) {
   }, []);
 
   // Calcular slots atuais (baseado no horário de Brasília com suporte a meia-noite)
-  const currentParties = parties.filter(p => isSlotActiveNow(p.slot_start, p.slot_end));
+  const currentParties = (parties || []).filter(p => p && isSlotActiveNow(p.slot_start, p.slot_end));
   const totalCurrentSlots = currentParties.length;
-  const idleSlots = currentParties.filter(p => p.status === 'GHOST_SLOT' || p.status === 'FALTA_1' || p.status === 'FALTA_2').length;
+  const idleSlots = currentParties.filter(p => p && (p.status === 'GHOST_SLOT' || p.status === 'FALTA_1' || p.status === 'FALTA_2')).length;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

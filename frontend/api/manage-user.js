@@ -26,19 +26,23 @@ export default async function handler(req, res) {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   // Validate requestor is Super Admin
-  const { data: requestor } = await supabase.from('profiles').select('email, role, main_character').eq('email', requestorEmail).single();
+  const cleanRequestorEmail = (requestorEmail || '').trim().toLowerCase();
+  const { data: requestor } = await supabase.from('profiles').select('email, role, main_character').eq('email', requestorEmail).maybeSingle();
   const reqName = requestor?.main_character || requestorEmail;
 
   if (!requestor || requestor.role !== 'super_admin') {
      // Fallback: If it's pifot16@gmail.com, force allow
-     if (requestorEmail.toLowerCase() !== 'pifot16@gmail.com') {
+     if (cleanRequestorEmail !== 'pifot16@gmail.com') {
          return res.status(403).json({ error: 'Você não tem permissão de Super Admin.' });
      }
   }
 
   try {
     if (action === 'delete') {
-      const { data: target } = await supabase.from('profiles').select('email, main_character').eq('id', targetUserId).single();
+      const { data: target } = await supabase.from('profiles').select('email, main_character').eq('id', targetUserId).maybeSingle();
+      if (!target) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
       if (target?.email?.toLowerCase() === 'pifot16@gmail.com') {
           return res.status(403).json({ error: 'O criador original não pode ser deletado.' });
       }
@@ -62,7 +66,10 @@ export default async function handler(req, res) {
     }
 
     if (action === 'update_email') {
-      const { data: target } = await supabase.from('profiles').select('email, main_character').eq('id', targetUserId).single();
+      const { data: target } = await supabase.from('profiles').select('email, main_character').eq('id', targetUserId).maybeSingle();
+      if (!target) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
       if (target?.email?.toLowerCase() === 'pifot16@gmail.com') {
           return res.status(403).json({ error: 'O email do criador original não pode ser alterado.' });
       }

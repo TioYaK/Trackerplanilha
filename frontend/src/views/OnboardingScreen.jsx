@@ -100,7 +100,7 @@ export default function OnboardingScreen() {
             .from('maker_validation_queue')
             .select('status, error_msg')
             .eq('id', jobInfo.id)
-            .single();
+            .maybeSingle();
             
           if (check && (check.status === 'completed' || check.status === 'error')) {
             isDone = true;

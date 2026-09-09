@@ -20,12 +20,14 @@ export default function GlobalAuditFeed() {
         const { data: hunts } = await supabase.from('guild_hunts_history').select('*').order('created_at', { ascending: false }).limit(20);
         if (hunts) {
           hunts.forEach(h => {
+            const hDate = parseUtcDate(h.created_at) || new Date();
+            const profit = Number(h.total_profit || 0);
             allLogs.push({
               id: `hunt-${h.id}`,
-              date: new Date(h.created_at),
+              date: hDate,
               type: 'LOOT',
               icon: <DollarSign size={16} className="text-green-500" />,
-              message: `A hunt "${h.hunt_name}" foi registrada pelo Loot Tracker, dividindo ${Number(h.total_profit).toLocaleString()} gp em lucros!`
+              message: `A hunt "${h.hunt_name || 'Desconhecida'}" foi registrada pelo Loot Tracker, dividindo ${profit.toLocaleString()} gp em lucros!`
             });
           });
         }
@@ -34,12 +36,14 @@ export default function GlobalAuditFeed() {
         const { data: txs } = await supabase.from('guild_bank_transactions').select('*').order('created_at', { ascending: false }).limit(20);
         if (txs && txs.length > 0) {
           txs.forEach(t => {
+            const tDate = parseUtcDate(t.created_at) || new Date();
+            const amount = Number(t.amount_tc || 0);
             allLogs.push({
               id: `tx-${t.id}`,
-              date: new Date(t.created_at),
+              date: tDate,
               type: 'BANK',
               icon: <DollarSign size={16} className={t.type === 'IN' ? "text-green-500" : "text-red-500"} />,
-              message: `O admin ${t.created_by} registrou um ${t.type === 'IN' ? 'depósito' : 'saque'} de ${t.amount_tc} TC (${t.title}).`
+              message: `O admin ${t.created_by || 'Admin'} registrou um ${t.type === 'IN' ? 'depósito' : 'saque'} de ${amount} TC (${t.title || 'Sem título'}).`
             });
           });
         }
@@ -53,13 +57,13 @@ export default function GlobalAuditFeed() {
               date: parseUtcDate(p.created_at) || new Date(), 
               type: 'PARTY',
               icon: <Swords size={16} className="text-blue-500" />,
-              message: `O admin ${p.created_by || 'Admin'} agendou uma PT para ${p.leader_name} em "${p.hunt_name}" para o slot das ${p.slot_start}.`
+              message: `O admin ${p.created_by || 'Admin'} agendou uma PT para ${p.leader_name || 'Líder'} em "${p.hunt_name || 'Hunt'}" para o slot das ${p.slot_start || '00:00'}.`
             });
           });
         }
 
         // Sort by date DESC
-        allLogs.sort((a, b) => b.date - a.date);
+        allLogs.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
         
         // Take top 30
         setLogs(allLogs.slice(0, 30));
@@ -71,8 +75,9 @@ export default function GlobalAuditFeed() {
   };
 
   const getTimeAgo = (date) => {
-    const seconds = Math.floor((new Date() - date) / 1000);
-    if (seconds < 60) return "Agora mesmo";
+    if (!date || isNaN(date.getTime())) return "Agora mesmo";
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds <= 0 || seconds < 60) return "Agora mesmo";
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `Há ${minutes}m`;
     const hours = Math.floor(minutes / 60);

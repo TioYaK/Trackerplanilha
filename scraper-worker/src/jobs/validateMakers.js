@@ -33,15 +33,16 @@ export const runValidateMakers = async () => {
 
         if (rules && rules.is_mandatory) {
           // Level
-          if (rules.min_level > 0 && charData.level < rules.min_level) {
+          const charLvl = Number(charData.level) || 0;
+          if (rules.min_level > 0 && charLvl < rules.min_level) {
             isError = true;
-            errorMsg = `O Maker precisa ser level ${rules.min_level} ou superior (Atual: ${charData.level}).`;
+            errorMsg = `O Maker precisa ser level ${rules.min_level} ou superior (Atual: ${charLvl}).`;
           }
           
           // Vocation
           if (!isError && rules.allowed_vocations && rules.allowed_vocations.length > 0) {
-            const voc = charData.vocation;
-            if (!rules.allowed_vocations.some(v => v.toLowerCase() === voc.toLowerCase())) {
+            const voc = String(charData.vocation || '').trim();
+            if (!rules.allowed_vocations.some(v => (v || '').toLowerCase() === voc.toLowerCase())) {
               isError = true;
               errorMsg = `Vocação não aceita. Vocações permitidas: ${rules.allowed_vocations.join(', ')}.`;
             }
@@ -49,8 +50,8 @@ export const runValidateMakers = async () => {
           
           // Guild
           if (!isError && rules.required_guild && rules.required_guild.trim().length > 0) {
-            const charGuild = charData.guild ? charData.guild : '';
-            if (charGuild.toLowerCase() !== rules.required_guild.toLowerCase()) {
+            const charGuild = charData.guild ? String(charData.guild).trim() : '';
+            if (charGuild.toLowerCase() !== rules.required_guild.trim().toLowerCase()) {
               isError = true;
               errorMsg = `O Maker precisa estar na guilda "${rules.required_guild}".`;
             }
@@ -58,8 +59,8 @@ export const runValidateMakers = async () => {
           
           // World
           if (!isError && rules.required_world && rules.required_world.trim().length > 0) {
-            const w = charData.world || '';
-            if (w.toLowerCase() !== rules.required_world.toLowerCase()) {
+            const w = String(charData.world || '').trim();
+            if (w.toLowerCase() !== rules.required_world.trim().toLowerCase()) {
               isError = true;
               errorMsg = `O Maker precisa estar no mundo "${rules.required_world}".`;
             }

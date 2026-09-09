@@ -32,51 +32,62 @@ export default async function handler(req, res) {
 
   try {
     // 1. Fetch Maker Rules
-    const { data: rules } = await supabase.from('maker_rules').select('*').limit(1).single();
+    const { data: rules } = await supabase.from('maker_rules').select('*').limit(1).maybeSingle();
     
     // 2. Fetch Character from RubinOT
-    const rubiRes = await fetch(`https://rubinot.com/api/characters/${encodeURIComponent(makerName)}`);
+    const rubiRes = await fetch(`https://rubinot.com.br/api/characters/${encodeURIComponent(makerName)}`);
     if (!rubiRes.ok) {
       if (rubiRes.status === 404) return res.status(400).json({ error: 'Personagem não encontrado no RubinOT' });
       return res.status(500).json({ error: 'Erro ao consultar API oficial' });
     }
     
     const charData = await rubiRes.json();
-    const c = charData.character || charData;
+    const c = charData?.character || charData;
+    if (!c) {
+      return res.status(400).json({ error: 'Dados do personagem inválidos' });
+    }
     
     // 3. Validate
     if (rules && rules.is_mandatory) {
       // Level
-      if (rules.min_level > 0 && c.level < rules.min_level) {
-        return res.status(400).json({ error: `O Maker precisa ser level ${rules.min_level} ou superior (Atual: ${c.level}).` });
+      const charLevel = Number(c.level) || 0;
+      if (rules.min_level > 0 && charLevel < rules.min_level) {
+        return res.status(400).json({ error: `O Maker precisa ser level ${rules.min_level} ou superior (Atual: ${charLevel}).` });
       }
       
       // Vocation
       if (rules.allowed_vocations && rules.allowed_vocations.length > 0) {
-        const voc = c.vocationName || c.vocation;
-        if (!rules.allowed_vocations.some(v => v.toLowerCase() === voc.toLowerCase())) {
+        const voc = String(c.vocationName || c.vocation || '').trim();
+        if (!rules.allowed_vocations.some(v => (v || '').toLowerCase() === voc.toLowerCase())) {
           return res.status(400).json({ error: `Vocação não aceita. Vocações permitidas: ${rules.allowed_vocations.join(', ')}.` });
         }
       }
       
       // Guild
       if (rules.required_guild && rules.required_guild.trim().length > 0) {
-        const charGuild = c.guild ? c.guild.name : '';
-        if (charGuild.toLowerCase() !== rules.required_guild.toLowerCase()) {
+        const charGuild = c.guild ? String(c.guild.name || c.guild).trim() : '';
+        if (charGuild.toLowerCase() !== rules.required_guild.trim().toLowerCase()) {
           return res.status(400).json({ error: `O Maker precisa estar na guilda "${rules.required_guild}".` });
         }
       }
       
       // World
       if (rules.required_world && rules.required_world.trim().length > 0) {
-        const w = c.world || '';
-        if (w.toLowerCase() !== rules.required_world.toLowerCase()) {
+        const w = String(c.world || '').trim();
+        if (w.toLowerCase() !== rules.required_world.trim().toLowerCase()) {
           return res.status(400).json({ error: `O Maker precisa estar no mundo "${rules.required_world}".` });
         }
       }
     }
 
-    return res.status(200).json({ success: true, character: { name: c.name, level: c.level, vocation: c.vocationName || c.vocation } });
+    return res.status(200).json({ 
+      success: true, 
+      character: { 
+        name: c.name || makerName, 
+        level: Number(c.level) || 0, 
+        vocation: c.vocationName || c.vocation || 'None' 
+      } 
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

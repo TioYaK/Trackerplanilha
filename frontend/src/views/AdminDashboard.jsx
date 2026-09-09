@@ -66,36 +66,51 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const safeDistance = (dateVal, options = {}) => {
+    if (!dateVal) return 'desconhecido';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return 'desconhecido';
+    return formatDistanceToNow(d, options);
+  };
+
   const now = new Date();
   const cutoffLimit = new Date(now.getTime() - 12 * 60 * 1000); // 12 minutos
-  const activeWorkers = workers.filter(w => new Date(w.last_ping) > cutoffLimit);
+  const activeWorkers = workers.filter(w => {
+    if (!w || !w.last_ping) return false;
+    const d = new Date(w.last_ping);
+    return !isNaN(d.getTime()) && d > cutoffLimit;
+  });
 
   // --- Process Data for Charts ---
 
   // 1. Online History Chart
-  const chartData = onlineHistory.map(row => ({
-    time: format(new Date(row.timestamp), 'dd/MM HH:mm'),
-    timestamp: new Date(row.timestamp).getTime(),
-    players: row.online_count
-  })).filter((_, i, arr) => i % Math.ceil(arr.length / 50) === 0 || i === arr.length -1);
+  const chartData = onlineHistory
+    .filter(row => row && row.timestamp && !isNaN(new Date(row.timestamp).getTime()))
+    .map(row => ({
+      time: format(new Date(row.timestamp), 'dd/MM HH:mm'),
+      timestamp: new Date(row.timestamp).getTime(),
+      players: Number(row.online_count) || 0
+    }))
+    .filter((_, i, arr) => i % Math.ceil(arr.length / 50) === 0 || i === arr.length - 1);
 
   // 2. Worker Performance (Task History)
   const workerPerf = {};
   let totalTasks = 0;
   taskHistory.forEach(th => {
+    if (!th || !th.worker_id) return;
     if (!workerPerf[th.worker_id]) {
-      workerPerf[th.worker_id] = { name: th.worker_id, count: 0, totalTime: 0 };
+      workerPerf[th.worker_id] = { name: String(th.worker_id), count: 0, totalTime: 0 };
     }
-    const c = th.task_count || 1;
+    const c = Number(th.task_count) || 1;
     workerPerf[th.worker_id].count += c;
-    workerPerf[th.worker_id].totalTime += th.duration_ms;
+    workerPerf[th.worker_id].totalTime += Number(th.duration_ms) || 0;
     totalTasks += c;
   });
 
   const perfData = Object.values(workerPerf).map(w => ({
-    name: w.name.substring(0, 10) + '...',
+    name: w.name ? (w.name.length > 10 ? w.name.substring(0, 10) + '...' : w.name) : 'Worker',
     tarefas: w.count,
-    avg_speed: (w.totalTime / w.count / 1000).toFixed(1)
+    avg_speed: w.count > 0 ? (w.totalTime / w.count / 1000).toFixed(1) : '0.0'
   }));
 
   // Render components
@@ -320,11 +335,11 @@ export default function AdminDashboard() {
                             </div>
                             <p className="text-sm text-gray-400 flex items-center mt-2">
                               <Clock size={14} className="mr-1" />
-                              Último ping: {formatDistanceToNow(new Date(worker.last_ping), { addSuffix: true, locale: ptBR })}
+                              Último ping: {safeDistance(worker.last_ping, { addSuffix: true, locale: ptBR })}
                             </p>
                             <p className="text-sm text-gray-400 flex items-center mt-1">
                               <Activity size={14} className="mr-1" />
-                              Uptime: começou {formatDistanceToNow(new Date(worker.started_at), { addSuffix: true, locale: ptBR })}
+                              Uptime: começou {safeDistance(worker.started_at, { addSuffix: true, locale: ptBR })}
                             </p>
                             <p className="text-sm text-gray-500 mt-2">
                               Versão: {worker.version || 'Desconhecida'} | Localização: {worker.location || 'Desconhecida'}
@@ -345,7 +360,7 @@ export default function AdminDashboard() {
                             {currentTask ? (
                               <div>
                                 <span className="text-tibia-highlight font-bold font-mono">{currentTask.task_type}</span>
-                                <p className="text-xs text-gray-400 mt-1">Trabalhando há {formatDistanceToNow(new Date(currentTask.locked_at), { locale: ptBR })}</p>
+                                <p className="text-xs text-gray-400 mt-1">Trabalhando há {safeDistance(currentTask.locked_at, { locale: ptBR })}</p>
                               </div>
                             ) : (
                               <div className="text-gray-500 flex items-center h-full">

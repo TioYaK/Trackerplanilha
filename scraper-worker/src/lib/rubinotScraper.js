@@ -100,6 +100,7 @@ async function initBrowser() {
     const launchOpts = {
         headless: true,
         userDataDir: SCRAPER_PROFILE_DIR,
+        protocolTimeout: 60000,
         args: getLeanChromeArgs([
             '--window-size=1920,1080',
             '--disable-gpu',
@@ -1072,7 +1073,10 @@ async function fetchRubinotApi(endpoint) {
         }
         const data = await page.evaluate(async (url) => {
             try {
-                const res = await fetch(url);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                const res = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
                 if (!res.ok) return null;
                 const contentType = res.headers.get('content-type') || '';
                 if (!contentType.includes('application/json')) return null;
