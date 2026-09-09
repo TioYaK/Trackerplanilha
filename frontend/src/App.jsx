@@ -27,6 +27,7 @@ const AdminPanel = lazy(() => import('./views/AdminPanel'));
 const AdminDashboard = lazy(() => import('./views/AdminDashboard'));
 const OnboardingScreen = lazy(() => import('./views/OnboardingScreen'));
 const WorkerDashboard = lazy(() => import('./views/WorkerDashboard'));
+const GuildPerks = lazy(() => import('./views/GuildPerks'));
 
 function ModuleFallback() {
   return (
@@ -42,7 +43,7 @@ function ModuleFallback() {
 // Tabs padrão visíveis quando não há configuração no banco
 const DEFAULT_VISIBLE_TABS = [
   'live', 'radar', 'roster', 'planilha', 'contribute',
-  'bank', 'market', 'loot', 'tracker', 'extreme', 'respawns'
+  'bank', 'market', 'loot', 'tracker', 'extreme', 'respawns', 'guild_perks'
 ];
 
 export default function App() {
@@ -173,6 +174,8 @@ export default function App() {
       case 'market':  return <GuildMarket isAdmin={isAdmin} />;
       case 'party':   return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
       case 'contribute': return <Contribute />;
+      case 'guild_perks': 
+      case 'pearks':   return <GuildPerks isAdmin={isAdmin} />;
       case 'admin':   return isAdmin ? <AdminPanel /> : null;
       case 'workers': return isAdmin ? <WorkerDashboard /> : null;
       case 'admin_dashboard': return <AdminDashboard />;

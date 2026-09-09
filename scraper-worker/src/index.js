@@ -27,6 +27,7 @@ import { runFetchRosterShard } from './jobs/fetchRosterShards.js';
 import { runSendDiscordReport } from './jobs/sendDiscordReport.js';
 import { runAuditBank } from './jobs/auditBank.js';
 import { runProcessAutoInvites } from './jobs/processAutoInvites.js';
+import { runAuditGuildPerks } from './jobs/auditGuildPerks.js';
 import { runArchiveSessions } from './jobs/archiveSessions.js';
 import { runValidateMakers } from './jobs/validateMakers.js';
 import { checkForUpdates } from './updater.js';
@@ -250,6 +251,9 @@ const processTask = async (task) => {
         break;
       case 'AUDIT_SLOTS':
         await runAuditSlots();
+        break;
+      case 'AUDIT_GUILD_PERKS':
+        await runAuditGuildPerks();
         break;
       case 'FETCH_ROSTER_SHARD':
         // O id do Shard vem do page_number (1, 2, 3, 4)
@@ -554,6 +558,12 @@ setInterval(async () => {
 setInterval(async () => {
   await runAuditBank();
 }, 60 * 60 * 1000); // Checa a cada 1 hora
+
+// Auditoria Contínua do Sistema de Perks da Guilda
+setTimeout(() => runAuditGuildPerks(), 20000);
+setInterval(async () => {
+  await runAuditGuildPerks();
+}, 30 * 60 * 1000); // A cada 30 minutos
 
 // Guardião do Armazenamento: Limpeza preventiva automática de disco e perfis
 setTimeout(() => runFullStorageMaintenance(), 5000);

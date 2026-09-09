@@ -5,7 +5,7 @@ import {
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
   Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
-  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus
+  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
@@ -39,6 +39,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
   const viewsData = {
     live: { label: 'Visão Geral (Ao Vivo)', icon: <Activity size={16} /> },
     roster: { label: 'Membros da Guilda', icon: <Users size={16} /> },
+    guild_perks: { label: 'Perks da Guilda', icon: <Award size={16} /> },
     radar: { label: 'Radar de Inimigos (Hunted)', icon: <ShieldAlert size={16} /> },
     tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
     planilha: { label: 'Controle de Hunts & PTs', icon: <FileSpreadsheet size={16} /> },
@@ -65,7 +66,7 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     {
       title: 'Gestão da Guilda',
       icon: <Users size={18} />,
-      items: ['roster', 'invite', 'attendance', 'analytics', 'tracker', 'contribute']
+      items: ['roster', 'guild_perks', 'invite', 'attendance', 'analytics', 'tracker', 'contribute']
     },
     {
       title: 'Economia e Hunts',
