@@ -1,9 +1,45 @@
-import React, { useState } from 'react';
-import { Download, Monitor, Activity, Users, ShieldCheck, Cpu, Heart, CheckCircle2, Network, Copy, Check, Terminal, ExternalLink, Archive } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { Download, Monitor, Activity, Users, ShieldCheck, Cpu, Heart, CheckCircle2, Network, Copy, Check, Terminal, ExternalLink, Archive, Zap } from 'lucide-react';
 
 export default function Contribute() {
   const [copied, setCopied] = useState(false);
+  const [networkStats, setNetworkStats] = useState({
+    activeWorkers: 0,
+    totalTasks: 0,
+    loading: true,
+  });
   const psCommand = 'irm https://trackerplanilha.vercel.app/Instalar_Worker.ps1 | iex';
+
+  useEffect(() => {
+    fetchNetworkStats();
+    const interval = setInterval(fetchNetworkStats, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchNetworkStats = async () => {
+    try {
+      const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from('worker_heartbeats')
+        .select('last_ping, metadata');
+
+      if (data) {
+        const active = data.filter(w => w.last_ping && w.last_ping > fiveMinsAgo).length;
+        let tasks = 0;
+        data.forEach(w => {
+          tasks += (w.metadata?.tasks_completed || 0);
+        });
+        setNetworkStats({
+          activeWorkers: active,
+          totalTasks: tasks,
+          loading: false,
+        });
+      }
+    } catch (e) {
+      setNetworkStats(prev => ({ ...prev, loading: false }));
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(psCommand);
@@ -14,7 +50,7 @@ export default function Contribute() {
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
       
-      <div className="text-center mb-12">
+      <div className="text-center mb-10">
         <h2 className="text-5xl font-medieval text-gradient-gold mb-4 flex items-center justify-center gap-3">
           <Heart className="text-red-500" size={40} />
           Colabore com a Nossa Guilda
@@ -22,6 +58,58 @@ export default function Contribute() {
         <p className="text-gray-400 font-sans text-lg max-w-3xl mx-auto leading-relaxed">
           Nossa inteligência artificial varre e monitora milhares de personagens para nos dar a melhor vantagem nas wars e na economia. Para que o nosso painel seja ultrarrápido e descentralizado, nós construímos uma <strong>Rede Compartilhada de Telemetria</strong>. O seu computador pode ser um nó nessa rede que mantém a guilda sempre no topo!
         </p>
+      </div>
+
+      {/* PODER DA REDE NEURAL EM TEMPO REAL (PILAR IV) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+        <div className="bg-black/60 border border-tibia-border p-4 rounded-lg shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-green-950/60 border border-green-700/50 rounded-lg text-green-400">
+            <Network size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Nós Contribuidores</p>
+            <p className="text-xl font-bold text-white flex items-center gap-1.5">
+              <span className="text-green-400">{networkStats.loading ? '...' : networkStats.activeWorkers}</span>
+              <span className="text-xs text-gray-500 font-normal">PCs online</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-black/60 border border-tibia-border p-4 rounded-lg shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-amber-950/60 border border-amber-700/50 rounded-lg text-amber-400">
+            <Zap size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Telemetria Coletada</p>
+            <p className="text-xl font-bold text-yellow-400 font-mono">
+              {networkStats.loading ? '...' : `${networkStats.totalTasks.toLocaleString('pt-BR')} tasks`}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-black/60 border border-tibia-border p-4 rounded-lg shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-sky-950/60 border border-sky-700/50 rounded-lg text-sky-400">
+            <ShieldCheck size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Estado da Rede</p>
+            <p className="text-xl font-bold text-sky-300">
+              100% Blindada
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-black/60 border border-tibia-border p-4 rounded-lg shadow-lg flex items-center gap-3">
+          <div className="p-3 bg-purple-950/60 border border-purple-700/50 rounded-lg text-purple-400">
+            <Activity size={24} className="animate-pulse" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Varreduras RubinOT</p>
+            <p className="text-xl font-bold text-purple-300">
+              Tempo Real 24/7
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
