@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Clock, TrendingUp, AlertTriangle, Users, Info, CheckCircle, RotateCcw, Shield, Zap, Skull, Calendar } from 'lucide-react';
+import { Clock, TrendingUp, AlertTriangle, Users, Info, CheckCircle, RotateCcw, Shield, Zap, Skull, Calendar, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { parseUtcDate, isSlotActiveNow } from '../lib/tibiaUtils';
 
@@ -181,9 +181,15 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         if (party.slot_start && party.slot_end) {
           const startBrt = new Date(startDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
           const endBrt = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-          const startM = startBrt.getHours() * 60 + startBrt.getMinutes();
+          let startM = startBrt.getHours() * 60 + startBrt.getMinutes();
           let endM = endBrt.getHours() * 60 + endBrt.getMinutes();
           if (endM < startM) endM += 1440;
+
+          // Se o slot cruza a meia-noite e a sessão começou nas primeiras horas da madrugada
+          if (eMin > 1440 && startM < (winEnd - 1440)) {
+            startM += 1440;
+            endM += 1440;
+          }
 
           const inWindow = (startM >= winStart && startM <= winEnd) || (startM <= sMin && endM >= sMin);
           if (!inWindow) return;
@@ -368,12 +374,13 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         const huntStart = isShowingLive ? new Date(lastSSTime) : parseDate(activeHunt.startRaw || activeHunt.start);
         const huntEnd = isShowingLive ? new Date() : parseDate(activeHunt.endRaw || activeHunt.end);
 
-        // Cruza mortes que ocorreram na janela da hunt (com margem de 1h antes até 3h depois do início)
+        // Cruza mortes que ocorreram na janela da hunt (30 min antes do início até 30 min depois do término)
         const huntDeaths = (recentDeaths || []).filter(d => {
           const dt = parseDate(d.death_time);
           if (!dt || !huntStart) return false;
-          const diffHours = (dt.getTime() - huntStart.getTime()) / (1000 * 3600);
-          return diffHours >= -0.5 && diffHours <= 4.5;
+          const startBound = huntStart.getTime() - 30 * 60 * 1000;
+          const endBound = (huntEnd ? huntEnd.getTime() : huntStart.getTime() + 4 * 3600 * 1000) + 30 * 60 * 1000;
+          return dt.getTime() >= startBound && dt.getTime() <= endBound;
         });
 
         const casualties = huntDeaths.map(d => {
@@ -396,31 +403,60 @@ export default function PartyDashboard({ party, onPlayerClick }) {
               totalXpGained: activeHunt.memberXp[m.toLowerCase()] || 0
             }));
 
-        const memberXpList = [...activeMembersWithXp].sort((a, b) => a.totalXpGained - b.totalXpGained);
+        // Calcula a produção bruta real por membro (XP ganho + perdas por mortes no período)
+        const memberProduction = activeMembersWithXp.map(m => {
+          const deaths = casualties.filter(c => c.character_name.toLowerCase() === m.name.toLowerCase());
+          const totalLoss = deaths.reduce((sum, c) => sum + c.estimatedLoss, 0);
+          return {
+            name: m.name,
+            totalXpGained: m.totalXpGained,
+            grossXp: m.totalXpGained + totalLoss,
+            deaths: deaths,
+            totalLoss: totalLoss
+          };
+        });
 
         let baselineXp = 0;
         let multiplierInsights = [];
 
-        if (memberXpList.length > 0) {
-          baselineXp = memberXpList[0].totalXpGained;
+        if (memberProduction.length > 0) {
+          const maxGross = Math.max(...memberProduction.map(m => m.grossXp));
+          
+          // Membros que caçaram o período integral (produção >= 35% do maior da party)
+          // Isso impede que jogadores que caçaram poucos minutos distorçam a baseline da equipe
+          const fullHuntCandidates = memberProduction
+            .filter(m => m.grossXp >= maxGross * 0.35)
+            .sort((a, b) => a.grossXp - b.grossXp);
 
-          memberXpList.forEach(m => {
-            const death = casualties.find(c => c.character_name.toLowerCase() === m.name.toLowerCase());
-            const ratio = baselineXp > 0 ? (m.totalXpGained / baselineXp) : 1;
+          const baselineCandidate = fullHuntCandidates.length > 0 ? fullHuntCandidates[0].grossXp : memberProduction[0].grossXp;
+          const isEveryoneBoosted = fullHuntCandidates.length > 0 && fullHuntCandidates.every(m => (m.grossXp / maxGross) >= 0.85 && maxGross > 100000000);
+          baselineXp = isEveryoneBoosted ? Math.round(baselineCandidate / 1.5) : baselineCandidate;
 
-            if (death) {
-              const projected = m.totalXpGained + death.estimatedLoss;
-              const hasBoost = baselineXp > 0 && (projected / baselineXp) >= 1.35;
+          memberProduction.forEach(m => {
+            const ratio = baselineXp > 0 ? (m.grossXp / baselineXp) : 1;
+            const hasDeath = m.deaths.length > 0;
+            const hasBoost = ratio >= 1.30;
+            const isPartial = baselineXp > 0 && (m.grossXp / baselineXp) < 0.50;
+
+            if (hasDeath) {
+              const deathDetails = m.deaths.map(d => `${d.time} para ${d.killed_by}`).join(', ');
+              const boostTag = hasBoost ? ' (operava com Stamina Verde, Prey ou Boost)' : '';
               multiplierInsights.push({
                 name: m.name,
                 type: 'DEATH',
-                text: `${m.name} (+${formatXp(m.totalXpGained)}): Sofreu uma baixa às ${death.time} para ${death.killed_by} (-~${death.formattedLoss} XP). Sem a baixa, teria fechado em ~${formatXp(projected)}${hasBoost ? ' (operava com Stamina Verde / Bônus)' : ''}.`
+                text: `${m.name} (+${formatXp(m.totalXpGained)}): Sofreu ${m.deaths.length} baixa(s) (${deathDetails}) com perda estimada de ~${formatXp(m.totalLoss)} XP. Sem as baixas, teria rendido ~${formatXp(m.grossXp)}${boostTag}.`
               });
-            } else if (ratio >= 1.35) {
+            } else if (isPartial) {
+              multiplierInsights.push({
+                name: m.name,
+                type: 'PARTIAL',
+                text: `${m.name} (+${formatXp(m.totalXpGained)}): Participação parcial ou entrada tardia no slot (${Math.round(ratio * 100)}% da média de tempo da party).`
+              });
+            } else if (hasBoost) {
               multiplierInsights.push({
                 name: m.name,
                 type: 'BOOST',
-                text: `${m.name} (+${formatXp(m.totalXpGained)}): Operou com Stamina Verde (1.5x) ou Bônus Ativo (+${Math.round((ratio - 1) * 100)}% sobre a base da party).`
+                text: `${m.name} (+${formatXp(m.totalXpGained)}): Operou com Stamina Verde (1.5x), Prey de XP ou Store Boost (+${Math.round((ratio - 1) * 100)}% sobre a base regular 100%).`
               });
             } else {
               multiplierInsights.push({
@@ -552,6 +588,11 @@ export default function PartyDashboard({ party, onPlayerClick }) {
 
   const chartData = membersData.map(m => ({ name: (m?.name || '').split(' ')[0] || 'Member', xp: Number(m?.totalXpGained) || 0 }));
   const formatXpAxis = (tick) => formatXp(tick);
+
+  const currentSelectedDayStr = selectedHuntDay || (historyChartData.length > 0 ? historyChartData[historyChartData.length - 1].day : null);
+  const currentDayIdx = historyChartData.findIndex(h => h.day === currentSelectedDayStr);
+  const prevHuntDay = currentDayIdx > 0 ? historyChartData[currentDayIdx - 1].day : null;
+  const nextHuntDay = currentDayIdx >= 0 && currentDayIdx < historyChartData.length - 1 ? historyChartData[currentDayIdx + 1].day : null;
 
   return (
     <div className="w-full max-w-7xl mx-auto p-8">
@@ -736,17 +777,105 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3 text-xs">
-                  <div className="bg-black/50 border border-tibia-border px-3 py-1.5 rounded text-gray-300 flex items-center">
-                    <Calendar size={13} className="mr-1.5 text-amber-400" />
-                    <span className="text-white font-semibold">{tacticalReport.day}</span>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {/* Seletor de Dia Interativo no Header do Raio-X */}
+                  <div className="flex items-center bg-black/60 border border-amber-500/40 rounded px-2.5 py-1 shadow-sm">
+                    <Filter size={13} className="text-amber-400 mr-2" />
+                    <select
+                      value={selectedHuntDay || (isSlotActive ? 'LIVE' : (historyChartData[historyChartData.length - 1]?.day || ''))}
+                      onChange={(e) => setSelectedHuntDay(e.target.value === 'LIVE' ? 'LIVE' : e.target.value)}
+                      className="bg-transparent text-white font-semibold text-xs outline-none cursor-pointer pr-1"
+                    >
+                      {isSlotActive && <option value="LIVE" className="bg-gray-900 text-green-400">🟢 Ao Vivo (Agora)</option>}
+                      {[...historyChartData].reverse().map((h, idx) => (
+                        <option key={h.day} value={h.day} className="bg-gray-900 text-white">
+                          {h.day} {idx === 0 ? '(Última)' : ''} — +{formatXp(h.totalXp)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="bg-black/50 border border-tibia-border px-3 py-1.5 rounded text-gray-300 flex items-center">
+
+                  {/* Botões de Navegação Anterior / Próximo */}
+                  <div className="flex items-center bg-black/40 border border-tibia-border rounded overflow-hidden">
+                    <button
+                      type="button"
+                      disabled={!prevHuntDay}
+                      onClick={() => prevHuntDay && setSelectedHuntDay(prevHuntDay)}
+                      title={prevHuntDay ? `Ver dia anterior (${prevHuntDay})` : 'Sem dia anterior'}
+                      className={`px-2 py-1 flex items-center transition-colors ${
+                        prevHuntDay 
+                          ? 'text-gray-300 hover:text-white hover:bg-white/10 cursor-pointer' 
+                          : 'text-gray-600 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <ChevronLeft size={14} className="mr-0.5" />
+                      <span className="text-[11px] hidden sm:inline">Anterior</span>
+                    </button>
+                    <div className="w-[1px] h-4 bg-tibia-border"></div>
+                    <button
+                      type="button"
+                      disabled={!nextHuntDay}
+                      onClick={() => nextHuntDay && setSelectedHuntDay(nextHuntDay)}
+                      title={nextHuntDay ? `Ver dia seguinte (${nextHuntDay})` : 'Sem dia seguinte'}
+                      className={`px-2 py-1 flex items-center transition-colors ${
+                        nextHuntDay 
+                          ? 'text-gray-300 hover:text-white hover:bg-white/10 cursor-pointer' 
+                          : 'text-gray-600 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <span className="text-[11px] hidden sm:inline">Próximo</span>
+                      <ChevronRight size={14} className="ml-0.5" />
+                    </button>
+                  </div>
+
+                  <div className="bg-black/50 border border-tibia-border px-3 py-1 rounded text-gray-300 flex items-center">
                     <Clock size={13} className="mr-1.5 text-blue-400" />
                     <span className="text-white font-semibold">{tacticalReport.huntHours}</span>
                   </div>
                 </div>
               </div>
+
+              {/* Seletor Rápido de Dias dentro do Raio-X */}
+              {historyChartData.length > 1 && (
+                <div className="px-5 py-2.5 bg-black/30 border-b border-tibia-border/40 flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-gray-400 font-bold uppercase text-[10px] tracking-wider mr-1 flex items-center">
+                    <Calendar size={11} className="mr-1 text-amber-400" />
+                    Auditar dia:
+                  </span>
+                  {isSlotActive && (
+                    <button
+                      onClick={() => setSelectedHuntDay('LIVE')}
+                      className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                        (selectedHuntDay === 'LIVE' || (!selectedHuntDay && isSlotActive))
+                          ? 'bg-green-500/30 text-green-300 border border-green-500'
+                          : 'bg-black/40 text-gray-400 hover:text-white border border-tibia-border/30'
+                      }`}
+                    >
+                      Ao Vivo
+                    </button>
+                  )}
+                  {[...historyChartData].reverse().map((h, idx) => {
+                    const isLatest = idx === 0;
+                    const isSelected = selectedHuntDay === h.day || (!selectedHuntDay && !isSlotActive && isLatest);
+                    return (
+                      <button
+                        key={`rx-${h.day}`}
+                        onClick={() => setSelectedHuntDay(h.day)}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${
+                          isSelected
+                            ? 'bg-amber-500 text-black font-bold border border-amber-400 shadow-sm'
+                            : 'bg-black/50 text-gray-300 hover:bg-black/80 hover:text-white border border-tibia-border/50'
+                        }`}
+                      >
+                        {h.day}
+                        <span className={`ml-1 text-[10px] ${isSelected ? 'text-black/80 font-bold' : 'text-amber-400/70 font-mono'}`}>
+                          +{formatXp(h.totalXp)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* 4 KPIs de Alto Impacto */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-black/20 border-b border-tibia-border/50">
@@ -852,7 +981,7 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                     </div>
                   </div>
                   <p className="text-[11px] text-gray-500 mt-4 italic">
-                    💡 A divergência de XP entre membros da mesma hunt é decorrente de Stamina Verde (50% de bônus nas primeiras 2h), Store Boosts ou mortes.
+                    💡 A divergência de XP entre membros da mesma hunt é decorrente de Stamina Verde (50% de bônus nas primeiras 2h), Prey de XP (+13% a +40% de bônus na criatura), Store Boosts (+50%) ou baixas/mortes no respawn.
                   </p>
                 </div>
 
