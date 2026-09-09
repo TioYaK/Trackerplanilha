@@ -1,7 +1,16 @@
-import React from 'react';
-import { Download, Monitor, Activity, Users, ShieldAlert, Cpu, Heart, CheckCircle2, Network } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Monitor, Activity, Users, ShieldCheck, Cpu, Heart, CheckCircle2, Network, Copy, Check, Terminal, ExternalLink, Archive } from 'lucide-react';
 
 export default function Contribute() {
+  const [copied, setCopied] = useState(false);
+  const psCommand = 'irm https://trackerplanilha.vercel.app/Instalar_Worker.ps1 | iex';
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(psCommand);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in">
       
@@ -11,96 +20,139 @@ export default function Contribute() {
           Colabore com a Nossa Guilda
         </h2>
         <p className="text-gray-400 font-sans text-lg max-w-3xl mx-auto leading-relaxed">
-          Nossa inteligência artificial varre e monitora milhares de personagens para nos dar a melhor vantagem na war e na economia. Para que o nosso painel seja o mais rápido de todos, nós construímos uma <strong>Rede Distribuída e Compartilhada</strong>. O seu computador pode ser um pedacinho desse grande cérebro que mantém a guilda no topo!
+          Nossa inteligência artificial varre e monitora milhares de personagens para nos dar a melhor vantagem nas wars e na economia. Para que o nosso painel seja ultrarrápido e descentralizado, nós construímos uma <strong>Rede Compartilhada de Telemetria</strong>. O seu computador pode ser um nó nessa rede que mantém a guilda sempre no topo!
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         
-        {/* Como Funciona */}
-        <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl p-8">
-          <h3 className="text-2xl font-medieval text-tibia-highlight mb-6 flex items-center gap-2">
-            <Cpu className="text-yellow-500" />
-            Como o Robô Funciona?
-          </h3>
-          
-          <div className="space-y-6 text-gray-300 font-sans">
-            <p>
-              Ao invés de rodarmos o nosso sistema num servidor caro (que seria facilmente bloqueado), nós criamos o <strong>Worker Node</strong>. Ele é um programinha extremamente leve, silencioso e invisível que roda no fundo do seu Windows, usando apenas uma poeirinha de internet e do seu processador quando você não os está usando.
-            </p>
-            <p>
-              Toda a nossa base de dados é dividida em micro-tarefas. O seu computador se conecta à guilda, pega uma dessas tarefas, lê o site oficial do jogo para coletar um dado, e envia para nossa planilha. É literalmente a guilda dando as mãos e trabalhando junto pelo mesmo objetivo!
-            </p>
-            <div className="bg-black/40 border border-green-500/30 rounded p-4 flex items-start gap-4 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
-              <ShieldAlert className="text-green-500 shrink-0 mt-1" />
-              <p className="text-sm">
-                <strong>100% Seguro e Pacífico:</strong> Pode ter paz absoluta. O robô atua APENAS lendo a página pública de jogadores no site oficial através de um navegador invisível. Ele NÃO lê a memória do jogo, NÃO requer permissões estranhas e <strong>TEM ZERO risco de banimento</strong>. É idêntico a você abrir o navegador e olhar o Rank de alguém, só que de forma automática.
+        {/* Como Funciona & Transparência */}
+        <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl p-8 flex flex-col justify-between">
+          <div>
+            <h3 className="text-2xl font-medieval text-tibia-highlight mb-6 flex items-center gap-2">
+              <Cpu className="text-yellow-500" />
+              Como o Worker Funciona?
+            </h3>
+            
+            <div className="space-y-5 text-gray-300 font-sans text-sm leading-relaxed">
+              <p>
+                Ao invés de rodarmos um servidor central vulnerável a bloqueios, criamos o <strong>Worker Node</strong>: um processo ultra leve e silencioso que roda no fundo do Windows, consumindo menos de 100 MB de RAM e CPU residual imperceptível.
               </p>
+              <p>
+                O seu computador pega micro-tarefas da fila (como verificar mortes recentes ou jogadores online no site oficial do RubinOT), processa os dados e envia para o banco de dados da guilda.
+              </p>
+              
+              <div className="bg-black/50 border border-green-500/40 rounded-lg p-4 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="text-green-400 shrink-0 mt-0.5" size={24} />
+                  <div>
+                    <h4 className="text-green-400 font-bold mb-1">100% Seguro, Auditável e Sem Riscos</h4>
+                    <p className="text-gray-300 text-xs leading-relaxed">
+                      O robô <strong>NÃO</strong> acessa a memória do Tibia, <strong>NÃO</strong> lê senhas ou arquivos pessoais e <strong>NÃO</strong> possui código malicioso. Ele apenas abre páginas web públicas em segundo plano para consultar dados do ranking oficial.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-gray-400">
+            <span className="flex items-center gap-1.5 text-gray-300">
+              <CheckCircle2 size={14} className="text-green-400" />
+              Código aberto no GitHub
+            </span>
+            <a 
+              href="https://github.com/TioYaK/Trackerplanilha" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-blue-400 hover:text-blue-300 flex items-center gap-1 font-semibold underline"
+            >
+              Auditar Código Fonte <ExternalLink size={12} />
+            </a>
           </div>
         </div>
 
-        {/* Instalação */}
+        {/* Instalação Limpa e Segura */}
         <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl p-8">
           <h3 className="text-2xl font-medieval text-tibia-highlight mb-6 flex items-center gap-2">
             <Download className="text-green-500" />
-            Junte-se à Mente Coletiva
+            Instalação Oficial
           </h3>
-          
-          <ul className="space-y-4 text-gray-300 font-sans mb-8">
-            <li className="flex items-start gap-3">
-              <CheckCircle2 className="text-tibia-primary shrink-0 mt-0.5" size={20} />
-              <span>Baixe o Instalador do Robô no botão abaixo.</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <CheckCircle2 className="text-tibia-primary shrink-0 mt-0.5" size={20} />
-              <span>Clique com botão <strong>DIREITO</strong> no arquivo <strong>Instalar_Worker.ps1</strong>.</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <CheckCircle2 className="text-tibia-primary shrink-0 mt-0.5" size={20} />
-              <span>A tela preta vai instalar o coração do robô silenciosamente em alguns segundos.</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <CheckCircle2 className="text-tibia-primary shrink-0 mt-0.5" size={20} />
-              <span>Prontinho! Seu PC já estará varrendo inimigos e ajudando nossa guilda toda vez que você ligar o computador!</span>
-            </li>
-          </ul>
 
-          <div className="flex flex-col items-center justify-center p-6 bg-black/30 border border-tibia-border rounded-lg gap-4">
+          <div className="space-y-6">
             
-            {/* BAT - Principal (1-clique) */}
-            <a 
-              href="/Instalar_Worker.bat" 
-              download
-              className="flex items-center gap-3 bg-gradient-to-b from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white font-medieval text-xl py-4 px-8 rounded-lg shadow-tibia-glow transform transition-all hover:scale-105 border border-green-400 w-full justify-center max-w-sm"
-            >
-              <Download size={24} />
-              Baixar Robô da Guilda (.bat)
-            </a>
+            {/* Opção 1: Pacote Seguro ZIP (Principal) */}
+            <div className="p-5 bg-black/40 border border-green-500/40 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-green-400 bg-green-950/60 border border-green-500/30 px-2 py-0.5 rounded">
+                  Recomendado (1 Clique)
+                </span>
+                <span className="text-xs text-gray-400">Windows 10 / 11</span>
+              </div>
 
-            <div className="bg-black/40 border border-yellow-500/30 rounded p-3 text-sm text-gray-400 max-w-sm w-full">
-              <p className="font-bold text-yellow-400 mb-1">⚡ Instalação em 1 clique:</p>
-              <ol className="list-decimal list-inside space-y-1">
-                <li>Baixe o arquivo <strong className="text-white">Instalar_Worker.bat</strong></li>
-                <li>Dê <strong className="text-white">DOIS CLIQUES</strong> nele para executar</li>
-                <li>Digite seu nome no terminal e pronto!</li>
-              </ol>
-              <div className="mt-3 pt-2 border-t border-white/10 text-xs text-gray-400">
-                <span>Outra opção (PowerShell): </span>
-                <a href="/Instalar_Worker.ps1" download className="text-blue-400 underline font-semibold hover:text-blue-300">
-                  Baixar .ps1
+              <p className="text-gray-300 text-sm mb-4">
+                Pacote oficial compactado. Baixe, extraia e execute o instalador. Não é bloqueado pelo navegador.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <a 
+                  href="/AuroriaWorker_Instalador.zip" 
+                  download
+                  className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-b from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg border border-green-400 text-sm transition-transform hover:scale-[1.02]"
+                >
+                  <Archive size={18} />
+                  Baixar Pacote Seguro (.zip)
                 </a>
-                <span className="block text-[11px] text-gray-500 mt-0.5">(Para .ps1: Botão DIREITO → Executar com PowerShell)</span>
+
+                <a 
+                  href="/AuroriaWorker_Instalador.exe" 
+                  download
+                  className="flex items-center justify-center gap-2 bg-black/60 hover:bg-black/80 text-gray-300 hover:text-white border border-tibia-border hover:border-gray-400 font-bold py-3 px-4 rounded-lg text-sm transition-colors"
+                  title="Download direto do executável compilado"
+                >
+                  <Download size={16} />
+                  .EXE Direto
+                </a>
               </div>
             </div>
-            
-            <a 
-              href="/Desinstalador_Worker.bat" 
-              download
-              className="flex items-center gap-2 text-gray-500 hover:text-red-400 transition-colors font-sans text-sm underline"
-            >
-              Parar de ajudar (Desinstalar)
-            </a>
+
+            {/* Opção 2: Comando Direto no PowerShell (Sem Download) */}
+            <div className="p-5 bg-black/40 border border-blue-500/30 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                  <Terminal size={14} />
+                  Instalação via Terminal (PowerShell)
+                </span>
+                <span className="text-xs text-gray-400">Zero Downloads</span>
+              </div>
+
+              <p className="text-xs text-gray-400 mb-3">
+                Abra o <strong>PowerShell</strong> no seu Windows e cole o comando abaixo:
+              </p>
+
+              <div className="flex items-center gap-2 bg-black/80 border border-gray-700 rounded p-2 text-xs font-mono text-green-400">
+                <span className="truncate select-all">{psCommand}</span>
+                <button 
+                  onClick={handleCopy}
+                  className="ml-auto flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-sans font-bold shrink-0 transition-colors"
+                >
+                  {copied ? <Check size={12} className="text-green-300" /> : <Copy size={12} />}
+                  {copied ? 'Copiado!' : 'Copiar'}
+                </button>
+              </div>
+            </div>
+
+            {/* Link de Desinstalação */}
+            <div className="text-center pt-2">
+              <a 
+                href="/Desinstalador_Worker.bat" 
+                download
+                className="text-xs text-gray-500 hover:text-red-400 transition-colors underline"
+              >
+                Deseja parar de colaborar? Baixar Desinstalador Completo
+              </a>
+            </div>
+
           </div>
         </div>
 
@@ -110,9 +162,9 @@ export default function Contribute() {
       <div className="bg-black/60 border border-tibia-border rounded-lg p-6 flex items-center gap-6 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
         <Activity className="text-blue-400 w-12 h-12 shrink-0 animate-pulse" />
         <div>
-          <h4 className="text-xl font-medieval text-white mb-2">Atualizações Automáticas Mágicas</h4>
-          <p className="text-gray-400 font-sans text-sm">
-            Você não precisa se preocupar em baixar o instalador de novo. Toda vez que nossa Inteligência Artificial melhora ou os administradores enviam um código novo, o seu robô baixa a melhoria sozinho, recarrega a si mesmo e volta ao trabalho em menos de 1 segundo, sem aparecer na sua tela ou pedir permissão. <strong>Você instala apenas uma vez, e está ajudando para sempre!</strong>
+          <h4 className="text-xl font-medieval text-white mb-2">Atualizações Automáticas Silenciosas</h4>
+          <p className="text-gray-400 font-sans text-sm leading-relaxed">
+            Você não precisa se preocupar em baixar o instalador novamente. Sempre que novas regras ou melhorias forem publicadas, o seu robô atualiza o código silenciosamente em segundo plano, sem piscar janelas, sem atrapalhar seu jogo e sem pedir permissões adicionais. <strong>Você instala uma única vez e apoia a guilda automaticamente!</strong>
           </p>
         </div>
       </div>
