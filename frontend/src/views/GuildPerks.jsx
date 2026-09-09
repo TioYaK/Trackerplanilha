@@ -561,23 +561,18 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
 
         {/* 4 Cards de Parâmetros Globais */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-          {/* Card 1: Vagas / Quórum */}
+          {/* Card 1: Membros Ativos */}
           <div className="bg-black/50 border border-tibia-border/60 p-4 rounded-lg">
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Vagas no Sistema</span>
+              <span>Membros com Perks</span>
               <Users size={15} className="text-blue-400" />
             </p>
             <p className="text-2xl font-black text-white mt-1">
-              {activeMembers.length} <span className="text-sm font-normal text-gray-400">/ {settings.max_slots}</span>
+              {activeMembers.length} <span className="text-sm font-normal text-gray-400">participantes</span>
             </p>
-            <div className="w-full bg-black/60 rounded-full h-1.5 mt-2.5 overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${
-                  activeMembers.length >= settings.max_slots ? 'bg-red-500' : 'bg-green-500'
-                }`}
-                style={{ width: `${Math.min(100, Math.round((activeMembers.length / settings.max_slots) * 100))}%` }}
-              />
-            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Com cargo e bônus ativos
+            </p>
           </div>
 
           {/* Card 2: Cota Vigente */}
@@ -949,7 +944,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
             </form>
 
             <div className="mt-6 pt-4 border-t border-tibia-border/40 text-[11px] text-gray-400 text-center">
-              Vagas disponíveis no momento: <strong className="text-white">{Math.max(0, settings.max_slots - activeMembers.length)}</strong>
+              Acesso restrito: aprovação individual pelo Administrador da guilda.
             </div>
           </div>
         </div>
@@ -1197,34 +1192,18 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
           </div>
 
           <form onSubmit={handleSaveSettings} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
-                  Duração do Ciclo (Dias)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="180"
-                  value={settings.cycle_days}
-                  onChange={(e) => setSettings({ ...settings, cycle_days: e.target.value })}
-                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
-                  Limite de Vagas (Cap)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="200"
-                  value={settings.max_slots}
-                  onChange={(e) => setSettings({ ...settings, max_slots: e.target.value })}
-                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-300 mb-1 uppercase">
+                Duração do Ciclo (Dias)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="180"
+                value={settings.cycle_days}
+                onChange={(e) => setSettings({ ...settings, cycle_days: e.target.value })}
+                className="w-full bg-black/80 border border-tibia-border/60 rounded px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
