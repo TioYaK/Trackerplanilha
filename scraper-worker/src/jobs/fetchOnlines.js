@@ -53,18 +53,30 @@ export const runFetchOnlines = async () => {
     const onlineSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
 
     if (huntedList && huntedList.length > 0) {
-      for (const hunted of huntedList) {
-        const isCurrentlyOnline = hunted.name ? onlineSet.has(hunted.name.toLowerCase()) : false;
-        
-        // Se o status mudou ou se ele acabou de ser visto online
-        if (isCurrentlyOnline) {
+      const huntedOnlineIds = huntedList
+        .filter(h => h.name && onlineSet.has(h.name.toLowerCase()))
+        .map(h => h.id);
+
+      const huntedToOfflineIds = huntedList
+        .filter(h => h.name && !onlineSet.has(h.name.toLowerCase()) && h.is_online)
+        .map(h => h.id);
+
+      const now = new Date().toISOString();
+      if (huntedOnlineIds.length > 0) {
+        for (let i = 0; i < huntedOnlineIds.length; i += 100) {
+          const chunk = huntedOnlineIds.slice(i, i + 100);
           await supabase.from('hunted_list')
-            .update({ is_online: true, last_seen: new Date().toISOString() })
-            .eq('id', hunted.id);
-        } else if (hunted.is_online) {
+            .update({ is_online: true, last_seen: now })
+            .in('id', chunk);
+        }
+      }
+
+      if (huntedToOfflineIds.length > 0) {
+        for (let i = 0; i < huntedToOfflineIds.length; i += 100) {
+          const chunk = huntedToOfflineIds.slice(i, i + 100);
           await supabase.from('hunted_list')
             .update({ is_online: false })
-            .eq('id', hunted.id);
+            .in('id', chunk);
         }
       }
     }

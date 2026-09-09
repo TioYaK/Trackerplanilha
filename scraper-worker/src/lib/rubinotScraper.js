@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import puppeteer from 'rebrowser-puppeteer';
 import * as cheerio from 'cheerio';
 import { findUniversalChrome, getLeanChromeArgs, cleanStaleLocks } from './storageGuardian.js';
@@ -84,7 +85,7 @@ async function closeBrowser() {
     }
 }
 
-const SCRAPER_PROFILE_DIR = path.join(process.cwd(), 'worker_profiles', 'scraper_runtime');
+const SCRAPER_PROFILE_DIR = fileURLToPath(new URL('../../worker_profiles/scraper_runtime', import.meta.url));
 
 async function initBrowser() {
     if (globalBrowser) return;

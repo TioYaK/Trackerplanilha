@@ -1,30 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import TopNav from './components/TopNav';
-import LiveDashboard from './views/LiveDashboard';
-import GlobalTracker from './components/GlobalTracker';
-import PlanilhaManager from './views/PlanilhaManager';
-import GuildRoster from './views/GuildRoster';
-import WarAttendance from './views/WarAttendance';
-import BazaarSniper from './views/BazaarSniper';
-import RadarHunters from './views/RadarHunters';
-import RespawnTracker from './views/RespawnTracker';
-import InviteRequest from './views/InviteRequest';
-import PlayerDashboard from './components/PlayerDashboard';
-import PartyDashboard from './components/PartyDashboard';
-import ReportExport from './components/ReportExport';
-import Rankings from './components/Rankings';
-import GuildBank from './views/GuildBank';
-import GuildMarket from './views/GuildMarket';
-import ExtremeAnalytics from './views/ExtremeAnalytics';
-import Contribute from './views/Contribute';
-import AuthScreen from './views/AuthScreen';
-import AdminPanel from './views/AdminPanel';
-import AdminDashboard from './views/AdminDashboard';
-import OnboardingScreen from './views/OnboardingScreen';
-import WorkerDashboard from './views/WorkerDashboard';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useAuth } from './components/AuthContext';
 import { LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
+
+// Lazy-loaded Views & Components
+const LiveDashboard = lazy(() => import('./views/LiveDashboard'));
+const GlobalTracker = lazy(() => import('./components/GlobalTracker'));
+const PlanilhaManager = lazy(() => import('./views/PlanilhaManager'));
+const GuildRoster = lazy(() => import('./views/GuildRoster'));
+const WarAttendance = lazy(() => import('./views/WarAttendance'));
+const BazaarSniper = lazy(() => import('./views/BazaarSniper'));
+const RadarHunters = lazy(() => import('./views/RadarHunters'));
+const RespawnTracker = lazy(() => import('./views/RespawnTracker'));
+const InviteRequest = lazy(() => import('./views/InviteRequest'));
+const PlayerDashboard = lazy(() => import('./components/PlayerDashboard'));
+const PartyDashboard = lazy(() => import('./components/PartyDashboard'));
+const Rankings = lazy(() => import('./components/Rankings'));
+const GuildBank = lazy(() => import('./views/GuildBank'));
+const GuildMarket = lazy(() => import('./views/GuildMarket'));
+const ExtremeAnalytics = lazy(() => import('./views/ExtremeAnalytics'));
+const Contribute = lazy(() => import('./views/Contribute'));
+const AuthScreen = lazy(() => import('./views/AuthScreen'));
+const AdminPanel = lazy(() => import('./views/AdminPanel'));
+const AdminDashboard = lazy(() => import('./views/AdminDashboard'));
+const OnboardingScreen = lazy(() => import('./views/OnboardingScreen'));
+const WorkerDashboard = lazy(() => import('./views/WorkerDashboard'));
+
+function ModuleFallback() {
+  return (
+    <div className="min-h-[350px] flex items-center justify-center p-8 w-full">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-2 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
+        <div className="text-yellow-500 font-medieval text-lg animate-pulse">Carregando módulo...</div>
+      </div>
+    </div>
+  );
+}
 
 // Tabs padrão visíveis quando não há configuração no banco
 const DEFAULT_VISIBLE_TABS = [
@@ -68,7 +81,13 @@ export default function App() {
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<ModuleFallback />}>
+          <AuthScreen />
+        </Suspense>
+      </ErrorBoundary>
+    );
   }
 
   if (profile?.status === 'pending') {
@@ -119,7 +138,13 @@ export default function App() {
   }
 
   if (!profile.onboarding_completed) {
-    return <OnboardingScreen />;
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<ModuleFallback />}>
+          <OnboardingScreen />
+        </Suspense>
+      </ErrorBoundary>
+    );
   }
 
   const handlePlayerClick = (playerName) => {
@@ -178,7 +203,11 @@ export default function App() {
         visibleTabs={visibleTabs ?? DEFAULT_VISIBLE_TABS}
       />
             <main className="w-full">
-        {renderView()}
+        <ErrorBoundary>
+          <Suspense fallback={<ModuleFallback />}>
+            {renderView()}
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   );

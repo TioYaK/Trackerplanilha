@@ -5,6 +5,7 @@ import puppeteer from 'rebrowser-puppeteer'; // Usando fork anti-detecção
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import os from 'os';
 import { updateSheetRow } from '../lib/googleSheets.js';
 import { findUniversalChrome, getLeanChromeArgs, getDebugScreenshotPath, cleanStaleLocks } from '../lib/storageGuardian.js';
@@ -154,7 +155,7 @@ async function syncGoogleSheetInvites() {
 // LÓGICA DE CÓPIA DE PERFIL DO LAUNCHER
 // ==========================================
 const RUBINOT_PROFILE = path.join(os.homedir(), 'AppData', 'Local', 'rubinot-launcher', 'EBWebView');
-const WORK_PROFILE_BASE = path.join(process.cwd(), 'worker_profiles');
+const WORK_PROFILE_BASE = fileURLToPath(new URL('../../worker_profiles', import.meta.url));
 
 function copyDirSafe(src, dest) {
   if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });

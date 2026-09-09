@@ -36,3 +36,4 @@ scraper-worker/worker_id.txt
 logs/
 worker_profiles/  
 scraper-worker/google-credentials.json  
+scraper-worker/debug_screenshots/

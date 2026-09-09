@@ -109,10 +109,10 @@ $VbsPath  = Join-Path $WorkerPath "run_worker.vbs"
 # Cria loop.bat de auto-update e run
 $batLines = @(
     "@echo off",
+    "cd /d `"$WorkerPath`"",
     ":loop",
     "git -C `"$WorkDir`" fetch --all",
     "git -C `"$WorkDir`" reset --hard origin/main",
-    "git -C `"$WorkDir`" clean -fd -e .env -e loop.bat -e run_worker.vbs",
     "`"$NodeExe`" `"$IndexJs`"",
     "ping 127.0.0.1 -n 15 > nul",
     "goto loop"
@@ -138,6 +138,7 @@ $taskXml = @"
     <Exec>
       <Command>wscript.exe</Command>
       <Arguments>"$VbsPath"</Arguments>
+      <WorkingDirectory>$WorkerPath</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>

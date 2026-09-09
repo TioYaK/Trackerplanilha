@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config({ path: path.join(process.cwd(), '.env') });
+const WORKER_ROOT = fileURLToPath(new URL('../', import.meta.url));
+dotenv.config({ path: path.join(WORKER_ROOT, '.env') });
 
 import express from 'express';
 import cors from 'cors';
@@ -37,7 +39,7 @@ applySelfHealingPatch();
 // ==========================================
 // ID PERSISTENTE DO WORKER
 // ==========================================
-const ID_FILE = path.join(process.cwd(), 'worker_id.txt');
+const ID_FILE = path.join(WORKER_ROOT, 'worker_id.txt');
 let WORKER_ID;
 
 if (fs.existsSync(ID_FILE)) {
@@ -625,7 +627,7 @@ supabase
      notifier.notify({
        title: `BattleStorm - ${alarm.type}`,
        message: alarm.message,
-       icon: path.join(process.cwd(), 'icon.png'),
+       icon: path.join(WORKER_ROOT, 'icon.png'),
        appID: 'BattleStorm',
        sound: true, 
        wait: false
