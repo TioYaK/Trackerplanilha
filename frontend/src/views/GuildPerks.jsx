@@ -6,7 +6,7 @@ import {
   XCircle, Coins, Users, Search, Copy, Check, FileText, 
   RefreshCw, Sliders, Calendar, Skull, UserCheck, UserX, AlertCircle, ArrowRight,
   Landmark, CheckSquare, Plus, Trash2, PieChart, Vote, DollarSign, TrendingUp, TrendingDown,
-  CheckCircle, Globe, Zap, BookOpen
+  CheckCircle, Globe, Zap, BookOpen, Calculator
 } from 'lucide-react';
 
 import { 
@@ -18,9 +18,12 @@ import {
   calculateGoldPower,
   ASCENSION_GENERAL_BONUSES,
   ASCENSION_BESTIARY_RACES,
-  ASCENSION_ELEMENTS
+  ASCENSION_ELEMENTS,
+  calculatePerkSimulation,
+  SIMULATOR_PRESET_SCENARIOS
 } from '../lib/guildPerksConfig';
 export { WORLDS_CONFIG, WORLD_GUILD_MAP, MARKET_EXCHANGE_RATE };
+
 
 
 
@@ -104,6 +107,16 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
   const [selectedPollOption, setSelectedPollOption] = useState({}); // { [pollId]: optionId }
   const [votingFeedback, setVotingFeedback] = useState({}); // { [pollId]: { type: 'success' | 'error', text: '' } }
   const [pollFilter, setPollFilter] = useState('ALL'); // 'ALL', 'OPEN', 'CLOSED'
+
+  // Simulador de Orçamento & Viabilidade (Exclusivo Admin)
+  const [simMembers, setSimMembers] = useState(1000);
+  const [simFeeRc, setSimFeeRc] = useState(50);
+  const [simRateRc, setSimRateRc] = useState(25);
+  const [simRateKk, setSimRateKk] = useState(2.0);
+  const [simTargetTier, setSimTargetTier] = useState('FULL');
+  const [simPerkCostPerMemberKk, setSimPerkCostPerMemberKk] = useState(0.8);
+  const [simItemCostPerMemberKk, setSimItemCostPerMemberKk] = useState(0.6);
+  const [simApplySuccess, setSimApplySuccess] = useState(false);
 
   // 1. Carrega dados do sistema
   const fetchAllData = useCallback(async () => {
@@ -335,6 +348,63 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       goldPowerKk
     };
   }, [filteredPayments, filteredExpenses]);
+
+  // Cálculos do Simulador Estratégico de Orçamento (Exclusivo Admin)
+  const simResult = useMemo(() => {
+    return calculatePerkSimulation({
+      members: simMembers,
+      feeRc: simFeeRc,
+      rateRc: simRateRc,
+      rateKk: simRateKk,
+      targetTier: simTargetTier,
+      perkCostPerMemberKk: simPerkCostPerMemberKk,
+      itemCostPerMemberKk: simItemCostPerMemberKk
+    });
+  }, [simMembers, simFeeRc, simRateRc, simRateKk, simTargetTier, simPerkCostPerMemberKk, simItemCostPerMemberKk]);
+
+  const simScenarios = useMemo(() => {
+    return SIMULATOR_PRESET_SCENARIOS.map(count => {
+      return calculatePerkSimulation({
+        members: count,
+        feeRc: simFeeRc,
+        rateRc: simRateRc,
+        rateKk: simRateKk,
+        targetTier: simTargetTier,
+        perkCostPerMemberKk: simPerkCostPerMemberKk,
+        itemCostPerMemberKk: simItemCostPerMemberKk
+      });
+    });
+  }, [simFeeRc, simRateRc, simRateKk, simTargetTier, simPerkCostPerMemberKk, simItemCostPerMemberKk]);
+
+  const handleApplySimulatedFee = async () => {
+    if (!isAdmin) return;
+    try {
+      setAdminActionLoading(true);
+      const targetWorld = selectedWorld !== 'ALL' ? selectedWorld : 'Auroria';
+      const cfg = allSettings[targetWorld.toLowerCase()] || settings;
+      
+      const { error } = await supabase
+        .from('guild_perk_settings')
+        .upsert({
+          ...cfg,
+          world: targetWorld,
+          fee_amount: simFeeRc,
+          fee_currency: 'RC',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'world' });
+
+      if (error) throw error;
+      
+      setSettings(prev => ({ ...prev, fee_amount: simFeeRc, fee_currency: 'RC' }));
+      setSimApplySuccess(true);
+      setTimeout(() => setSimApplySuccess(false), 3000);
+      fetchAllData();
+    } catch (err) {
+      alert(`Erro ao aplicar cota: ${err.message}`);
+    } finally {
+      setAdminActionLoading(false);
+    }
+  };
 
   // Copiar nome do char Bank
   const handleCopyBank = () => {
@@ -1466,6 +1536,18 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               <Sliders size={14} />
               <span>Ajustes do Ciclo</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('admin_simulator')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                activeTab === 'admin_simulator'
+                  ? 'bg-emerald-500 text-black shadow-md'
+                  : 'bg-emerald-950/30 text-emerald-400 hover:bg-emerald-900/40 border border-emerald-600/40'
+              }`}
+            >
+              <Calculator size={14} />
+              <span>Simulador & Projeções</span>
+            </button>
           </>
         )}
       </div>
@@ -2584,6 +2666,428 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               <span>Salvar Alterações de {settingsTargetWorld}</span>
             </button>
           </form>
+        </div>
+      )}
+
+      {/* ADMIN ABA 4: Simulador & Planejador de Orçamento da Ascensão */}
+      {isAdmin && activeTab === 'admin_simulator' && (
+        <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-6 shadow-inner space-y-6">
+          {/* Top Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-tibia-border/40 pb-4">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-xl font-medieval text-emerald-400 flex items-center gap-2">
+                  <Calculator className="text-emerald-400" size={22} />
+                  Simulador Estratégico & Planejador de Orçamento
+                </h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Exclusivo da Liderança
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Calcule a viabilidade financeira, margem de lucro em RC, custos de itens e descubra a cota ideal para qualquer volume de membros.
+              </p>
+            </div>
+
+            {/* Presets Rápidos de Membros */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-bold text-gray-400 uppercase mr-1">Cenários Rápidos:</span>
+              {[50, 100, 250, 500, 1000].map(count => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setSimMembers(count)}
+                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all border ${
+                    simMembers === count
+                      ? 'bg-emerald-500 text-black border-emerald-400 shadow-sm'
+                      : 'bg-black/60 text-gray-300 hover:text-white border-tibia-border/60 hover:border-emerald-500/50'
+                  }`}
+                >
+                  {count === 1000 ? '1.000 (Full)' : `${count}`}
+                </button>
+              ))}
+              {activeMembers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSimMembers(activeMembers.length)}
+                  className="px-2.5 py-1 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all"
+                  title="Usar número real de membros ativos do servidor"
+                >
+                  Atual ({activeMembers.length})
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Grid de Parâmetros / Controles */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-black/50 border border-tibia-border/50 rounded-xl p-4">
+            {/* Parâmetro 1: Quantidade de Membros */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-gray-300 uppercase flex items-center gap-1">
+                  <Users size={13} className="text-blue-400" />
+                  Membros Participantes
+                </label>
+                <span className="text-xs font-black text-blue-400 font-mono">{simMembers} jogadores</span>
+              </div>
+              <input
+                type="range"
+                min="10"
+                max="1500"
+                step="10"
+                value={simMembers}
+                onChange={(e) => setSimMembers(Number(e.target.value))}
+                className="w-full accent-blue-500 h-1.5 bg-black/80 rounded-lg cursor-pointer"
+              />
+              <div className="flex items-center gap-2 mt-1.5">
+                <input
+                  type="number"
+                  min="1"
+                  max="5000"
+                  value={simMembers}
+                  onChange={(e) => setSimMembers(Math.max(1, Number(e.target.value)))}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-2.5 py-1 text-xs text-white font-mono focus:border-blue-400 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Parâmetro 2: Cota por Membro (RC) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-gray-300 uppercase flex items-center gap-1">
+                  <Coins size={13} className="text-amber-400" />
+                  Cota por Membro (RC)
+                </label>
+                <span className="text-xs font-black text-amber-400 font-mono">{simFeeRc} RC / ciclo</span>
+              </div>
+              <input
+                type="range"
+                min="5"
+                max="150"
+                step="5"
+                value={simFeeRc}
+                onChange={(e) => setSimFeeRc(Number(e.target.value))}
+                className="w-full accent-amber-500 h-1.5 bg-black/80 rounded-lg cursor-pointer"
+              />
+              <div className="flex items-center gap-2 mt-1.5">
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={simFeeRc}
+                  onChange={(e) => setSimFeeRc(Math.max(1, Number(e.target.value)))}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-2.5 py-1 text-xs text-amber-300 font-mono font-bold focus:border-amber-400 focus:outline-none"
+                />
+                <span className="text-[11px] text-gray-400 whitespace-nowrap">
+                  ≈ {(simFeeRc * simResult.rateKkPerRc).toFixed(1)} KK Gold
+                </span>
+              </div>
+            </div>
+
+            {/* Parâmetro 3: Cotação de Mercado */}
+            <div>
+              <label className="block text-xs font-bold text-gray-300 uppercase mb-1 flex items-center gap-1">
+                <RefreshCw size={13} className="text-yellow-400" />
+                Cotação de Mercado (Market)
+              </label>
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    min="1"
+                    value={simRateRc}
+                    onChange={(e) => setSimRateRc(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded px-2 py-1 text-xs text-white font-mono focus:border-amber-400 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-gray-400 block mt-0.5">RC</span>
+                </div>
+                <span className="text-xs font-bold text-gray-400">=</span>
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={simRateKk}
+                    onChange={(e) => setSimRateKk(Math.max(0.1, Number(e.target.value)))}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded px-2 py-1 text-xs text-white font-mono focus:border-amber-400 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-gray-400 block mt-0.5">KK (Gold)</span>
+                </div>
+              </div>
+              <span className="text-[10px] text-amber-300 font-mono block mt-1">
+                Taxa: 1 RC = {simResult.rateKkPerRc.toFixed(3)} KK ({Math.round(simResult.rateKkPerRc * 1000)}k)
+              </span>
+            </div>
+
+            {/* Parâmetro 4: Meta da Season */}
+            <div>
+              <label className="block text-xs font-bold text-gray-300 uppercase mb-1 flex items-center gap-1">
+                <Award size={13} className="text-purple-400" />
+                Meta de Evolução da Season
+              </label>
+              <select
+                value={simTargetTier}
+                onChange={(e) => setSimTargetTier(e.target.value)}
+                className="w-full bg-black/80 border border-tibia-border/60 rounded px-2.5 py-1.5 text-xs text-white focus:border-purple-400 focus:outline-none"
+              >
+                <option value="FULL">🏆 100% Full Perks (6 Slots no Nível V = 30 Perks)</option>
+                <option value="COMPETITIVE">⚔️ Competitivo / War (4 Slots no Nível V)</option>
+                <option value="ESSENTIAL">🛡️ Essencial (2 Slots no Nível V)</option>
+              </select>
+              <span className="text-[10px] text-gray-400 block mt-1">
+                {simTargetTier === 'FULL' ? 'Objetivo máximo da guilda' : 'Foco em bônus prioritários'}
+              </span>
+            </div>
+
+            {/* Parâmetro 5: Custo de Itens no Market */}
+            <div>
+              <label className="block text-xs font-bold text-gray-300 uppercase mb-1 flex items-center gap-1">
+                <Sparkles size={13} className="text-emerald-400" />
+                Compra de Itens (Market) / Membro
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={simItemCostPerMemberKk}
+                  onChange={(e) => setSimItemCostPerMemberKk(Math.max(0, Number(e.target.value)))}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-2.5 py-1 text-xs text-white font-mono focus:border-emerald-400 focus:outline-none"
+                />
+                <span className="text-xs text-gray-400 font-bold whitespace-nowrap">KK / membro</span>
+              </div>
+              <span className="text-[10px] text-gray-400 block mt-1">
+                Total Itens: <strong>{simResult.itemCostGoldKk.toLocaleString('pt-BR')} KK</strong>
+              </span>
+            </div>
+
+            {/* Parâmetro 6: Custo de Ativação em Gold */}
+            <div>
+              <label className="block text-xs font-bold text-gray-300 uppercase mb-1 flex items-center gap-1">
+                <DollarSign size={13} className="text-yellow-400" />
+                Taxas de Ativação dos Perks / Membro
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={simPerkCostPerMemberKk}
+                  onChange={(e) => setSimPerkCostPerMemberKk(Math.max(0, Number(e.target.value)))}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded px-2.5 py-1 text-xs text-white font-mono focus:border-yellow-400 focus:outline-none"
+                />
+                <span className="text-xs text-gray-400 font-bold whitespace-nowrap">KK / membro</span>
+              </div>
+              <span className="text-[10px] text-gray-400 block mt-1">
+                Total Ativação: <strong>{simResult.perkCostGoldKk.toLocaleString('pt-BR')} KK</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* 3 Grandes KPI Cards de Resultados */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Card 1: Arrecadação Bruta */}
+            <div className="bg-black/60 border border-tibia-border/60 p-5 rounded-xl shadow-lg relative overflow-hidden">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
+                Arrecadação Bruta (Entrada)
+              </span>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-3xl font-black text-green-400 font-mono">
+                  {simResult.grossRc.toLocaleString('pt-BR')}
+                </span>
+                <span className="text-base font-bold text-gray-300">RC</span>
+              </div>
+              <div className="mt-2 text-xs text-gray-300">
+                Poder em Gold: <strong className="text-yellow-400 font-mono">{simResult.grossGoldKk.toLocaleString('pt-BR')} KK</strong>
+                <span className="text-[11px] text-gray-500 ml-1">({(simResult.grossGoldKk / 1000).toFixed(2)} Bi)</span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">
+                {simResult.members} membros × {simResult.feeRc} RC
+              </p>
+            </div>
+
+            {/* Card 2: Custo Operacional Total */}
+            <div className="bg-black/60 border border-tibia-border/60 p-5 rounded-xl shadow-lg relative overflow-hidden">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
+                Custo Operacional Total (Despesa)
+              </span>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-3xl font-black text-red-400 font-mono">
+                  {simResult.totalCostGoldKk.toLocaleString('pt-BR')}
+                </span>
+                <span className="text-base font-bold text-gray-300">KK Gold</span>
+              </div>
+              <div className="mt-2 text-xs text-amber-300">
+                Vender no Market: <strong className="font-mono">{simResult.rcNeededForCost.toLocaleString('pt-BR')} RC</strong>
+                <span className="text-[11px] text-gray-400 ml-1">({100 - simResult.surplusMarginPct}% da arrecadação)</span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Perks: {simResult.perkCostGoldKk} KK + Itens: {simResult.itemCostGoldKk} KK
+              </p>
+            </div>
+
+            {/* Card 3: Sobra Líquida da Liderança (Lucro Real) */}
+            <div className="bg-gradient-to-br from-emerald-950/50 via-black/70 to-black/70 border-2 border-emerald-500/60 p-5 rounded-xl shadow-xl relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">
+                  Sobra Líquida da Liderança
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  {simResult.surplusMarginPct}% de Margem
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-3xl font-black text-emerald-400 font-mono">
+                  +{simResult.surplusRc.toLocaleString('pt-BR')}
+                </span>
+                <span className="text-base font-bold text-white">RC Livres</span>
+              </div>
+              <div className="mt-2 text-xs text-gray-300">
+                Equivalente em Gold: <strong className="text-yellow-400 font-mono">+{simResult.surplusGoldKk.toLocaleString('pt-BR')} KK</strong>
+              </div>
+              <p className="text-[11px] text-emerald-300/80 mt-1">
+                Fundo de guerra líquido após pagar 100% da Season!
+              </p>
+            </div>
+          </div>
+
+          {/* Barra Visual de Margem */}
+          <div className="bg-black/50 border border-tibia-border/50 rounded-xl p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-red-400 flex items-center gap-1">
+                <TrendingDown size={14} />
+                Custo de Operação: {100 - simResult.surplusMarginPct}% ({simResult.rcNeededForCost.toLocaleString('pt-BR')} RC)
+              </span>
+              <span className="text-emerald-400 flex items-center gap-1">
+                <TrendingUp size={14} />
+                Sobra Líquida: {simResult.surplusMarginPct}% (+{simResult.surplusRc.toLocaleString('pt-BR')} RC)
+              </span>
+            </div>
+            <div className="w-full h-3.5 bg-black/80 rounded-full overflow-hidden border border-tibia-border/60 flex">
+              <div
+                style={{ width: `${Math.min(100, Math.max(0, 100 - simResult.surplusMarginPct))}%` }}
+                className="bg-red-500/80 transition-all duration-500"
+                title={`Custo: ${100 - simResult.surplusMarginPct}%`}
+              />
+              <div
+                style={{ width: `${Math.min(100, Math.max(0, simResult.surplusMarginPct))}%` }}
+                className="bg-emerald-500 transition-all duration-500"
+                title={`Sobra: ${simResult.surplusMarginPct}%`}
+              />
+            </div>
+          </div>
+
+          {/* Destaque Break-Even & Ação Rápida */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Box Break-Even */}
+            <div className="bg-black/60 border border-amber-500/40 rounded-xl p-4 flex items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold text-amber-300 uppercase flex items-center gap-1.5">
+                  <Zap size={14} className="text-yellow-400" />
+                  Ponto de Equilíbrio (Break-Even)
+                </span>
+                <p className="text-xs text-gray-300 mt-1">
+                  Cota mínima necessária por membro para empatar todos os custos sem lucro:
+                </p>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-yellow-400 font-mono">
+                    {simResult.breakEvenFeeRc} RC
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    (Lucro atual de {simFeeRc - simResult.breakEvenFeeRc} RC por membro)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Box Ação Rápida: Aplicar no Servidor */}
+            <div className="bg-black/60 border border-emerald-500/40 rounded-xl p-4 flex flex-col justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-emerald-300 uppercase flex items-center gap-1.5">
+                  <Sliders size={14} className="text-emerald-400" />
+                  Aplicar Cota no Servidor ({selectedWorld === 'ALL' ? 'Auroria' : selectedWorld})
+                </span>
+                <p className="text-xs text-gray-300 mt-1">
+                  Deseja atualizar a cota oficial de <strong>{selectedWorld === 'ALL' ? 'Auroria' : selectedWorld}</strong> para <strong>{simFeeRc} RC</strong> agora?
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleApplySimulatedFee}
+                disabled={adminActionLoading}
+                className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs uppercase tracking-wider rounded transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                {simApplySuccess ? (
+                  <>
+                    <Check size={16} className="text-black" />
+                    <span>Cota de {simFeeRc} RC Aplicada com Sucesso!</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={16} />
+                    <span>Definir Cota Oficial em {simFeeRc} RC</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Tabela Comparativa de Escala */}
+          <div className="bg-black/50 border border-tibia-border/60 rounded-xl p-4 space-y-3">
+            <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
+              <PieChart size={16} className="text-amber-400" />
+              Tabela Comparativa de Escala (50 a 1.000 Membros)
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse font-mono">
+                <thead>
+                  <tr className="border-b border-tibia-border/60 text-gray-400 uppercase tracking-wider font-bold bg-black/60">
+                    <th className="p-2.5">Membros</th>
+                    <th className="p-2.5">Arrecadação (RC)</th>
+                    <th className="p-2.5">Poder em Gold</th>
+                    <th className="p-2.5">Custo Total Gold</th>
+                    <th className="p-2.5">RC p/ Pagar</th>
+                    <th className="p-2.5 text-emerald-400 font-black">Sobra Líquida (RC)</th>
+                    <th className="p-2.5 text-right">Margem %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-tibia-border/30">
+                  {simScenarios.map((scen) => {
+                    const isSelected = simMembers === scen.members;
+                    return (
+                      <tr
+                        key={scen.members}
+                        onClick={() => setSimMembers(scen.members)}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-emerald-500/20 text-white font-bold border-l-4 border-emerald-400'
+                            : 'hover:bg-white/5 text-gray-300'
+                        }`}
+                      >
+                        <td className="p-2.5">
+                          <span className="font-bold">{scen.members.toLocaleString('pt-BR')}</span>
+                          {scen.members === 1000 && <span className="text-[10px] text-yellow-400 ml-1">(Guilda Full)</span>}
+                        </td>
+                        <td className="p-2.5 text-yellow-300 font-bold">{scen.grossRc.toLocaleString('pt-BR')} RC</td>
+                        <td className="p-2.5">{scen.grossGoldKk.toLocaleString('pt-BR')} KK</td>
+                        <td className="p-2.5 text-red-400">{scen.totalCostGoldKk.toLocaleString('pt-BR')} KK</td>
+                        <td className="p-2.5 text-gray-400">{scen.rcNeededForCost.toLocaleString('pt-BR')} RC</td>
+                        <td className="p-2.5 text-emerald-400 font-black text-sm">+{scen.surplusRc.toLocaleString('pt-BR')} RC</td>
+                        <td className="p-2.5 text-right">
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">
+                            {scen.surplusMarginPct}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-gray-500 italic">
+              Clique em qualquer linha da tabela para carregar automaticamente o cenário no simulador acima.
+            </p>
+          </div>
         </div>
       )}
 
