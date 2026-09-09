@@ -32,7 +32,7 @@ import { runValidateMakers } from './jobs/validateMakers.js';
 import { checkForUpdates } from './updater.js';
 import { applySelfHealingPatch } from './selfHeal.js';
 import { closeBrowser, isInMaintenance } from './lib/rubinotScraper.js';
-import { runFullStorageMaintenance, getDiskHealth } from './lib/storageGuardian.js';
+import { runFullStorageMaintenance, getDiskHealth, cleanWorkerProfileCaches } from './lib/storageGuardian.js';
 
 applySelfHealingPatch();
 
@@ -76,22 +76,26 @@ const fetchTask = async () => {
       .in('task_type', priorityTypes)
       .or(orQuery)
       .order('locked_at', { ascending: true, nullsFirst: true })
-      .limit(1);
+      .limit(5);
 
-    let task = (prioTasks && prioTasks.length > 0) ? prioTasks[0] : null;
+    let candidates = (prioTasks && prioTasks.length > 0) ? prioTasks : null;
 
-    if (!task) {
+    if (!candidates) {
       const { data: tasks, error } = await supabase
         .from('task_queue')
         .select('*')
         .or(orQuery)
         .order('locked_at', { ascending: true, nullsFirst: true })
-        .limit(1);
+        .limit(5);
 
       if (error) throw error;
       if (!tasks || tasks.length === 0) return null;
-      task = tasks[0];
+      candidates = tasks;
     }
+
+    // Anti-colisão no swarm: seleciona com jitter entre os candidatos para paralelismo real
+    const pickIndex = Math.floor(Math.random() * candidates.length);
+    const task = candidates[pickIndex];
 
     // Tenta aplicar o lock (concorrência otimista)
     let query = supabase
@@ -160,6 +164,8 @@ const requeueTask = async (task) => {
 // ==========================================
 let sessionStats = {};
 let isProcessingTask = false;
+let currentTaskType = 'IDLE';
+let totalTasksCompleted = 0;
 
 const processTask = async (task) => {
   if (isProcessingTask) {
@@ -167,6 +173,7 @@ const processTask = async (task) => {
     return;
   }
   isProcessingTask = true;
+  currentTaskType = task.task_type;
   const ts = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   console.log(`\n[WORKER] ▶ [${ts}] Processando: ${task.task_type} (ID: ${task.id})`);
   const startTime = Date.now();
@@ -250,6 +257,7 @@ const processTask = async (task) => {
     sessionStats[task.task_type].duration += duration;
 
     await requeueTask(task);
+    totalTasksCompleted++;
   } catch (error) {
     console.error(`[WORKER] ❌ Falha na tarefa ${task.task_type}:`, error.message);
 
@@ -274,6 +282,7 @@ const processTask = async (task) => {
   } finally {
     clearTimeout(timeoutId);
     isProcessingTask = false;
+    currentTaskType = 'IDLE';
   }
 };
 
@@ -371,6 +380,8 @@ const loop = async () => {
 const sendHeartbeat = async () => {
   try {
     const disk = getDiskHealth();
+    const memoryMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
+    const uptimeSec = Math.round((Date.now() - new Date(WORKER_STARTED).getTime()) / 1000);
     const metadata = {
       ...WORKER_METADATA,
       disk_free_gb: disk.freeGb,
@@ -378,6 +389,10 @@ const sendHeartbeat = async () => {
       disk_percent_free: disk.percentFree,
       disk_warning: disk.isLowDisk,
       disk_text: disk.text,
+      current_task: isProcessingTask ? currentTaskType : 'IDLE',
+      tasks_completed: totalTasksCompleted,
+      memory_mb: memoryMb,
+      uptime_seconds: uptimeSec,
     };
 
     await supabase.from('worker_heartbeats').upsert({
@@ -403,9 +418,45 @@ const sendHeartbeat = async () => {
       }
     }
 
-    console.log(`[HEARTBEAT] ♥ Ping enviado. Workers online: verificar dashboard.`);
+    console.log(`[HEARTBEAT] ♥ Ping enviado (${isProcessingTask ? currentTaskType : 'IDLE'}, ${totalTasksCompleted} tasks, ${memoryMb}MB RAM).`);
   } catch (err) {
     // ignorar falha de heartbeat
+  }
+};
+
+// ==========================================
+// WATCHDOG ANTI-DEADLOCK DE TAREFAS ÓRFÃS
+// ==========================================
+const runOrphanTaskWatchdog = async () => {
+  try {
+    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+    // 1. Busca workers offline há mais de 5 minutos
+    const { data: deadWorkers } = await supabase
+      .from('worker_heartbeats')
+      .select('worker_id')
+      .lt('last_ping', fiveMinsAgo);
+
+    const deadWorkerIds = (deadWorkers || []).map(w => w.worker_id).filter(Boolean);
+
+    // 2. Libera tarefas presas em IN_PROGRESS há mais de 5 min ou vinculadas a workers mortos
+    let query = supabase
+      .from('task_queue')
+      .update({ status: 'PENDING', locked_at: null, worker_id: null })
+      .eq('status', 'IN_PROGRESS');
+
+    if (deadWorkerIds.length > 0) {
+      query = query.or(`locked_at.lte.${fiveMinsAgo},worker_id.in.(${deadWorkerIds.join(',')})`);
+    } else {
+      query = query.lte('locked_at', fiveMinsAgo);
+    }
+
+    const { data: unlocked, error } = await query.select('id, task_type, worker_id');
+    if (!error && unlocked && unlocked.length > 0) {
+      console.warn(`[WATCHDOG] 🐕 ${unlocked.length} tarefa(s) órfã(s) recuperada(s) de workers inativos e devolvida(s) à fila:`, unlocked.map(u => u.task_type).join(', '));
+    }
+  } catch (err) {
+    // watchdog silencioso
   }
 };
 
@@ -413,6 +464,7 @@ const sendHeartbeat = async () => {
 setTimeout(() => {
   sendHeartbeat();
   setInterval(sendHeartbeat, 60 * 1000);
+  setInterval(runOrphanTaskWatchdog, 2 * 60 * 1000); // Watchdog a cada 2 min
 }, 5000);
 
 // Iniciar Loop
@@ -537,7 +589,7 @@ const processC2Command = async (cmd) => {
        notifier.notify({
          title: 'Mensagem do Admin (BattleStorm)',
          message: cmd.payload?.message || 'Sem mensagem',
-         icon: path.join(process.cwd(), 'icon.png'),
+         icon: path.join(WORKER_ROOT, 'icon.png'),
          sound: true
        });
     } else if (cmd.command === 'RESTART_PC') {
@@ -551,6 +603,22 @@ const processC2Command = async (cmd) => {
        console.log('[C2 COMMAND] Reiniciando Worker / Aplicando Updates...');
        await checkForUpdates();
        process.exit(0);
+    } else if (cmd.command === 'CLEAN_STORAGE') {
+       console.log('[C2 COMMAND] 🧹 Executando manutenção preventiva de armazenamento...');
+       cleanWorkerProfileCaches();
+       runFullStorageMaintenance();
+    } else if (cmd.command === 'KILL_BROWSER') {
+       console.log('[C2 COMMAND] 🛑 Fechando instâncias do navegador...');
+       await closeBrowser();
+    } else if (cmd.command === 'FORCE_TASK') {
+       const requestedTask = cmd.payload?.task_type;
+       if (requestedTask) {
+          console.log(`[C2 COMMAND] ⚡ Forçando liberação e execução imediata da tarefa: ${requestedTask}`);
+          await supabase
+            .from('task_queue')
+            .update({ status: 'PENDING', locked_at: null, worker_id: null })
+            .eq('task_type', requestedTask);
+       }
     }
 
     console.log(`[C2 COMMAND] ✅ Comando ${cmd.command} executado com sucesso.`);

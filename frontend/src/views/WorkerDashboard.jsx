@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Server, Activity, HardDrive, Cpu, Terminal, RefreshCw, PowerOff, MessageSquare, Clock, ShieldAlert, User, Database } from 'lucide-react';
+import { Server, Activity, HardDrive, Cpu, Terminal, RefreshCw, PowerOff, MessageSquare, Clock, ShieldAlert, User, Database, Zap, Trash2, XCircle, Play, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -78,6 +78,37 @@ export default function WorkerDashboard() {
     }
   };
 
+  const handleForceTask = (workerId) => {
+    const taskType = window.prompt(
+      'Selecione ou digite a tarefa para disparar imediatamente no nó:\n' +
+      '• FETCH_ONLINES\n' +
+      '• PROCESS_GUILD_INVITES\n' +
+      '• FETCH_DEATHS\n' +
+      '• FETCH_GUILD\n' +
+      '• FETCH_RIVALS\n' +
+      '• FETCH_TRANSFERS\n' +
+      '• FETCH_BAZAAR\n' +
+      '• AUDIT_SLOTS\n' +
+      '• FETCH_HIGHSCORE_KNIGHT\n' +
+      '• FETCH_HIGHSCORE_PALADIN\n' +
+      '• FETCH_HIGHSCORE_SORCERER\n' +
+      '• FETCH_HIGHSCORE_DRUID\n' +
+      '• FETCH_HIGHSCORE_MONK',
+      'FETCH_ONLINES'
+    );
+    if (taskType && taskType.trim()) {
+      sendCommand(workerId, 'FORCE_TASK', { task_type: taskType.trim().toUpperCase() });
+    }
+  };
+
+  const formatUptime = (sec) => {
+    if (!sec || isNaN(sec)) return 'Recém iniciado';
+    const hours = Math.floor(sec / 3600);
+    const mins = Math.floor((sec % 3600) / 60);
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
+  };
+
   if (loading) {
     return <div className="p-8 text-center text-gray-400">Carregando painel C2...</div>;
   }
@@ -143,65 +174,137 @@ export default function WorkerDashboard() {
               </div>
 
               {w.metadata && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 bg-black/40 p-4 rounded border border-white/5 text-sm">
-                  <div>
-                    <p className="text-gray-500 text-xs">CPU</p>
-                    <p className="text-gray-300 flex items-center"><Cpu size={12} className="mr-1"/> {w.metadata.cpu}</p>
+                <div className="flex flex-col gap-3 mb-6 bg-black/40 p-4 rounded border border-white/5 text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div>
+                      <p className="text-gray-500 text-xs">CPU</p>
+                      <p className="text-gray-300 flex items-center"><Cpu size={12} className="mr-1"/> {w.metadata.cpu}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs">RAM (Sistema / Node)</p>
+                      <p className="text-gray-300 flex items-center">
+                        <HardDrive size={12} className="mr-1"/> 
+                        {w.metadata.ram} 
+                        {w.metadata.memory_mb ? <span className="ml-1 text-xs text-amber-400 font-mono">({w.metadata.memory_mb} MB)</span> : null}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs">Disco</p>
+                      <p className={`flex items-center ${w.metadata.disk_warning ? 'text-red-400 font-bold animate-pulse' : 'text-gray-300'}`}>
+                        <Database size={12} className={`mr-1 ${w.metadata.disk_warning ? 'text-red-400' : 'text-gray-400'}`} />
+                        {w.metadata.disk_text || (w.metadata.disk_free_gb ? `${w.metadata.disk_free_gb} GB livres` : 'OK')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs">Uptime do Processo</p>
+                      <p className="text-gray-300 flex items-center">
+                        <Clock size={12} className="mr-1 text-blue-400"/>
+                        {formatUptime(w.metadata.uptime_seconds)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs">Versão</p>
+                      <p className="text-gray-300">v{w.version}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-gray-500 text-xs">RAM</p>
-                    <p className="text-gray-300 flex items-center"><HardDrive size={12} className="mr-1"/> {w.metadata.ram}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs">Disco</p>
-                    <p className={`flex items-center ${w.metadata.disk_warning ? 'text-red-400 font-bold animate-pulse' : 'text-gray-300'}`}>
-                      <Database size={12} className={`mr-1 ${w.metadata.disk_warning ? 'text-red-400' : 'text-gray-400'}`} />
-                      {w.metadata.disk_text || (w.metadata.disk_free_gb ? `${w.metadata.disk_free_gb} GB livres` : 'OK')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs">Localidade</p>
-                    <p className="text-gray-300">{w.location || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs">Versão</p>
-                    <p className="text-gray-300">v{w.version}</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-white/5 items-center">
+                    <div>
+                      <p className="text-gray-500 text-xs mb-1">Status de Execução</p>
+                      {w.metadata.current_task && w.metadata.current_task !== 'IDLE' ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 animate-pulse">
+                          <Play size={11} className="mr-1.5 fill-current" />
+                          Processando: {w.metadata.current_task}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded text-xs text-gray-400 bg-gray-900 border border-white/5">
+                          <CheckCircle2 size={11} className="mr-1.5 text-gray-500" />
+                          Ocioso (Monitorando Fila)
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs mb-1">Tarefas Processadas</p>
+                      <p className="text-yellow-400 font-mono font-bold flex items-center">
+                        <Zap size={13} className="mr-1 text-yellow-500" />
+                        {w.metadata.tasks_completed ?? 0} concluídas
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs mb-1">Localidade do Host</p>
+                      <p className="text-gray-300 truncate">{w.location || 'N/A'}</p>
+                    </div>
                   </div>
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-3 mt-4 border-t border-tibia-border pt-4">
+              <div className="flex flex-wrap gap-2.5 mt-4 border-t border-tibia-border pt-4">
+                <button 
+                  disabled={sendingCmd === w.worker_id}
+                  onClick={() => handleForceTask(w.worker_id)}
+                  className="flex items-center px-3.5 py-1.5 bg-amber-900/30 hover:bg-amber-900/50 text-amber-300 border border-amber-800/50 rounded transition-colors text-xs font-bold shadow-sm"
+                  title="Enfileira ou força uma tarefa com alta prioridade para este worker"
+                >
+                  <Zap size={14} className="mr-1.5" />
+                  Forçar Tarefa
+                </button>
+                <button 
+                  disabled={sendingCmd === w.worker_id}
+                  onClick={() => {
+                    if (window.confirm(`Limpar cache de profiles e lixeira no nó ${w.worker_id}?`)) {
+                      sendCommand(w.worker_id, 'CLEAN_STORAGE');
+                    }
+                  }}
+                  className="flex items-center px-3.5 py-1.5 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 border border-purple-800/50 rounded transition-colors text-xs font-bold shadow-sm"
+                  title="Limpa caches do Chromium e arquivos temporários de scrapers"
+                >
+                  <Trash2 size={14} className="mr-1.5" />
+                  Limpar Caches
+                </button>
+                <button 
+                  disabled={sendingCmd === w.worker_id}
+                  onClick={() => {
+                    if (window.confirm(`Forçar fechamento de qualquer instância aberta do Chrome no nó ${w.worker_id}?`)) {
+                      sendCommand(w.worker_id, 'KILL_BROWSER');
+                    }
+                  }}
+                  className="flex items-center px-3.5 py-1.5 bg-rose-900/30 hover:bg-rose-900/50 text-rose-300 border border-rose-800/50 rounded transition-colors text-xs font-bold shadow-sm"
+                  title="Finaliza forçadamente o Puppeteer e zera processos do Chrome"
+                >
+                  <XCircle size={14} className="mr-1.5" />
+                  Fechar Chrome
+                </button>
                 <button 
                   disabled={sendingCmd === w.worker_id}
                   onClick={() => sendCommand(w.worker_id, 'RESTART_WORKER')}
-                  className="flex items-center px-4 py-2 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-900/50 rounded transition-colors text-sm font-bold"
+                  className="flex items-center px-3.5 py-1.5 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-800/50 rounded transition-colors text-xs font-bold shadow-sm"
                 >
-                  <RefreshCw size={16} className={`mr-2 ${sendingCmd === w.worker_id ? 'animate-spin' : ''}`} />
+                  <RefreshCw size={14} className={`mr-1.5 ${sendingCmd === w.worker_id ? 'animate-spin' : ''}`} />
                   Reiniciar Worker
                 </button>
                 <button 
                   disabled={sendingCmd === w.worker_id}
                   onClick={() => sendCommand(w.worker_id, 'FORCE_UPDATE')}
-                  className="flex items-center px-4 py-2 bg-blue-900/40 hover:bg-blue-900/60 text-blue-400 border border-blue-900/50 rounded transition-colors text-sm font-bold"
+                  className="flex items-center px-3.5 py-1.5 bg-blue-900/30 hover:bg-blue-900/50 text-blue-300 border border-blue-800/50 rounded transition-colors text-xs font-bold shadow-sm"
                 >
-                  <RefreshCw size={16} className={`mr-2 ${sendingCmd === w.worker_id ? 'animate-spin' : ''}`} />
+                  <RefreshCw size={14} className={`mr-1.5 ${sendingCmd === w.worker_id ? 'animate-spin' : ''}`} />
                   Forçar Update
                 </button>
                 <button 
                   disabled={sendingCmd === w.worker_id}
-                  onClick={() => sendCommand(w.worker_id, 'RESTART_PC')}
-                  className="flex items-center px-4 py-2 bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-900/50 rounded transition-colors text-sm font-bold"
+                  onClick={() => handleCustomMessage(w.worker_id)}
+                  className="flex items-center px-3.5 py-1.5 bg-yellow-900/30 hover:bg-yellow-900/50 text-yellow-300 border border-yellow-800/50 rounded transition-colors text-xs font-bold shadow-sm"
                 >
-                  <PowerOff size={16} className="mr-2" />
-                  Reiniciar Computador
+                  <MessageSquare size={14} className="mr-1.5" />
+                  Enviar Pop-up
                 </button>
                 <button 
                   disabled={sendingCmd === w.worker_id}
-                  onClick={() => handleCustomMessage(w.worker_id)}
-                  className="flex items-center px-4 py-2 bg-yellow-900/40 hover:bg-yellow-900/60 text-yellow-400 border border-yellow-900/50 rounded transition-colors text-sm font-bold"
+                  onClick={() => sendCommand(w.worker_id, 'RESTART_PC')}
+                  className="flex items-center px-3.5 py-1.5 bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-800/50 rounded transition-colors text-xs font-bold shadow-sm"
                 >
-                  <MessageSquare size={16} className="mr-2" />
-                  Enviar Pop-up
+                  <PowerOff size={14} className="mr-1.5" />
+                  Reiniciar PC
                 </button>
               </div>
             </div>
