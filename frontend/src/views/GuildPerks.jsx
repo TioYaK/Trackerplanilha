@@ -6,11 +6,22 @@ import {
   XCircle, Coins, Users, Search, Copy, Check, FileText, 
   RefreshCw, Sliders, Calendar, Skull, UserCheck, UserX, AlertCircle, ArrowRight,
   Landmark, CheckSquare, Plus, Trash2, PieChart, Vote, DollarSign, TrendingUp, TrendingDown,
-  CheckCircle, Globe
+  CheckCircle, Globe, Zap, BookOpen
 } from 'lucide-react';
 
-import { WORLDS_CONFIG, WORLD_GUILD_MAP } from '../lib/guildPerksConfig';
-export { WORLDS_CONFIG, WORLD_GUILD_MAP };
+import { 
+  WORLDS_CONFIG, 
+  WORLD_GUILD_MAP, 
+  MARKET_EXCHANGE_RATE, 
+  convertRcToKk, 
+  convertKkToRc, 
+  calculateGoldPower,
+  ASCENSION_GENERAL_BONUSES,
+  ASCENSION_BESTIARY_RACES,
+  ASCENSION_ELEMENTS
+} from '../lib/guildPerksConfig';
+export { WORLDS_CONFIG, WORLD_GUILD_MAP, MARKET_EXCHANGE_RATE };
+
 
 
 export default function GuildPerks({ isPublic = false, isAdmin = false }) {
@@ -308,6 +319,7 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
 
     const rcBalance = Math.round((effectiveRcIn - totalRcOut) * 100) / 100;
     const kkBalance = Math.round((effectiveKkIn - totalKkOut) * 100) / 100;
+    const goldPowerKk = calculateGoldPower(rcBalance, kkBalance);
 
     return {
       totalRcIn: Math.round(totalRcIn * 100) / 100,
@@ -319,7 +331,8 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       totalRcOut: Math.round(totalRcOut * 100) / 100,
       totalKkOut: Math.round(totalKkOut * 100) / 100,
       rcBalance,
-      kkBalance
+      kkBalance,
+      goldPowerKk
     };
   }, [filteredPayments, filteredExpenses]);
 
@@ -1239,10 +1252,10 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
               <Users size={15} className="text-blue-400" />
             </p>
             <p className="text-2xl font-black text-white mt-1">
-              {activeMembers.length} <span className="text-sm font-normal text-gray-400">participantes</span>
+              {activeMembers.length} <span className="text-sm font-normal text-gray-400">/ +1k guilda</span>
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              {selectedWorld === 'ALL' ? 'Todas as guildas ativas' : `Guilda ${WORLD_GUILD_MAP[selectedWorld] || ''}`}
+              {selectedWorld === 'ALL' ? 'Grupo restrito de Perks' : `Cargo ativo em ${WORLD_GUILD_MAP[selectedWorld] || ''}`}
             </p>
           </div>
 
@@ -1255,8 +1268,10 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
             <p className="text-2xl font-black text-amber-400 mt-1">
               {settings.fee_amount} <span className="text-sm font-normal text-gray-300">{settings.fee_currency}</span>
             </p>
-            <p className="text-xs text-gray-400 mt-1">
-              {selectedWorld === 'ALL' ? 'Padrão por ciclo' : `Manutenção ${selectedWorld}`}
+            <p className="text-xs text-amber-300/80 mt-1 font-mono">
+              {settings.fee_currency === 'RC' 
+                ? `≈ ${(Number(settings.fee_amount || 50) * (2 / 25)).toFixed(1)} KK Gold (est.)` 
+                : `${selectedWorld === 'ALL' ? 'Padrão por ciclo' : `Manutenção ${selectedWorld}`}`}
             </p>
           </div>
 
@@ -1295,6 +1310,33 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
             <p className="text-[11px] text-gray-400 mt-1">
               {copiedBank ? <span className="text-green-400 font-semibold">Nome copiado!</span> : 'Destinatário das transferências'}
             </p>
+          </div>
+        </div>
+
+        {/* Card Informativo: Regras Oficiais do Guild Ascension (RubinOT Wiki) */}
+        <div className="mt-4 p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-black/50 to-blue-500/10 border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-start md:items-center gap-3">
+            <div className="p-2 rounded-lg bg-amber-500/20 text-yellow-400 border border-amber-500/30 flex-shrink-0 mt-0.5 md:mt-0">
+              <BookOpen size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">
+                  Diretriz da Guild Ascension
+                </span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                  RubinOT Wiki
+                </span>
+              </div>
+              <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                Todas as nossas guildas possuem <strong>+1.000 jogadores</strong>. O custo de cada Perk é <strong>multiplicado pelos membros elegíveis</strong> e novos membros exigem <strong>cobrir a diferença retroativa</strong> de etapas anteriores. Por isso, apenas quem contribui e caça recebe o cargo.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0 bg-black/80 px-3 py-1.5 rounded-lg border border-amber-500/30 text-xs">
+            <span className="text-gray-400">Cotação Média:</span>
+            <span className="font-mono font-bold text-yellow-400">25 RC ≈ 2.0 KK Gold</span>
+            <span className="text-[10px] text-gray-500 font-mono">(0.08 KK/RC)</span>
           </div>
         </div>
       </div>
@@ -1863,9 +1905,17 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                   + {financialStats.kkBalance.toLocaleString('pt-BR')} KK
                 </span>
               </div>
-              <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
-                <Shield size={13} className="text-amber-400" />
-                Fundo de reserva para as próximas perks
+              <div className="mt-2.5 pt-2 border-t border-amber-500/30 flex items-center justify-between text-xs">
+                <span className="text-amber-200/80 font-medium flex items-center gap-1">
+                  <Zap size={13} className="text-amber-400" />
+                  Poder de Compra Estimado:
+                </span>
+                <span className="font-extrabold text-yellow-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40">
+                  ≈ {financialStats.goldPowerKk.toLocaleString('pt-BR')} KK Gold
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1 text-right font-mono">
+                (Base de mercado: 25 RC ≈ 2 KK de Gold)
               </p>
             </div>
           </div>
@@ -2779,6 +2829,37 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                       </div>
                     </div>
 
+                    {/* Atalho com Cotação Média de Mercado (25 RC ≈ 2 KK) */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-1">
+                      <span className="text-[11px] text-gray-400">
+                        Cotação de Mercado: <strong className="text-yellow-400">25 RC ≈ 2.0 KK</strong> (0.08 KK/RC)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const amt = parseFloat(expenseForm.amount);
+                          if (!amt || isNaN(amt)) return;
+                          if (expenseForm.currency === 'RC') {
+                            setExpenseForm(prev => ({
+                              ...prev,
+                              converted_currency: 'KK',
+                              converted_amount: (amt * (2.0 / 25)).toFixed(2)
+                            }));
+                          } else {
+                            setExpenseForm(prev => ({
+                              ...prev,
+                              converted_currency: 'RC',
+                              converted_amount: Math.round(amt * (25 / 2.0)).toString()
+                            }));
+                          }
+                        }}
+                        className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded text-[11px] font-bold flex items-center justify-center gap-1 transition-all"
+                      >
+                        <Zap size={12} className="text-yellow-400" />
+                        <span>Aplicar Média ({expenseForm.currency === 'RC' ? '25 RC = 2 KK' : '2 KK = 25 RC'})</span>
+                      </button>
+                    </div>
+
                     {expenseForm.amount && expenseForm.converted_amount && Number(expenseForm.amount) > 0 && Number(expenseForm.converted_amount) > 0 && (
                       <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center justify-between">
                         <span>Taxa Efetiva de Câmbio:</span>
@@ -2852,6 +2933,79 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Presets Rápidos Oficiais da Wiki RubinOT */}
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 space-y-2">
+                <span className="text-[11px] font-bold text-amber-300 uppercase flex items-center gap-1.5">
+                  <BookOpen size={13} className="text-amber-400" />
+                  Preenchimento Rápido com Dados da Wiki:
+                </span>
+                <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPollForm(prev => ({
+                        ...prev,
+                        title: 'Qual General Bonus devemos priorizar no próximo ciclo?',
+                        description: 'Votação oficial para os slots de bônus gerais (Guild Ascension).',
+                        options: ASCENSION_GENERAL_BONUSES.map(b => b.title)
+                      }));
+                    }}
+                    className="p-2 rounded bg-black/70 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 hover:border-amber-500/60 font-semibold text-left transition-all flex items-center gap-1.5"
+                  >
+                    <span>⭐</span>
+                    <span className="truncate">10 General Bonuses</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPollForm(prev => ({
+                        ...prev,
+                        title: 'Qual Dano Elemental (Slot 5) devemos focar?',
+                        description: 'Votação para o slot de Elemental Damage no RubinOT (afeta criaturas, bosses e PvP).',
+                        options: ASCENSION_ELEMENTS.map(el => `${el} Damage`)
+                      }));
+                    }}
+                    className="p-2 rounded bg-black/70 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 hover:border-amber-500/60 font-semibold text-left transition-all flex items-center gap-1.5"
+                  >
+                    <span>⚔️</span>
+                    <span className="truncate">7 Danos Elementais</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPollForm(prev => ({
+                        ...prev,
+                        title: 'Qual Defesa Elemental (Slot 6) devemos priorizar?',
+                        description: 'Votação para o slot de Elemental Defense no RubinOT (proteção PvE e PvP).',
+                        options: ASCENSION_ELEMENTS.map(el => `${el} Defense`)
+                      }));
+                    }}
+                    className="p-2 rounded bg-black/70 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 hover:border-amber-500/60 font-semibold text-left transition-all flex items-center gap-1.5"
+                  >
+                    <span>🛡️</span>
+                    <span className="truncate">7 Defesas Elementais</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPollForm(prev => ({
+                        ...prev,
+                        title: 'Qual Raça do Bestiary (Slot 4) devemos focar?',
+                        description: 'Votação para o slot de Race Damage (aumenta o dano contra criaturas daquela raça).',
+                        options: ['Dragon', 'Demon', 'Undead', 'Construct', 'Extra Dimensional', 'Giant', 'Humanoid']
+                      }));
+                    }}
+                    className="p-2 rounded bg-black/70 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 hover:border-amber-500/60 font-semibold text-left transition-all flex items-center gap-1.5"
+                  >
+                    <span>🐉</span>
+                    <span className="truncate">Top Raças Bestiary</span>
+                  </button>
+                </div>
               </div>
 
               <div>
