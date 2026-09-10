@@ -4,6 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
+
 
 /**
  * Localizador Universal de Navegadores (Cross-Platform).
@@ -220,6 +222,36 @@ export function cleanStaleLocks(dirPath) {
   }
 }
 
+/**
+ * Oculta completamente a janela de processos nativos do Chromium no Windows Desktop Manager.
+ * Remove a janela do Alt+Tab e da barra de tarefas, evitando incômodo visual ao usuário.
+ */
+export function hideProcessWindow(pid) {
+  if (process.platform !== 'win32' || !pid) return;
+  const psCmd = `
+    Add-Type -TypeDefinition @"
+    using System;
+    using System.Runtime.InteropServices;
+    public class WinHider {
+        [DllImport("user32.dll")]
+        public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+    }
+"@
+    for ($i = 0; $i -lt 12; $i++) {
+        $p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
+        if ($p -and $p.MainWindowHandle -ne [IntPtr]::Zero) {
+            [WinHider]::ShowWindowAsync($p.MainWindowHandle, 0)
+            break
+        }
+        Start-Sleep -Milliseconds 100
+    }
+  `;
+  try {
+    exec(`powershell -NoProfile -NonInteractive -Command "${psCmd.replace(/\r?\n/g, ' ')}"`, () => {});
+  } catch {}
+}
+
+
 
 /**
  * Analisa a saúde do disco em tempo real via fs.statfsSync nativo do Node.js.
@@ -286,8 +318,12 @@ export function getLeanChromeArgs(extraArgs = []) {
     '--aggressive-cache-discard',
     '--no-default-browser-check',
     '--no-first-run',
+    '--window-position=-32000,-32000',
+    '--disable-notifications',
+    '--mute-audio',
     ...extraArgs
   ];
+
 }
 
 /**

@@ -5,7 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import puppeteer from 'rebrowser-puppeteer';
 import * as cheerio from 'cheerio';
-import { findUniversalChrome, getLeanChromeArgs, cleanStaleLocks } from './storageGuardian.js';
+import { findUniversalChrome, getLeanChromeArgs, cleanStaleLocks, hideProcessWindow } from './storageGuardian.js';
+
 
 // ─── Estado do browser ────────────────────────────────────────────────────────
 let globalBrowser  = null;
@@ -132,7 +133,11 @@ async function initBrowser() {
     if (chromeExe) launchOpts.executablePath = chromeExe;
 
     globalBrowser = await puppeteer.launch(launchOpts);
+    const scraperPid = globalBrowser.process()?.pid;
+    if (scraperPid) hideProcessWindow(scraperPid);
+
     globalBrowser.on('disconnected', () => {
+
         console.log('[Scraper] Browser desconectado. Limpando estado...');
         globalBrowser  = null;
         guildPage      = null;

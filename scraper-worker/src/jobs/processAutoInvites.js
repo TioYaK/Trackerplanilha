@@ -8,7 +8,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
 import { updateSheetRow } from '../lib/googleSheets.js';
-import { findUniversalChrome, getLeanChromeArgs, getDebugScreenshotPath, cleanStaleLocks } from '../lib/storageGuardian.js';
+import { findUniversalChrome, getLeanChromeArgs, getDebugScreenshotPath, cleanStaleLocks, hideProcessWindow } from '../lib/storageGuardian.js';
+
 
 async function updateSheetIfApplicable(invite, updates) {
   if (invite.requested_by && invite.requested_by.includes('Linha')) {
@@ -301,22 +302,27 @@ export async function runProcessAutoInvites() {
       const profilePath = ensureProfile(world);
       cleanStaleLocks(profilePath);
 
-      console.log(`[PUPPETEER] Abrindo navegador para ${world}...`);
+      console.log(`[PUPPETEER] Abrindo navegador silencioso em segundo plano para ${world}...`);
       const browser = await puppeteer.launch({
         headless: false, // Necessário para passar no Cloudflare Turnstile
         executablePath: chromeExe || undefined,
         userDataDir: profilePath,
         args: getLeanChromeArgs([
           '--window-size=1280,800',
-          '--window-position=9999,9999', // Empurra a janela pra fora da tela visível
+          '--window-position=-32000,-32000',
           '--exclude-switches=enable-automation'
         ]),
         ignoreDefaultArgs: ['--enable-automation'],
       });
 
+      const browserPid = browser.process()?.pid;
+      if (browserPid) hideProcessWindow(browserPid);
+
       try {
-        const page = await browser.newPage();
+        const pages = await browser.pages();
+        const page = pages.length > 0 ? pages[0] : await browser.newPage();
         await page.setViewport({ width: 1280, height: 800 });
+
         
         // Login no RubinOT
         console.log(`[AutoInvite] 🔑 Efetuando login no RubinOT (${world}) com a conta: ${leaderAcc.account_name}...`);
