@@ -424,7 +424,7 @@ export async function runProcessAutoInvites() {
  */
 async function loginRubinot(page, accountName, password) {
     try {
-      await page.goto('https://rubinot.com.br/login', { waitUntil: 'domcontentloaded', timeout: 25000 }).catch(e =>
+      await page.goto('https://rubinot.com.br/login', { waitUntil: 'networkidle2', timeout: 30000 }).catch(e =>
         console.error('[AutoInvite] Aviso de timeout no /login, prosseguindo...'));
 
       // Verificar se o site está em manutenção
@@ -434,7 +434,6 @@ async function loginRubinot(page, accountName, password) {
         console.warn('[AutoInvite] 🔧 Site em manutenção! Pausando processamento...');
         return 'MAINTENANCE';
       }
-
 
       // Verificar se já está logado (o perfil do Chrome pode ter a sessão salva)
       const alreadyLoggedIn = contentAfterNav.includes('Minha Conta') || contentAfterNav.includes('>Sair<') || contentAfterNav.includes('Logado como');
@@ -447,7 +446,7 @@ async function loginRubinot(page, accountName, password) {
       const emailSelector = 'input[type="email"], input[name="email"], input[id="email"]';
       const passSelector = 'input[type="password"], input[name="password"], input[id="password"]';
       
-      const foundEmail = await page.waitForSelector(emailSelector, { visible: true, timeout: 8000 }).catch(() => null);
+      const foundEmail = await page.waitForSelector(emailSelector, { visible: true, timeout: 15000 }).catch(() => null);
 
       if (page.url().includes('/maintenance')) {
         console.warn('[AutoInvite] 🔧 Site em manutenção detectado durante o carregamento!');
