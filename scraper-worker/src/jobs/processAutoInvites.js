@@ -305,12 +305,11 @@ export async function runProcessAutoInvites() {
 
       console.log(`[PUPPETEER] Abrindo navegador silencioso em segundo plano para ${world}...`);
       const browser = await puppeteer.launch({
-        headless: false, // Necessário para passar no Cloudflare Turnstile
+        headless: 'new', // 100% silencioso e invisível: sem janela física e sem ícone na barra de tarefas
         executablePath: chromeExe || undefined,
         userDataDir: profilePath,
         args: getLeanChromeArgs([
           '--window-size=1280,800',
-          '--window-position=-32000,-32000',
           '--exclude-switches=enable-automation'
         ]),
         ignoreDefaultArgs: ['--enable-automation'],
@@ -456,11 +455,19 @@ async function loginRubinot(page, accountName, password) {
       }
 
       if (foundEmail) {
+        // Fechar banner de cookies se existir para não cobrir elementos
+        try {
+          const cookieBtn = await page.$('button ::-p-text("Apenas Essenciais")') || 
+                            await page.$('button ::-p-text("Aceitar Todos")') ||
+                            await page.$('button ::-p-text("Aceitar")');
+          if (cookieBtn) await cookieBtn.click().catch(() => {});
+        } catch {}
+
         await new Promise(r => setTimeout(r, 600));
         await page.click(emailSelector, { clickCount: 3 });
-        await page.type(emailSelector, accountName, { delay: 50 });
+        await page.type(emailSelector, accountName, { delay: 40 });
         await page.click(passSelector, { clickCount: 3 });
-        await page.type(passSelector, password, { delay: 50 });
+        await page.type(passSelector, password, { delay: 40 });
         await new Promise(r => setTimeout(r, 500));
 
         await page.evaluate(() => {
@@ -469,8 +476,32 @@ async function loginRubinot(page, accountName, password) {
           if (btn) btn.click();
         });
 
-        await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
-        await new Promise(r => setTimeout(r, 2000));
+        // Esperar resolução do Cloudflare Turnstile ou navegação pós-login (até 15s)
+        for (let i = 0; i < 15; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+
+          const tsFrame = page.frames().find(f => f.url().includes('challenges.cloudflare.com') || f.url().includes('turnstile'));
+          if (tsFrame) {
+            try {
+              const checkbox = await tsFrame.$('input[type="checkbox"]');
+              if (checkbox) {
+                await checkbox.click();
+              } else {
+                const body = await tsFrame.$('body');
+                if (body) await body.click();
+              }
+            } catch (e) {}
+          }
+
+          const curUrl = page.url();
+          if (curUrl.includes('/account') || curUrl.includes('/my-account')) break;
+
+          const content = await page.content().catch(() => '');
+          if (content.includes('Minha Conta') || content.includes('>Sair<') || content.includes('Logado como')) break;
+          if (curUrl.includes('/maintenance') || content.includes('Maintenance Mode')) break;
+        }
+
+        await new Promise(r => setTimeout(r, 1500));
       } else {
         const curUrl = page.url();
         const content = await page.content().catch(() => '');

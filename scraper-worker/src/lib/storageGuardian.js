@@ -10,10 +10,25 @@ import { fileURLToPath } from 'url';
 /**
  * Localizador Universal de Navegadores (Cross-Platform).
  * Funciona em Windows, Linux e macOS, procurando instalações de sistema ou usuário.
+ * NUNCA utiliza o Microsoft Edge para não interferir com o navegador pessoal do usuário.
  */
 export function findUniversalChrome() {
   if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
     return process.env.CHROME_PATH;
+  }
+
+  // 1. Prioriza o Chromium isolado do Puppeteer (totalmente independente do sistema)
+  const puppeteerDir = path.join(os.homedir(), '.cache', 'puppeteer', 'chrome');
+  if (fs.existsSync(puppeteerDir)) {
+    try {
+      const versions = fs.readdirSync(puppeteerDir);
+      for (const ver of versions) {
+        const candidateWin = path.join(puppeteerDir, ver, 'chrome-win64', 'chrome.exe');
+        if (fs.existsSync(candidateWin)) return candidateWin;
+        const candidateLinux = path.join(puppeteerDir, ver, 'chrome-linux64', 'chrome');
+        if (fs.existsSync(candidateLinux)) return candidateLinux;
+      }
+    } catch {}
   }
 
   const isWin = process.platform === 'win32';
@@ -25,11 +40,6 @@ export function findUniversalChrome() {
     isWin && 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     isWin && 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     isWin && process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Google\\Chrome\\Application\\chrome.exe'),
-    
-    // Windows - Microsoft Edge (Padrão em quase todo Windows 10/11)
-    isWin && 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    isWin && 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    isWin && process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Microsoft\\Edge\\Application\\msedge.exe'),
 
     // Windows - Brave Browser
     isWin && 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
@@ -44,7 +54,6 @@ export function findUniversalChrome() {
 
     // macOS
     isMac && '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    isMac && '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     isMac && '/Applications/Chromium.app/Contents/MacOS/Chromium',
     isMac && '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
   ].filter(Boolean);
