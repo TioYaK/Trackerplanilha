@@ -102,8 +102,20 @@ export default function InviteRequest({ isPublic = false }) {
   const getStatusBadge = (status, msg) => {
     if (status === 'SUCCESS') return <span className="px-2 py-1 bg-green-900/30 text-green-400 border border-green-500/50 rounded text-xs">Sucesso</span>;
     if (status === 'FAILED') return <span className="px-2 py-1 bg-red-900/30 text-red-400 border border-red-500/50 rounded text-xs" title={msg}>Falha</span>;
+    if (status === 'IN_PROGRESS') return <span className="px-2 py-1 bg-cyan-900/30 text-cyan-400 border border-cyan-500/50 rounded text-xs animate-pulse">Processando</span>;
     return <span className="px-2 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-500/50 rounded text-xs">Pendente</span>;
   };
+
+  const getDetailsText = (inv) => {
+    if (inv.status === 'SUCCESS') return 'Convite enviado';
+    if (inv.status === 'IN_PROGRESS') return 'Enviando convite...';
+    if (inv.status === 'PENDING') {
+      if (inv.world === 'Malveria') return 'Em breve...';
+      return inv.error_message || 'Na fila...';
+    }
+    return inv.error_message || 'Falha ao convidar';
+  };
+
 
   const filteredInvites = recentInvites.filter(inv => {
     const matchName = (inv.character_name || '').toLowerCase().includes((searchTerm || '').toLowerCase());
@@ -236,21 +248,23 @@ export default function InviteRequest({ isPublic = false }) {
                     </td>
                   )}
                   <td className="py-2 px-4">{getStatusBadge(inv.status, inv.error_message)}</td>
-                  <td className="py-2 px-4 text-xs text-gray-400 max-w-[200px] truncate" title={inv.error_message || ''}>
-                    {inv.status === 'PENDING' ? (inv.world === 'Malveria' ? 'Em breve...' : 'Na fila...') : inv.status === 'SUCCESS' ? '—' : inv.error_message || 'OK'}
+                  <td className="py-2 px-4 text-xs text-gray-400 max-w-[200px] truncate" title={inv.error_message || getDetailsText(inv)}>
+                    {getDetailsText(inv)}
                   </td>
                   {!isPublic && (
                     <td className="py-2 px-4 text-center">
-                      {inv.status === 'FAILED' && (
+                      {inv.status !== 'SUCCESS' && (
                         <button
                           onClick={() => handleRetry(inv.id)}
                           className="bg-[#141414] hover:bg-tibia-primary hover:text-black border border-tibia-border rounded px-2 py-1 text-xs transition-colors"
+                          title="Reprocessar convite"
                         >
                           🔄 Reprocessar
                         </button>
                       )}
                     </td>
                   )}
+
                 </tr>
               ))}
             </tbody>

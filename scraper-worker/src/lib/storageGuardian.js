@@ -211,7 +211,7 @@ export function cleanWorkerProfileCaches() {
  */
 export function cleanStaleLocks(dirPath) {
   if (!dirPath || !fs.existsSync(dirPath)) return;
-  const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+  const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket', 'lockfile'];
   for (const lf of lockFiles) {
     const lPath = path.join(dirPath, lf);
     if (fs.existsSync(lPath)) {
@@ -219,6 +219,7 @@ export function cleanStaleLocks(dirPath) {
     }
   }
 }
+
 
 /**
  * Analisa a saúde do disco em tempo real via fs.statfsSync nativo do Node.js.

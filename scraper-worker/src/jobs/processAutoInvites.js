@@ -256,18 +256,7 @@ export async function runProcessAutoInvites() {
 
     console.log(`[AutoInvite] 📋 Encontrados ${pendingInvites.length} convites para processar.`);
 
-    // 2. Marcar como IN_PROGRESS e limpar mensagens de erro antigas
-    const inviteIds = pendingInvites.map(i => i.id);
-    await supabase
-      .from('guild_invites_queue')
-      .update({ status: 'IN_PROGRESS', error_message: null, updated_at: new Date().toISOString() })
-      .in('id', inviteIds);
-
-    for (const inv of pendingInvites) {
-      await updateSheetIfApplicable(inv, { statusD: 'Processando', workerE: `Worker-${inv.world || 'Auto'}` });
-    }
-
-    // 3. Agrupar por Mundo/Servidor
+    // 2. Agrupar por Mundo/Servidor
     const invitesByWorld = {};
     for (const invite of pendingInvites) {
       const worldKey = (invite.world || 'Auroria').trim();
@@ -275,10 +264,9 @@ export async function runProcessAutoInvites() {
       invitesByWorld[worldKey].push(invite);
     }
 
-    // 4. Inicializar o browser
+    // 3. Processar cada mundo isoladamente
     const chromeExe = findUniversalChrome();
     
-    // Configuração base (agora mudou para instanciar dentro do loop de mundos)
     for (const [world, invites] of Object.entries(invitesByWorld)) {
       console.log(`\n[AutoInvite] 🌐 Iniciando lote para o mundo: ${world} (${invites.length} convites)`);
 
@@ -310,21 +298,21 @@ export async function runProcessAutoInvites() {
         continue;
       }
 
-        const profilePath = ensureProfile(world);
-        cleanStaleLocks(profilePath);
+      const profilePath = ensureProfile(world);
+      cleanStaleLocks(profilePath);
 
-        console.log(`[PUPPETEER] Abrindo navegador para ${world}...`);
-        const browser = await puppeteer.launch({
-          headless: false, // Necessário para passar no Cloudflare Turnstile
-          executablePath: chromeExe || undefined,
-          userDataDir: profilePath,
-          args: getLeanChromeArgs([
-            '--window-size=1280,800',
-            '--window-position=9999,9999', // Empurra a janela pra fora da tela visível
-            '--exclude-switches=enable-automation'
-          ]),
-          ignoreDefaultArgs: ['--enable-automation'],
-        });
+      console.log(`[PUPPETEER] Abrindo navegador para ${world}...`);
+      const browser = await puppeteer.launch({
+        headless: false, // Necessário para passar no Cloudflare Turnstile
+        executablePath: chromeExe || undefined,
+        userDataDir: profilePath,
+        args: getLeanChromeArgs([
+          '--window-size=1280,800',
+          '--window-position=9999,9999', // Empurra a janela pra fora da tela visível
+          '--exclude-switches=enable-automation'
+        ]),
+        ignoreDefaultArgs: ['--enable-automation'],
+      });
 
       try {
         const page = await browser.newPage();
@@ -337,10 +325,10 @@ export async function runProcessAutoInvites() {
         if (loggedIn === 'MAINTENANCE') {
           console.warn('[AutoInvite] 🔧 RubinOT em manutenção. Revertendo lote e aguardando o site voltar...');
           await browser.close().catch(() => {});
-          const currentWorldInviteIds = invites.map(i => i.id);
+          const allPendingIds = pendingInvites.map(i => i.id);
           await supabase.from('guild_invites_queue')
-            .update({ status: 'PENDING', error_message: 'Site em manutenção', updated_at: new Date().toISOString() })
-            .in('id', currentWorldInviteIds);
+            .update({ status: 'PENDING', error_message: 'Site em manutenção (RubinOT)', updated_at: new Date().toISOString() })
+            .in('id', allPendingIds);
           releaseLock();
           return; // Para tudo
         }
@@ -358,6 +346,18 @@ export async function runProcessAutoInvites() {
           await browser.close().catch(() => {});
           continue; // Pula para o próximo mundo
         }
+
+        // Marcar apenas os convites deste mundo como IN_PROGRESS
+        const currentWorldInviteIds = invites.map(i => i.id);
+        await supabase
+          .from('guild_invites_queue')
+          .update({ status: 'IN_PROGRESS', error_message: null, updated_at: new Date().toISOString() })
+          .in('id', currentWorldInviteIds);
+
+        for (const inv of invites) {
+          await updateSheetIfApplicable(inv, { statusD: 'Processando', workerE: `Worker-${inv.world || 'Auto'}` });
+        }
+
 
         // Processar cada convite deste mundo
         for (const invite of invites) {
@@ -420,15 +420,17 @@ export async function runProcessAutoInvites() {
  */
 async function loginRubinot(page, accountName, password) {
     try {
-      await page.goto('https://rubinot.com.br/login', { waitUntil: 'networkidle2', timeout: 30000 }).catch(e =>
+      await page.goto('https://rubinot.com.br/login', { waitUntil: 'domcontentloaded', timeout: 25000 }).catch(e =>
         console.error('[AutoInvite] Aviso de timeout no /login, prosseguindo...'));
 
       // Verificar se o site está em manutenção
+      const currentUrl = page.url();
       const contentAfterNav = await page.content();
-      if (contentAfterNav.includes('Maintenance Mode') || contentAfterNav.includes('Server is under maintenance') || contentAfterNav.includes("We'll Be Right Back")) {
+      if (currentUrl.includes('/maintenance') || contentAfterNav.includes('Maintenance Mode') || contentAfterNav.includes('Server is under maintenance') || contentAfterNav.includes("We'll Be Right Back")) {
         console.warn('[AutoInvite] 🔧 Site em manutenção! Pausando processamento...');
         return 'MAINTENANCE';
       }
+
 
       // Verificar se já está logado (o perfil do Chrome pode ter a sessão salva)
       const alreadyLoggedIn = contentAfterNav.includes('Minha Conta') || contentAfterNav.includes('>Sair<') || contentAfterNav.includes('Logado como');
