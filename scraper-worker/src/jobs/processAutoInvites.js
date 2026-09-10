@@ -441,16 +441,21 @@ async function loginRubinot(page, accountName, password) {
 
       // Esperar o campo de email aparecer (React pode demorar a montar)
       const emailSelector = 'input[type="email"], input[name="email"], input[id="email"]';
-      await page.waitForSelector(emailSelector, { timeout: 8000 }).catch(() => {});
+      const passSelector = 'input[type="password"], input[name="password"], input[id="password"]';
+      
+      const foundEmail = await page.waitForSelector(emailSelector, { visible: true, timeout: 8000 }).catch(() => null);
 
-      const emailInput = await page.$(emailSelector);
-      const passInput  = await page.$('input[type="password"], input[name="password"], input[id="password"]');
+      if (page.url().includes('/maintenance')) {
+        console.warn('[AutoInvite] 🔧 Site em manutenção detectado durante o carregamento!');
+        return 'MAINTENANCE';
+      }
 
-      if (emailInput && passInput) {
-        await emailInput.click({ clickCount: 3 });
-        await emailInput.type(accountName, { delay: 60 });
-        await passInput.click({ clickCount: 3 });
-        await passInput.type(password, { delay: 60 });
+      if (foundEmail) {
+        await new Promise(r => setTimeout(r, 600));
+        await page.click(emailSelector, { clickCount: 3 });
+        await page.type(emailSelector, accountName, { delay: 50 });
+        await page.click(passSelector, { clickCount: 3 });
+        await page.type(passSelector, password, { delay: 50 });
         await new Promise(r => setTimeout(r, 500));
 
         await page.evaluate(() => {
@@ -462,6 +467,12 @@ async function loginRubinot(page, accountName, password) {
         await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
         await new Promise(r => setTimeout(r, 2000));
       } else {
+        const curUrl = page.url();
+        const content = await page.content().catch(() => '');
+        if (curUrl.includes('/maintenance') || content.includes('Maintenance Mode') || content.includes('Server is under maintenance') || content.includes("We'll Be Right Back")) {
+          console.warn('[AutoInvite] 🔧 Site em manutenção detectado (redirecionado de /login)!');
+          return 'MAINTENANCE';
+        }
         console.error(`[AutoInvite] ⚠️ Campos de login não encontrados para ${accountName}. Tentando screenshot...`);
         await page.screenshot({ path: getDebugScreenshotPath('debug_login_form.png') }).catch(() => {});
         return false;
@@ -469,6 +480,11 @@ async function loginRubinot(page, accountName, password) {
 
       // Verificar se está logado após submeter
       const pageContent = await page.content();
+      if (page.url().includes('/maintenance') || pageContent.includes('Maintenance Mode')) {
+        console.warn('[AutoInvite] 🔧 Site em manutenção detectado após submissão!');
+        return 'MAINTENANCE';
+      }
+
       const isLoggedIn = pageContent.includes('Minha Conta') || pageContent.includes('>Sair<') || pageContent.includes('Logado como');
 
       if (!isLoggedIn) {
@@ -480,9 +496,16 @@ async function loginRubinot(page, accountName, password) {
       console.log(`[AutoInvite] ✅ Login confirmado para ${accountName}.`);
       return true;
     } catch (err) {
+      const curUrl = page.url();
+      const content = await page.content().catch(() => '');
+      if (curUrl.includes('/maintenance') || content.includes('Maintenance Mode') || content.includes('Server is under maintenance') || content.includes("We'll Be Right Back")) {
+        console.warn('[AutoInvite] 🔧 Site em manutenção detectado durante erro de navegação!');
+        return 'MAINTENANCE';
+      }
       console.error('[AutoInvite] Erro durante o login:', err.message);
       return false;
     }
+
   }
 
 /**
