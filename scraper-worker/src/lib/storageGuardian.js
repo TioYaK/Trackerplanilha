@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
-import { exec } from 'child_process';
+
 
 
 /**
@@ -222,34 +222,6 @@ export function cleanStaleLocks(dirPath) {
   }
 }
 
-/**
- * Oculta completamente a janela de processos nativos do Chromium no Windows Desktop Manager.
- * Remove a janela do Alt+Tab e da barra de tarefas, evitando incômodo visual ao usuário.
- */
-export function hideProcessWindow(pid) {
-  if (process.platform !== 'win32' || !pid) return;
-  const psCmd = `
-    Add-Type -TypeDefinition @"
-    using System;
-    using System.Runtime.InteropServices;
-    public class WinHider {
-        [DllImport("user32.dll")]
-        public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
-    }
-"@
-    for ($i = 0; $i -lt 12; $i++) {
-        $p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
-        if ($p -and $p.MainWindowHandle -ne [IntPtr]::Zero) {
-            [WinHider]::ShowWindowAsync($p.MainWindowHandle, 0)
-            break
-        }
-        Start-Sleep -Milliseconds 100
-    }
-  `;
-  try {
-    exec(`powershell -NoProfile -NonInteractive -Command "${psCmd.replace(/\r?\n/g, ' ')}"`, () => {});
-  } catch {}
-}
 
 
 

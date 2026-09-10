@@ -8,7 +8,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
 import { updateSheetRow } from '../lib/googleSheets.js';
-import { findUniversalChrome, getLeanChromeArgs, getDebugScreenshotPath, cleanStaleLocks, hideProcessWindow } from '../lib/storageGuardian.js';
+import { findUniversalChrome, getLeanChromeArgs, getDebugScreenshotPath, cleanStaleLocks } from '../lib/storageGuardian.js';
+
 
 
 async function updateSheetIfApplicable(invite, updates) {
@@ -315,11 +316,9 @@ export async function runProcessAutoInvites() {
         ignoreDefaultArgs: ['--enable-automation'],
       });
 
-      const browserPid = browser.process()?.pid;
-      if (browserPid) hideProcessWindow(browserPid);
-
       try {
         const pages = await browser.pages();
+
         const page = pages.length > 0 ? pages[0] : await browser.newPage();
         await page.setViewport({ width: 1280, height: 800 });
 
