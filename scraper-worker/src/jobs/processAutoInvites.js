@@ -446,11 +446,26 @@ async function loginRubinot(page, accountName, password) {
       const emailSelector = 'input[type="email"], input[name="email"], input[id="email"]';
       const passSelector = 'input[type="password"], input[name="password"], input[id="password"]';
       
-      const foundEmail = await page.waitForSelector(emailSelector, { visible: true, timeout: 15000 }).catch(() => null);
+      let foundEmail = await page.waitForSelector(emailSelector, { visible: true, timeout: 8000 }).catch(() => null);
 
-      if (page.url().includes('/maintenance')) {
-        console.warn('[AutoInvite] 🔧 Site em manutenção detectado durante o carregamento!');
-        return 'MAINTENANCE';
+      if (!foundEmail) {
+        // Se não achou o email de imediato, pode ser tela de verificação humana do Cloudflare
+        for (let i = 0; i < 8; i++) {
+          const tsFrame = page.frames().find(f => f.url().includes('challenges.cloudflare.com') || f.url().includes('turnstile'));
+          if (tsFrame) {
+            try {
+              const checkbox = await tsFrame.$('input[type="checkbox"]');
+              if (checkbox) await checkbox.click();
+              else {
+                const body = await tsFrame.$('body');
+                if (body) await body.click();
+              }
+            } catch {}
+          }
+          await new Promise(r => setTimeout(r, 1500));
+          foundEmail = await page.$(emailSelector);
+          if (foundEmail) break;
+        }
       }
 
       if (foundEmail) {
