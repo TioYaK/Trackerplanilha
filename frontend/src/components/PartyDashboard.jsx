@@ -80,25 +80,21 @@ export default function PartyDashboard({ party, onPlayerClick }) {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
-      let durationText = '';
-      if (data.startRaw && data.endRaw) {
-        const start = parseUtcDate(data.startRaw);
-        const end = parseUtcDate(data.endRaw);
-        if (start && end) {
-          const dMins = Math.max(1, Math.round((end - start) / 60000));
-          const hours = Math.floor(dMins / 60);
-          const mins = dMins % 60;
-          durationText = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
-        }
-      }
+      const durationText = data.coreDurationText || '';
       return (
         <div className="bg-gray-900 border border-tibia-border p-3 rounded shadow-lg text-sm">
           <p className="font-bold text-tibia-primary mb-1">{label}</p>
           <p className="text-gray-300">XP Total: <span className="text-green-400 font-bold">+{formatXp(data.totalXp)}</span></p>
+          {data.formattedCoreXpHour && (
+            <p className="text-amber-400 font-bold text-xs mt-0.5">ΔXP/h Respawn: {data.formattedCoreXpHour}</p>
+          )}
           {data.singlePing ? (
              <p className="text-blue-400 mt-1"><Clock size={12} className="inline mr-1" /> Ping Isolado: {data.start}</p>
           ) : (
              <p className="text-blue-400 mt-1"><Clock size={12} className="inline mr-1" /> Horário: {data.start} - {data.end} {durationText && `(${durationText})`}</p>
+          )}
+          {data.hasExtendedActivity && (
+            <p className="text-[11px] text-gray-400 mt-0.5">Atividade geral (c/ bosses): {data.fullRange}</p>
           )}
           <p className="text-[10px] text-amber-400/80 mt-1.5 italic">Clique para auditar esta hunt</p>
         </div>
@@ -266,11 +262,90 @@ export default function PartyDashboard({ party, onPlayerClick }) {
       .sort((a, b) => a.rawDate - b.rawDate)
       .map(h => {
          const diffMins = Math.max(1, (h.end - h.start) / (1000 * 60));
+         const fullStartStr = formatTime(h.start);
+         const fullEndStr = formatTime(h.end);
+         const fullDurationHours = Math.max(0.1, (h.end - h.start) / (1000 * 3600));
+         const fullXpHour = Math.round(h.totalXp / fullDurationHours);
+
+         let coreStart = fullStartStr;
+         let coreEnd = fullEndStr;
+         let coreDurationHours = fullDurationHours;
+         let hasExtendedActivity = false;
+         let hasPreActivity = false;
+         let hasPostActivity = false;
+         let preMinutes = 0;
+         let postMinutes = 0;
+
+         if (party.slot_start && party.slot_end) {
+           const slotStartStr = party.slot_start.slice(0, 5);
+           const slotEndStr = party.slot_end.slice(0, 5);
+           const sM = toMinutes(party.slot_start);
+           let eM = toMinutes(party.slot_end);
+           if (eM <= sM) eM += 1440;
+           const slotDurationHours = (eM - sM) / 60;
+
+           const startBrt = new Date(h.start.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+           const endBrt = new Date(h.end.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+           let actStartM = startBrt.getHours() * 60 + startBrt.getMinutes();
+           let actEndM = endBrt.getHours() * 60 + endBrt.getMinutes();
+           if (actEndM < actStartM) actEndM += 1440;
+
+           if (eM > 1440 && actStartM < (eM - 1440)) {
+             actStartM += 1440;
+             actEndM += 1440;
+           }
+
+           hasPreActivity = actStartM < (sM - 15);
+           hasPostActivity = actEndM > (eM + 15);
+           hasExtendedActivity = hasPreActivity || hasPostActivity;
+
+           if (hasPreActivity) {
+             preMinutes = Math.max(0, sM - actStartM);
+           }
+           if (hasPostActivity) {
+             postMinutes = Math.max(0, actEndM - eM);
+           }
+
+           if (hasExtendedActivity) {
+             coreStart = slotStartStr;
+             coreEnd = slotEndStr;
+             coreDurationHours = Math.max(0.5, slotDurationHours);
+           } else {
+             coreStart = fullStartStr;
+             coreEnd = fullEndStr;
+             coreDurationHours = Math.max(0.1, (h.end - h.start) / (1000 * 3600));
+           }
+         }
+
+         const coreDurationMins = Math.round(coreDurationHours * 60);
+         const coreH = Math.floor(coreDurationMins / 60);
+         const coreM = coreDurationMins % 60;
+         const coreDurationText = coreH > 0 
+           ? (coreM > 0 ? `${coreH}h ${coreM}min` : `${coreH}h`)
+           : `${coreM}min`;
+
+         const coreXpHour = Math.round(h.totalXp / coreDurationHours);
+
          return {
              day: h.day,
              totalXp: h.totalXp,
-             start: formatTime(h.start),
-             end: formatTime(h.end),
+             start: coreStart,
+             end: coreEnd,
+             coreDurationText,
+             coreDurationHours,
+             coreXpHour,
+             formattedCoreXpHour: `${formatXp(coreXpHour)}/h`,
+             fullStart: fullStartStr,
+             fullEnd: fullEndStr,
+             fullDurationHours,
+             fullXpHour,
+             formattedFullXpHour: `${formatXp(fullXpHour)}/h`,
+             hasExtendedActivity,
+             hasPreActivity,
+             hasPostActivity,
+             preMinutes,
+             postMinutes,
+             fullRange: `${fullStartStr} - ${fullEndStr}`,
              startRaw: h.start,
              endRaw: h.end,
              singlePing: diffMins < 10,
@@ -415,28 +490,30 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         xpHour: party.delta_xp || '0'
       });
     } else if (activeHunt) {
-      let calculatedXpHour = null;
-      if (activeHunt.startRaw && activeHunt.endRaw) {
-        const sDate = parseUtcDate(activeHunt.startRaw);
-        const eDate = parseUtcDate(activeHunt.endRaw);
-        if (sDate && eDate) {
-          const diffHours = Math.max(0.1, (eDate.getTime() - sDate.getTime()) / (1000 * 3600));
-          if (diffHours > 0 && activeHunt.totalXp > 0) {
-            calculatedXpHour = `${formatXp(Math.round(activeHunt.totalXp / diffHours))}/h`;
-          }
-        }
-      }
       if (activeHunt.singlePing) {
         setActualHuntTime({ 
           single: `${activeHunt.start} (${activeHunt.day})`,
-          xpHour: calculatedXpHour || party.delta_xp || '0'
+          xpHour: activeHunt.formattedCoreXpHour || party.delta_xp || '0',
+          coreXpHour: activeHunt.formattedCoreXpHour,
+          fullXpHour: activeHunt.formattedFullXpHour,
+          hasExtended: activeHunt.hasExtendedActivity,
+          fullRange: activeHunt.fullRange
         });
       } else {
         setActualHuntTime({ 
           start: activeHunt.start, 
           end: activeHunt.end, 
           day: activeHunt.day,
-          xpHour: calculatedXpHour || party.delta_xp || '0'
+          durationText: activeHunt.coreDurationText,
+          xpHour: activeHunt.formattedCoreXpHour || party.delta_xp || '0',
+          coreXpHour: activeHunt.formattedCoreXpHour,
+          fullXpHour: activeHunt.formattedFullXpHour,
+          hasExtended: activeHunt.hasExtendedActivity,
+          fullStart: activeHunt.fullStart,
+          fullEnd: activeHunt.fullEnd,
+          fullRange: activeHunt.fullRange,
+          postMinutes: activeHunt.postMinutes,
+          preMinutes: activeHunt.preMinutes
         });
       }
     } else {
@@ -549,6 +626,15 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             });
           }
         });
+
+        if (activeHunt && activeHunt.hasExtendedActivity) {
+          multiplierInsights.unshift({
+            name: 'Atividade Pós-Slot (Bosses & Ociosidade)',
+            type: 'EXTENDED',
+            tag: 'Filtro Anti-Diluição',
+            text: `A equipe permaneceu conectada até às ${activeHunt.fullEnd} (${activeHunt.postMinutes || 0}min além do término do respawn) para realizar bosses e afazeres secundários com ganho residual de XP. A telemetria focou o cálculo na janela do respawn ativo (${activeHunt.start} - ${activeHunt.end}, ${activeHunt.formattedCoreXpHour}) para manter a precisão do rendimento real da hunt, evitando a distorção da média para ${activeHunt.formattedFullXpHour}.`
+          });
+        }
       }
 
       const absentMembers = validMembers.filter(m => {
@@ -579,7 +665,12 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         multiplierInsights: multiplierInsights,
         huntHours: isShowingLive 
           ? `${party.slot_start?.slice(0, 5) || '--:--'} - Agora` 
-          : (activeHunt.singlePing ? `${activeHunt.start} (Pico Isolado)` : `${activeHunt.start} - ${activeHunt.end}`)
+          : (activeHunt.singlePing ? `${activeHunt.start} (Pico Isolado)` : `${activeHunt.start} - ${activeHunt.end}`),
+        durationText: activeHunt?.coreDurationText,
+        hasExtended: Boolean(activeHunt?.hasExtendedActivity),
+        fullRange: activeHunt?.hasExtendedActivity ? activeHunt.fullRange : null,
+        coreXpHourText: activeHunt?.formattedCoreXpHour,
+        dilutedXpHourText: activeHunt?.formattedFullXpHour
       });
     } else {
       setTacticalReport(null);
@@ -712,33 +803,68 @@ export default function PartyDashboard({ party, onPlayerClick }) {
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold flex items-center">
-                Horário Real (Telemetria)
+            <p className="text-xs text-gray-500 uppercase font-bold flex items-center justify-between">
+              <span>Horário Real (Telemetria)</span>
+              {actualHuntTime?.durationText && (
+                <span className="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20 px-1.5 py-0.5 rounded font-mono font-normal">
+                  {actualHuntTime.durationText}
+                </span>
+              )}
             </p>
-            <p className="text-lg font-bold text-white flex items-center">
-               {actualHuntTime ? (
-                   actualHuntTime.single ? (
-                       <><Clock size={16} className="text-blue-400 mr-2" /> {actualHuntTime.single}</>
-                   ) : (
-                       <><Clock size={16} className="text-blue-400 mr-2" /> {actualHuntTime.start} - {actualHuntTime.end} <span className="text-xs text-gray-400 ml-2 font-normal">({actualHuntTime.day})</span></>
-                   )
-               ) : (
-                   <span className="text-gray-500 text-sm italic">Não detectado</span>
-               )}
-            </p>
+            <div className="mt-1">
+              {actualHuntTime ? (
+                actualHuntTime.single ? (
+                  <p className="text-lg font-bold text-white flex items-center">
+                    <Clock size={16} className="text-blue-400 mr-2" /> {actualHuntTime.single}
+                  </p>
+                ) : (
+                  <div>
+                    <p className="text-lg font-bold text-white flex items-center">
+                      <Clock size={16} className="text-blue-400 mr-2" /> 
+                      <span>{actualHuntTime.start} - {actualHuntTime.end}</span>
+                      <span className="text-xs text-gray-400 ml-2 font-normal">({actualHuntTime.day})</span>
+                    </p>
+                    {actualHuntTime.hasExtended && (
+                      <p className="text-[11px] text-amber-300/90 font-medium flex items-center mt-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5 animate-pulse"></span>
+                        Atividade geral: {actualHuntTime.fullRange} <span className="text-gray-400 text-[10px] ml-1">(bosses / pré-hunt)</span>
+                      </p>
+                    )}
+                  </div>
+                )
+              ) : (
+                <p className="text-lg font-bold text-gray-500 text-sm italic">Não detectado</p>
+              )}
+            </div>
             <p className="text-[10px] text-gray-500 mt-1 leading-tight flex items-start">
                <Info size={10} className="mr-1 mt-[2px] flex-shrink-0" />
-               <span>Aviso: Margem de erro de ~5 minutos devido ao intervalo do robô. 
-               {actualHuntTime && actualHuntTime.single && " 'Pico Isolado' indica que a hunt durou menos de 10 minutos."}</span>
+               <span>
+                 {actualHuntTime?.hasExtended
+                   ? 'Filtro de respawn ativo: tempo focado na hunt principal, desconsiderando bosses pós-slot.'
+                   : 'Aviso: Margem de erro de ~5 minutos devido ao intervalo do robô.'}
+               </span>
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold">
-              {isShowingLive ? 'ΔXP/h Registrado (Ao Vivo)' : 'ΔXP/h da Hunt'}
+            <p className="text-xs text-gray-500 uppercase font-bold flex items-center justify-between">
+              <span>{isShowingLive ? 'ΔXP/h Registrado (Ao Vivo)' : 'ΔXP/h da Hunt'}</span>
+              {actualHuntTime?.hasExtended && (
+                <span className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded font-mono font-normal">
+                  Taxa Respawn
+                </span>
+              )}
             </p>
-            <p className="text-lg font-bold text-white">
-              {actualHuntTime && actualHuntTime.xpHour ? actualHuntTime.xpHour : (party.delta_xp || '0')}
-            </p>
+            <div className="mt-1">
+              <p className="text-2xl font-black text-amber-400 font-mono tracking-tight flex items-baseline">
+                {actualHuntTime && actualHuntTime.xpHour ? actualHuntTime.xpHour : (party.delta_xp || '0')}
+              </p>
+              {actualHuntTime?.hasExtended && actualHuntTime.fullXpHour && (
+                <p className="text-[11px] text-gray-400 mt-0.5 flex items-center">
+                  <span className="text-gray-500 mr-1">Média c/ bosses:</span>
+                  <span className="text-gray-300 font-mono font-medium">{actualHuntTime.fullXpHour}</span>
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -971,6 +1097,14 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                   <div className="bg-black/50 border border-tibia-border px-3 py-1 rounded text-gray-300 flex items-center">
                     <Clock size={13} className="mr-1.5 text-blue-400" />
                     <span className="text-white font-semibold">{tacticalReport.huntHours}</span>
+                    {tacticalReport.durationText && (
+                      <span className="ml-1.5 text-xs text-blue-300 font-mono font-normal">({tacticalReport.durationText})</span>
+                    )}
+                    {tacticalReport.hasExtended && tacticalReport.fullRange && (
+                      <span className="ml-2 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-medium" title={`Atividade total com bosses: ${tacticalReport.fullRange}`}>
+                        Bosses até {tacticalReport.fullRange.split(' - ')[1]}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1101,6 +1235,8 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                                 ? 'bg-red-950/30 border-red-500/30 text-red-200'
                                 : ins.type === 'PARTIAL'
                                 ? 'bg-yellow-950/30 border-yellow-500/30 text-yellow-200'
+                                : ins.type === 'EXTENDED'
+                                ? 'bg-purple-950/30 border-purple-500/30 text-purple-200'
                                 : 'bg-black/40 border-tibia-border/40 text-gray-300'
                             }`}
                           >
@@ -1113,9 +1249,11 @@ export default function PartyDashboard({ party, onPlayerClick }) {
                                   ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                                   : ins.type === 'PARTIAL'
                                   ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                                  : ins.type === 'EXTENDED'
+                                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                                   : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                               }`}>
-                                {ins.tag || (ins.type === 'BOOST' ? 'Prey / Boost' : ins.type === 'DEATH' ? 'Baixa em Combate' : ins.type === 'PARTIAL' ? 'Participação Parcial' : 'Rendimento Padrão (100%)')}
+                                {ins.tag || (ins.type === 'BOOST' ? 'Prey / Boost' : ins.type === 'DEATH' ? 'Baixa em Combate' : ins.type === 'PARTIAL' ? 'Participação Parcial' : ins.type === 'EXTENDED' ? 'Filtro Anti-Diluição' : 'Rendimento Padrão (100%)')}
                               </span>
                             </div>
                             <p className="text-gray-300">{ins.text}</p>
