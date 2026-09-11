@@ -55,7 +55,12 @@ export function findUniversalChrome() {
     // macOS
     isMac && '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     isMac && '/Applications/Chromium.app/Contents/MacOS/Chromium',
-    isMac && '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
+    isMac && '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+
+    // Windows - Microsoft Edge (Fallback exclusivo de segurança para workers remotos sem Chrome instalado)
+    isWin && 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    isWin && 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    isWin && process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Microsoft\\Edge\\Application\\msedge.exe'),
   ].filter(Boolean);
 
   for (const p of candidates) {
