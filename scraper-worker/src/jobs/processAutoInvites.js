@@ -178,20 +178,35 @@ function copyDirSafe(src, dest) {
 }
 
 function ensureProfile(world) {
-  const profileDest = path.join(WORK_PROFILE_BASE, `launcher_${world}`);
-  const srcDefault = path.join(WORK_PROFILE_BASE, 'auroria_launcher', 'Default');
-  const destDefault = path.join(profileDest, 'Default');
-  
-  // Se o perfil do mundo não existir, copia do auroria_launcher (que já tem o cookie cf_clearance validado para o Chrome)
-  if (!fs.existsSync(destDefault) && fs.existsSync(srcDefault)) {
-    console.log(`[PROFILE] Copiando perfil validado do Chrome para mundo ${world}...`);
-    copyDirSafe(srcDefault, destDefault);
-  }
-  
+  const profileDest = path.join(WORK_PROFILE_BASE, `launcher_${world.toLowerCase()}`);
   if (!fs.existsSync(profileDest)) {
     fs.mkdirSync(profileDest, { recursive: true });
   }
   return profileDest;
+}
+
+/**
+ * Detecta e clica no widget do Cloudflare Turnstile usando coordenadas reais do mouse (CDP)
+ */
+async function solveTurnstileIfPresent(page, maxAttempts = 6) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const tsFrame = page.frames().find(f => f.url().includes('challenges.cloudflare.com') || f.url().includes('turnstile'));
+    if (tsFrame) {
+      try {
+        const frameEl = await tsFrame.frameElement();
+        if (frameEl) {
+          const box = await frameEl.boundingBox();
+          if (box && box.width > 0) {
+            await page.mouse.click(box.x + 28, box.y + box.height / 2);
+            await new Promise(r => setTimeout(r, 1200));
+            return true;
+          }
+        }
+      } catch {}
+    }
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  return false;
 }
 
 const LOCK_FILE = path.join(process.cwd(), '.invite_processing.lock');
@@ -320,6 +335,7 @@ export async function runProcessAutoInvites() {
 
         const page = pages.length > 0 ? pages[0] : await browser.newPage();
         await page.setViewport({ width: 1280, height: 800 });
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
 
         
         // Login no RubinOT
@@ -409,7 +425,14 @@ export async function runProcessAutoInvites() {
           }
         }
       } finally {
-        await browser.close().catch(() => {});
+        try {
+          const pid = browser.process()?.pid;
+          await browser.close().catch(() => {});
+          if (pid && process.platform === 'win32') {
+            try { process.kill(pid, 0); process.kill(pid); } catch {}
+          }
+        } catch {}
+        cleanStaleLocks(profilePath);
       }
     }
   } catch (err) {
@@ -450,38 +473,26 @@ async function loginRubinot(page, accountName, password) {
 
       if (!foundEmail) {
         // Se não achou o email de imediato, pode ser tela de verificação humana do Cloudflare
-        for (let i = 0; i < 8; i++) {
-          const tsFrame = page.frames().find(f => f.url().includes('challenges.cloudflare.com') || f.url().includes('turnstile'));
-          if (tsFrame) {
-            try {
-              const checkbox = await tsFrame.$('input[type="checkbox"]');
-              if (checkbox) await checkbox.click();
-              else {
-                const body = await tsFrame.$('body');
-                if (body) await body.click();
-              }
-            } catch {}
-          }
-          await new Promise(r => setTimeout(r, 1500));
-          foundEmail = await page.$(emailSelector);
-          if (foundEmail) break;
-        }
+        console.log('[AutoInvite] 🛡️ Verificando desafio Cloudflare inicial...');
+        await solveTurnstileIfPresent(page, 8);
+        foundEmail = await page.$(emailSelector);
       }
 
       if (foundEmail) {
         // Fechar banner de cookies se existir para não cobrir elementos
         try {
-          const cookieBtn = await page.$('button ::-p-text("Apenas Essenciais")') || 
-                            await page.$('button ::-p-text("Aceitar Todos")') ||
-                            await page.$('button ::-p-text("Aceitar")');
-          if (cookieBtn) await cookieBtn.click().catch(() => {});
+          await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button'));
+            const aceitar = btns.find(b => b.innerText.includes('Aceitar') || b.innerText.includes('Essenciais'));
+            if (aceitar) aceitar.click();
+          });
         } catch {}
 
         await new Promise(r => setTimeout(r, 600));
         await page.click(emailSelector, { clickCount: 3 });
-        await page.type(emailSelector, accountName, { delay: 40 });
+        await page.type(emailSelector, accountName, { delay: 35 });
         await page.click(passSelector, { clickCount: 3 });
-        await page.type(passSelector, password, { delay: 40 });
+        await page.type(passSelector, password, { delay: 35 });
         await new Promise(r => setTimeout(r, 500));
 
         await page.evaluate(() => {
@@ -490,22 +501,11 @@ async function loginRubinot(page, accountName, password) {
           if (btn) btn.click();
         });
 
-        // Esperar resolução do Cloudflare Turnstile ou navegação pós-login (até 15s)
+        // Esperar resolução do Cloudflare Turnstile pós-submit ou navegação (até 15s)
         for (let i = 0; i < 15; i++) {
           await new Promise(r => setTimeout(r, 1000));
 
-          const tsFrame = page.frames().find(f => f.url().includes('challenges.cloudflare.com') || f.url().includes('turnstile'));
-          if (tsFrame) {
-            try {
-              const checkbox = await tsFrame.$('input[type="checkbox"]');
-              if (checkbox) {
-                await checkbox.click();
-              } else {
-                const body = await tsFrame.$('body');
-                if (body) await body.click();
-              }
-            } catch (e) {}
-          }
+          await solveTurnstileIfPresent(page, 1);
 
           const curUrl = page.url();
           if (curUrl.includes('/account') || curUrl.includes('/my-account')) break;
@@ -563,19 +563,21 @@ async function loginRubinot(page, accountName, password) {
  */
 async function inviteCharacter(page, world, guildName, characterName) {
   try {
-    // 1. Ir para a página de gerenciar guilda diretamente
+    // 1. Ir para a página de gerenciar guilda diretamente (ou apenas reutilizar se já estiver nela)
     const encodedGuild = encodeURIComponent(guildName);
     const targetUrl = `https://rubinot.com.br/guilds/${encodedGuild}/manage`;
-    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-    await new Promise(r => setTimeout(r, 2000));
+    if (!page.url().includes(`/guilds/${encodedGuild}/manage`)) {
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await new Promise(r => setTimeout(r, 1500));
+    }
 
     // Fechar banner de cookies se existir
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button'));
-      const aceitar = btns.find(b => b.innerText.includes('Aceitar'));
+      const aceitar = btns.find(b => b.innerText.includes('Aceitar') || b.innerText.includes('Essenciais'));
       if (aceitar) aceitar.click();
     });
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 300));
 
     // Clicar na aba Convidar
     await page.evaluate(() => {
@@ -607,32 +609,10 @@ async function inviteCharacter(page, world, guildName, characterName) {
     });
 
     // Esperar processamento do Cloudflare e resposta da página
-    let turnstileSolved = false;
     for (let i = 0; i < 15; i++) {
         await new Promise(r => setTimeout(r, 1000));
         
-        // Ocultado a requisição dupla via API, já que a UI consome o token e envia o formulário automaticamente.
-        
-        if (!turnstileSolved) {
-            try {
-                const tsFrame = page.frames().find(f => f.url().includes('challenges.cloudflare.com'));
-                if (tsFrame) {
-                    const checkbox = await tsFrame.$('input[type="checkbox"]');
-                    if (checkbox) {
-                        await checkbox.click();
-                        turnstileSolved = true;
-                        // Não espera muito, no próximo tick do loop ele já vai pegar o token
-                    } else {
-                        // Tentar clicar no widget via bounding box
-                        const body = await tsFrame.$('body');
-                        if (body) {
-                           await body.click();
-                           turnstileSolved = true;
-                        }
-                    }
-                }
-            } catch(e) {}
-        }
+        await solveTurnstileIfPresent(page, 1);
         
         // Vamos buscar frases exatas no texto da página para caso a UI tenha funcionado
         const pageText = await page.evaluate(() => document.body.innerText.toLowerCase());

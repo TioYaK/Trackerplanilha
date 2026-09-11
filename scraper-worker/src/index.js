@@ -655,13 +655,21 @@ supabase
   })
   .subscribe();
 
-// ==========================================
-// C2 DASHBOARD COMMAND LISTENER & POLLER
-// ==========================================
 const processC2Command = async (cmd) => {
   if (!cmd || cmd.worker_id !== WORKER_ID || cmd.executed) return;
 
-  console.log(`\n[C2 COMMAND] Executando comando: ${cmd.command}`);
+  // Proteção contra comandos antigos/stale acumulados no banco de dados
+  const createdAt = new Date(cmd.created_at || Date.now()).getTime();
+  const ageSeconds = Math.round((Date.now() - createdAt) / 1000);
+  const maxAge = cmd.command === 'RESTART_PC' ? 60 : 300; // RESTART_PC expira em 60s, outros em 5 min
+
+  if (ageSeconds > maxAge) {
+    console.warn(`[C2 COMMAND] ⚠️ Comando ${cmd.command} expirado ignorado (criado há ${ageSeconds}s atrás, limite: ${maxAge}s).`);
+    await supabase.from('worker_commands').update({ executed: true, executed_at: new Date().toISOString() }).eq('id', cmd.id);
+    return;
+  }
+
+  console.log(`\n[C2 COMMAND] Executando comando: ${cmd.command} (idade: ${ageSeconds}s)`);
 
   try {
     // Marcar como executado imediatamente para evitar duplicação

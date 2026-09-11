@@ -228,10 +228,14 @@ export function cleanWorkerProfileCaches() {
 export function cleanStaleLocks(dirPath) {
   if (!dirPath || !fs.existsSync(dirPath)) return;
   const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket', 'lockfile'];
-  for (const lf of lockFiles) {
-    const lPath = path.join(dirPath, lf);
-    if (fs.existsSync(lPath)) {
-      try { fs.unlinkSync(lPath); } catch {}
+  const targets = [dirPath, path.join(dirPath, 'Default')];
+  for (const target of targets) {
+    if (!fs.existsSync(target)) continue;
+    for (const lf of lockFiles) {
+      const lPath = path.join(target, lf);
+      if (fs.existsSync(lPath)) {
+        try { fs.unlinkSync(lPath); } catch {}
+      }
     }
   }
 }
