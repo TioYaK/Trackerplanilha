@@ -328,14 +328,13 @@ export default function WorkerDashboard() {
                 <div className="flex items-center">
                   <Server size={24} className={`mr-3 ${isOnline ? 'text-green-400' : 'text-red-400'}`} />
                   <div>
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                      {w.metadata?.owner && w.metadata.owner !== 'Anônimo' && (
-                        <span className="bg-tibia-primary/20 text-tibia-primary text-xs px-2 py-1 rounded border border-tibia-primary/30 flex items-center">
-                          <User size={12} className="mr-1" />
-                          {w.metadata.owner}
-                        </span>
-                      )}
-                      {w.worker_id}
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
+                      <span className="text-yellow-400 font-medieval text-2xl">
+                        {w.metadata?.owner && w.metadata.owner !== 'Anônimo' ? w.metadata.owner : 'Membro Anônimo'}
+                      </span>
+                      <span className="text-xs font-mono text-gray-400 bg-black/40 px-2 py-0.5 rounded border border-gray-700">
+                        {w.worker_id}
+                      </span>
                     </h3>
                     <p className="text-sm text-gray-400 flex items-center mt-1">
                       <Activity size={14} className="mr-1" />

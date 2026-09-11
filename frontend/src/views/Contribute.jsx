@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Download, Monitor, Activity, Users, ShieldCheck, Cpu, Heart, CheckCircle2, Network, Copy, Check, Terminal, ExternalLink, Archive, Zap } from 'lucide-react';
+import { Download, Monitor, Activity, Users, ShieldCheck, Cpu, Heart, CheckCircle2, Network, Copy, Check, Terminal, ExternalLink, Archive, Zap, MapPin, User, Award, Crown } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export default function Contribute() {
   const [copied, setCopied] = useState(false);
+  const [workersList, setWorkersList] = useState([]);
   const [networkStats, setNetworkStats] = useState({
     activeWorkers: 0,
     totalTasks: 0,
@@ -22,9 +25,11 @@ export default function Contribute() {
       const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from('worker_heartbeats')
-        .select('last_ping, metadata');
+        .select('*')
+        .order('last_ping', { ascending: false });
 
       if (data) {
+        setWorkersList(data);
         const active = data.filter(w => w.last_ping && w.last_ping > fiveMinsAgo).length;
         let tasks = 0;
         data.forEach(w => {
@@ -110,6 +115,112 @@ export default function Contribute() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* MURAL DE CONTRIBUIDORES / NÓS ATIVOS DA GUILDA */}
+      <div className="mb-12">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6 border-b border-tibia-border pb-3">
+          <div>
+            <h3 className="text-2xl font-medieval text-gradient-gold flex items-center gap-2">
+              <Award className="text-yellow-400" size={26} />
+              Mural de Contribuidores da Guilda
+            </h3>
+            <p className="text-sm text-gray-400">
+              Membros que conectaram seus computadores para manter a inteligência e o radar 24/7 ativos.
+            </p>
+          </div>
+          <div className="text-xs text-gray-500 font-mono bg-black/40 px-3 py-1.5 rounded border border-gray-800 self-start sm:self-auto">
+            Atualização em tempo real
+          </div>
+        </div>
+
+        {workersList.length === 0 && !networkStats.loading ? (
+          <div className="text-center py-8 text-gray-500 bg-black/30 border border-tibia-border rounded-lg">
+            Nenhum nó de telemetria registrado ainda. Seja o primeiro a instalar!
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {workersList.map((worker) => {
+              const isOnline = worker.last_ping ? new Date(worker.last_ping).getTime() > Date.now() - 5 * 60 * 1000 : false;
+              const ownerName = worker.metadata?.owner || 'Membro Anônimo';
+              const tasksCompleted = worker.metadata?.tasks_completed || 0;
+              const cpuInfo = worker.metadata?.cpu || 'Processador';
+              const ramInfo = worker.metadata?.ram || '';
+              const cores = worker.metadata?.cores;
+
+              return (
+                <div 
+                  key={worker.worker_id} 
+                  className={`relative p-5 rounded-lg border transition-all duration-200 ${
+                    isOnline 
+                      ? 'bg-gradient-to-b from-black/80 to-green-950/20 border-green-500/40 shadow-[0_0_20px_rgba(34,197,94,0.12)]' 
+                      : 'bg-black/50 border-gray-800 opacity-60'
+                  }`}
+                >
+                  {/* Top: Status & Tasks */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-400 shadow-[0_0_8px_#4ade80] animate-pulse' : 'bg-gray-600'}`} />
+                      <div>
+                        <h4 className="text-lg font-bold text-white flex items-center gap-1.5 leading-tight">
+                          <Crown size={16} className="text-yellow-400 shrink-0" />
+                          <span className="text-yellow-400 font-medieval">{ownerName}</span>
+                        </h4>
+                        <span className="text-[11px] font-mono text-gray-500">{worker.worker_id}</span>
+                      </div>
+                    </div>
+                    
+                    <span className={`px-2 py-0.5 text-[11px] font-bold rounded uppercase tracking-wider border ${
+                      isOnline 
+                        ? 'bg-green-500/20 text-green-300 border-green-500/30' 
+                        : 'bg-gray-800 text-gray-400 border-gray-700'
+                    }`}>
+                      {isOnline ? 'ONLINE' : 'OFFLINE'}
+                    </span>
+                  </div>
+
+                  {/* Localização */}
+                  {worker.location && (
+                    <p className="text-xs text-gray-400 flex items-center gap-1.5 mb-3">
+                      <MapPin size={13} className="text-blue-400 shrink-0" />
+                      <span className="truncate">{worker.location}</span>
+                    </p>
+                  )}
+
+                  {/* Especificações de Hardware */}
+                  <div className="bg-black/60 rounded p-2.5 mb-3 border border-white/5 space-y-1 text-xs text-gray-300">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-400 flex items-center gap-1">
+                        <Cpu size={12} className="text-amber-400" /> CPU:
+                      </span>
+                      <span className="font-mono text-gray-200 truncate max-w-[180px]" title={cpuInfo}>
+                        {cpuInfo} {cores ? `(${cores}c)` : ''}
+                      </span>
+                    </div>
+                    {ramInfo && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-gray-400 flex items-center gap-1">
+                          <Monitor size={12} className="text-purple-400" /> RAM:
+                        </span>
+                        <span className="font-mono text-gray-200">{ramInfo}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer: Tarefas & Visto por último */}
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
+                    <span className="text-gray-400">
+                      Tarefas: <strong className="text-yellow-400 font-mono">{tasksCompleted.toLocaleString('pt-BR')}</strong>
+                    </span>
+                    <span className="text-gray-500 text-[11px]">
+                      {isOnline ? '🟢 Ativo agora' : worker.last_ping ? `Visto ${formatDistanceToNow(new Date(worker.last_ping), { addSuffix: true, locale: ptBR })}` : 'Desconectado'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">

@@ -96,10 +96,19 @@ export default function AdminDashboard() {
   // 2. Worker Performance (Task History)
   const workerPerf = {};
   let totalTasks = 0;
+
+  const workerOwnerMap = {};
+  workers.forEach(w => {
+    if (w && w.worker_id) {
+      workerOwnerMap[w.worker_id] = w.metadata?.owner || w.worker_id;
+    }
+  });
+
   taskHistory.forEach(th => {
     if (!th || !th.worker_id) return;
+    const displayName = workerOwnerMap[th.worker_id] || th.worker_id;
     if (!workerPerf[th.worker_id]) {
-      workerPerf[th.worker_id] = { name: String(th.worker_id), count: 0, totalTime: 0 };
+      workerPerf[th.worker_id] = { name: displayName, count: 0, totalTime: 0 };
     }
     const c = Number(th.task_count) || 1;
     workerPerf[th.worker_id].count += c;
@@ -108,7 +117,7 @@ export default function AdminDashboard() {
   });
 
   const perfData = Object.values(workerPerf).map(w => ({
-    name: w.name ? (w.name.length > 10 ? w.name.substring(0, 10) + '...' : w.name) : 'Worker',
+    name: w.name ? (w.name.length > 14 ? w.name.substring(0, 14) + '...' : w.name) : 'Worker',
     tarefas: w.count,
     avg_speed: w.count > 0 ? (w.totalTime / w.count / 1000).toFixed(1) : '0.0'
   }));
@@ -326,10 +335,15 @@ export default function AdminDashboard() {
                         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
                           {/* Info */}
                           <div className="flex-1">
-                            <div className="flex items-center mb-1">
-                              <Cpu className={`mr-2 ${isActive ? 'text-green-400' : 'text-red-400'}`} size={20} />
-                              <span className="font-bold text-lg text-white">{worker.worker_id}</span>
-                              <span className={`ml-3 px-2 py-0.5 text-xs font-bold rounded ${isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                            <div className="flex items-center mb-1 flex-wrap gap-2">
+                              <Cpu className={`mr-1.5 ${isActive ? 'text-green-400' : 'text-red-400'}`} size={20} />
+                              <span className="font-bold text-lg text-yellow-400 font-medieval">
+                                {worker.metadata?.owner || 'Membro Anônimo'}
+                              </span>
+                              <span className="text-xs font-mono text-gray-400 bg-black/50 px-2 py-0.5 rounded border border-gray-700">
+                                {worker.worker_id}
+                              </span>
+                              <span className={`px-2 py-0.5 text-xs font-bold rounded ${isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                                 {isActive ? 'ONLINE' : 'OFFLINE'}
                               </span>
                             </div>
