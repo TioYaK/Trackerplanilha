@@ -7,9 +7,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'ads.txt', 'Instalar_Worker.ps1'],
       workbox: {
-        importScripts: ['/custom-sw.js']
+        importScripts: ['/custom-sw.js'],
+        navigateFallbackDenylist: [/^\/ads\.txt/, /^\/Instalar_Worker/, /^\/api/]
       },
       manifest: {
         name: 'BattleStorm Tracker',
