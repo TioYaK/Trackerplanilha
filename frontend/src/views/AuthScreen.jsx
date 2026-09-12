@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../components/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Shield, Mail, Lock, User, Crosshair, Headphones, LogIn, UserPlus } from 'lucide-react';
+import AdBanner from '../components/AdBanner';
 
 export default function AuthScreen() {
   const { login, register } = useAuth();
@@ -53,7 +54,7 @@ export default function AuthScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex items-center justify-center p-4">
+    <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex flex-col items-center justify-center p-4 py-8">
       <div className="bg-black/80 border-2 border-tibia-border rounded-lg shadow-tibia-glow max-w-md w-full p-8 relative overflow-hidden">
         
         {/* Decorative elements */}
@@ -181,6 +182,11 @@ export default function AuthScreen() {
             {isLogin ? "Membro novo? Registre-se aqui" : "Já tem conta? Faça login"}
           </button>
         </div>
+      </div>
+
+      {/* Banner de Anúncio / Patrocinador na Tela de Login */}
+      <div className="max-w-md w-full mt-4">
+        <AdBanner allowDismiss={false} />
       </div>
     </div>
   );
