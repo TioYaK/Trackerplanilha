@@ -59,7 +59,7 @@ Refresh-Path
 
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host "  -> Node.js nao encontrado. Instalando via winget..." -ForegroundColor Gray
-    winget install --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements -e
+    winget install --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent -e *> $null
     Refresh-Path
 } else {
     Write-Host "  -> Node.js: OK" -ForegroundColor Green
@@ -67,7 +67,7 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Host "  -> Git nao encontrado. Instalando via winget..." -ForegroundColor Gray
-    winget install --id Git.Git --accept-source-agreements --accept-package-agreements -e
+    winget install --id Git.Git --accept-source-agreements --accept-package-agreements --silent -e *> $null
     Refresh-Path
 } else {
     Write-Host "  -> Git: OK" -ForegroundColor Green
@@ -81,16 +81,17 @@ Write-Host "[2/4] Baixando a ultima versao do robo..." -ForegroundColor Yellow
 
 if (Test-Path (Join-Path $WorkDir ".git")) {
     Write-Host "  -> Atualizando instalacao existente..." -ForegroundColor Gray
-    git -C $WorkDir fetch --all
-    git -C $WorkDir reset --hard origin/main
+    git -C $WorkDir fetch --all --quiet *> $null
+    git -C $WorkDir reset --hard origin/main --quiet *> $null
 } else {
     if (Test-Path $WorkDir) { Remove-Item $WorkDir -Recurse -Force -ErrorAction SilentlyContinue }
     New-Item -ItemType Directory -Path $WorkDir -Force | Out-Null
-    git clone https://github.com/TioYaK/Trackerplanilha.git $WorkDir
+    git clone --quiet https://github.com/TioYaK/Trackerplanilha.git $WorkDir *> $null
 }
 
 # Garante que a pasta existe mesmo se o git clone falhar por algum motivo
 New-Item -ItemType Directory -Path $WorkerPath -Force | Out-Null
+Write-Host "  -> Arquivos atualizados com sucesso!" -ForegroundColor Green
 
 # ---- [3/4] Credenciais ----
 Write-Host ""
@@ -108,19 +109,17 @@ $envLines | Set-Content -Path (Join-Path $WorkerPath ".env") -Encoding UTF8
 Write-Host "  -> Credenciais salvas." -ForegroundColor Green
 
 if (Test-Path $WorkerPath) {
-    Write-Host "  -> Instalando modulos do Node.js..." -ForegroundColor Gray
+    Write-Host "  -> Instalando modulos do Node.js (aguarde alguns instantes)..." -ForegroundColor Gray
     Push-Location $WorkerPath
     Refresh-Path
     
-    # Usa npm.cmd / cmd.exe para evitar bloqueio de ExecutionPolicy no npm.ps1 do PowerShell
-    $npmCmd = "C:\Program Files\nodejs\npm.cmd"
-    if (-not (Test-Path $npmCmd)) {
-        $npmCmd = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
-    }
+    # Executa npm em modo 100% silencioso para nao poluir o terminal com notices/deprecations
+    cmd.exe /c "npm install --silent --no-audit --no-fund" *> $null
     
-    if ($npmCmd -and (Test-Path $npmCmd)) {
-        & $npmCmd install --no-audit --no-fund
+    if (Test-Path (Join-Path $WorkerPath "node_modules")) {
+        Write-Host "  -> Modulos instalados com sucesso!" -ForegroundColor Green
     } else {
+        # Fallback caso falhe silenciosamente
         cmd.exe /c "npm install --no-audit --no-fund"
     }
     Pop-Location
@@ -158,7 +157,7 @@ $vbsContent = @(
 ) -join "`r`n"
 $vbsContent | Set-Content -Path $VbsPath -Encoding ASCII
 
-# Registra no Task Scheduler
+# Registra no Task Scheduler sem cuspir texto no console
 $taskXml = @"
 <?xml version='1.0' encoding='UTF-16'?>
 <Task version='1.2' xmlns='http://schemas.microsoft.com/windows/2004/02/mit/task'>
@@ -180,9 +179,13 @@ $taskXml = @"
 "@
 $TempXml = [System.IO.Path]::GetTempFileName() + ".xml"
 [System.IO.File]::WriteAllText($TempXml, $taskXml, [System.Text.Encoding]::Unicode)
-schtasks /Delete /TN "AuroriaWorker" /F 2>$null | Out-Null
-schtasks /Create /TN "AuroriaWorker" /XML $TempXml | Out-Null
+schtasks /Delete /TN "AuroriaWorker" /F *> $null
+schtasks /Create /TN "AuroriaWorker" /XML $TempXml *> $null
 Remove-Item $TempXml -ErrorAction SilentlyContinue
+
+# Encerra qualquer instancia anterior do worker para evitar processos duplicados
+Get-CimInstance Win32_Process -Filter "Name = 'wscript.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*run_worker.vbs*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*AuroriaWorker*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
 # Inicia agora se o arquivo VBS existir
 if (Test-Path $VbsPath) {
