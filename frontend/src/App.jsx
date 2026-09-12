@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import TopNav from './components/TopNav';
 import ErrorBoundary from './components/ErrorBoundary';
+import AdBanner from './components/AdBanner';
 import { useAuth } from './components/AuthContext';
 import { LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
@@ -205,7 +206,13 @@ export default function App() {
         isAdmin={isAdmin}
         visibleTabs={visibleTabs ?? DEFAULT_VISIBLE_TABS}
       />
-            <main className="w-full">
+      
+      {/* Banner de Publicidade / Patrocinador Oficial */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-2">
+        <AdBanner />
+      </div>
+
+      <main className="w-full">
         <ErrorBoundary>
           <Suspense fallback={<ModuleFallback />}>
             {renderView()}
