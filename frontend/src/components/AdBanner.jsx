@@ -7,9 +7,9 @@ import { ExternalLink, Sparkles, Shield, X } from 'lucide-react';
  * fallback elegante para Banners de Afiliados / Patrocinadores da Guilda.
  */
 export default function AdBanner({
-  slot = import.meta.env.VITE_ADSENSE_SLOT || '1234567890',
-  client = import.meta.env.VITE_ADSENSE_CLIENT_ID || 'ca-pub-XXXXXXXXXXXXXXXX',
-  format = 'horizontal', // 'horizontal', 'rectangle', 'auto'
+  slot = import.meta.env.VITE_ADSENSE_SLOT || null,
+  client = import.meta.env.VITE_ADSENSE_CLIENT_ID || 'ca-pub-6600830490965208',
+  format = 'auto', // 'horizontal', 'rectangle', 'auto'
   responsive = true,
   className = '',
   customTitle = 'Compre Tibia Coins com Entrega Rápida & Desconto',
@@ -23,25 +23,11 @@ export default function AdBanner({
   const [adBlocked, setAdBlocked] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  const isRealAdSense = client && !client.includes('XXXX') && !client.includes('placeholder');
+  // Considera AdSense ativo no bloco quando houver um slot numérico válido criado no AdSense
+  const hasValidSlot = slot && slot !== '1234567890' && /^\d+$/.test(slot);
 
   useEffect(() => {
-    if (!isRealAdSense || dismissed) return;
-
-    // Injeta o script do Google AdSense se ainda não estiver presente no <head>
-    const scriptId = 'google-adsense-script';
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${client}`;
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.onerror = () => {
-        // Provável bloqueio por AdBlocker
-        setAdBlocked(true);
-      };
-      document.head.appendChild(script);
-    }
+    if (!hasValidSlot || dismissed) return;
 
     // Inicializa o anúncio no slot com segurança para SPAs
     const timer = setTimeout(() => {
@@ -57,12 +43,12 @@ export default function AdBanner({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [client, slot, isRealAdSense, dismissed]);
+  }, [slot, hasValidSlot, dismissed]);
 
   if (dismissed) return null;
 
   // Se o AdSense estiver configurado com credenciais válidas e não bloqueado, renderiza o slot do Google
-  if (isRealAdSense && !adBlocked) {
+  if (hasValidSlot && !adBlocked) {
     return (
       <div className={`relative my-4 overflow-hidden rounded-lg border border-yellow-500/20 bg-black/60 p-2 text-center shadow-lg ${className}`}>
         {allowDismiss && (
