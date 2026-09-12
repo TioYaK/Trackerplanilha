@@ -90,6 +90,23 @@ const POLL_INTERVAL = 3000;       // 3 segundos entre ciclos vazios
 const LOCK_TIMEOUT_MINUTES = 5;
 const UPDATE_CHECK_INTERVAL = 10 * 60 * 1000; // Mínimo 10 min entre git pulls
 
+let isWorkerPaused = false;
+
+// Sincronização inicial do estado de pausa
+(async () => {
+  try {
+    const { data: hb } = await supabase
+      .from('worker_heartbeats')
+      .select('metadata')
+      .eq('worker_id', WORKER_ID)
+      .maybeSingle();
+    if (hb?.metadata?.is_paused) {
+      isWorkerPaused = true;
+      console.log(`[WORKER] ⏸️ Worker iniciando em modo PAUSADO/DESLIGADO (conforme configurado no painel).`);
+    }
+  } catch (e) {}
+})();
+
 console.log(`\n${'='.repeat(60)}`);
 console.log(`[WORKER] 🚀 Iniciando Worker ID: ${WORKER_ID}`);
 console.log(`${'='.repeat(60)}\n`);
@@ -98,6 +115,7 @@ console.log(`${'='.repeat(60)}\n`);
 // SISTEMA DE TAREFAS
 // ==========================================
 const fetchTask = async () => {
+  if (isWorkerPaused) return null;
   try {
     const now = new Date().toISOString();
     const crashLimit = new Date();
@@ -415,13 +433,11 @@ const loop = async () => {
     // ignorar
   }
 
-  if (false) {
-    console.log(`[WORKER] 🔴 Suspenso devido a bloqueio/timeout. Retorna em: ${new Date(localBanUntil).toLocaleString()}`);
-    setTimeout(loop, 60000); // Tenta novamente em 1 minuto (só pra avisar e continuar dormindo)
+  // Se o worker foi desligado/pausado temporariamente pelo painel
+  if (isWorkerPaused) {
+    setTimeout(loop, 4000);
     return;
   }
-
-
 
   const task = await fetchTask();
   if (task) {
@@ -444,18 +460,35 @@ const loop = async () => {
 
 const sendHeartbeat = async () => {
   try {
+    // Sincroniza estado de pausa caso tenha sido alterado via banco de dados
+    try {
+      const { data: myHb } = await supabase
+        .from('worker_heartbeats')
+        .select('metadata')
+        .eq('worker_id', WORKER_ID)
+        .maybeSingle();
+      if (myHb?.metadata?.is_paused !== undefined && isWorkerPaused !== Boolean(myHb.metadata.is_paused)) {
+        isWorkerPaused = Boolean(myHb.metadata.is_paused);
+        console.log(`[SYNC] 🔄 Estado de pausa sincronizado com o painel: ${isWorkerPaused ? 'PAUSADO (STANDBY)' : 'ATIVO (LIGADO)'}`);
+        if (isWorkerPaused) {
+          try { await closeBrowser(); } catch (e) {}
+        }
+      }
+    } catch (e) {}
+
     const disk = getDiskHealth();
     const memoryMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
     const uptimeSec = Math.round((Date.now() - new Date(WORKER_STARTED).getTime()) / 1000);
     const avgDuration = totalTasksCompletedCount > 0 ? Math.round(totalExecutionTimeMs / totalTasksCompletedCount) : null;
     const metadata = {
       ...WORKER_METADATA,
+      is_paused: isWorkerPaused,
       disk_free_gb: disk.freeGb,
       disk_total_gb: disk.totalGb,
       disk_percent_free: disk.percentFree,
       disk_warning: disk.isLowDisk,
       disk_text: disk.text,
-      current_task: isProcessingTask ? currentTaskType : 'IDLE',
+      current_task: isWorkerPaused ? 'STANDBY (Desligado pelo Painel)' : (isProcessingTask ? currentTaskType : 'IDLE'),
       tasks_completed: totalTasksCompleted,
       memory_mb: memoryMb,
       uptime_seconds: uptimeSec,
@@ -605,6 +638,7 @@ app.listen(3001, () => {
 supabase
   .channel('worker_sync')
   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'task_queue' }, (payload) => {
+    if (isWorkerPaused) return;
     if (payload.new.status === 'PENDING' && payload.new.locked_at) {
        const lockTime = new Date(payload.new.locked_at).getTime();
        if (lockTime <= Date.now()) {
@@ -632,6 +666,7 @@ supabase
   supabase
     .channel('guild_invites')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_invites_queue' }, (payload) => {
+      if (isWorkerPaused) return;
       if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && payload.new.status === 'PENDING')) {
         console.log('\n[REALTIME] Gatilho acionado (Novo invite ou Reprocessamento)!');
         if (!isProcessingTask) {
@@ -646,6 +681,7 @@ supabase
   supabase
     .channel('maker_validation')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maker_validation_queue' }, (payload) => {
+     if (isWorkerPaused) return;
      console.log('\n[REALTIME] Novo maker recebido para validar!');
      if (!isProcessingTask) {
        runValidateMakers().catch(err => console.error('[ValidateMakers] Erro no gatilho realtime:', err.message));
@@ -739,6 +775,15 @@ const processC2Command = async (cmd) => {
           })
           .eq('worker_id', WORKER_ID);
         console.log('[C2 COMMAND] 📄 Logs remotos transmitidos com sucesso.');
+     } else if (cmd.command === 'PAUSE_WORKER') {
+        console.log('[C2 COMMAND] ⏸️ Worker pausado/desligado remotamente pelo Dashboard!');
+        isWorkerPaused = true;
+        try { await closeBrowser(); } catch (e) {}
+        await sendHeartbeat();
+     } else if (cmd.command === 'RESUME_WORKER') {
+        console.log('[C2 COMMAND] ▶️ Worker retomado/ligado remotamente pelo Dashboard!');
+        isWorkerPaused = false;
+        await sendHeartbeat();
      }
 
     console.log(`[C2 COMMAND] ✅ Comando ${cmd.command} executado com sucesso.`);

@@ -21,6 +21,7 @@ export default function WorkerDashboard() {
   const [activeLogWorker, setActiveLogWorker] = useState(null);
   const [fetchingLogs, setFetchingLogs] = useState(false);
   const [copiedLogs, setCopiedLogs] = useState(false);
+  const [togglingPause, setTogglingPause] = useState(null);
   const terminalEndRef = useRef(null);
 
   useEffect(() => {
@@ -112,6 +113,56 @@ export default function WorkerDashboard() {
       }
     } finally {
       setSendingCmd(null);
+    }
+  };
+
+  const handleToggleWorkerPause = async (worker) => {
+    const isCurrentlyPaused = Boolean(worker.metadata?.is_paused);
+    const nextState = !isCurrentlyPaused;
+    const workerId = worker.worker_id;
+
+    setTogglingPause(workerId);
+
+    // 1. Atualização Otimista Instantânea na UI
+    setWorkers(prev => prev.map(w => {
+      if (w.worker_id === workerId) {
+        return {
+          ...w,
+          metadata: {
+            ...w.metadata,
+            is_paused: nextState,
+            current_task: nextState ? 'STANDBY (Desligado pelo Painel)' : 'IDLE'
+          }
+        };
+      }
+      return w;
+    }));
+
+    try {
+      // 2. Persiste no banco worker_heartbeats
+      const currentMeta = worker.metadata || {};
+      const updatedMeta = { ...currentMeta, is_paused: nextState };
+      await supabase
+        .from('worker_heartbeats')
+        .update({ metadata: updatedMeta })
+        .eq('worker_id', workerId);
+
+      // 3. Dispara comando Realtime C2 (PAUSE_WORKER / RESUME_WORKER)
+      const command = nextState ? 'PAUSE_WORKER' : 'RESUME_WORKER';
+      await supabase
+        .from('worker_commands')
+        .insert({
+          worker_id: workerId,
+          command,
+          payload: { is_paused: nextState },
+          executed: false
+        });
+
+    } catch (err) {
+      console.error('Erro ao alternar estado de pausa do worker:', err);
+      fetchWorkers();
+    } finally {
+      setTogglingPause(null);
     }
   };
 
@@ -238,7 +289,9 @@ export default function WorkerDashboard() {
     return <div className="p-8 text-center text-gray-400">Carregando painel C2...</div>;
   }
 
-  const onlineWorkersCount = workers.filter(w => w.last_ping && new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000).length;
+  const onlineWorkers = workers.filter(w => w.last_ping && new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000);
+  const activeRunningWorkers = onlineWorkers.filter(w => !w.metadata?.is_paused);
+  const pausedWorkersCount = onlineWorkers.filter(w => w.metadata?.is_paused).length;
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in relative">
@@ -270,9 +323,13 @@ export default function WorkerDashboard() {
           </div>
           <div>
             <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Nós na Rede</p>
-            <p className="text-xl font-bold text-white">
-              <span className="text-green-400">{onlineWorkersCount}</span>
-              <span className="text-gray-500 text-sm"> / {workers.length} online</span>
+            <p className="text-xl font-bold text-white flex items-baseline gap-1.5 flex-wrap">
+              <span className="text-green-400">{activeRunningWorkers.length}</span>
+              <span className="text-xs text-gray-400 font-normal">ativos</span>
+              {pausedWorkersCount > 0 && (
+                <span className="text-xs text-amber-400 font-mono">({pausedWorkersCount} em pausa)</span>
+              )}
+              <span className="text-gray-500 text-xs font-normal">/ {workers.length} total</span>
             </p>
           </div>
         </div>
@@ -318,15 +375,16 @@ export default function WorkerDashboard() {
       <div className="grid grid-cols-1 gap-6">
         {workers.map(w => {
           const isOnline = w.last_ping ? new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000 : false;
+          const isPaused = Boolean(w.metadata?.is_paused);
           const lastError = w.metadata?.last_error;
           const avgDuration = w.metadata?.avg_task_duration_ms;
 
           return (
-            <div key={w.worker_id} className={`bg-tibia-card border ${isOnline ? 'border-green-900/50' : 'border-red-900/50'} p-6 rounded-lg shadow-xl`}>
+            <div key={w.worker_id} className={`bg-tibia-card border ${isPaused ? 'border-amber-500/50 bg-amber-950/10' : isOnline ? 'border-green-900/50' : 'border-red-900/50'} p-6 rounded-lg shadow-xl transition-all`}>
               {/* CABEÇALHO DO CARD */}
-              <div className="flex justify-between items-start mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                 <div className="flex items-center">
-                  <Server size={24} className={`mr-3 ${isOnline ? 'text-green-400' : 'text-red-400'}`} />
+                  <Server size={24} className={`mr-3 ${isPaused ? 'text-amber-400' : isOnline ? 'text-green-400' : 'text-red-400'}`} />
                   <div>
                     <h3 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
                       <span className="text-yellow-400 font-medieval text-2xl">
@@ -339,18 +397,50 @@ export default function WorkerDashboard() {
                     <p className="text-sm text-gray-400 flex items-center mt-1">
                       <Activity size={14} className="mr-1" />
                       Status: 
-                      <span className={`ml-1 font-bold ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
-                        {isOnline ? 'ONLINE' : 'OFFLINE'}
+                      <span className={`ml-1 font-bold ${isPaused ? 'text-amber-400' : isOnline ? 'text-green-400' : 'text-red-400'}`}>
+                        {isPaused ? 'PAUSADO (STANDBY)' : isOnline ? 'ONLINE' : 'OFFLINE'}
                       </span>
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Último Ping</p>
-                  <p className="text-sm text-blue-400">
-                    <Clock size={12} className="inline mr-1" />
-                    {w.last_ping ? formatDistanceToNow(new Date(w.last_ping), { addSuffix: true, locale: ptBR }) : 'Nunca'}
-                  </p>
+
+                <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                  {/* CHAVINHA DE LIGAR / DESLIGAR TEMPORARIAMENTE */}
+                  <div className="flex items-center gap-2.5 bg-black/60 border border-white/10 px-3 py-1.5 rounded-lg shadow-inner">
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold tracking-wider block text-gray-400 leading-tight">
+                        Operação
+                      </span>
+                      <span className={`text-[11px] font-bold font-mono ${isPaused ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {isPaused ? 'DESLIGADO' : 'LIGADO'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={togglingPause === w.worker_id}
+                      onClick={() => handleToggleWorkerPause(w)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isPaused 
+                          ? 'bg-red-950/60 border-red-500/50' 
+                          : 'bg-emerald-600 border-emerald-400 shadow-md shadow-emerald-500/30'
+                      } ${togglingPause === w.worker_id ? 'opacity-50 cursor-wait' : ''}`}
+                      title={isPaused ? 'Clique para LIGAR este worker' : 'Clique para DESLIGAR temporariamente este worker'}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          isPaused ? 'translate-x-0 bg-gray-400' : 'translate-x-5 bg-white'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Último Ping</p>
+                    <p className="text-sm text-blue-400">
+                      <Clock size={12} className="inline mr-1" />
+                      {w.last_ping ? formatDistanceToNow(new Date(w.last_ping), { addSuffix: true, locale: ptBR }) : 'Nunca'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -395,7 +485,12 @@ export default function WorkerDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 border-t border-white/5 items-center">
                     <div>
                       <p className="text-gray-500 text-xs mb-1">Status de Execução</p>
-                      {w.metadata.current_task && w.metadata.current_task !== 'IDLE' ? (
+                      {isPaused ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-amber-950/80 text-amber-300 border border-amber-500/40">
+                          <PowerOff size={11} className="mr-1.5 text-amber-400" />
+                          Standby (Desligado pelo Painel)
+                        </span>
+                      ) : w.metadata.current_task && w.metadata.current_task !== 'IDLE' ? (
                         <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 animate-pulse">
                           <Play size={11} className="mr-1.5 fill-current" />
                           Processando: {w.metadata.current_task}

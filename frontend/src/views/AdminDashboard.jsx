@@ -343,9 +343,15 @@ export default function AdminDashboard() {
                               <span className="text-xs font-mono text-gray-400 bg-black/50 px-2 py-0.5 rounded border border-gray-700">
                                 {worker.worker_id}
                               </span>
-                              <span className={`px-2 py-0.5 text-xs font-bold rounded ${isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                {isActive ? 'ONLINE' : 'OFFLINE'}
-                              </span>
+                              {worker.metadata?.is_paused ? (
+                                <span className="px-2 py-0.5 text-xs font-bold rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                                  PAUSADO (STANDBY)
+                                </span>
+                              ) : (
+                                <span className={`px-2 py-0.5 text-xs font-bold rounded ${isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                  {isActive ? 'ONLINE' : 'OFFLINE'}
+                                </span>
+                              )}
                             </div>
                             <p className="text-sm text-gray-400 flex items-center mt-2">
                               <Clock size={14} className="mr-1" />
