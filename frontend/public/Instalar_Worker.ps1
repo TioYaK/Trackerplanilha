@@ -1,12 +1,19 @@
 # ==============================================================
 #  AURORIA WORKER - Instalador em 1 clique (PowerShell)
-#  Versao 1.5 - Fail-safe & Robusto
+#  Versao 1.6 - Fail-safe & Robusto
 # ==============================================================
 param()
 
+# Desbloqueia execucao de scripts na sessao atual do PowerShell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
+
 # Solicita admin se necessario
 If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
-    Start-Process PowerShell -Verb RunAs -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"" + $MyInvocation.MyCommand.Path + "`"")
+    if ($MyInvocation.MyCommand.Path) {
+        Start-Process PowerShell -Verb RunAs -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"" + $MyInvocation.MyCommand.Path + "`"")
+    } else {
+        Start-Process PowerShell -Verb RunAs -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -Command `"irm https://trackerplanilha.vercel.app/Instalar_Worker.ps1 | iex`"")
+    }
     Exit
 }
 
@@ -36,12 +43,24 @@ Write-Host "  -> Credenciais obtidas com sucesso!" -ForegroundColor Green
 # ---- [1/4] Pre-requisitos ----
 Write-Host ""
 Write-Host "[1/4] Verificando pre-requisitos (Node.js e Git)..." -ForegroundColor Yellow
-$env:PATH = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+function Refresh-Path {
+    $machinePath = [System.Environment]::GetEnvironmentVariable("Path","Machine")
+    $userPath = [System.Environment]::GetEnvironmentVariable("Path","User")
+    $env:PATH = "$machinePath;$userPath"
+    if (Test-Path "C:\Program Files\nodejs") {
+        $env:PATH = "C:\Program Files\nodejs;$env:PATH"
+    }
+    if (Test-Path "C:\Program Files\Git\cmd") {
+        $env:PATH = "$env:PATH;C:\Program Files\Git\cmd"
+    }
+}
+Refresh-Path
 
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host "  -> Node.js nao encontrado. Instalando via winget..." -ForegroundColor Gray
     winget install --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements -e
-    $env:PATH = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    Refresh-Path
 } else {
     Write-Host "  -> Node.js: OK" -ForegroundColor Green
 }
@@ -49,7 +68,7 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Host "  -> Git nao encontrado. Instalando via winget..." -ForegroundColor Gray
     winget install --id Git.Git --accept-source-agreements --accept-package-agreements -e
-    $env:PATH = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    Refresh-Path
 } else {
     Write-Host "  -> Git: OK" -ForegroundColor Green
 }
@@ -91,7 +110,19 @@ Write-Host "  -> Credenciais salvas." -ForegroundColor Green
 if (Test-Path $WorkerPath) {
     Write-Host "  -> Instalando modulos do Node.js..." -ForegroundColor Gray
     Push-Location $WorkerPath
-    npm install --silent
+    Refresh-Path
+    
+    # Usa npm.cmd / cmd.exe para evitar bloqueio de ExecutionPolicy no npm.ps1 do PowerShell
+    $npmCmd = "C:\Program Files\nodejs\npm.cmd"
+    if (-not (Test-Path $npmCmd)) {
+        $npmCmd = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+    }
+    
+    if ($npmCmd -and (Test-Path $npmCmd)) {
+        & $npmCmd install --no-audit --no-fund
+    } else {
+        cmd.exe /c "npm install --no-audit --no-fund"
+    }
     Pop-Location
 }
 
@@ -99,8 +130,15 @@ if (Test-Path $WorkerPath) {
 Write-Host ""
 Write-Host "[4/4] Configurando inicializacao automatica com Windows..." -ForegroundColor Yellow
 
+Refresh-Path
 $NodeExe = (Get-Command node -ErrorAction SilentlyContinue).Source
-if (-not $NodeExe) { $NodeExe = "C:\Program Files\nodejs\node.exe" }
+if (-not $NodeExe -or -not (Test-Path $NodeExe)) {
+    if (Test-Path "C:\Program Files\nodejs\node.exe") {
+        $NodeExe = "C:\Program Files\nodejs\node.exe"
+    } else {
+        $NodeExe = "node.exe"
+    }
+}
 
 $IndexJs  = Join-Path $WorkerPath "src\index.js"
 $VbsPath  = Join-Path $WorkerPath "run_worker.vbs"
