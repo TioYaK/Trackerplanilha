@@ -41,6 +41,7 @@ const AboutUs = lazy(() => import('./views/AboutUs'));
 const GuidesHub = lazy(() => import('./views/GuidesHub'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
+import GlobalSearchModal from './components/GlobalSearchModal';
 
 function ModuleFallback() {
   return (
@@ -232,6 +233,19 @@ export default function App() {
   const [inspectedPlayer, setInspectedPlayer] = useState(null);
   const [inspectedPlayerWorld, setInspectedPlayerWorld] = useState(null);
   const [previousView, setPreviousView] = useState('home');
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+
+  // Atalho Global de Busca Rápida: Ctrl + K ou Cmd + K
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchModalOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const navigateView = (view, extra = {}) => {
     if (currentView !== 'players' && view !== currentView) {
@@ -597,6 +611,7 @@ export default function App() {
         user={user}
         profile={profile}
         visibleTabs={visibleTabs ?? DEFAULT_VISIBLE_TABS}
+        onOpenSearch={() => setSearchModalOpen(true)}
       />
       
       {/* Banner de Publicidade Oficial (nunca exibe em telas de login ou institucionais para cumprir regras do AdSense) */}
@@ -624,6 +639,13 @@ export default function App() {
           onOpenFull={handleOpenFullInvestigation}
         />
       )}
+
+      <GlobalSearchModal
+        isOpen={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onNavigate={navigateView}
+        onPlayerClick={handlePlayerClick}
+      />
     </div>
   );
 }

@@ -21,7 +21,8 @@ export default function TopNav({
   isGuildMember, 
   user, 
   profile, 
-  visibleTabs 
+  visibleTabs,
+  onOpenSearch 
 }) {
   const { logout } = useAuth();
   const { activeWorld, setActiveWorld, worlds, activeWorldObj } = useWorld();
@@ -182,6 +183,19 @@ export default function TopNav({
         {/* Right Icons */}
         <div className="flex items-center space-x-2 sm:space-x-3">
           
+          {/* Botão de Busca Rápida / Spotlight (Ctrl + K) */}
+          <button
+            onClick={onOpenSearch}
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 rounded-lg border border-white/10 bg-black/60 hover:bg-white/10 text-gray-400 hover:text-white text-xs transition-all shadow-md group cursor-pointer"
+            title="Busca Rápida Global (Ctrl + K)"
+          >
+            <Search size={14} className="text-yellow-400 group-hover:scale-110 transition-transform" />
+            <span className="hidden md:inline font-sans">Buscar...</span>
+            <kbd className="hidden lg:inline-block text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-mono">
+              Ctrl K
+            </kbd>
+          </button>
+
           {/* Seletor Global de Servidor / Mundo */}
           <div className="relative group">
             <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-yellow-500/40 bg-black/60 hover:bg-black/80 text-yellow-300 font-medieval text-xs shadow-md transition-all hover:scale-105 active:scale-95" title={`Servidor Ativo: ${activeWorldObj.name}`}>
@@ -315,6 +329,20 @@ export default function TopNav({
       {mobileMenuOpen && (
         <div className="lg:hidden absolute top-16 left-0 w-full bg-black/95 border-b-2 border-tibia-border max-h-[80vh] overflow-y-auto z-50">
           <div className="p-4 space-y-6">
+            
+            {/* Busca Rápida Mobile */}
+            <div className="pb-3 border-b border-tibia-border/50">
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenSearch?.();
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-black/60 border border-yellow-500/40 text-yellow-300 font-bold text-xs"
+              >
+                <Search size={16} /> Buscar Jogador, Mundo ou Guia...
+              </button>
+            </div>
+
             {/* Seletor de Mundo Mobile */}
             <div className="pb-3 border-b border-tibia-border/50">
               <label className="block text-[11px] font-bold text-yellow-400 uppercase tracking-wider mb-2 font-medieval">
