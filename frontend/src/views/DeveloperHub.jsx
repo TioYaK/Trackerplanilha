@@ -772,7 +772,7 @@ print(data)`;
                 Escolha o Plano Ideal para a Sua Aplicação
               </h2>
               <p className="text-sm text-gray-400 font-sans">
-                Cobrança flexível em Tibia Coins (in-game) ou Pix direto. Sem burocracia, ativação imediata.
+                Pagamento exclusivo via Pix direto. Sem intermediários, ativação rápida.
               </p>
             </div>
 
@@ -790,25 +790,25 @@ print(data)`;
 
                   <div>
                     <div className="text-3xl font-bold font-medieval text-white">Grátis</div>
-                    <p className="text-xs text-gray-400 mt-1">Para membros da guilda e apoiadores com worker ativo.</p>
+                    <p className="text-xs text-gray-400 mt-1">Acesso demonstrativo para testes básicos.</p>
                   </div>
 
                   <div className="space-y-2.5 pt-4 border-t border-tibia-border text-xs text-gray-300">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-green-400 shrink-0" />
-                      <span><strong>60 requisições</strong> por minuto</span>
+                      <span><strong>15 requisições</strong> por minuto</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-green-400 shrink-0" />
-                      <span>Acesso a <code className="text-yellow-400">/character</code>, <code className="text-yellow-400">/onlines</code></span>
+                      <span>Apenas consulta de status <code className="text-yellow-400">/character</code></span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-green-400 shrink-0" />
-                      <span>Mural de Mortes Recentes <code className="text-yellow-400">/deaths</code></span>
+                      <span>1 Chave de API única</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-green-400 shrink-0" />
-                      <span>1 Chave de API ativa</span>
+                    <div className="flex items-center gap-2 text-gray-500">
+                      <span className="text-red-400 font-bold text-sm leading-none shrink-0">✕</span>
+                      <span>Sem histórico de mortes ou leilões</span>
                     </div>
                   </div>
                 </div>
@@ -840,17 +840,17 @@ print(data)`;
                       <span className="text-4xl font-bold font-medieval text-yellow-400">R$ 50,00</span>
                       <span className="text-xs text-gray-400">/ mês</span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Ativação rápida via Pix. Ideal para bots e ferramentas.</p>
+                    <p className="text-xs text-gray-400 mt-1">Ativação rápida via Pix. Ideal para bots moderados.</p>
                   </div>
 
                   <div className="space-y-2.5 pt-4 border-t border-yellow-500/20 text-xs text-gray-200">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-yellow-400 shrink-0" />
-                      <span><strong>300 requisições</strong> por minuto</span>
+                      <span><strong>100 requisições</strong> por minuto</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-yellow-400 shrink-0" />
-                      <span>Todos os endpoints com <strong>histórico estendido</strong></span>
+                      <span>Acesso a <code className="text-yellow-400">/character</code>, <code className="text-yellow-400">/onlines</code> e <code className="text-yellow-400">/deaths</code></span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-yellow-400 shrink-0" />
@@ -858,11 +858,11 @@ print(data)`;
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-yellow-400 shrink-0" />
-                      <span>Até <strong>3 Chaves de API</strong> simultâneas</span>
+                      <span>Até <strong>2 Chaves de API</strong> simultâneas</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-yellow-400 shrink-0" />
-                      <span>Suporte técnico prioritário via Discord</span>
+                      <span>Suporte técnico via Discord</span>
                     </div>
                   </div>
                 </div>
@@ -885,7 +885,7 @@ print(data)`;
                     <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
                       Guild Enterprise
                     </span>
-                    <span className="text-xs text-purple-400 font-bold">War & High Frequency</span>
+                    <span className="text-xs text-purple-400 font-bold">War & Espionagem</span>
                   </div>
 
                   <div>
@@ -899,7 +899,7 @@ print(data)`;
                   <div className="space-y-2.5 pt-4 border-t border-tibia-border text-xs text-gray-300">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-purple-400 shrink-0" />
-                      <span><strong>1.200 requisições</strong> por minuto</span>
+                      <span><strong>400 requisições</strong> por minuto</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-purple-400 shrink-0" />
@@ -907,7 +907,7 @@ print(data)`;
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-purple-400 shrink-0" />
-                      <span>Chaves de API ilimitadas para múltiplos bots</span>
+                      <span>Até <strong>5 Chaves de API</strong> simultâneas</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={14} className="text-purple-400 shrink-0" />

@@ -73,7 +73,7 @@ export async function validateApiKey(req, res) {
   }
 
   // Rate Limiting por Minuto
-  const rateLimit = foundKey.rate_limit || (foundKey.tier === 'ENTERPRISE' ? 1200 : foundKey.tier === 'PRO' ? 300 : 60);
+  const rateLimit = foundKey.rate_limit || (foundKey.tier === 'ENTERPRISE' ? 400 : foundKey.tier === 'PRO' ? 100 : 15);
   const now = Date.now();
   const bucket = rateLimitBuckets.get(keyStr) || { count: 0, resetAt: now + 60000 };
 
