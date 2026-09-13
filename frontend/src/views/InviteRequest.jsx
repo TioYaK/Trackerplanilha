@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { parseUtcDate } from '../lib/tibiaUtils';
 import { Shield, UserPlus, Info, CheckCircle2, AlertCircle, RefreshCw, Server, Send } from 'lucide-react';
-import { WORLDS_LIST } from '../context/WorldContext';
+import { WORLDS_LIST, useWorld } from '../context/WorldContext';
 
 export default function InviteRequest({ isPublic = false, defaultCharacter = '' }) {
+  const { activeWorld } = useWorld();
   const [clientId] = useState(() => {
     let id = localStorage.getItem('invite_client_id');
     if (!id) {
@@ -15,7 +16,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
   });
 
   const [characterName, setCharacterName] = useState(defaultCharacter || '');
-  const [world, setWorld] = useState('Auroria');
+  const [world, setWorld] = useState(() => (activeWorld && activeWorld !== 'ALL' ? activeWorld : 'Auroria'));
   const [status, setStatus] = useState('idle'); // idle, loading, success, error
   const [message, setMessage] = useState('');
   const [recentInvites, setRecentInvites] = useState([]);
@@ -23,6 +24,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [worldFilter, setWorldFilter] = useState('ALL');
 
   useEffect(() => {
     if (defaultCharacter && !characterName) {
@@ -122,13 +124,13 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
   const getStatusBadge = (status, msg) => {
     if (status === 'SUCCESS') return <span className="px-2 py-1 bg-green-900/40 text-green-400 border border-green-500/50 rounded text-xs font-semibold">Sucesso</span>;
     if (status === 'FAILED') return <span className="px-2 py-1 bg-red-900/40 text-red-400 border border-red-500/50 rounded text-xs font-semibold" title={msg}>Falha</span>;
-    if (status === 'IN_PROGRESS') return <span className="px-2 py-1 bg-cyan-900/40 text-cyan-400 border border-cyan-500/50 rounded text-xs animate-pulse font-semibold">Processando</span>;
+    if (status === 'IN_PROGRESS' || status === 'PROCESSING') return <span className="px-2 py-1 bg-cyan-900/40 text-cyan-400 border border-cyan-500/50 rounded text-xs animate-pulse font-semibold">Processando</span>;
     return <span className="px-2 py-1 bg-yellow-900/40 text-yellow-400 border border-yellow-500/50 rounded text-xs font-semibold">Na Fila</span>;
   };
 
   const getDetailsText = (inv) => {
     if (inv.status === 'SUCCESS') return 'Convite enviado in-game';
-    if (inv.status === 'IN_PROGRESS') return 'Enviando convite...';
+    if (inv.status === 'IN_PROGRESS' || inv.status === 'PROCESSING') return 'Enviando convite...';
     if (inv.status === 'PENDING') {
       if (inv.world === 'Malveria') return 'Em breve...';
       return inv.error_message || 'Aguardando robô...';
@@ -136,10 +138,31 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
     return inv.error_message || 'Falha ao convidar';
   };
 
+  const pendingCount = recentInvites.filter(i => i.status === 'PENDING').length;
+  const processingCount = recentInvites.filter(i => i.status === 'IN_PROGRESS' || i.status === 'PROCESSING').length;
+  const successCount = recentInvites.filter(i => i.status === 'SUCCESS').length;
+  const failedCount = recentInvites.filter(i => i.status === 'FAILED').length;
+
   const filteredInvites = recentInvites.filter(inv => {
     const matchName = (inv.character_name || '').toLowerCase().includes((searchTerm || '').toLowerCase());
-    const matchStatus = statusFilter === 'ALL' || inv.status === statusFilter;
-    return matchName && matchStatus;
+    
+    // Filtro de status (inclui suporte para 'PROCESSING' / 'IN_PROGRESS')
+    let matchStatus = true;
+    if (statusFilter === 'PROCESSING') {
+      matchStatus = inv.status === 'IN_PROGRESS' || inv.status === 'PROCESSING';
+    } else if (statusFilter === 'PENDING') {
+      matchStatus = inv.status === 'PENDING';
+    } else if (statusFilter !== 'ALL') {
+      matchStatus = inv.status === statusFilter;
+    }
+
+    // Filtro de mundo
+    let matchWorld = true;
+    if (worldFilter !== 'ALL') {
+      matchWorld = (inv.world || '').toLowerCase() === worldFilter.toLowerCase();
+    }
+
+    return matchName && matchStatus && matchWorld;
   });
 
   return (
@@ -167,13 +190,38 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
             </div>
           </div>
 
-          {/* BADGES DOS MUNDOS COBERTOS */}
+          {/* BADGES DOS MUNDOS COBERTOS (FILTROS RÁPIDOS) */}
           <div className="flex flex-wrap gap-2 text-xs shrink-0 max-w-md">
-            {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => (
-              <div key={w.id} className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-                <span>{w.icon}</span> <span>{w.name}</span>
-              </div>
-            ))}
+            <button
+              type="button"
+              onClick={() => setWorldFilter('ALL')}
+              className={`px-2.5 py-1 rounded-lg font-sans flex items-center gap-1.5 transition-all text-xs cursor-pointer ${
+                worldFilter === 'ALL'
+                  ? 'bg-yellow-500 text-black font-bold shadow-md ring-1 ring-yellow-400'
+                  : 'bg-black/60 border border-white/15 text-gray-300 hover:border-yellow-500/50 hover:text-white'
+              }`}
+              title="Mostrar convites de todos os mundos"
+            >
+              <span>🌐</span> <span>Todos</span>
+            </button>
+            {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => {
+              const isSelected = worldFilter.toLowerCase() === w.id.toLowerCase();
+              return (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setWorldFilter(isSelected ? 'ALL' : w.id)}
+                  className={`px-2.5 py-1 rounded-lg font-sans flex items-center gap-1.5 transition-all text-xs cursor-pointer ${
+                    isSelected
+                      ? 'bg-yellow-500/20 border-2 border-yellow-400 text-yellow-300 font-bold shadow-md scale-105'
+                      : 'bg-black/60 border border-white/15 text-gray-300 hover:border-yellow-500/50 hover:text-white'
+                  }`}
+                  title={`Filtrar convites do servidor ${w.name}`}
+                >
+                  <span>{w.icon}</span> <span>{w.name}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -264,34 +312,139 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
 
         {/* TABELA DE CONVITES RECENTES */}
         <div className="lg:w-2/3 w-full bg-tibia-card border-2 border-tibia-border rounded-xl shadow-xl flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-tibia-border bg-black/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h2 className="text-base sm:text-lg font-medieval font-bold text-tibia-highlight">
-                Fila de Processamento de Convites
-              </h2>
-              <span className="text-xs text-gray-400 font-sans">
-                {isPublic ? 'Seus convites solicitados nesta sessão' : 'Últimos 100 convites solicitados (Tempo Real)'}
-              </span>
+          <div className="p-4 border-b border-tibia-border bg-black/40 flex flex-col gap-3">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-base sm:text-lg font-medieval font-bold text-tibia-highlight flex items-center gap-2">
+                  <Server size={18} className="text-yellow-400" />
+                  Fila de Processamento de Convites
+                </h2>
+                <div className="text-xs text-gray-400 font-sans flex flex-wrap items-center gap-2 mt-0.5">
+                  <span>{isPublic ? 'Seus convites solicitados nesta sessão' : 'Últimos 100 convites solicitados (Tempo Real)'}</span>
+                  {worldFilter !== 'ALL' && (
+                    <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-[11px] font-semibold">
+                      Mundo: {worldFilter}
+                    </span>
+                  )}
+                  {statusFilter !== 'ALL' && (
+                    <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[11px] font-semibold">
+                      Status: {statusFilter === 'PROCESSING' ? 'Processando' : statusFilter}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <input 
+                  type="text" 
+                  placeholder="Buscar por nick..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-[#101010] border border-tibia-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:border-tibia-highlight text-white min-w-[130px]"
+                />
+
+                {/* Filtro por Mundo */}
+                <select 
+                  value={worldFilter}
+                  onChange={(e) => setWorldFilter(e.target.value)}
+                  className="bg-[#101010] border border-tibia-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:border-tibia-highlight text-white font-sans cursor-pointer"
+                  title="Filtrar por mundo"
+                >
+                  <option value="ALL">🌍 Todos os Mundos</option>
+                  {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => (
+                    <option key={w.id} value={w.id}>{w.icon} {w.name} ({w.type})</option>
+                  ))}
+                </select>
+
+                {/* Filtro por Status */}
+                <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-[#101010] border border-tibia-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:border-tibia-highlight text-white font-sans cursor-pointer"
+                  title="Filtrar por status"
+                >
+                  <option value="ALL">📋 Todos ({recentInvites.length})</option>
+                  <option value="PROCESSING">⚡ Processando ({processingCount})</option>
+                  <option value="PENDING">⏳ Na Fila ({pendingCount})</option>
+                  <option value="SUCCESS">✅ Sucesso ({successCount})</option>
+                  <option value="FAILED">❌ Falhas ({failedCount})</option>
+                </select>
+              </div>
             </div>
-            
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <input 
-                type="text" 
-                placeholder="Filtrar por nick..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-[#101010] border border-tibia-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:border-tibia-highlight text-white"
-              />
-              <select 
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-[#101010] border border-tibia-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:border-tibia-highlight text-white"
+
+            {/* Quick Status Badges */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-white/5">
+              <span className="text-[11px] text-gray-400 font-sans mr-1">Filtro rápido:</span>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('ALL')}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                  statusFilter === 'ALL'
+                    ? 'bg-yellow-500 text-black shadow'
+                    : 'bg-black/50 text-gray-400 hover:text-white border border-tibia-border'
+                }`}
               >
-                <option value="ALL">Todos os Status</option>
-                <option value="PENDING">Pendentes</option>
-                <option value="SUCCESS">Sucesso</option>
-                <option value="FAILED">Falhas</option>
-              </select>
+                Todos ({recentInvites.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'PROCESSING' ? 'ALL' : 'PROCESSING')}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                  statusFilter === 'PROCESSING'
+                    ? 'bg-cyan-500 text-black shadow animate-pulse'
+                    : 'bg-cyan-950/40 text-cyan-400 hover:bg-cyan-900/60 border border-cyan-500/40'
+                }`}
+              >
+                <RefreshCw size={10} className={statusFilter === 'PROCESSING' ? 'animate-spin' : ''} />
+                Processando ({processingCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'PENDING' ? 'ALL' : 'PENDING')}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                  statusFilter === 'PENDING'
+                    ? 'bg-yellow-600 text-black shadow'
+                    : 'bg-yellow-950/40 text-yellow-400 hover:bg-yellow-900/60 border border-yellow-500/40'
+                }`}
+              >
+                Na Fila ({pendingCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'SUCCESS' ? 'ALL' : 'SUCCESS')}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                  statusFilter === 'SUCCESS'
+                    ? 'bg-green-600 text-black shadow'
+                    : 'bg-green-950/40 text-green-400 hover:bg-green-900/60 border border-green-500/40'
+                }`}
+              >
+                Sucesso ({successCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'FAILED' ? 'ALL' : 'FAILED')}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                  statusFilter === 'FAILED'
+                    ? 'bg-red-600 text-white shadow'
+                    : 'bg-red-950/40 text-red-400 hover:bg-red-900/60 border border-red-500/40'
+                }`}
+              >
+                Falhas ({failedCount})
+              </button>
+
+              {(worldFilter !== 'ALL' || statusFilter !== 'ALL' || searchTerm) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorldFilter('ALL');
+                    setStatusFilter('ALL');
+                    setSearchTerm('');
+                  }}
+                  className="ml-auto text-[11px] text-yellow-400 hover:underline cursor-pointer"
+                >
+                  ✕ Limpar filtros
+                </button>
+              )}
             </div>
           </div>
 
