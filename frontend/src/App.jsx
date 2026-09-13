@@ -49,6 +49,8 @@ const ForgeCalculator = lazy(() => import('./views/ForgeCalculator'));
 const BossTracker = lazy(() => import('./views/BossTracker'));
 const DailyRoulette = lazy(() => import('./views/DailyRoulette'));
 const WheelOfDestiny = lazy(() => import('./views/WheelOfDestiny'));
+const PlayerInvestigation = lazy(() => import('./views/PlayerInvestigation'));
+const LiveWarFeed = lazy(() => import('./views/LiveWarFeed'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import GlobalSearchModal from './components/GlobalSearchModal';
@@ -115,6 +117,15 @@ const ROUTE_TO_VIEW = {
   '/party-finder': 'party_finder',
   '/party-search': 'party_finder',
   '/vagas': 'party_finder',
+  '/investigacao': 'investigation',
+  '/spy-pro': 'investigation',
+  '/investigar': 'investigation',
+  '/makers': 'investigation',
+  '/war-feed': 'war_feed',
+  '/massacres': 'war_feed',
+  '/treta': 'war_feed',
+  '/feed-war': 'war_feed',
+  '/frags-live': 'war_feed',
   '/loot': 'loot_splitter',
   '/loot-split': 'loot_splitter',
   '/divisao': 'loot_splitter',
@@ -549,6 +560,23 @@ export default function App() {
     }
     if (currentView === 'party_finder') {
       return <PartyFinder onPlayerClick={handlePlayerClick} onNavigate={navigateView} user={user} profile={profile} />;
+    }
+    if (currentView === 'investigation') {
+      return (
+        <PlayerInvestigation 
+          onPlayerClick={handlePlayerClick} 
+          onNavigate={navigateView} 
+          isAdmin={isAdmin} 
+        />
+      );
+    }
+    if (currentView === 'war_feed') {
+      return (
+        <LiveWarFeed 
+          onPlayerClick={handlePlayerClick} 
+          onNavigate={navigateView} 
+        />
+      );
     }
     if (currentView === 'sorteio' || currentView === 'giveaway') {
       return (
