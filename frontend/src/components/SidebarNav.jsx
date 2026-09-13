@@ -16,6 +16,7 @@ export const NAVIGATION_GROUPS = [
     title: 'Guerra & Inteligência',
     icon: Swords,
     accentColor: 'text-red-400',
+    iconBg: 'bg-red-500/10 border-red-500/25',
     borderColor: 'border-red-500/30',
     bgGradient: 'from-red-950/30 to-transparent',
     items: [
@@ -31,6 +32,7 @@ export const NAVIGATION_GROUPS = [
     title: 'Endgame & Respawns',
     icon: Skull,
     accentColor: 'text-rose-400',
+    iconBg: 'bg-rose-500/10 border-rose-500/25',
     borderColor: 'border-rose-500/30',
     bgGradient: 'from-rose-950/30 to-transparent',
     items: [
@@ -46,6 +48,7 @@ export const NAVIGATION_GROUPS = [
     title: 'Bazaar & Economia',
     icon: Gem,
     accentColor: 'text-emerald-400',
+    iconBg: 'bg-emerald-500/10 border-emerald-500/25',
     borderColor: 'border-emerald-500/30',
     bgGradient: 'from-emerald-950/30 to-transparent',
     items: [
@@ -61,6 +64,7 @@ export const NAVIGATION_GROUPS = [
     title: 'Automação & Spy',
     icon: Bell,
     accentColor: 'text-indigo-400',
+    iconBg: 'bg-indigo-500/10 border-indigo-500/25',
     borderColor: 'border-indigo-500/30',
     bgGradient: 'from-indigo-950/30 to-transparent',
     items: [
@@ -74,6 +78,7 @@ export const NAVIGATION_GROUPS = [
     title: 'Comunidade & Social',
     icon: Users,
     accentColor: 'text-yellow-400',
+    iconBg: 'bg-yellow-500/10 border-yellow-500/25',
     borderColor: 'border-yellow-500/30',
     bgGradient: 'from-yellow-950/30 to-transparent',
     items: [
@@ -180,17 +185,19 @@ export default function SidebarNav({
       {mobileOpen && (
         <div 
           onClick={() => setMobileOpen(false)}
-          className="fixed inset-0 z-40 bg-black/85 backdrop-blur-sm lg:hidden transition-opacity"
+          className="fixed inset-0 z-40 bg-black/85 backdrop-blur-md lg:hidden transition-opacity"
         />
       )}
 
       {/* Sidebar Container */}
       <aside className={`
         fixed top-0 bottom-0 left-0 z-50 
-        bg-[#07080c] text-gray-200
-        border-r border-tibia-border/70 
+        bg-[#07080c]/98 text-gray-200
+        border-r border-yellow-500/15
         flex flex-col justify-between 
-        transition-all duration-300 ease-in-out shadow-2xl
+        transition-all duration-300 ease-in-out
+        shadow-[4px_0_30px_rgba(0,0,0,0.85)]
+        backdrop-blur-2xl
         ${isCollapsed ? 'w-[72px]' : 'w-64 sm:w-72'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
@@ -198,24 +205,25 @@ export default function SidebarNav({
         {/* ===================================================================== */}
         {/* TOPO: LOGO & STATUS DO SERVIDOR                                        */}
         {/* ===================================================================== */}
-        <div className="p-3.5 border-b border-white/10 flex items-center justify-between gap-2 shrink-0 bg-gradient-to-r from-yellow-950/30 via-transparent to-transparent">
+        <div className="p-3.5 border-b border-white/10 flex items-center justify-between gap-2 shrink-0 bg-gradient-to-r from-yellow-950/40 via-amber-950/15 to-transparent">
           
           {/* Logo & Marca */}
           <div 
             onClick={() => handleNavClick('home')}
             className="flex items-center gap-2.5 cursor-pointer overflow-hidden group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-500/30 via-amber-600/20 to-black border border-yellow-500/60 flex items-center justify-center shrink-0 shadow-lg shadow-yellow-500/10 group-hover:scale-105 transition-transform">
-              <span className="text-xl">👑</span>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-500/30 via-amber-600/20 to-black border border-yellow-500/60 flex items-center justify-center shrink-0 shadow-lg shadow-yellow-500/20 group-hover:scale-105 group-hover:border-yellow-400 transition-all duration-300">
+              <span className="text-xl filter drop-shadow-[0_2px_4px_rgba(234,179,8,0.5)]">👑</span>
             </div>
 
             {!isCollapsed && (
               <div className="flex flex-col leading-tight animate-fade-in truncate">
-                <span className="font-medieval text-base sm:text-lg text-gradient-gold tracking-wide truncate">
+                <span className="font-medieval text-base sm:text-lg text-gradient-gold tracking-wide truncate group-hover:brightness-110 transition-all">
                   RubinOT Tracker
                 </span>
-                <span className="text-[10px] text-gray-400 font-mono tracking-widest uppercase flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> 16 Mundos Online
+                <span className="text-[10px] text-gray-400 font-mono tracking-widest uppercase flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80] animate-pulse" /> 
+                  <span>16 Mundos Online</span>
                 </span>
               </div>
             )}
@@ -225,7 +233,8 @@ export default function SidebarNav({
           <div className="flex items-center">
             <button
               onClick={() => setMobileOpen(false)}
-              className="lg:hidden p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white"
+              className="lg:hidden p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+              title="Fechar menu"
             >
               <X size={18} />
             </button>
@@ -233,7 +242,7 @@ export default function SidebarNav({
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               title={isCollapsed ? 'Expandir Menu Completo' : 'Recolher para Modo Dock'}
-              className="hidden lg:flex p-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-yellow-400 transition-all"
+              className="hidden lg:flex p-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-yellow-400 hover:border-yellow-500/40 transition-all"
             >
               {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             </button>
@@ -245,7 +254,7 @@ export default function SidebarNav({
         {/* BUSCA RÁPIDA DE FERRAMENTAS NA SIDEBAR                                 */}
         {/* ===================================================================== */}
         {!isCollapsed && (
-          <div className="px-3 pt-3 pb-1">
+          <div className="px-3 pt-3 pb-1 shrink-0">
             <div className="relative">
               <Search className="absolute left-2.5 top-2 text-gray-500" size={13} />
               <input
@@ -253,12 +262,13 @@ export default function SidebarNav({
                 placeholder="Filtrar ferramentas..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                className="w-full bg-black/70 border border-white/10 hover:border-yellow-500/40 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-all"
+                className="w-full bg-black/60 border border-white/10 hover:border-yellow-500/40 rounded-xl pl-8 pr-7 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-yellow-500/80 focus:ring-1 focus:ring-yellow-500/30 transition-all"
               />
               {searchFilter && (
                 <button
                   onClick={() => setSearchFilter('')}
-                  className="absolute right-2 top-1.5 text-gray-500 hover:text-white text-xs"
+                  className="absolute right-2 top-1.5 text-gray-500 hover:text-white text-xs p-0.5"
+                  title="Limpar filtro"
                 >
                   <X size={12} />
                 </button>
@@ -270,14 +280,14 @@ export default function SidebarNav({
         {/* ===================================================================== */}
         {/* NAVEGAÇÃO PRINCIPAL COM ACORDEÕES E SUBMENUS                           */}
         {/* ===================================================================== */}
-        <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-2.5 py-2.5 space-y-2.5 custom-scrollbar">
           
           {/* ATALHOS PRINCIPAIS EM DESTAQUE (Topo fixo) */}
           <div className="space-y-1 pb-2 border-b border-white/5">
             {[
-              { id: 'live', label: 'Portal Central Rubinot', icon: Globe, color: 'text-amber-400' },
-              { id: 'companion', label: 'Mini HUD Gamer (Monitor 2)', icon: Monitor, color: 'text-cyan-400', badge: 'HOT', badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' },
-              { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas', icon: Compass, color: 'text-yellow-400', badge: 'NOVO', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' }
+              { id: 'live', label: 'Portal Central Rubinot', icon: Globe, color: 'text-amber-400', activeStyle: 'from-amber-500/25 via-amber-500/10 to-transparent border-amber-400' },
+              { id: 'companion', label: 'Mini HUD Gamer (Monitor 2)', icon: Monitor, color: 'text-cyan-400', badge: 'HOT', badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40', activeStyle: 'from-cyan-500/25 via-cyan-500/10 to-transparent border-cyan-400' },
+              { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas', icon: Compass, color: 'text-yellow-400', badge: 'NOVO', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40', activeStyle: 'from-yellow-500/25 via-yellow-500/10 to-transparent border-yellow-400' }
             ].map(item => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
@@ -290,13 +300,15 @@ export default function SidebarNav({
                       w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-xs font-semibold
                       transition-all duration-200 relative select-none
                       ${isActive 
-                        ? 'bg-gradient-to-r from-yellow-500/25 via-yellow-500/10 to-transparent text-yellow-300 border-l-2 border-yellow-400 font-bold shadow-md shadow-yellow-500/5' 
+                        ? `bg-gradient-to-r ${item.activeStyle} text-yellow-300 border-l-2 font-bold shadow-md shadow-yellow-500/10` 
                         : 'text-gray-300 hover:text-white hover:bg-white/5 hover:translate-x-1'
                       }
                       ${isCollapsed ? 'justify-center px-0' : ''}
                     `}
                   >
-                    <Icon size={17} className={`shrink-0 ${isActive ? 'text-yellow-400' : item.color}`} />
+                    <div className={`p-1 rounded-lg ${isActive ? 'bg-yellow-500/20' : 'bg-white/5'} shrink-0`}>
+                      <Icon size={16} className={isActive ? 'text-yellow-400' : item.color} />
+                    </div>
 
                     {!isCollapsed && (
                       <span className="truncate flex-1 text-left">
@@ -313,7 +325,7 @@ export default function SidebarNav({
 
                   {/* Tooltip no Modo Dock (72px) */}
                   {isCollapsed && (
-                    <div className="opacity-0 group-hover:opacity-100 pointer-events-none fixed left-[76px] z-50 px-3 py-1.5 rounded-xl bg-black/95 border border-yellow-500/50 text-xs font-bold text-yellow-300 whitespace-nowrap shadow-2xl transition-opacity flex items-center gap-2">
+                    <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-none absolute left-[68px] top-1/2 -translate-y-1/2 z-50 px-3 py-1.5 rounded-xl bg-[#0c0d14]/95 border border-yellow-500/50 text-xs font-bold text-yellow-300 whitespace-nowrap shadow-2xl backdrop-blur-md transition-all flex items-center gap-2">
                       <span>{item.label}</span>
                       {item.badge && (
                         <span className={`text-[9px] px-1 py-0.5 rounded border ${item.badgeColor}`}>
@@ -339,7 +351,7 @@ export default function SidebarNav({
                   key={group.id} 
                   className={`rounded-2xl transition-all duration-200 border ${
                     hasActiveChild 
-                      ? 'bg-white/[0.02] border-white/10' 
+                      ? 'bg-white/[0.03] border-white/10 shadow-sm' 
                       : 'border-transparent hover:border-white/5'
                   }`}
                 >
@@ -351,14 +363,21 @@ export default function SidebarNav({
                       className={`
                         w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold
                         transition-all select-none
-                        ${hasActiveChild ? 'text-yellow-400' : 'text-gray-400 hover:text-gray-200'}
+                        ${hasActiveChild ? 'text-yellow-400' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}
                         ${isCollapsed ? 'justify-center px-0' : ''}
                       `}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <GroupIcon size={16} className={`shrink-0 ${hasActiveChild ? 'text-yellow-400' : group.accentColor}`} />
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border ${
+                          hasActiveChild 
+                            ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300 shadow-[0_0_10px_rgba(234,179,8,0.2)]' 
+                            : `${group.iconBg} ${group.accentColor}`
+                        }`}>
+                          <GroupIcon size={14} />
+                        </div>
+                        
                         {!isCollapsed && (
-                          <span className="truncate uppercase text-[11px] tracking-wider">
+                          <span className="truncate uppercase text-[11px] tracking-wider font-semibold">
                             {group.title}
                           </span>
                         )}
@@ -366,12 +385,12 @@ export default function SidebarNav({
 
                       {!isCollapsed && (
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-gray-500 font-mono px-1 rounded bg-white/5">
+                          <span className="text-[10px] text-gray-500 font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/5">
                             {group.items.length}
                           </span>
                           <ChevronDown 
                             size={13} 
-                            className={`text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+                            className={`text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180 text-yellow-400' : ''}`} 
                           />
                         </div>
                       )}
@@ -379,33 +398,44 @@ export default function SidebarNav({
 
                     {/* Popover flutuante no modo Dock (72px) ao passar o mouse */}
                     {isCollapsed && (
-                      <div className="opacity-0 group-hover:opacity-100 pointer-events-auto fixed left-[76px] z-50 py-2 px-3 rounded-2xl bg-black/95 border border-yellow-500/50 shadow-2xl transition-opacity flex flex-col gap-1 min-w-[200px]">
-                        <span className="text-[10px] font-bold uppercase text-yellow-400 tracking-wider pb-1 border-b border-white/10">
-                          {group.title}
-                        </span>
-                        {group.items.map(child => (
-                          <button
-                            key={child.id}
-                            onClick={() => handleNavClick(child.id)}
-                            className={`flex items-center justify-between text-left text-xs py-1.5 px-2 rounded-lg transition-colors ${
-                              currentView === child.id ? 'bg-yellow-500/20 text-yellow-300 font-bold' : 'text-gray-300 hover:bg-white/10'
-                            }`}
-                          >
-                            <span>{child.label}</span>
-                            {child.badge && (
-                              <span className={`text-[9px] px-1 rounded border ${child.badgeColor || 'border-yellow-500/30'}`}>
-                                {child.badge}
-                              </span>
-                            )}
-                          </button>
-                        ))}
+                      <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-auto absolute left-[68px] top-0 z-50 py-2.5 px-3 rounded-2xl bg-[#0c0d14]/95 backdrop-blur-xl border border-yellow-500/40 shadow-2xl transition-all duration-150 flex flex-col gap-1 min-w-[230px]">
+                        <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-white/10">
+                          <span className="text-[10px] font-bold uppercase text-yellow-400 tracking-wider flex items-center gap-1.5">
+                            <GroupIcon size={12} />
+                            {group.title}
+                          </span>
+                          <span className="text-[9px] text-gray-400 font-mono bg-white/10 px-1 rounded">
+                            {group.items.length}
+                          </span>
+                        </div>
+
+                        <div className="max-h-[300px] overflow-y-auto space-y-0.5 custom-scrollbar pr-1">
+                          {group.items.map(child => (
+                            <button
+                              key={child.id}
+                              onClick={() => handleNavClick(child.id)}
+                              className={`w-full flex items-center justify-between text-left text-xs py-1.5 px-2 rounded-lg transition-all ${
+                                currentView === child.id 
+                                  ? 'bg-yellow-500/20 text-yellow-300 font-bold border border-yellow-500/30' 
+                                  : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                              }`}
+                            >
+                              <span className="truncate">{child.label}</span>
+                              {child.badge && (
+                                <span className={`text-[9px] px-1 rounded border shrink-0 ${child.badgeColor || 'border-yellow-500/30'}`}>
+                                  {child.badge}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
 
                   {/* ITENS DO SUBMENU (EXPANDIDO) COM LINHA GUIA ELEGANTE */}
                   {!isCollapsed && isOpen && (
-                    <div className="ml-4 pl-2.5 border-l border-white/10 space-y-0.5 py-1 animate-fade-in">
+                    <div className="ml-5 pl-3 border-l border-white/10 space-y-0.5 py-1 animate-fade-in relative">
                       {group.items.map(item => {
                         const ItemIcon = item.icon;
                         const isActive = currentView === item.id;
@@ -416,15 +446,19 @@ export default function SidebarNav({
                             onClick={() => handleNavClick(item.id)}
                             className={`
                               w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium
-                              transition-all duration-150 select-none
+                              transition-all duration-150 select-none group/item relative
                               ${isActive 
-                                ? 'bg-yellow-500/20 text-yellow-300 font-bold shadow-sm' 
+                                ? 'bg-yellow-500/20 text-yellow-300 font-bold shadow-[0_0_12px_rgba(234,179,8,0.15)] border border-yellow-500/30' 
                                 : 'text-gray-400 hover:text-gray-200 hover:bg-white/5 hover:translate-x-1'
                               }
                             `}
                           >
                             <div className="flex items-center gap-2 truncate">
-                              <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-yellow-400' : 'bg-gray-600'}`} />
+                              <span className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
+                                isActive 
+                                  ? 'bg-yellow-400 shadow-[0_0_6px_#facc15] scale-125' 
+                                  : 'bg-gray-600 group-hover/item:bg-gray-400'
+                              }`} />
                               <span className="truncate">{item.label}</span>
                             </div>
 
@@ -449,26 +483,26 @@ export default function SidebarNav({
         {/* ===================================================================== */}
         {/* RODAPÉ DA SIDEBAR: CARD DO USUÁRIO & LOGIN                              */}
         {/* ===================================================================== */}
-        <div className="p-3 border-t border-white/10 bg-black/60 shrink-0">
+        <div className="p-3 border-t border-white/10 bg-black/70 shrink-0">
           
           {user ? (
             <div className="flex items-center justify-between gap-2">
               <div 
                 onClick={onOpenProfile}
-                className={`flex items-center gap-2.5 cursor-pointer flex-1 min-w-0 ${isCollapsed ? 'justify-center' : ''}`}
+                className={`flex items-center gap-2.5 cursor-pointer flex-1 min-w-0 group ${isCollapsed ? 'justify-center' : ''}`}
                 title="Abrir Meu Perfil"
               >
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/30 to-black border border-yellow-500/50 flex items-center justify-center text-yellow-300 font-bold shrink-0 text-xs shadow-inner">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/30 to-black border border-yellow-500/50 flex items-center justify-center text-yellow-300 font-bold shrink-0 text-xs shadow-inner group-hover:border-yellow-400 transition-colors">
                   {profile?.main_character ? profile.main_character.charAt(0).toUpperCase() : 'U'}
                 </div>
 
                 {!isCollapsed && (
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-bold text-gray-200 truncate">
+                    <span className="text-xs font-bold text-gray-200 truncate group-hover:text-yellow-400 transition-colors">
                       {profile?.main_character || user.email?.split('@')[0]}
                     </span>
-                    <span className="text-[10px] text-yellow-400 font-semibold flex items-center gap-1">
-                      {isPremium ? '👑 VIP RubinOT' : 'Membro Comum'}
+                    <span className="text-[10px] text-yellow-400/90 font-semibold flex items-center gap-1">
+                      {isPremium ? '👑 VIP RubinOT' : 'Membro RubinOT'}
                     </span>
                   </div>
                 )}
@@ -488,7 +522,7 @@ export default function SidebarNav({
             <button
               onClick={() => handleNavClick('auth')}
               className={`
-                w-full py-2 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-700 text-black font-bold font-medieval text-xs shadow-lg transition-all hover:scale-[1.02] flex items-center justify-center gap-2
+                w-full py-2 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-700 hover:from-yellow-500 hover:to-amber-600 text-black font-bold font-medieval text-xs shadow-lg transition-all hover:scale-[1.02] flex items-center justify-center gap-2
                 ${isCollapsed ? 'px-0' : 'px-3'}
               `}
             >
