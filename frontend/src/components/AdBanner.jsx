@@ -13,7 +13,7 @@ export default function AdBanner({
   responsive = true,
   className = '',
   customBadge = 'Publicidade Disponível',
-  customTitle = 'Anuncie Aqui no BattleStorm Tracker',
+  customTitle = 'Anuncie Aqui no Rubinot Tracker',
   customSubtitle = 'Divulgue sua marca, stream, guilda ou serviços para centenas de jogadores diariamente',
   customLink = 'https://discord.gg',
   customButtonText = 'Anuncie Conosco',

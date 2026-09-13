@@ -17,6 +17,8 @@ export default function AuthScreen({ onBack }) {
   const [name, setName] = useState('');
   const [mainCharacter, setMainCharacter] = useState('');
   const [ts3Nickname, setTs3Nickname] = useState('');
+  const [world, setWorld] = useState('Auroria');
+  const [guildName, setGuildName] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,24 +32,17 @@ export default function AuthScreen({ onBack }) {
       } else {
         const cleanMain = mainCharacter.trim();
         
-        // Verifica se pertence à guilda oficial
-        let isOfficialGuild = false;
-        try {
-          const { data: roster } = await supabase
-            .from('view_guild_roster')
-            .select('name')
-            .ilike('name', cleanMain)
-            .limit(1);
-          if (roster && roster.length > 0) isOfficialGuild = true;
-        } catch (e) {}
-
-        await register({ email, password, name, mainCharacter: cleanMain, ts3Nickname });
+        await register({ 
+          email, 
+          password, 
+          name, 
+          mainCharacter: cleanMain, 
+          ts3Nickname,
+          world,
+          guildName: guildName.trim()
+        });
         
-        if (isOfficialGuild) {
-          setSuccessMsg('Cadastro realizado com sucesso! Como membro da guilda oficial, sua conta aguarda ativação de um Administrador.');
-        } else {
-          setSuccessMsg('Cadastro realizado com sucesso! Sua conta do Rubinot Hub foi criada. Faça login para continuar.');
-        }
+        setSuccessMsg(`Cadastro realizado com sucesso! Sua conta do Rubinot Tracker (${world}) foi criada. Faça login para continuar.`);
         setIsLogin(true); // Volta pro login
       }
     } catch (err) {
@@ -124,11 +119,40 @@ export default function AuthScreen({ onBack }) {
                 <input
                   type="text"
                   required
-                  placeholder="Nick no TS3"
+                  placeholder="Nick no TS3 / Discord"
                   value={ts3Nickname}
                   onChange={(e) => setTs3Nickname(e.target.value)}
                   className="w-full bg-black/50 border border-tibia-border rounded pl-10 pr-3 py-2 text-white font-sans focus:outline-none focus:border-tibia-highlight transition-colors"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-sans text-gray-400 mb-1">Mundo Principal</label>
+                  <select
+                    value={world}
+                    onChange={(e) => setWorld(e.target.value)}
+                    className="w-full bg-black/50 border border-tibia-border rounded px-3 py-2 text-white font-sans text-xs focus:outline-none focus:border-tibia-highlight transition-colors"
+                  >
+                    <option value="Auroria">🛡️ Auroria</option>
+                    <option value="Belaria">⚔️ Belaria</option>
+                    <option value="Bellum">⚡ Bellum</option>
+                    <option value="Tenebrium">💀 Tenebrium</option>
+                    <option value="Vesperia">🦅 Vesperia</option>
+                    <option value="Malveria">🏹 Malveria</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-sans text-gray-400 mb-1">Sua Guilda (opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Battle Storm"
+                    value={guildName}
+                    onChange={(e) => setGuildName(e.target.value)}
+                    className="w-full bg-black/50 border border-tibia-border rounded px-3 py-2 text-white font-sans text-xs focus:outline-none focus:border-tibia-highlight transition-colors"
+                  />
+                </div>
               </div>
             </>
           )}

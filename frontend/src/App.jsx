@@ -469,22 +469,23 @@ export default function App() {
       );
     }
 
-    // 4. Abas de Gestão da Guilda 🛡️ (Gated estritamente para membros Shell Patrocina)
+    // 4. Abas de Gestão da Guilda 🛡️ (Gated para membros de guilda ativa)
     const guildViews = ['planilha', 'planilha_live', 'respawns', 'roster', 'bank', 'market', 'party'];
     if (guildViews.includes(currentView)) {
+      const activeGuildName = profile?.makers?._guild || profile?.guild_name || 'Guilda';
       const featureTitles = {
         planilha: 'Controle de Hunts & Caves',
         planilha_live: 'Monitor de Caves (Ao Vivo)',
         respawns: 'Respawns & Regras',
-        roster: 'Exército da Guilda',
-        bank: 'Tesouraria da Guilda',
+        roster: `Exército da ${activeGuildName}`,
+        bank: `Tesouraria da ${activeGuildName}`,
         market: 'Mercado Interno'
       };
 
       if (!user) {
         return (
           <GuildGate 
-            featureName={featureTitles[currentView] || 'Área Restrita da Guilda Battle Storm'}
+            featureName={featureTitles[currentView] || `Área Restrita da ${activeGuildName}`}
             onLogin={() => navigateView('auth')}
             onNavigate={navigateView}
           />
@@ -513,7 +514,7 @@ export default function App() {
       if (profile?.status !== 'active' && !isAdmin) {
         return (
           <GuildGate 
-            featureName={featureTitles[currentView] || 'Área Restrita da Guilda Battle Storm'}
+            featureName={featureTitles[currentView] || `Área Restrita da ${activeGuildName}`}
             onLogin={() => navigateView('auth')}
             onNavigate={navigateView}
           />

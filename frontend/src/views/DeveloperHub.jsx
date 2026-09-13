@@ -264,7 +264,7 @@ print(data)`;
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/50 bg-yellow-500/15 px-3.5 py-1 text-xs font-bold text-yellow-300 uppercase tracking-wider mb-3 shadow-inner">
                 <Terminal size={14} className="text-yellow-400" />
-                BattleStorm Developer API Engine
+                Rubinot Developer API Engine
               </div>
 
               <h1 className="text-3xl sm:text-5xl font-medieval text-gradient-gold drop-shadow-lg leading-tight">

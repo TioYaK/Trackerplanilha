@@ -29,6 +29,8 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
     }
   }, [defaultCharacter]);
 
+  const [customGuild, setCustomGuild] = useState('');
+
   const worldGuildMap = {
     'Auroria': 'Shellpatrocina',
     'Belaria': 'Battlestorm Belaria',
@@ -79,7 +81,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
     setStatus('loading');
     setMessage('');
 
-    const guildName = worldGuildMap[world];
+    const guildName = customGuild.trim() || worldGuildMap[world] || 'Shellpatrocina';
 
     try {
       const { error } = await supabase
@@ -97,7 +99,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
       if (error) throw error;
 
       setStatus('success');
-      setMessage(`Convite para <strong>${characterName}</strong> solicitado com sucesso!<br/>O robô oficial enviará o convite in-game no site em instantes.`);
+      setMessage(`Convite para <strong>${characterName}</strong> (Guilda: <em>${guildName}</em>) solicitado com sucesso!<br/>O robô enviará o convite in-game no site em instantes.`);
       setCharacterName('');
       fetchRecentInvites();
     } catch (err) {
@@ -132,7 +134,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
   return (
     <div className="p-4 sm:p-8 w-full max-w-[1600px] mx-auto text-tibia-highlight flex flex-col gap-6 animate-fade-in">
       
-      {/* BANNER INSTITUCIONAL: EXCLUSIVIDADE SHELL PATROCINA */}
+      {/* BANNER INSTITUCIONAL: GUILDAS DO RUBINOT */}
       <div className="w-full bg-gradient-to-r from-yellow-950/40 via-black/90 to-yellow-950/40 border-2 border-yellow-500/40 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md">
         <div className="absolute top-0 right-0 w-96 h-96 bg-yellow-500/5 rounded-full blur-3xl pointer-events-none" />
         
@@ -143,38 +145,36 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
             </div>
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-xs font-bold text-yellow-300 uppercase tracking-wider mb-1.5">
-                <Shield size={13} /> Sistema de Membros Recrutados
+                <Shield size={13} /> Sistema de Recrutamento & Convites
               </div>
               <h1 className="text-2xl sm:text-4xl font-medieval text-gradient-gold drop-shadow-md">
-                Convites In-Game • Battle Storm
+                Convites In-Game • Guildas do Rubinot
               </h1>
               <p className="text-gray-300 font-sans text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-                Este sistema automatizado de convite in-game é <strong>exclusivo para membros já recrutados</strong> da guilda <strong>Battle Storm</strong> (registrada como <strong>Shellpatrocina</strong> no Auroria) e de suas guildas nos demais servidores da rede Rubinot.
+                Emissão automatizada de convites in-game para qualquer guilda nos 6 servidores da rede Rubinot.
               </p>
             </div>
           </div>
 
           {/* BADGES DOS MUNDOS COBERTOS */}
           <div className="flex flex-wrap gap-2 text-xs shrink-0 max-w-md">
-            <div className="px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/40 text-yellow-300 font-sans flex items-center gap-1.5 shadow-sm">
-              <span>🛡️</span>
-              <span>Auroria: <strong>Shellpatrocina</strong></span>
+            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
+              <span>🛡️</span> <span>Auroria</span>
             </div>
-            <div className="px-3 py-1.5 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>⚔️</span>
-              <span>Belaria: <strong>Battlestorm</strong></span>
+            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
+              <span>⚔️</span> <span>Belaria</span>
             </div>
-            <div className="px-3 py-1.5 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>⚔️</span>
-              <span>Bellum: <strong>Battlestorm</strong></span>
+            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
+              <span>⚡</span> <span>Bellum</span>
             </div>
-            <div className="px-3 py-1.5 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>⚔️</span>
-              <span>Retro: <strong>Tenebrium</strong></span>
+            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
+              <span>💀</span> <span>Tenebrium</span>
             </div>
-            <div className="px-3 py-1.5 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>⚔️</span>
-              <span>Vesperia: <strong>Battlestorm</strong></span>
+            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
+              <span>🦅</span> <span>Vesperia</span>
+            </div>
+            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
+              <span>🏹</span> <span>Malveria</span>
             </div>
           </div>
         </div>
@@ -218,12 +218,12 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                   onChange={(e) => setWorld(e.target.value)}
                   className="w-full bg-[#101010] border border-tibia-border rounded-lg py-2.5 px-3.5 focus:outline-none focus:border-tibia-highlight text-white font-sans text-sm transition-colors cursor-pointer"
                 >
-                  <option value="Auroria">Auroria — Shellpatrocina (Rubinot)</option>
-                  <option value="Belaria">Belaria — Battlestorm Belaria</option>
-                  <option value="Bellum">Bellum — Battlestorm Bellum</option>
-                  <option value="Tenebrium">Tenebrium — Battlestorm Retro</option>
-                  <option value="Vesperia">Vesperia — Battlestorm Vesperia</option>
-                  <option value="Malveria">Malveria — Battlestorm Malveria</option>
+                  <option value="Auroria">Auroria (Open-PvP)</option>
+                  <option value="Belaria">Belaria (Open-PvP)</option>
+                  <option value="Bellum">Bellum (Open-PvP)</option>
+                  <option value="Tenebrium">Tenebrium (Retro Open-PvP)</option>
+                  <option value="Vesperia">Vesperia (Open-PvP)</option>
+                  <option value="Malveria">Malveria (Open-PvP)</option>
                 </select>
               </div>
 
@@ -231,7 +231,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
               <div className="bg-yellow-950/20 border border-yellow-500/30 rounded-lg p-3 text-[11px] text-gray-300 flex items-start gap-2">
                 <Info size={16} className="text-yellow-400 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Atenção:</strong> Uso exclusivo para membros já recrutados pela liderança da <strong>Battle Storm</strong> (Shell Patrocina). O personagem não pode pertencer a outra guilda.
+                  <strong>Atenção:</strong> Solicitação destinada aos membros recrutados pela liderança de sua guilda. O personagem não pode pertencer a outra guilda no servidor.
                 </span>
               </div>
 

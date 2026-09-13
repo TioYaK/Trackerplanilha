@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Download } from 'lucide-react';
 
-export default function ReportExport({ elementId = "report-content", filename = "Auditoria_Auroria.pdf" }) {
+export default function ReportExport({ elementId = "report-content", filename = "Auditoria_Rubinot.pdf" }) {
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExportPDF = async () => {

@@ -7,8 +7,11 @@ import {
   RefreshCw, Flame, User, Swords, Zap, ExternalLink 
 } from 'lucide-react';
 import { formatVocation } from '../lib/tibiaUtils';
+import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 
 export default function GlobalTracker({ onPlayerClick }) {
+  const { selectedWorld, setSelectedWorld, worldConfig } = useWorld();
+
   // Aba Ativa: 'server' (Monitor Global de Todo o Servidor) | 'war_room' (Sala de Guerra da Guilda)
   const [activeTab, setActiveTab] = useState('server');
 
@@ -440,8 +443,12 @@ export default function GlobalTracker({ onPlayerClick }) {
     try {
       let query = supabase
         .from('current_character_state')
-        .select('character_name, level, vocation, xp_total, last_active, session_start_xp', { count: 'exact' })
+        .select('character_name, level, vocation, xp_total, last_active, session_start_xp, world', { count: 'exact' })
         .not('level', 'is', null);
+
+      if (selectedWorld && selectedWorld !== 'ALL') {
+        query = query.eq('world', selectedWorld);
+      }
 
       if (searchTerm.trim()) {
         query = query.ilike('character_name', `%${searchTerm.trim()}%`);
@@ -511,7 +518,7 @@ export default function GlobalTracker({ onPlayerClick }) {
 
   useEffect(() => {
     fetchServerPlayers();
-  }, [searchTerm, vocFilter, sortField, page]);
+  }, [searchTerm, vocFilter, sortField, page, selectedWorld]);
 
   const formatCompactXp = (num) => {
     if (!num) return '0';
@@ -589,7 +596,7 @@ export default function GlobalTracker({ onPlayerClick }) {
             }`}
           >
             <Shield size={18} />
-            Sala de Guerra & BI (Battle Storm)
+            Sala de Guerra & Inteligência Tática
           </button>
         </div>
 
@@ -676,6 +683,22 @@ export default function GlobalTracker({ onPlayerClick }) {
                 <option value="Monk">Monks</option>
               </select>
 
+              {/* Filtro de Mundo */}
+              <select
+                value={selectedWorld}
+                onChange={(e) => {
+                  setSelectedWorld(e.target.value);
+                  setPage(0);
+                }}
+                className="bg-black/80 border border-yellow-500/30 text-xs text-yellow-300 rounded-xl px-3 py-2.5 focus:outline-none focus:border-yellow-500 font-bold"
+              >
+                {WORLDS_LIST.map(w => (
+                  <option key={w.id} value={w.id} className="bg-gray-900 text-white">
+                    {w.icon} {w.name}
+                  </option>
+                ))}
+              </select>
+
               {/* Filtro de Afiliação */}
               <select
                 value={affiliationFilter}
@@ -683,7 +706,7 @@ export default function GlobalTracker({ onPlayerClick }) {
                 className="bg-black/80 border border-white/15 text-xs text-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-yellow-500"
               >
                 <option value="ALL">Todas as Afiliações</option>
-                <option value="guild">🛡️ Guilda Battle Storm</option>
+                <option value="guild">🛡️ Membros da Guilda</option>
                 <option value="hunted">💀 Rivais / Hunted</option>
               </select>
 
@@ -733,6 +756,7 @@ export default function GlobalTracker({ onPlayerClick }) {
                         <tr>
                           <th className="py-3.5 px-4">#</th>
                           <th className="py-3.5 px-4">Personagem</th>
+                          <th className="py-3.5 px-4">Mundo</th>
                           <th className="py-3.5 px-4">Vocação</th>
                           <th className="py-3.5 px-4">Nível</th>
                           <th className="py-3.5 px-4">XP Total</th>
@@ -775,7 +799,7 @@ export default function GlobalTracker({ onPlayerClick }) {
 
                                   {isGuild && (
                                     <span className="bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0">
-                                      🛡️ Battle Storm
+                                      🛡️ Guilda
                                     </span>
                                   )}
                                   {isHunted && (
@@ -784,6 +808,12 @@ export default function GlobalTracker({ onPlayerClick }) {
                                     </span>
                                   )}
                                 </div>
+                              </td>
+
+                              <td className="py-3 px-4">
+                                <span className="text-xs bg-yellow-950/40 border border-yellow-500/20 text-yellow-300/80 px-2 py-0.5 rounded font-mono">
+                                  {p.world || 'Rubinot'}
+                                </span>
                               </td>
 
                               <td className={`py-3 px-4 text-xs font-semibold ${vocColor}`}>
@@ -865,7 +895,7 @@ export default function GlobalTracker({ onPlayerClick }) {
           <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
             <div>
               <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Sala de Guerra (War Room)</h2>
-              <p className="text-gray-400 font-sans">Business Intelligence e comportamento estratégico da guilda Battle Storm (Shellpatrocina).</p>
+              <p className="text-gray-400 font-sans">Business Intelligence e comportamento tático e estratégico das guildas e servidores.</p>
             </div>
           </div>
 

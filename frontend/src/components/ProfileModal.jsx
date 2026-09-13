@@ -25,11 +25,15 @@ export default function ProfileModal({ onClose }) {
     Bellum: '',
     Tenebrium: ''
   });
+  const [mainWorld, setMainWorld] = useState(() => profile?.makers?._world || 'Auroria');
+  const [guildName, setGuildName] = useState(() => profile?.guild_name || profile?.makers?._guild || '');
   const [characterStats, setCharacterStats] = useState({ level: 'N/A', vocation: 'Desconhecida' });
 
   useEffect(() => {
     if (profile?.makers) {
       setMakers(profile.makers);
+      if (profile.makers._world) setMainWorld(profile.makers._world);
+      if (profile.makers._guild) setGuildName(profile.makers._guild);
     }
   }, [profile]);
 
@@ -144,11 +148,12 @@ export default function ProfileModal({ onClose }) {
     setLoading(true);
 
     try {
-      const auroriaMakersList = (makers.Auroria || '').split(',').map(m => m.trim()).filter(m => m);
-  
-      if (auroriaMakersList.length === 0) {
-        throw new Error('Você precisa registrar pelo menos 1 maker no servidor Auroria (obrigatório).');
-      }
+      // Coleta todos os makers informados em qualquer servidor
+      const allEnteredMakers = [];
+      ['Auroria', 'Malveria', 'Belaria', 'Vesperia', 'Bellum', 'Tenebrium'].forEach(server => {
+        const list = (makers[server] || '').split(',').map(m => m.trim()).filter(Boolean);
+        list.forEach(m => allEnteredMakers.push({ server, name: m }));
+      });
 
       let allProfiles = [];
       let page = 0;
@@ -164,15 +169,17 @@ export default function ProfileModal({ onClose }) {
         page++;
       }
 
-      for (const makerName of auroriaMakersList) {
+      for (const item of allEnteredMakers) {
+        const makerName = item.name;
         for (const p of allProfiles) {
           if (p.main_character && p.main_character.toLowerCase() === makerName.toLowerCase() && p.id !== user.id) {
-            throw new Error(`O personagem "${makerName}" já é o Main Character do jogador ${p.main_character}.`);
+            throw new Error(`O personagem "${makerName}" (${item.server}) já é o Main Character do jogador ${p.main_character}.`);
           }
           
           if (p.id !== user.id) {
             const pMakers = p.makers || {};
             for (const srv of Object.keys(pMakers)) {
+              if (srv.startsWith('_')) continue; // Ignora metadados
               const val = pMakers[srv];
               const list = typeof val === 'string' ? val.split(',') : (Array.isArray(val) ? val : []);
               if (list.some(m => m && typeof m === 'string' && m.trim().toLowerCase() === makerName.toLowerCase())) {
@@ -183,9 +190,13 @@ export default function ProfileModal({ onClose }) {
         }
       }
 
-      // Prepara payload de atualização
+      // Prepara payload de atualização com metadados de Mundo e Guilda
       const updateData = {
-        makers: makers
+        makers: {
+          ...makers,
+          _world: mainWorld,
+          _guild: guildName.trim()
+        }
       };
 
       // Se o usuário não estiver bloqueado, atualiza o avatar_url
@@ -333,33 +344,70 @@ export default function ProfileModal({ onClose }) {
         )}
 
         <form onSubmit={handleSave}>
+          {/* Seção 1: Configuração do Jogador */}
           <div className="bg-black/60 border border-tibia-border p-4 rounded-lg mb-4">
-            <h3 className="text-lg font-bold text-tibia-highlight mb-2">Makers em Auroria *</h3>
-            <p className="text-xs text-gray-400 mb-3">Você precisa ter pelo menos um maker principal registrado em Auroria.</p>
-            <input
-              type="text"
-              required
-              value={makers.Auroria || ''}
-              onChange={(e) => handleChange('Auroria', e.target.value)}
-              placeholder="Ex: Makerzinha, Druid Maker (separe por vírgulas)"
-              className="w-full bg-black/60 border border-tibia-border rounded p-2 text-white focus:border-tibia-primary focus:outline-none"
-            />
+            <h3 className="text-sm font-bold text-tibia-highlight mb-3 uppercase tracking-wider font-medieval">
+              ⚔️ Afiliação & Servidor de Origem
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Mundo Principal *</label>
+                <select
+                  value={mainWorld}
+                  onChange={(e) => setMainWorld(e.target.value)}
+                  className="w-full bg-black/60 border border-tibia-border rounded p-2 text-white text-sm focus:border-tibia-primary focus:outline-none"
+                >
+                  <option value="Auroria">🛡️ Auroria (Rubinot)</option>
+                  <option value="Belaria">⚔️ Belaria</option>
+                  <option value="Bellum">⚡ Bellum (Retro-PvP)</option>
+                  <option value="Tenebrium">💀 Tenebrium (Retro)</option>
+                  <option value="Vesperia">🦅 Vesperia</option>
+                  <option value="Malveria">🏹 Malveria</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Sua Guilda</label>
+                <input
+                  type="text"
+                  value={guildName}
+                  onChange={(e) => setGuildName(e.target.value)}
+                  placeholder="Ex: Battle Storm, Shellpatrocina, etc."
+                  className="w-full bg-black/60 border border-tibia-border rounded p-2 text-white text-sm focus:border-tibia-primary focus:outline-none"
+                >
+                </input>
+              </div>
+            </div>
           </div>
 
+          {/* Seção 2: Makers nos 6 Servidores */}
           <div className="bg-black/60 border border-tibia-border p-4 rounded-lg mb-6">
-            <h3 className="text-lg font-bold text-gray-300 mb-2 border-b border-tibia-border pb-2">Outros Servidores</h3>
-            <p className="text-xs text-gray-500 mb-4">Makers farmando em outros servidores (separe por vírgula).</p>
+            <h3 className="text-sm font-bold text-gray-200 mb-1 border-b border-tibia-border pb-2 font-medieval">
+              🎭 Rede de Makers & Farm (6 Servidores)
+            </h3>
+            <p className="text-xs text-gray-400 mb-4 font-sans">
+              Informe os nomes dos personagens que você usa para farmar em cada servidor (separe múltiplos por vírgula). Nenhum servidor é obrigatório.
+            </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {['Malveria', 'Belaria', 'Vesperia', 'Bellum', 'Tenebrium'].map((server) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {[
+                { name: 'Auroria', icon: '🛡️' },
+                { name: 'Belaria', icon: '⚔️' },
+                { name: 'Bellum', icon: '⚡' },
+                { name: 'Tenebrium', icon: '💀' },
+                { name: 'Vesperia', icon: '🦅' },
+                { name: 'Malveria', icon: '🏹' }
+              ].map(({ name: server, icon }) => (
                 <div key={server}>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">{server}</label>
+                  <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+                    <span>{icon}</span> {server}
+                  </label>
                   <input
                     type="text"
                     value={makers[server] || ''}
                     onChange={(e) => handleChange(server, e.target.value)}
-                    placeholder="Nome do(s) char(s)..."
-                    className="w-full bg-black/40 border border-gray-700 rounded p-2 text-white text-sm focus:border-gray-500 focus:outline-none"
+                    placeholder="Ex: Makerzinha, Farm Knight..."
+                    className="w-full bg-black/40 border border-gray-700 rounded p-2 text-white text-xs focus:border-yellow-500 focus:outline-none"
                   />
                 </div>
               ))}

@@ -4,8 +4,10 @@ import { Target, AlertTriangle, Clock, TrendingDown, Coins, Search, ExternalLink
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatVocation } from '../lib/tibiaUtils';
+import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 
 export default function BazaarSniper() {
+  const { selectedWorld, setSelectedWorld } = useWorld();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, hunted, opportunity
@@ -35,6 +37,9 @@ export default function BazaarSniper() {
   }, []);
 
   const filtered = alerts.filter(a => {
+    if (selectedWorld !== 'ALL' && a.world_name && a.world_name.toLowerCase() !== selectedWorld.toLowerCase()) {
+      return false;
+    }
     if (filter === 'hunted') return a.is_hunted;
     if (filter === 'opportunity') return a.is_sniping_opportunity;
     return true;
@@ -49,8 +54,23 @@ export default function BazaarSniper() {
             Sniper de Char Bazaar
           </h1>
           <p className="text-gray-400 mt-1 font-sans">
-            Rastreamento automático de inimigos tentando vender personagens e pechinchas de alto nível.
+            Rastreamento automático de inimigos e pechinchas de alto nível nos 6 servidores do Rubinot.
           </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-gray-400 font-sans">Mundo:</label>
+          <select
+            value={selectedWorld}
+            onChange={(e) => setSelectedWorld(e.target.value)}
+            className="bg-black/80 border border-yellow-500/40 text-xs text-yellow-300 rounded-xl px-3 py-2 focus:outline-none focus:border-yellow-500 font-bold cursor-pointer"
+          >
+            {WORLDS_LIST.map(w => (
+              <option key={w.id} value={w.id} className="bg-gray-900 text-white">
+                {w.icon} {w.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

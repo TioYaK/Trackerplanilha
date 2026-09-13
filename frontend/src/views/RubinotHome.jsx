@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { parseUtcDate, toBrtTimeStr } from '../lib/tibiaUtils';
+import { useWorld } from '../context/WorldContext';
 import { 
   Globe, Activity, Skull, Trophy, Gem, Cpu, Calculator, 
   Search, Shield, ArrowRight, RefreshCw, Users, Server, 
@@ -8,18 +9,8 @@ import {
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 
-const RUBINOT_WORLDS = [
-  { id: 'ALL', name: 'Todos os Mundos', icon: '🌐' },
-  { id: 'Auroria', name: 'Auroria (Rubinot)', icon: '🛡️' },
-  { id: 'Belaria', name: 'Belaria', icon: '⚔️' },
-  { id: 'Bellum', name: 'Bellum', icon: '⚔️' },
-  { id: 'Tenebrium', name: 'Tenebrium (Retro)', icon: '⚔️' },
-  { id: 'Vesperia', name: 'Vesperia', icon: '⚔️' },
-  { id: 'Malveria', name: 'Malveria', icon: '⚔️' },
-];
-
 export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user }) {
-  const [selectedWorld, setSelectedWorld] = useState('ALL');
+  const { activeWorld: selectedWorld, setActiveWorld: setSelectedWorld, worlds: RUBINOT_WORLDS } = useWorld();
   const [recentDeaths, setRecentDeaths] = useState([]);
   const [topRushers, setTopRushers] = useState([]);
   const [onlineCount, setOnlineCount] = useState(0);
@@ -354,10 +345,10 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
               <span className="text-[10px] text-yellow-400/80 font-bold uppercase">100% Gratuito</span>
             </div>
             <h4 className="text-lg sm:text-xl font-medieval font-bold text-gradient-gold group-hover:text-yellow-300 transition-colors">
-              Sorteio da Comunidade Rubinot & Battle Storm
+              Sorteio Oficial da Comunidade Rubinot
             </h4>
             <p className="text-xs text-gray-300 font-sans">
-              Participe agora da rodada ativa! Concorra a Tibia Coins e prêmios em KKs. Inscrição rápida e sorteio com roleta ao vivo.
+              Participe agora da rodada ativa! Concorra a Tibia Coins e prêmios em KKs. Inscrição rápida e sorteio com roleta ao vivo para todos os mundos.
             </p>
           </div>
         </div>
@@ -440,25 +431,25 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           </button>
         </div>
 
-        {/* CARD 3: ESPAÇO DA GUILDA BATTLE STORM (RESTRITO) */}
+        {/* CARD 3: ESPAÇO DE GESTÃO DA GUILDA (MULTI-GUILDA) */}
         <div className="relative overflow-hidden rounded-2xl border border-yellow-500/30 bg-gradient-to-b from-yellow-950/20 via-black/90 to-black p-6 shadow-2xl flex flex-col justify-between group hover:border-yellow-500/60 transition-all">
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="rounded-full bg-yellow-500/20 border border-yellow-500/40 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-yellow-400 flex items-center gap-1.5">
                 <Shield size={13} /> Área da Guilda
               </span>
-              <span className="text-[10px] text-yellow-500/80 uppercase font-bold tracking-wider">Membros</span>
+              <span className="text-[10px] text-yellow-500/80 uppercase font-bold tracking-wider">Multi-Guilda</span>
             </div>
 
             <h3 className="text-2xl font-medieval text-white mb-1 group-hover:text-yellow-400 transition-colors">
-              Guilda Battle Storm
+              Espaço & Gestão de Guilda
             </h3>
             <div className="text-[11px] text-yellow-400/80 font-sans mb-3 flex items-center gap-1">
-              <span>🛡️ Divisão Auroria: Shell Patrocina</span>
+              <span>🛡️ Suporte para todas as guildas em todos os mundos</span>
             </div>
             
             <p className="text-xs text-gray-300 font-sans leading-relaxed mb-6">
-              Espaço reservado aos membros recrutados: agendamento de caves, banco da guilda, perks de war e emissão de convites in-game.
+              Espaço reservado aos membros e lideranças: agendamento de caves, controle de hunts, banco da guilda, perks de war e emissão de convites in-game.
             </p>
           </div>
 
@@ -466,7 +457,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
             onClick={() => onNavigate('planilha')}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-black/70 hover:bg-yellow-950/40 border border-yellow-500/40 py-3 text-sm font-bold text-yellow-400 shadow-lg transition-all active:scale-95"
           >
-            <Shield size={16} /> Acessar Battle Storm
+            <Shield size={16} /> Acessar Gestão de Guilda
             <ArrowRight size={16} />
           </button>
         </div>

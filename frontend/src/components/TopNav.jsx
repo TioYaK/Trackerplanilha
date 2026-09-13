@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { useWorld } from '../context/WorldContext';
 import { 
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
@@ -23,6 +24,7 @@ export default function TopNav({
   visibleTabs 
 }) {
   const { logout } = useAuth();
+  const { activeWorld, setActiveWorld, worlds, activeWorldObj } = useWorld();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [workerCount, setWorkerCount] = useState(0);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -56,7 +58,7 @@ export default function TopNav({
     developers: { label: 'API para Devs ⚡', icon: <Code2 size={16} className="text-yellow-400" /> },
     contribute: { label: 'Baixar Worker (VIP Grátis)', icon: <Cpu size={16} className="text-green-400" /> },
 
-    // 🛡️ Guilda Shell Patrocina
+    // 🛡️ Espaço da Guilda (Qualquer Guilda)
     planilha: { label: 'Controle de Hunts & Caves', icon: <FileSpreadsheet size={16} /> },
     planilha_live: { label: 'Monitor de Caves (Ao Vivo)', icon: <Activity size={16} /> },
     respawns: { label: 'Respawns & Regras', icon: <ShieldAlert size={16} /> },
@@ -84,7 +86,7 @@ export default function TopNav({
       items: ['live', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
-      title: 'Guilda Battle Storm',
+      title: profile?.guild_name ? `Guilda ${profile.guild_name}` : 'Espaço da Guilda',
       icon: <Shield size={18} />,
       badge: !isGuildMember ? '🔒' : null,
       items: ['planilha', 'planilha_live', 'respawns', 'roster', 'bank', 'market', 'guild_perks', 'invite']
@@ -177,7 +179,40 @@ export default function TopNav({
         </nav>
 
         {/* Right Icons */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          
+          {/* Seletor Global de Servidor / Mundo */}
+          <div className="relative group">
+            <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-yellow-500/40 bg-black/60 hover:bg-black/80 text-yellow-300 font-medieval text-xs shadow-md transition-all hover:scale-105 active:scale-95" title={`Servidor Ativo: ${activeWorldObj.name}`}>
+              <span className="text-sm">{activeWorldObj.icon}</span>
+              <span className="font-bold tracking-wide hidden md:inline">{activeWorldObj.shortName}</span>
+              <ChevronDown size={13} className="text-yellow-500/80 group-hover:rotate-180 transition-transform duration-200" />
+            </button>
+            
+            <div className="absolute right-0 mt-2 w-48 bg-black/95 border border-yellow-500/40 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 p-1.5 space-y-1">
+              <div className="px-2 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider border-b border-white/10">
+                Selecione o Servidor
+              </div>
+              {worlds.map((w) => (
+                <button
+                  key={w.id}
+                  onClick={() => setActiveWorld(w.id)}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-sans transition-all ${
+                    activeWorld.toLowerCase() === w.id.toLowerCase()
+                      ? 'bg-yellow-500/20 text-yellow-300 font-bold border border-yellow-500/40'
+                      : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>{w.icon}</span>
+                    <span>{w.name}</span>
+                  </span>
+                  <span className="text-[9px] text-gray-500 font-mono">{w.type}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <PushNotificationBell />
           <InstallPWA />
           
@@ -279,6 +314,29 @@ export default function TopNav({
       {mobileMenuOpen && (
         <div className="lg:hidden absolute top-16 left-0 w-full bg-black/95 border-b-2 border-tibia-border max-h-[80vh] overflow-y-auto z-50">
           <div className="p-4 space-y-6">
+            {/* Seletor de Mundo Mobile */}
+            <div className="pb-3 border-b border-tibia-border/50">
+              <label className="block text-[11px] font-bold text-yellow-400 uppercase tracking-wider mb-2 font-medieval">
+                Servidor Rubinot Ativo
+              </label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {worlds.map((w) => (
+                  <button
+                    key={w.id}
+                    onClick={() => setActiveWorld(w.id)}
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-sans text-left transition-all ${
+                      activeWorld.toLowerCase() === w.id.toLowerCase()
+                        ? 'bg-yellow-500/30 text-yellow-300 font-bold border border-yellow-500/50'
+                        : 'bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    <span>{w.icon}</span>
+                    <span className="truncate">{w.shortName}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {!user && (
               <div className="pb-3 border-b border-tibia-border/50">
                 <button

@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }) => {
     if (error) throw error;
   };
 
-  const register = async ({ email, password, name, mainCharacter, ts3Nickname }) => {
+  const register = async ({ email, password, name, mainCharacter, ts3Nickname, world, guildName }) => {
     // 1. Criar usuário no Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
     if (authError) throw authError;
     if (!authData.user) throw new Error('Erro ao criar usuário');
 
-    // 2. Criar o Profile Pendente
+    // 2. Criar o Profile Pendente com Metadados de Mundo e Guilda
     const { error: profileError } = await supabase.from('profiles').insert([
       {
         id: authData.user.id,
@@ -82,7 +82,11 @@ export const AuthProvider = ({ children }) => {
         main_character: mainCharacter,
         ts3_nickname: ts3Nickname,
         status: 'pending', // Alfândega!
-        role: 'user'
+        role: 'user',
+        makers: {
+          _world: world || 'Auroria',
+          _guild: guildName || ''
+        }
       }
     ]);
 

@@ -22,7 +22,7 @@ const RUBINOT_WORLDS = [
 
 const DEFAULT_GIVEAWAY = {
   id: 'round-1',
-  title: 'Sorteio Oficial da Comunidade Rubinot & Battle Storm',
+  title: 'Sorteio Oficial da Comunidade Rubinot',
   prize: '250 Tibia Coins',
   prize_image: '',
   description: 'Participe do sorteio oficial da semana! Aberto a todos os jogadores dos servidores do Rubinot.',
@@ -32,7 +32,7 @@ const DEFAULT_GIVEAWAY = {
   winners_count: 1,
   status: 'OPEN', // 'OPEN' | 'DRAWING' | 'FINISHED'
   created_at: new Date().toISOString(),
-  created_by: 'Administração Battle Storm',
+  created_by: 'Administração Rubinot',
   participants: [
     { id: 'p1', name: 'Chikungunha Mlk Conquista', world: 'Auroria', level: 2747, vocation: 'Elder Druid', entered_at: new Date(Date.now() - 3600000).toISOString() },
     { id: 'p2', name: 'Iury The King', world: 'Auroria', level: 2666, vocation: 'Elite Knight', entered_at: new Date(Date.now() - 3000000).toISOString() },
@@ -227,7 +227,7 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
       if (!member) {
         setRegStatus({ 
           type: 'error', 
-          message: 'Este sorteio é exclusivo para membros da guilda Battle Storm.' 
+          message: 'Este sorteio é exclusivo para membros de guilda registrada.' 
         });
         return;
       }
@@ -1253,7 +1253,7 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
                       className="w-full rounded-lg bg-black/60 border border-tibia-border px-3 py-2 text-sm text-white focus:border-yellow-500 outline-none"
                     >
                       <option value="ALL">🌐 Todos os Jogadores (Público)</option>
-                      <option value="GUILD">🛡️ Apenas Membros Battle Storm</option>
+                      <option value="GUILD">🛡️ Apenas Membros de Guilda</option>
                       <option value="VIP">💎 Apenas VIPs / Workers Ativos</option>
                     </select>
                   </div>
