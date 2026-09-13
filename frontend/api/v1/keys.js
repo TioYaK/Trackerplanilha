@@ -61,8 +61,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Limite de 3 chaves ativas atingido para sua conta.' });
     }
 
+    const requestedTier = (req.body?.tier || 'STARTER').toUpperCase();
+    const isPro = requestedTier === 'PRO';
+    const isEnterprise = requestedTier === 'ENTERPRISE';
+    const rateLimit = isEnterprise ? 1500 : (isPro ? 600 : 60);
+
     const randomHex = crypto.randomBytes(16).toString('hex');
-    const newApiKey = `bst_live_${randomHex}`;
+    const prefix = isPro ? 'rub_pro_' : (isEnterprise ? 'rub_ent_' : 'rub_live_');
+    const newApiKey = `${prefix}${randomHex}`;
 
     const newKeyObj = {
       id: `key_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
@@ -71,8 +77,8 @@ export default async function handler(req, res) {
       user_id: user_id || null,
       user_email: user_email.toLowerCase().trim(),
       user_name: user_name || 'Desenvolvedor',
-      tier: 'STARTER', // 'STARTER' (60/min), 'PRO' (300/min), 'ENTERPRISE' (1200/min)
-      rate_limit: 60,
+      tier: requestedTier, // 'STARTER' (60/min), 'PRO' (600/min), 'ENTERPRISE' (1500/min)
+      rate_limit: rateLimit,
       status: 'ACTIVE',
       created_at: new Date().toISOString(),
       last_used_at: null,

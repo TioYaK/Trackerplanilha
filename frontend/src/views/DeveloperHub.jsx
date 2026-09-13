@@ -96,6 +96,7 @@ export default function DeveloperHub({ user, profile, isAdmin, onNavigate }) {
     }
     setCreatingKey(true);
     try {
+      const isVip = isAdmin || profile?.role === 'premium' || profile?.is_premium === true;
       const res = await fetch('/api/v1/keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,7 +104,8 @@ export default function DeveloperHub({ user, profile, isAdmin, onNavigate }) {
           name: newKeyName.trim() || 'Minha Aplicação',
           user_id: user?.id,
           user_email: userEmail,
-          user_name: profile?.main_character || profile?.name || 'Dev'
+          user_name: profile?.main_character || profile?.name || 'Dev',
+          tier: isVip ? 'PRO' : 'STARTER'
         })
       });
       const data = await res.json();
@@ -111,7 +113,8 @@ export default function DeveloperHub({ user, profile, isAdmin, onNavigate }) {
         setKeys([data.apiKey, ...keys]);
         setNewKeyName('');
         setSelectedKeyForTest(data.apiKey.key);
-        alert('🎉 Chave de API criada com sucesso! Copie e guarde em segurança.');
+        const tierMsg = data.apiKey.tier === 'PRO' ? ' (Plano PRO VIP - 600 req/min!)' : '';
+        alert(`🎉 Chave de API gerada com sucesso${tierMsg}! Copie e guarde em segurança.`);
       } else {
         alert(`Erro: ${data.error || 'Falha ao criar chave'}`);
       }
