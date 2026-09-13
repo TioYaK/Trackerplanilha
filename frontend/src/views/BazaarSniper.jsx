@@ -5,7 +5,8 @@ import {
   Star, Shield, Sword, Wand2, RefreshCw, Flame, Sparkles, Filter, 
   ArrowUpDown, Volume2, VolumeX, Eye, Calculator, ChevronDown, CheckCircle2,
   Award, Globe, Zap, ArrowRight, User, LayoutGrid, List, SlidersHorizontal,
-  Bookmark, Check, Share2, DollarSign, HelpCircle, X, History, BarChart3, Package
+  Bookmark, Check, Share2, DollarSign, HelpCircle, X, History, BarChart3, Package,
+  Crosshair, ShieldCheck, Gem
 } from 'lucide-react';
 import { formatVocation } from '../lib/tibiaUtils';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
@@ -21,6 +22,9 @@ const VOCATION_TABS = [
   { id: 'monk', label: 'Exalted Monk', short: 'Monk', icon: '🥋', color: 'text-purple-400' },
   { id: 'none', label: 'Rook / Sem Voc', short: 'None', icon: '🛡️', color: 'text-gray-400' }
 ];
+
+// Palavras-chave dos itens meta/BiS no Tibia e RubinOT
+const BIS_KEYWORDS = ['soul', 'falcon', 'sanguine', 'naga', 'cobra', 'lion', 'alicorn', 'spiritthorn', 'arcanomancer', 'eldritch'];
 
 // Dados estatísticos reais extraídos do histórico oficial de 1.000 leilões do RubinOT
 const RUBINOT_MARKET_STATS = {
@@ -61,13 +65,24 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const [nowTimestamp, setNowTimestamp] = useState(Date.now());
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Filtros Avançados
+  // 1. Filtros Básicos & Status
   const [minLevel, setMinLevel] = useState('');
   const [maxLevel, setMaxLevel] = useState('');
   const [minBid, setMinBid] = useState('');
   const [maxBid, setMaxBid] = useState('');
   const [minCharms, setMinCharms] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'active' | 'all' | 'ended'
+
+  // 2. Filtros de Equipamentos Valiosos & Tiers da Forja
+  const [itemSetFilter, setItemSetFilter] = useState('all'); // 'all' | 'bis' | 'soulwar' | 'falcon' | 'sanguine' | 'naga_cobra' | 'lion_spirit'
+  const [itemTierFilter, setItemTierFilter] = useState('all'); // 'all' | 'tier1' | 'tier2' | 'tier3'
+
+  // 3. Filtros de Habilidades & Skills
+  const [minMagLevel, setMinMagLevel] = useState('');
+  const [minDist, setMinDist] = useState('');
+  const [minMelee, setMinMelee] = useState('');
+  const [meleeType, setMeleeType] = useState('any'); // 'any' | 'sword' | 'axe' | 'club'
+  const [minShielding, setMinShielding] = useState('');
 
   // Favoritos
   const [favorites, setFavorites] = useState(() => {
@@ -179,6 +194,12 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, tierBonus };
   };
 
+  // Checagem de itens BiS / Meta
+  const checkCharHasBis = (itemsData) => {
+    if (!Array.isArray(itemsData)) return false;
+    return itemsData.some(it => it?.name && BIS_KEYWORDS.some(k => it.name.toLowerCase().includes(k)));
+  };
+
   // Contagem de leilões por vocação
   const vocationCounts = useMemo(() => {
     const counts = { ALL: alerts.length, knight: 0, paladin: 0, sorcerer: 0, druid: 0, monk: 0, none: 0 };
@@ -223,6 +244,42 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     };
   };
 
+  // Contagem de filtros ativos
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (minLevel || maxLevel) count++;
+    if (minBid || maxBid) count++;
+    if (minCharms) count++;
+    if (statusFilter !== 'all') count++;
+    if (itemSetFilter !== 'all') count++;
+    if (itemTierFilter !== 'all') count++;
+    if (minMagLevel) count++;
+    if (minDist) count++;
+    if (minMelee) count++;
+    if (minShielding) count++;
+    return count;
+  }, [minLevel, maxLevel, minBid, maxBid, minCharms, statusFilter, itemSetFilter, itemTierFilter, minMagLevel, minDist, minMelee, minShielding]);
+
+  const resetAllFilters = () => {
+    setMinLevel('');
+    setMaxLevel('');
+    setMinBid('');
+    setMaxBid('');
+    setMinCharms('');
+    setSelectedVoc('ALL');
+    setSelectedWorld('ALL');
+    setSearchQuery('');
+    setActiveChip('all');
+    setStatusFilter('all');
+    setItemSetFilter('all');
+    setItemTierFilter('all');
+    setMinMagLevel('');
+    setMinDist('');
+    setMinMelee('');
+    setMeleeType('any');
+    setMinShielding('');
+  };
+
   // Filtragem e Ordenação
   const filteredAndSortedAuctions = useMemo(() => {
     let result = alerts.filter(a => {
@@ -256,17 +313,91 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         if (selectedVoc === 'none' && (voc.includes('knight') || voc.includes('paladin') || voc.includes('sorcerer') || voc.includes('druid') || voc.includes('monk'))) return false;
       }
 
-      // Faixas
+      // Faixas de Nível e Lance
       if (minLevel && (a.level || 0) < Number(minLevel)) return false;
       if (maxLevel && (a.level || 0) > Number(maxLevel)) return false;
       if (minBid && (a.current_bid || 0) < Number(minBid)) return false;
       if (maxBid && (a.current_bid || 0) > Number(maxBid)) return false;
       if (minCharms && (a.charm_points || 0) < Number(minCharms)) return false;
 
-      // Chips
+      // Filtro de Equipamentos Valiosos (Itens Bons / BiS)
+      if (itemSetFilter !== 'all') {
+        if (!Array.isArray(a.items_data) || a.items_data.length === 0) return false;
+        if (itemSetFilter === 'bis') {
+          const hasBis = a.items_data.some(it => it?.name && BIS_KEYWORDS.some(k => it.name.toLowerCase().includes(k)));
+          if (!hasBis) return false;
+        } else if (itemSetFilter === 'soulwar') {
+          const hasSoul = a.items_data.some(it => it?.name && it.name.toLowerCase().includes('soul'));
+          if (!hasSoul) return false;
+        } else if (itemSetFilter === 'falcon') {
+          const hasFalcon = a.items_data.some(it => it?.name && it.name.toLowerCase().includes('falcon'));
+          if (!hasFalcon) return false;
+        } else if (itemSetFilter === 'sanguine') {
+          const hasSanguine = a.items_data.some(it => it?.name && it.name.toLowerCase().includes('sanguine'));
+          if (!hasSanguine) return false;
+        } else if (itemSetFilter === 'naga_cobra') {
+          const hasNagaCobra = a.items_data.some(it => it?.name && (it.name.toLowerCase().includes('naga') || it.name.toLowerCase().includes('cobra')));
+          if (!hasNagaCobra) return false;
+        } else if (itemSetFilter === 'lion_spirit') {
+          const hasLionSpirit = a.items_data.some(it => it?.name && (it.name.toLowerCase().includes('lion') || it.name.toLowerCase().includes('spiritthorn') || it.name.toLowerCase().includes('alicorn') || it.name.toLowerCase().includes('eldritch')));
+          if (!hasLionSpirit) return false;
+        }
+      }
+
+      // Filtro de Tier da Forja
+      if (itemTierFilter !== 'all') {
+        if (!Array.isArray(a.items_data)) return false;
+        if (itemTierFilter === 'tier1' && !a.items_data.some(it => it?.tier >= 1)) return false;
+        if (itemTierFilter === 'tier2' && !a.items_data.some(it => it?.tier >= 2)) return false;
+        if (itemTierFilter === 'tier3' && !a.items_data.some(it => it?.tier >= 3)) return false;
+      }
+
+      // Filtro de Magic Level (ML)
+      if (minMagLevel && (a.mag_level || 0) < Number(minMagLevel)) return false;
+
+      // Filtro de Distance (RP)
+      if (minDist && (a.skills_data?.dist || 0) < Number(minDist)) return false;
+
+      // Filtro de Melee (Sword, Axe, Club ou Qualquer)
+      if (minMelee) {
+        const reqMelee = Number(minMelee);
+        if (meleeType === 'sword') {
+          if ((a.skills_data?.sword || 0) < reqMelee) return false;
+        } else if (meleeType === 'axe') {
+          if ((a.skills_data?.axe || 0) < reqMelee) return false;
+        } else if (meleeType === 'club') {
+          if ((a.skills_data?.club || 0) < reqMelee) return false;
+        } else {
+          const maxM = Math.max(a.skills_data?.sword || 0, a.skills_data?.axe || 0, a.skills_data?.club || 0);
+          if (maxM < reqMelee) return false;
+        }
+      }
+
+      // Filtro de Shielding
+      if (minShielding && (a.skills_data?.shielding || 0) < Number(minShielding)) return false;
+
+      // Chips Rápidos
       if (activeChip === 'opportunity') {
         const fipe = calculateCharFipe(a);
         return fipe.discountPct >= 20 || a.is_sniping_opportunity;
+      }
+      if (activeChip === 'bis_gear') {
+        return checkCharHasBis(a.items_data);
+      }
+      if (activeChip === 'tier2_plus') {
+        return Array.isArray(a.items_data) && a.items_data.some(it => it?.tier >= 2);
+      }
+      if (activeChip === 'high_skills') {
+        const voc = (a.vocation || '').toLowerCase();
+        const isMage = voc.includes('sorcerer') || voc.includes('druid');
+        const dist = a.skills_data?.dist || 0;
+        const melee = Math.max(a.skills_data?.sword || 0, a.skills_data?.axe || 0, a.skills_data?.club || 0);
+        const ml = a.mag_level || 0;
+        if (isMage) {
+          if (ml < 115) return false;
+        } else {
+          if (dist < 120 && melee < 120 && ml < 35) return false;
+        }
       }
       if (activeChip === 'ending_soon') {
         return !timeInfo.isEnded && timeInfo.totalSeconds < 3 * 3600;
@@ -322,7 +453,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     });
 
     return result;
-  }, [alerts, selectedWorld, searchQuery, selectedVoc, activeChip, sortOption, minLevel, maxLevel, minBid, maxBid, minCharms, statusFilter, favorites, nowTimestamp]);
+  }, [alerts, selectedWorld, searchQuery, selectedVoc, activeChip, sortOption, minLevel, maxLevel, minBid, maxBid, minCharms, statusFilter, itemSetFilter, itemTierFilter, minMagLevel, minDist, minMelee, meleeType, minShielding, favorites, nowTimestamp]);
 
   // Estatísticas
   const stats = useMemo(() => {
@@ -332,6 +463,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     let opportunities = 0;
     let endingSoon = 0;
     let tieredCount = 0;
+    let bisCount = 0;
 
     alerts.forEach(a => {
       const timeInfo = getTimeRemaining(a.auction_end);
@@ -343,10 +475,13 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       }
       const fipe = calculateCharFipe(a);
       if (fipe.discountPct >= 20 || a.is_sniping_opportunity) opportunities++;
-      if (Array.isArray(a.items_data) && a.items_data.some(it => it?.tier > 0)) tieredCount++;
+      if (Array.isArray(a.items_data)) {
+        if (a.items_data.some(it => it?.tier > 0)) tieredCount++;
+        if (a.items_data.some(it => it?.name && BIS_KEYWORDS.some(k => it.name.toLowerCase().includes(k)))) bisCount++;
+      }
     });
 
-    return { total, activeCount, endedCount, opportunities, endingSoon, tieredCount, favoritesCount: favorites.length };
+    return { total, activeCount, endedCount, opportunities, endingSoon, tieredCount, bisCount, favoritesCount: favorites.length };
   }, [alerts, favorites, nowTimestamp]);
 
   const handleShareAuction = (auction) => {
@@ -376,7 +511,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             </h1>
             
             <p className="text-gray-300 font-sans text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
-              Consulte leilões ativos e o histórico dos últimos 30 dias de vendas do RubinOT. Clique em qualquer personagem para inspecionar itens, skills, tiers da forja e a avaliação FIPE real.
+              Consulte leilões ativos e o histórico dos últimos 30 dias de vendas do RubinOT. Filtre por skills avançadas, itens BiS/forja e clique em qualquer personagem para inspecionar tudo o que ele tinha!
             </p>
           </div>
 
@@ -397,14 +532,18 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             <button
               onClick={() => setShowFiltersDrawer(!showFiltersDrawer)}
               className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${
-                showFiltersDrawer || minLevel || minBid || minCharms
-                  ? 'bg-yellow-500 text-stone-950 border-yellow-400 font-black'
+                showFiltersDrawer || activeFiltersCount > 0
+                  ? 'bg-yellow-500 text-stone-950 border-yellow-400 font-black shadow-lg shadow-yellow-500/20'
                   : 'bg-black/60 border-white/10 text-gray-300 hover:text-white'
               }`}
             >
               <SlidersHorizontal size={15} />
-              <span>Filtros Pro</span>
-              {(minLevel || minBid || minCharms) && <span className="w-2 h-2 rounded-full bg-red-500" />}
+              <span>Filtros Pro & Skills</span>
+              {activeFiltersCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-red-600 text-white text-[11px] font-black flex items-center justify-center">
+                  {activeFiltersCount}
+                </span>
+              )}
             </button>
 
             {/* Alternar Visualização: Grid vs Tabela */}
@@ -513,90 +652,295 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
           </div>
         )}
 
-        {/* DRAWER DE FILTROS PRO AVANÇADOS */}
+        {/* DRAWER AVANÇADO DE FILTROS PRO (SKILLS, ITENS BONS, FORJA E METAS) */}
         {showFiltersDrawer && (
-          <div className="mt-6 pt-6 border-t border-yellow-500/20 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in bg-stone-950/80 p-5 rounded-2xl border border-stone-800">
+          <div className="mt-6 pt-6 border-t border-yellow-500/20 space-y-5 animate-fade-in bg-stone-950/95 p-5 sm:p-6 rounded-2xl border border-yellow-500/40 shadow-2xl">
+            
+            {/* SEÇÃO 1: FILTROS DE EQUIPAMENTOS VALIOSOS & TIERS */}
             <div>
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Faixa de Level</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  placeholder="Min"
-                  value={minLevel}
-                  onChange={(e) => setMinLevel(e.target.value)}
-                  className="w-1/2 bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-                />
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={maxLevel}
-                  onChange={(e) => setMaxLevel(e.target.value)}
-                  className="w-1/2 bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-                />
+              <div className="flex items-center gap-2 mb-3 pb-1 border-b border-stone-800 text-xs font-bold text-yellow-400 uppercase tracking-wider">
+                <Gem size={15} /> 1. Equipamentos Bons & Forja de Exaltação
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-1.5">
+                  <label className="text-xs font-bold text-white flex items-center justify-between">
+                    <span>Equipamentos / Sets Notáveis (BiS)</span>
+                    <span className="text-[10px] text-yellow-400 font-mono">269 chars com BiS</span>
+                  </label>
+                  <select
+                    value={itemSetFilter}
+                    onChange={(e) => setItemSetFilter(e.target.value)}
+                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-xs text-yellow-300 font-bold focus:outline-none focus:border-yellow-500"
+                  >
+                    <option value="all">Qualquer Equipamento</option>
+                    <option value="bis">💎 Qualquer Item BiS / Meta (Soul, Falcon, Sanguine...)</option>
+                    <option value="soulwar">💀 Soulwar Gear (Soulshell, Soulstalkers, Soulmaimer...)</option>
+                    <option value="falcon">🦅 Falcon Gear (Falcon Bow, Coif, Battleaxe, Plate...)</option>
+                    <option value="sanguine">🩸 Sanguine Gear (Rotten Blood BiS Lendário)</option>
+                    <option value="naga_cobra">🐍 Naga & Cobra Gear (Crossbow, Rod, Wand, Axe...)</option>
+                    <option value="lion_spirit">🦁 Lion / Spiritthorn / Alicorn / Eldritch</option>
+                  </select>
+                </div>
+
+                <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-1.5">
+                  <label className="text-xs font-bold text-white flex items-center justify-between">
+                    <span>Nível de Tier da Forja</span>
+                    <span className="text-[10px] text-cyan-400 font-mono">172 chars com Tier</span>
+                  </label>
+                  <select
+                    value={itemTierFilter}
+                    onChange={(e) => setItemTierFilter(e.target.value)}
+                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="all">Qualquer Tier</option>
+                    <option value="tier1">⚡ Possui Itens Tier 1 ou superior (T1+)</option>
+                    <option value="tier2">⚡⚡ Possui Itens Tier 2 ou superior (T2+)</option>
+                    <option value="tier3">👑 Possui Itens Tier 3 Lendário (T3+)</option>
+                  </select>
+                </div>
               </div>
             </div>
 
+            {/* SEÇÃO 2: FILTROS DE HABILIDADES & SKILLS */}
             <div>
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Faixa de Lance (TC)</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  placeholder="Min TC"
-                  value={minBid}
-                  onChange={(e) => setMinBid(e.target.value)}
-                  className="w-1/2 bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-                />
-                <input
-                  type="number"
-                  placeholder="Max TC"
-                  value={maxBid}
-                  onChange={(e) => setMaxBid(e.target.value)}
-                  className="w-1/2 bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-                />
+              <div className="flex items-center gap-2 mb-3 pb-1 border-b border-stone-800 text-xs font-bold text-yellow-400 uppercase tracking-wider">
+                <Crosshair size={15} /> 2. Habilidades & Skills Mínimas
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {/* Magic Level */}
+                <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-2">
+                  <label className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                    <Wand2 size={14} /> Magic Level Mínimo
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Ex: 35 ou 120"
+                    value={minMagLevel}
+                    onChange={(e) => setMinMagLevel(e.target.value)}
+                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {[35, 40, 100, 120, 130].map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setMinMagLevel(String(val))}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${minMagLevel === String(val) ? 'bg-blue-600 text-white font-bold' : 'bg-stone-800 text-gray-400 hover:text-white'}`}
+                      >
+                        {val}+
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Distance Fighting */}
+                <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-2">
+                  <label className="text-xs font-bold text-green-400 flex items-center gap-1.5">
+                    <Target size={14} /> Distance Mínimo (RP)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Ex: 115 ou 125"
+                    value={minDist}
+                    onChange={(e) => setMinDist(e.target.value)}
+                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {[115, 120, 125, 130, 135].map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setMinDist(String(val))}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${minDist === String(val) ? 'bg-green-600 text-white font-bold' : 'bg-stone-800 text-gray-400 hover:text-white'}`}
+                      >
+                        {val}+
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Melee Skill (Sword/Axe/Club) */}
+                <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-red-400 flex items-center gap-1.5">
+                      <Sword size={14} /> Melee (EK/Monk)
+                    </label>
+                    <select
+                      value={meleeType}
+                      onChange={(e) => setMeleeType(e.target.value)}
+                      className="bg-stone-950 border border-stone-700 text-[10px] text-gray-300 rounded px-1.5 py-0.5"
+                    >
+                      <option value="any">Qualquer Melee</option>
+                      <option value="sword">Espada (Sword)</option>
+                      <option value="axe">Machado (Axe)</option>
+                      <option value="club">Clava (Club)</option>
+                    </select>
+                  </div>
+                  <input
+                    type="number"
+                    placeholder="Ex: 115 ou 125"
+                    value={minMelee}
+                    onChange={(e) => setMinMelee(e.target.value)}
+                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {[115, 120, 125, 130, 135].map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setMinMelee(String(val))}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${minMelee === String(val) ? 'bg-red-600 text-white font-bold' : 'bg-stone-800 text-gray-400 hover:text-white'}`}
+                      >
+                        {val}+
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Shielding */}
+                <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-2">
+                  <label className="text-xs font-bold text-stone-300 flex items-center gap-1.5">
+                    <ShieldCheck size={14} /> Shielding Mínimo
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Ex: 110 ou 120"
+                    value={minShielding}
+                    onChange={(e) => setMinShielding(e.target.value)}
+                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {[105, 110, 115, 120, 125].map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setMinShielding(String(val))}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${minShielding === String(val) ? 'bg-stone-600 text-white font-bold' : 'bg-stone-800 text-gray-400 hover:text-white'}`}
+                      >
+                        {val}+
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
+            {/* SEÇÃO 3: NÍVEL, LANCE, CHARMS & STATUS */}
             <div>
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Charm Points Mínimos</label>
-              <select
-                value={minCharms}
-                onChange={(e) => setMinCharms(e.target.value)}
-                className="w-full bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-              >
-                <option value="">Qualquer quantidade</option>
-                <option value="500">500+ Charms</option>
-                <option value="1500">1.500+ Charms</option>
-                <option value="3000">3.000+ Charms</option>
-                <option value="5000">5.000+ Charms</option>
-              </select>
+              <div className="flex items-center gap-2 mb-3 pb-1 border-b border-stone-800 text-xs font-bold text-yellow-400 uppercase tracking-wider">
+                <Coins size={15} /> 3. Nível, Preço (TC) e Andamento
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Faixa de Level</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={minLevel}
+                      onChange={(e) => setMinLevel(e.target.value)}
+                      className="w-1/2 bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={maxLevel}
+                      onChange={(e) => setMaxLevel(e.target.value)}
+                      className="w-1/2 bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Faixa de Lance (TC)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min TC"
+                      value={minBid}
+                      onChange={(e) => setMinBid(e.target.value)}
+                      className="w-1/2 bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max TC"
+                      value={maxBid}
+                      onChange={(e) => setMaxBid(e.target.value)}
+                      className="w-1/2 bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Charm Points Mínimos</label>
+                  <select
+                    value={minCharms}
+                    onChange={(e) => setMinCharms(e.target.value)}
+                    className="w-full bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold"
+                  >
+                    <option value="">Qualquer quantidade</option>
+                    <option value="500">500+ Charms</option>
+                    <option value="1500">1.500+ Charms</option>
+                    <option value="3000">3.000+ Charms</option>
+                    <option value="5000">5.000+ Charms</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Status do Leilão</label>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter('active')}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'active' ? 'bg-amber-500 text-stone-950 font-black' : 'bg-stone-900 text-gray-400'}`}
+                    >
+                      Ativos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter('all')}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'all' ? 'bg-amber-500 text-stone-950 font-black' : 'bg-stone-900 text-gray-400'}`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter('ended')}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'ended' ? 'bg-amber-500 text-stone-950 font-black' : 'bg-stone-900 text-gray-400'}`}
+                    >
+                      Histórico
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Status do Leilão</label>
-              <div className="flex gap-1">
+            {/* BARRA DE AÇÕES DO DRAWER */}
+            <div className="pt-3 border-t border-stone-800 flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs text-gray-400 font-mono">
+                {filteredAndSortedAuctions.length} leilões filtrados com sucesso
+              </span>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setStatusFilter('active')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'active' ? 'bg-amber-500 text-stone-950 font-black' : 'bg-stone-900 text-gray-400'}`}
+                  onClick={resetAllFilters}
+                  className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-700 text-xs text-gray-300 font-bold transition-colors"
                 >
-                  Ativos
+                  Limpar Todos os Filtros
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStatusFilter('all')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'all' ? 'bg-amber-500 text-stone-950 font-black' : 'bg-stone-900 text-gray-400'}`}
+                  onClick={() => setShowFiltersDrawer(false)}
+                  className="px-4 py-1.5 rounded-lg bg-yellow-500 hover:bg-yellow-400 text-xs text-stone-950 font-black transition-colors"
                 >
-                  Todos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('ended')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'ended' ? 'bg-amber-500 text-stone-950 font-black' : 'bg-stone-900 text-gray-400'}`}
-                >
-                  Histórico
+                  Aplicar e Fechar
                 </button>
               </div>
             </div>
+
           </div>
         )}
       </div>
@@ -660,19 +1004,19 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
 
         <div 
-          onClick={() => setActiveChip('opportunity')}
+          onClick={() => setActiveChip('bis_gear')}
           className={`bg-black/80 border p-3.5 rounded-2xl cursor-pointer transition-all shadow-lg ${
-            activeChip === 'opportunity' 
-              ? 'border-green-500 bg-green-950/20 shadow-green-500/10' 
-              : 'border-yellow-500/20 hover:border-green-500/50'
+            activeChip === 'bis_gear' 
+              ? 'border-purple-500 bg-purple-950/20 shadow-purple-500/10' 
+              : 'border-yellow-500/20 hover:border-purple-500/50'
           }`}
         >
           <div className="flex justify-between items-center">
-            <span className="text-xs text-green-400 uppercase font-semibold">Pechinchas FIPE</span>
-            <Flame className="text-green-400" size={16} />
+            <span className="text-xs text-purple-400 uppercase font-semibold">Com Itens BiS</span>
+            <Gem className="text-purple-400" size={16} />
           </div>
-          <p className="text-2xl sm:text-3xl font-medieval font-bold text-green-400 mt-1">{stats.opportunities}</p>
-          <p className="text-[11px] text-green-500/70 mt-0.5">&gt;20% abaixo do mercado</p>
+          <p className="text-2xl sm:text-3xl font-medieval font-bold text-purple-300 mt-1">{stats.bisCount}</p>
+          <p className="text-[11px] text-purple-400/70 mt-0.5">Soulwar, Falcon, Sanguine</p>
         </div>
 
         <div 
@@ -684,7 +1028,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
           }`}
         >
           <div className="flex justify-between items-center">
-            <span className="text-xs text-cyan-400 uppercase font-semibold">Com Itens Tierizados</span>
+            <span className="text-xs text-cyan-400 uppercase font-semibold">Com Itens Tier</span>
             <Zap className="text-cyan-400" size={16} />
           </div>
           <p className="text-2xl sm:text-3xl font-medieval font-bold text-cyan-400 mt-1">{stats.tieredCount}</p>
@@ -716,7 +1060,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             <Search className="absolute left-3.5 top-3 text-gray-500" size={16} />
             <input
               type="text"
-              placeholder="Buscar personagem ou item (ex: soulshell, naga, falcon, rift bow)..."
+              placeholder="Buscar personagem ou item (ex: soulshell, falcon, sanguine, naga, lion)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-stone-900 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500"
@@ -754,13 +1098,15 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
         </div>
 
-        {/* Chips Secundários */}
+        {/* Chips Rápidos de Atalhos */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
           <div className="flex flex-wrap gap-1.5">
             {[
               { id: 'all', label: '🌟 Todos' },
+              { id: 'bis_gear', label: '💎 Com BiS (Soul/Falcon/Sanguine)' },
+              { id: 'tier2_plus', label: '⚡ Tier 2+' },
+              { id: 'high_skills', label: '🎯 Skills 120+ / ML Alto' },
               { id: 'opportunity', label: '🔥 Pechinchas FIPE' },
-              { id: 'tiered_items', label: '⚡ Itens com Tier' },
               { id: 'ending_soon', label: '⏳ Últimas Horas' },
               { id: 'favorites', label: `⭐ Favoritos (${favorites.length})` },
               { id: 'high_level', label: '👑 Lvl 800+' },
@@ -781,23 +1127,12 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             ))}
           </div>
 
-          {(minLevel || minBid || minCharms || selectedVoc !== 'ALL' || selectedWorld !== 'ALL' || searchQuery || activeChip !== 'all') && (
+          {(minLevel || maxLevel || minBid || maxBid || minCharms || selectedVoc !== 'ALL' || selectedWorld !== 'ALL' || searchQuery || activeChip !== 'all' || statusFilter !== 'all' || itemSetFilter !== 'all' || itemTierFilter !== 'all' || minMagLevel || minDist || minMelee || minShielding) && (
             <button
-              onClick={() => {
-                setMinLevel('');
-                setMaxLevel('');
-                setMinBid('');
-                setMaxBid('');
-                setMinCharms('');
-                setSelectedVoc('ALL');
-                setSelectedWorld('ALL');
-                setSearchQuery('');
-                setActiveChip('all');
-                setStatusFilter('all');
-              }}
-              className="text-xs text-yellow-400 hover:text-white underline"
+              onClick={resetAllFilters}
+              className="text-xs text-yellow-400 hover:text-white underline font-bold"
             >
-              Resetar Filtros
+              Resetar Todos os Filtros
             </button>
           )}
         </div>
@@ -814,19 +1149,13 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
           <Target className="mx-auto text-yellow-500/40" size={48} />
           <h3 className="text-xl font-medieval text-white">Nenhum leilão encontrado para os filtros atuais</h3>
           <p className="text-xs text-gray-400 max-w-md mx-auto">
-            Tente selecionar "Todas as Classes", "Todos os Mundos" ou marcar "Status: Todos" para visualizar também os leilões finalizados recentemente.
+            Tente flexibilizar os filtros de skills, selecionar "Todas as Classes" ou marcar "Qualquer Equipamento" para expandir os resultados.
           </p>
           <button
-            onClick={() => {
-              setSelectedVoc('ALL');
-              setSelectedWorld('ALL');
-              setActiveChip('all');
-              setStatusFilter('all');
-              setSearchQuery('');
-            }}
+            onClick={resetAllFilters}
             className="px-4 py-2 rounded-xl bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-xs font-bold text-yellow-300 transition-all"
           >
-            Ver Todos os Leilões
+            Ver Todos os Leilões (Limpar Filtros)
           </button>
         </div>
       ) : viewMode === 'table' ? (
@@ -844,7 +1173,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   <th className="p-3.5">Level</th>
                   <th className="p-3.5">Skills / ML</th>
                   <th className="p-3.5">Charms</th>
-                  <th className="p-3.5">Itens / Tiers</th>
+                  <th className="p-3.5">Equipamentos / Tiers</th>
                   <th className="p-3.5">Preço (TC)</th>
                   <th className="p-3.5">FIPE Real</th>
                   <th className="p-3.5">Status</th>
@@ -860,6 +1189,8 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   const bidVal = Number(auction.current_bid) || 0;
                   const vocStr = formatVocation(auction.vocation);
                   const hasTier = Array.isArray(auction.items_data) && auction.items_data.some(it => it && it.tier > 0);
+                  const highestTier = Array.isArray(auction.items_data) ? auction.items_data.reduce((max, it) => Math.max(max, it?.tier || 0), 0) : 0;
+                  const hasBis = checkCharHasBis(auction.items_data);
 
                   return (
                     <tr 
@@ -877,10 +1208,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         </button>
                       </td>
                       <td className="p-3">
-                        <div className="font-bold text-white hover:text-yellow-400 flex items-center gap-1.5">
+                        <div className="font-bold text-white hover:text-yellow-400 flex items-center gap-1.5 flex-wrap">
                           <span>{auction.character_name}</span>
                           {auction.is_hunted && <span className="text-[10px] px-1 bg-red-600 text-white rounded font-bold">Hunted</span>}
-                          {hasTier && <span className="text-[10px] px-1 bg-cyan-900 text-cyan-300 border border-cyan-500/30 rounded font-bold">⚡ Tier</span>}
+                          {hasBis && <span className="text-[10px] px-1 bg-purple-950 text-purple-300 border border-purple-500/40 rounded font-bold">💎 BiS</span>}
+                          {highestTier > 0 && <span className="text-[10px] px-1 bg-cyan-950 text-cyan-300 border border-cyan-500/30 rounded font-bold">⚡ T{highestTier}</span>}
                         </div>
                       </td>
                       <td className="p-3 text-yellow-300 font-mono">{auction.world_name || 'Rubinot'}</td>
@@ -892,7 +1224,10 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       <td className="p-3 text-purple-300 font-mono">{auction.charm_points || 0}</td>
                       <td className="p-3 text-gray-400">
                         {Array.isArray(auction.items_data) && auction.items_data.length > 0 ? (
-                          <span className="text-cyan-400 font-mono font-bold">{auction.items_data.length} itens</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-cyan-400 font-mono font-bold">{auction.items_data.length} itens</span>
+                            {hasBis && <span className="text-[10px] text-purple-400">✦ BiS</span>}
+                          </div>
                         ) : (
                           <span className="text-gray-600">-</span>
                         )}
@@ -936,7 +1271,8 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             const fipe = calculateCharFipe(auction);
             const bidVal = Number(auction.current_bid) || 0;
             const lvl = Number(auction.level) || 1;
-            const hasTier = Array.isArray(auction.items_data) && auction.items_data.some(it => it && it.tier > 0);
+            const highestTier = Array.isArray(auction.items_data) ? auction.items_data.reduce((max, it) => Math.max(max, it?.tier || 0), 0) : 0;
+            const hasBis = checkCharHasBis(auction.items_data);
 
             const vocStr = formatVocation(auction.vocation);
             const isMage = vocStr.includes('Sorcerer') || vocStr.includes('Druid');
@@ -950,6 +1286,10 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               : isEK
               ? { name: 'Melee Skill', val: Math.max(auction.skills_data?.sword || 0, auction.skills_data?.axe || 0, auction.skills_data?.club || 0) || '?', icon: <Sword size={13} className="text-red-400" /> }
               : { name: 'Skill', val: '?', icon: <Zap size={13} className="text-yellow-400" /> };
+
+            const maxMeleeVal = Math.max(auction.skills_data?.sword || 0, auction.skills_data?.axe || 0, auction.skills_data?.club || 0);
+            const isTopSkill = (isMage && (auction.mag_level || 0) >= 115) ||
+              (!isMage && (auction.skills_data?.dist >= 120 || maxMeleeVal >= 120 || (auction.mag_level || 0) >= 35));
 
             return (
               <div 
@@ -980,21 +1320,27 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         <Star size={16} fill={isFav ? "currentColor" : "none"} />
                       </button>
 
-                      {hasTier && (
+                      {hasBis && (
+                        <span className="bg-purple-950/90 border border-purple-500/50 text-purple-300 text-[10px] font-black uppercase px-2 py-0.5 rounded flex items-center gap-1 shadow">
+                          💎 BiS Gear
+                        </span>
+                      )}
+
+                      {highestTier > 0 && (
                         <span className="bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded flex items-center gap-1">
-                          ⚡ Com Tier
+                          ⚡ Tier {highestTier}
+                        </span>
+                      )}
+
+                      {isTopSkill && (
+                        <span className="bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded flex items-center gap-1">
+                          🎯 Top Skill
                         </span>
                       )}
 
                       {fipe.discountPct >= 20 && !timeInfo.isEnded && (
                         <span className="bg-emerald-500 text-stone-950 text-[10px] font-black uppercase px-2 py-0.5 rounded shadow flex items-center gap-1">
                           <Flame size={12} /> {fipe.discountPct}% Abaixo FIPE
-                        </span>
-                      )}
-
-                      {lvl >= 800 && (
-                        <span className="bg-purple-900/60 border border-purple-500/40 text-purple-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
-                          👑 Lvl 800+
                         </span>
                       )}
                     </div>
@@ -1075,25 +1421,33 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     </div>
                   </div>
 
-                  {/* ITENS INCLUSOS COM BADGE DE TIER */}
+                  {/* ITENS INCLUSOS COM BADGE DE TIER E DESTAQUE BIS */}
                   {Array.isArray(auction.items_data) && auction.items_data.length > 0 && (
                     <div className="flex items-center gap-1.5 mb-3 p-2 rounded-xl bg-black/40 border border-white/5 overflow-x-auto custom-scrollbar">
-                      {auction.items_data.slice(0, 6).map((item, idx) => (
-                        <div key={idx} className="relative shrink-0 group/item">
-                          <img 
-                            src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
-                            alt={item?.name || 'Item'}
-                            title={`${item?.name || ''} ${item?.tier > 0 ? `[Tier ${item.tier}]` : ''}`}
-                            className="w-7 h-7 object-contain drop-shadow bg-stone-900/60 rounded p-0.5 border border-stone-700/40"
-                            onError={(e) => { e.target.style.display = 'none'; }}
-                          />
-                          {item?.tier > 0 && (
-                            <span className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[9px] font-black px-1 rounded-full shadow">
-                              T{item.tier}
-                            </span>
-                          )}
-                        </div>
-                      ))}
+                      {auction.items_data.slice(0, 6).map((item, idx) => {
+                        const isBisItem = item?.name && BIS_KEYWORDS.some(k => item.name.toLowerCase().includes(k));
+
+                        return (
+                          <div key={idx} className="relative shrink-0 group/item">
+                            <img 
+                              src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
+                              alt={item?.name || 'Item'}
+                              title={`${item?.name || ''} ${item?.tier > 0 ? `[Tier ${item.tier}]` : ''} ${isBisItem ? '(BiS / Meta)' : ''}`}
+                              className={`w-7 h-7 object-contain drop-shadow rounded p-0.5 border ${
+                                isBisItem 
+                                  ? 'bg-purple-950/60 border-purple-500/60' 
+                                  : 'bg-stone-900/60 border-stone-700/40'
+                              }`}
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                            {item?.tier > 0 && (
+                              <span className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[9px] font-black px-1 rounded-full shadow">
+                                T{item.tier}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                       {auction.items_data.length > 6 && (
                         <span className="text-[10px] text-gray-400 font-bold px-1.5 py-0.5 bg-stone-800 rounded">
                           +{auction.items_data.length - 6}
@@ -1178,6 +1532,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       Hunted
                     </span>
                   )}
+                  {checkCharHasBis(selectedAuctionModal.items_data) && (
+                    <span className="text-xs px-2 py-0.5 bg-purple-950 text-purple-300 border border-purple-500/50 rounded font-black uppercase">
+                      💎 Com BiS
+                    </span>
+                  )}
                 </h2>
                 <div className="flex items-center gap-2 mt-1 text-xs sm:text-sm text-gray-400 flex-wrap">
                   <span className="text-yellow-400 font-bold font-mono">Level {selectedAuctionModal.level}</span>
@@ -1189,7 +1548,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               </div>
             </div>
 
-            {/* 1. INVENTÁRIO & ITENS DO PERSONAGEM (COM TIERS E FOTOS) */}
+            {/* 1. INVENTÁRIO & ITENS DO PERSONAGEM (COM TIERS, FOTOS E IDENTIFICAÇÃO DE ITENS BONS) */}
             <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -1202,40 +1561,59 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
               {Array.isArray(selectedAuctionModal.items_data) && selectedAuctionModal.items_data.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-60 overflow-y-auto custom-scrollbar p-1">
-                  {selectedAuctionModal.items_data.map((item, idx) => (
-                    <div 
-                      key={idx} 
-                      className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition-all ${
-                        item.tier > 0 
-                          ? 'bg-cyan-950/30 border-cyan-500/40 shadow-sm shadow-cyan-500/10' 
-                          : 'bg-stone-950/80 border-stone-800/80'
-                      }`}
-                    >
-                      <div className="relative shrink-0">
-                        <img 
-                          src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
-                          alt={item?.name || 'Item'}
-                          className="w-9 h-9 object-contain bg-stone-900 rounded-lg p-1 border border-stone-700/50"
-                          onError={(e) => { e.target.style.display = 'none'; }}
-                        />
-                        {item.tier > 0 && (
-                          <span className="absolute -top-1.5 -right-1.5 bg-yellow-400 text-stone-950 text-[10px] font-black px-1 rounded-full shadow">
-                            T{item.tier}
-                          </span>
-                        )}
-                      </div>
+                  {selectedAuctionModal.items_data.map((item, idx) => {
+                    const isSoul = item?.name && item.name.toLowerCase().includes('soul');
+                    const isFalcon = item?.name && item.name.toLowerCase().includes('falcon');
+                    const isSanguine = item?.name && item.name.toLowerCase().includes('sanguine');
+                    const isOtherBis = item?.name && BIS_KEYWORDS.some(k => item.name.toLowerCase().includes(k)) && !isSoul && !isFalcon && !isSanguine;
 
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-white capitalize truncate" title={item?.name}>
-                          {item?.name}
+                    return (
+                      <div 
+                        key={idx} 
+                        className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition-all ${
+                          isSanguine
+                            ? 'bg-red-950/40 border-red-500/50 shadow-md shadow-red-900/20'
+                            : isSoul
+                            ? 'bg-purple-950/40 border-purple-500/50 shadow-md shadow-purple-900/20'
+                            : isFalcon
+                            ? 'bg-amber-950/40 border-amber-500/50 shadow-md shadow-amber-900/20'
+                            : isOtherBis
+                            ? 'bg-emerald-950/30 border-emerald-500/40 shadow-sm'
+                            : item.tier > 0 
+                            ? 'bg-cyan-950/30 border-cyan-500/40 shadow-sm shadow-cyan-500/10' 
+                            : 'bg-stone-950/80 border-stone-800/80'
+                        }`}
+                      >
+                        <div className="relative shrink-0">
+                          <img 
+                            src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
+                            alt={item?.name || 'Item'}
+                            className="w-9 h-9 object-contain bg-stone-900 rounded-lg p-1 border border-stone-700/50"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                          {item.tier > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 bg-yellow-400 text-stone-950 text-[10px] font-black px-1 rounded-full shadow">
+                              T{item.tier}
+                            </span>
+                          )}
                         </div>
-                        <div className="text-[10px] text-gray-400 flex items-center gap-1.5 mt-0.5">
-                          {item.count > 1 && <span>Qtd: {item.count}</span>}
-                          {item.tier > 0 && <span className="text-cyan-400 font-bold">Tier {item.tier}</span>}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-white capitalize truncate" title={item?.name}>
+                            {item?.name}
+                          </div>
+                          <div className="text-[10px] text-gray-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            {item.count > 1 && <span>Qtd: {item.count}</span>}
+                            {item.tier > 0 && <span className="text-cyan-400 font-bold">Tier {item.tier}</span>}
+                            {isSanguine && <span className="text-red-400 font-black">🩸 Sanguine</span>}
+                            {isSoul && <span className="text-purple-400 font-black">💀 Soulwar</span>}
+                            {isFalcon && <span className="text-amber-400 font-black">🦅 Falcon</span>}
+                            {isOtherBis && <span className="text-emerald-400 font-black">💎 BiS</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-4 rounded-xl bg-stone-950/60 text-center text-xs text-gray-500">
@@ -1244,41 +1622,46 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               )}
             </div>
 
-            {/* 2. TODAS AS HABILIDADES (SKILLS) */}
+            {/* 2. TODAS AS HABILIDADES (SKILLS) COM DETALHES COMPLETOS */}
             <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-5 space-y-3">
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Sword size={14} className="text-amber-400" /> Habilidades & Competências (Skills)
               </h3>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
                 <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
-                  <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
-                    <Wand2 size={13} className="text-blue-400" /> Magic Level
+                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
+                    <Wand2 size={12} className="text-blue-400" /> Magic Level
                   </span>
-                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.mag_level || '-'}</div>
+                  <div className="text-xl font-black text-blue-400 font-mono">{selectedAuctionModal.mag_level || '-'}</div>
                 </div>
 
                 <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
-                  <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
-                    <Target size={13} className="text-green-400" /> Distance
+                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
+                    <Target size={12} className="text-green-400" /> Distance
                   </span>
-                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.skills_data?.dist || '-'}</div>
+                  <div className="text-xl font-black text-green-400 font-mono">{selectedAuctionModal.skills_data?.dist || '-'}</div>
                 </div>
 
                 <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
-                  <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
-                    <Sword size={13} className="text-red-400" /> Melee (Sword/Axe/Club)
+                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
+                    <Sword size={12} className="text-red-400" /> Espada (Sword)
                   </span>
-                  <div className="text-xl font-black text-white font-mono">
-                    {Math.max(selectedAuctionModal.skills_data?.sword || 0, selectedAuctionModal.skills_data?.axe || 0, selectedAuctionModal.skills_data?.club || 0) || '-'}
-                  </div>
+                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.skills_data?.sword || '-'}</div>
                 </div>
 
                 <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
-                  <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
-                    <Shield size={13} className="text-stone-400" /> Shielding
+                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
+                    <Sword size={12} className="text-orange-400" /> Machado (Axe)
                   </span>
-                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.skills_data?.shielding || '-'}</div>
+                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.skills_data?.axe || '-'}</div>
+                </div>
+
+                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
+                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
+                    <Shield size={12} className="text-stone-400" /> Shielding
+                  </span>
+                  <div className="text-xl font-black text-stone-300 font-mono">{selectedAuctionModal.skills_data?.shielding || '-'}</div>
                 </div>
               </div>
             </div>
