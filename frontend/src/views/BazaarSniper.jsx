@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Target, AlertTriangle, Clock, TrendingDown, Coins, Search, ExternalLink, 
@@ -6,7 +6,7 @@ import {
   ArrowUpDown, Volume2, VolumeX, Eye, Calculator, ChevronDown, CheckCircle2,
   Award, Globe, Zap, ArrowRight, User, LayoutGrid, List, SlidersHorizontal,
   Bookmark, Check, Share2, DollarSign, HelpCircle, X, History, BarChart3, Package,
-  Crosshair, ShieldCheck, Gem
+  Crosshair, ShieldCheck, Gem, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { formatVocation } from '../lib/tibiaUtils';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
@@ -49,6 +49,67 @@ const RUBINOT_MARKET_STATS = {
   }
 };
 
+// Avatar ultra-leve em SVG/CSS que não dispara requisições HTTP externas
+function CharAvatar({ name, vocation, size = 'md' }) {
+  const initial = (name || '?').charAt(0).toUpperCase();
+  const voc = (vocation || '').toLowerCase();
+
+  let bgClasses = 'from-stone-900 to-stone-950 text-amber-400 border-stone-700';
+  if (voc.includes('knight')) bgClasses = 'from-red-950/80 to-stone-950 text-red-400 border-red-500/40';
+  else if (voc.includes('paladin')) bgClasses = 'from-yellow-950/80 to-stone-950 text-yellow-300 border-yellow-500/40';
+  else if (voc.includes('sorcerer')) bgClasses = 'from-orange-950/80 to-stone-950 text-orange-400 border-orange-500/40';
+  else if (voc.includes('druid')) bgClasses = 'from-emerald-950/80 to-stone-950 text-emerald-400 border-emerald-500/40';
+  else if (voc.includes('monk')) bgClasses = 'from-purple-950/80 to-stone-950 text-purple-300 border-purple-500/40';
+
+  const dim = size === 'lg' ? 'w-16 h-16 text-2xl' : 'w-12 h-12 text-lg';
+
+  return (
+    <div className={`${dim} rounded-2xl bg-gradient-to-br ${bgClasses} border flex items-center justify-center font-bold font-medieval shadow-md shrink-0 select-none`}>
+      {initial}
+    </div>
+  );
+}
+
+// Avaliação FIPE individual calibrada com os dados reais de venda do RubinOT
+function calculateCharFipe(char) {
+  const lvl = Number(char.level) || 100;
+  const ch = Number(char.charm_points) || 0;
+  const voc = (char.vocation || '').toLowerCase();
+  
+  let baseRate = 1.0;
+  if (lvl > 700) baseRate = 1.2;
+  if (lvl > 900) baseRate = 1.5;
+  if (lvl > 1100) baseRate = 1.9;
+
+  if (voc.includes('druid')) baseRate *= 1.25;
+  else if (voc.includes('paladin')) baseRate *= 1.20;
+  else if (voc.includes('knight')) baseRate *= 1.05;
+  else if (voc.includes('sorcerer')) baseRate *= 1.02;
+  else if (voc.includes('monk')) baseRate *= 0.95;
+
+  let baseTc = Math.round(lvl * baseRate);
+  const charmsBonus = Math.round((ch / 1000) * 300);
+
+  let tierBonus = 0;
+  if (Array.isArray(char.items_data)) {
+    char.items_data.forEach(it => {
+      if (it?.tier === 1) tierBonus += 250;
+      else if (it?.tier === 2) tierBonus += 600;
+      else if (it?.tier >= 3) tierBonus += 1500;
+    });
+  }
+
+  const avgFipe = Math.round(baseTc + charmsBonus + tierBonus);
+  const minFipe = Math.round(avgFipe * 0.85);
+  const maxFipe = Math.round(avgFipe * 1.15);
+
+  const currentBid = Number(char.current_bid) || 0;
+  const discountPct = (avgFipe > 0 && currentBid > 0) ? Math.round(((avgFipe - currentBid) / avgFipe) * 100) : 0;
+  const estimatedProfitTc = Math.max(0, Math.round(avgFipe * 0.88 - 50 - currentBid));
+
+  return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, tierBonus };
+}
+
 export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const { selectedWorld, setSelectedWorld } = useWorld();
   const [alerts, setAlerts] = useState([]);
@@ -64,6 +125,10 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const [selectedAuctionModal, setSelectedAuctionModal] = useState(null);
   const [nowTimestamp, setNowTimestamp] = useState(Date.now());
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Paginação inteligente para máxima fluidez
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(24);
 
   // 1. Filtros Básicos & Status
   const [minLevel, setMinLevel] = useState('');
@@ -111,14 +176,15 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     });
   };
 
-  // Ticker de tempo regressivo
+  // Ticker de tempo regressivo otimizado (atualiza a cada 10s para não estrangular CPU/render do navegador)
   useEffect(() => {
     const timer = setInterval(() => {
       setNowTimestamp(Date.now());
-    }, 1000);
+    }, 10000);
     return () => clearInterval(timer);
   }, []);
 
+  // Busca e Pré-processamento único de dados (O(1) lookups)
   const fetchAlerts = async () => {
     setLoading(true);
     try {
@@ -129,7 +195,49 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         .limit(600);
 
       if (error) throw error;
-      setAlerts(data || []);
+
+      // Pré-computa FIPE, flags e tags de alta performance UMA ÚNICA VEZ
+      const preprocessed = (data || []).map(a => {
+        const fipe = calculateCharFipe(a);
+        const items = Array.isArray(a.items_data) ? a.items_data : [];
+        let hasBis = false;
+        let highestTier = 0;
+        let bisTags = [];
+
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (!item) continue;
+          if (item.tier > highestTier) highestTier = item.tier;
+          const nameLower = (item.name || '').toLowerCase();
+          for (let k = 0; k < BIS_KEYWORDS.length; k++) {
+            if (nameLower.includes(BIS_KEYWORDS[k])) {
+              hasBis = true;
+              if (!bisTags.includes(BIS_KEYWORDS[k])) bisTags.push(BIS_KEYWORDS[k]);
+            }
+          }
+        }
+
+        const voc = (a.vocation || '').toLowerCase();
+        const isMage = voc.includes('sorcerer') || voc.includes('druid');
+        const maxMelee = Math.max(a.skills_data?.sword || 0, a.skills_data?.axe || 0, a.skills_data?.club || 0);
+        const dist = a.skills_data?.dist || 0;
+        const ml = a.mag_level || 0;
+        const isTopSkill = isMage ? ml >= 115 : (dist >= 120 || maxMelee >= 120 || ml >= 35);
+        const endTimeMs = a.auction_end ? new Date(a.auction_end).getTime() : 0;
+
+        return {
+          ...a,
+          _fipe: fipe,
+          _hasBis: hasBis,
+          _bisTags: bisTags,
+          _highestTier: highestTier,
+          _maxMelee: maxMelee,
+          _isTopSkill: isTopSkill,
+          _endTimeMs: endTimeMs
+        };
+      });
+
+      setAlerts(preprocessed);
     } catch (err) {
       console.error('Erro ao buscar leilões do Bazaar:', err);
     } finally {
@@ -148,58 +256,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     setAudioEnabled(next);
   };
 
-  // Avaliação FIPE individual calibrada com os dados reais de venda do RubinOT
-  const calculateCharFipe = (char) => {
-    const lvl = Number(char.level) || 100;
-    const ch = Number(char.charm_points) || 0;
-    const voc = (char.vocation || '').toLowerCase();
-    
-    // Taxa base calibrada por level com dados de 1.000 leilões do RubinOT
-    let baseRate = 1.0;
-    if (lvl > 700) baseRate = 1.2;
-    if (lvl > 900) baseRate = 1.5;
-    if (lvl > 1100) baseRate = 1.9;
-
-    // Multiplicador da vocação conforme valorização real de venda
-    if (voc.includes('druid')) baseRate *= 1.25;
-    else if (voc.includes('paladin')) baseRate *= 1.20;
-    else if (voc.includes('knight')) baseRate *= 1.05;
-    else if (voc.includes('sorcerer')) baseRate *= 1.02;
-    else if (voc.includes('monk')) baseRate *= 0.95;
-
-    let baseTc = Math.round(lvl * baseRate);
-
-    // Bônus por charms: cada 1000 charms adiciona ~300 TC
-    const charmsBonus = Math.round((ch / 1000) * 300);
-
-    // Bônus por itens tierizados no char
-    let tierBonus = 0;
-    if (Array.isArray(char.items_data)) {
-      char.items_data.forEach(it => {
-        if (it?.tier === 1) tierBonus += 250;
-        else if (it?.tier === 2) tierBonus += 600;
-        else if (it?.tier >= 3) tierBonus += 1500;
-      });
-    }
-
-    const avgFipe = Math.round(baseTc + charmsBonus + tierBonus);
-    const minFipe = Math.round(avgFipe * 0.85);
-    const maxFipe = Math.round(avgFipe * 1.15);
-
-    const currentBid = Number(char.current_bid) || 0;
-    const discountPct = (avgFipe > 0 && currentBid > 0) ? Math.round(((avgFipe - currentBid) / avgFipe) * 100) : 0;
-    // Lucro estimado na revenda (Preço FIPE - 12% taxa cipsoft - 50 TC fixa - Lance)
-    const estimatedProfitTc = Math.max(0, Math.round(avgFipe * 0.88 - 50 - currentBid));
-
-    return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, tierBonus };
-  };
-
-  // Checagem de itens BiS / Meta
-  const checkCharHasBis = (itemsData) => {
-    if (!Array.isArray(itemsData)) return false;
-    return itemsData.some(it => it?.name && BIS_KEYWORDS.some(k => it.name.toLowerCase().includes(k)));
-  };
-
   // Contagem de leilões por vocação
   const vocationCounts = useMemo(() => {
     const counts = { ALL: alerts.length, knight: 0, paladin: 0, sorcerer: 0, druid: 0, monk: 0, none: 0 };
@@ -216,15 +272,15 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   }, [alerts]);
 
   // Formatação de tempo restante
-  const getTimeRemaining = (auctionEnd) => {
-    if (!auctionEnd) return { text: 'Expirado', isUrgent: false, isImminent: false, isEnded: true, totalSeconds: 0 };
-    const diff = new Date(auctionEnd).getTime() - nowTimestamp;
+  const getTimeRemaining = (auctionEnd, endTimeMs) => {
+    const endMs = endTimeMs || (auctionEnd ? new Date(auctionEnd).getTime() : 0);
+    if (!endMs) return { text: 'Expirado', isUrgent: false, isImminent: false, isEnded: true, totalSeconds: 0 };
+    const diff = endMs - nowTimestamp;
     if (diff <= 0) return { text: 'Encerrado (Vendido)', isUrgent: false, isImminent: false, isEnded: true, totalSeconds: 0 };
 
     const totalSeconds = Math.floor(diff / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
 
     const isImminent = totalSeconds < 30 * 60;
     const isUrgent = totalSeconds < 2 * 3600;
@@ -236,7 +292,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
     const pad = (n) => String(n).padStart(2, '0');
     return {
-      text: `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`,
+      text: `${pad(hours)}h ${pad(minutes)}m restantes`,
       isUrgent,
       isImminent,
       isEnded: false,
@@ -278,16 +334,22 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     setMinMelee('');
     setMeleeType('any');
     setMinShielding('');
+    setCurrentPage(1);
   };
 
-  // Filtragem e Ordenação
+  // Resetar página quando qualquer filtro mudar
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedVoc, selectedWorld, activeChip, statusFilter, itemSetFilter, itemTierFilter, minLevel, maxLevel, minBid, maxBid, minCharms, minMagLevel, minDist, minMelee, minShielding, sortOption]);
+
+  // Filtragem e Ordenação com Pré-processados O(1)
   const filteredAndSortedAuctions = useMemo(() => {
     let result = alerts.filter(a => {
-      const timeInfo = getTimeRemaining(a.auction_end);
+      const isEnded = (a._endTimeMs || 0) <= nowTimestamp;
 
       // Status Filter
-      if (statusFilter === 'active' && timeInfo.isEnded) return false;
-      if (statusFilter === 'ended' && !timeInfo.isEnded) return false;
+      if (statusFilter === 'active' && isEnded) return false;
+      if (statusFilter === 'ended' && !isEnded) return false;
 
       // Mundo
       if (selectedWorld !== 'ALL' && a.world_name && a.world_name.toLowerCase() !== selectedWorld.toLowerCase()) {
@@ -320,36 +382,21 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       if (maxBid && (a.current_bid || 0) > Number(maxBid)) return false;
       if (minCharms && (a.charm_points || 0) < Number(minCharms)) return false;
 
-      // Filtro de Equipamentos Valiosos (Itens Bons / BiS)
+      // Filtro de Equipamentos Valiosos
       if (itemSetFilter !== 'all') {
-        if (!Array.isArray(a.items_data) || a.items_data.length === 0) return false;
-        if (itemSetFilter === 'bis') {
-          const hasBis = a.items_data.some(it => it?.name && BIS_KEYWORDS.some(k => it.name.toLowerCase().includes(k)));
-          if (!hasBis) return false;
-        } else if (itemSetFilter === 'soulwar') {
-          const hasSoul = a.items_data.some(it => it?.name && it.name.toLowerCase().includes('soul'));
-          if (!hasSoul) return false;
-        } else if (itemSetFilter === 'falcon') {
-          const hasFalcon = a.items_data.some(it => it?.name && it.name.toLowerCase().includes('falcon'));
-          if (!hasFalcon) return false;
-        } else if (itemSetFilter === 'sanguine') {
-          const hasSanguine = a.items_data.some(it => it?.name && it.name.toLowerCase().includes('sanguine'));
-          if (!hasSanguine) return false;
-        } else if (itemSetFilter === 'naga_cobra') {
-          const hasNagaCobra = a.items_data.some(it => it?.name && (it.name.toLowerCase().includes('naga') || it.name.toLowerCase().includes('cobra')));
-          if (!hasNagaCobra) return false;
-        } else if (itemSetFilter === 'lion_spirit') {
-          const hasLionSpirit = a.items_data.some(it => it?.name && (it.name.toLowerCase().includes('lion') || it.name.toLowerCase().includes('spiritthorn') || it.name.toLowerCase().includes('alicorn') || it.name.toLowerCase().includes('eldritch')));
-          if (!hasLionSpirit) return false;
-        }
+        if (!a._hasBis) return false;
+        if (itemSetFilter === 'soulwar' && !a._bisTags.includes('soul')) return false;
+        if (itemSetFilter === 'falcon' && !a._bisTags.includes('falcon')) return false;
+        if (itemSetFilter === 'sanguine' && !a._bisTags.includes('sanguine')) return false;
+        if (itemSetFilter === 'naga_cobra' && !a._bisTags.includes('naga') && !a._bisTags.includes('cobra')) return false;
+        if (itemSetFilter === 'lion_spirit' && !a._bisTags.includes('lion') && !a._bisTags.includes('spiritthorn') && !a._bisTags.includes('alicorn') && !a._bisTags.includes('eldritch')) return false;
       }
 
       // Filtro de Tier da Forja
       if (itemTierFilter !== 'all') {
-        if (!Array.isArray(a.items_data)) return false;
-        if (itemTierFilter === 'tier1' && !a.items_data.some(it => it?.tier >= 1)) return false;
-        if (itemTierFilter === 'tier2' && !a.items_data.some(it => it?.tier >= 2)) return false;
-        if (itemTierFilter === 'tier3' && !a.items_data.some(it => it?.tier >= 3)) return false;
+        if (itemTierFilter === 'tier1' && (a._highestTier || 0) < 1) return false;
+        if (itemTierFilter === 'tier2' && (a._highestTier || 0) < 2) return false;
+        if (itemTierFilter === 'tier3' && (a._highestTier || 0) < 3) return false;
       }
 
       // Filtro de Magic Level (ML)
@@ -368,8 +415,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         } else if (meleeType === 'club') {
           if ((a.skills_data?.club || 0) < reqMelee) return false;
         } else {
-          const maxM = Math.max(a.skills_data?.sword || 0, a.skills_data?.axe || 0, a.skills_data?.club || 0);
-          if (maxM < reqMelee) return false;
+          if ((a._maxMelee || 0) < reqMelee) return false;
         }
       }
 
@@ -378,37 +424,20 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
       // Chips Rápidos
       if (activeChip === 'opportunity') {
-        const fipe = calculateCharFipe(a);
-        return fipe.discountPct >= 20 || a.is_sniping_opportunity;
+        return (a._fipe?.discountPct || 0) >= 20 || a.is_sniping_opportunity;
       }
-      if (activeChip === 'bis_gear') {
-        return checkCharHasBis(a.items_data);
-      }
-      if (activeChip === 'tier2_plus') {
-        return Array.isArray(a.items_data) && a.items_data.some(it => it?.tier >= 2);
-      }
-      if (activeChip === 'high_skills') {
-        const voc = (a.vocation || '').toLowerCase();
-        const isMage = voc.includes('sorcerer') || voc.includes('druid');
-        const dist = a.skills_data?.dist || 0;
-        const melee = Math.max(a.skills_data?.sword || 0, a.skills_data?.axe || 0, a.skills_data?.club || 0);
-        const ml = a.mag_level || 0;
-        if (isMage) {
-          if (ml < 115) return false;
-        } else {
-          if (dist < 120 && melee < 120 && ml < 35) return false;
-        }
-      }
+      if (activeChip === 'bis_gear') return a._hasBis;
+      if (activeChip === 'tier2_plus') return (a._highestTier || 0) >= 2;
+      if (activeChip === 'high_skills') return a._isTopSkill;
       if (activeChip === 'ending_soon') {
-        return !timeInfo.isEnded && timeInfo.totalSeconds < 3 * 3600;
+        const diffSec = Math.floor(((a._endTimeMs || 0) - nowTimestamp) / 1000);
+        return !isEnded && diffSec < 3 * 3600 && diffSec > 0;
       }
       if (activeChip === 'favorites') {
         const aId = a.id || a.auction_id;
         return favorites.includes(aId);
       }
-      if (activeChip === 'tiered_items') {
-        return Array.isArray(a.items_data) && a.items_data.some(it => it && it.tier > 0);
-      }
+      if (activeChip === 'tiered_items') return (a._highestTier || 0) > 0;
       if (activeChip === 'hunted') return a.is_hunted;
       if (activeChip === 'high_level') return (a.level || 0) >= 800;
       if (activeChip === 'cheap') return (a.current_bid || 0) <= 500 && (a.current_bid || 0) > 0;
@@ -417,25 +446,20 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       return true;
     });
 
-    // Ordenação
+    // Ordenação Otimizada
     result.sort((a, b) => {
-      const timeA = new Date(a.auction_end).getTime();
-      const timeB = new Date(b.auction_end).getTime();
-      const isEndedA = timeA - nowTimestamp <= 0;
-      const isEndedB = timeB - nowTimestamp <= 0;
+      const isEndedA = (a._endTimeMs || 0) <= nowTimestamp;
+      const isEndedB = (b._endTimeMs || 0) <= nowTimestamp;
 
-      // Se statusFilter for 'all', ativos vêm primeiro
       if (statusFilter === 'all' && isEndedA !== isEndedB) {
         return isEndedA ? 1 : -1;
       }
 
       if (sortOption === 'ending') {
-        return isEndedA ? (timeB - timeA) : (timeA - timeB);
+        return isEndedA ? (b._endTimeMs - a._endTimeMs) : (a._endTimeMs - b._endTimeMs);
       }
       if (sortOption === 'profit_desc') {
-        const profitA = calculateCharFipe(a).estimatedProfitTc;
-        const profitB = calculateCharFipe(b).estimatedProfitTc;
-        return profitB - profitA;
+        return (b._fipe?.estimatedProfitTc || 0) - (a._fipe?.estimatedProfitTc || 0);
       }
       if (sortOption === 'price_asc') {
         return (a.current_bid || 0) - (b.current_bid || 0);
@@ -455,7 +479,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     return result;
   }, [alerts, selectedWorld, searchQuery, selectedVoc, activeChip, sortOption, minLevel, maxLevel, minBid, maxBid, minCharms, statusFilter, itemSetFilter, itemTierFilter, minMagLevel, minDist, minMelee, meleeType, minShielding, favorites, nowTimestamp]);
 
-  // Estatísticas
+  // Paginação: Apenas renderiza 24 itens por vez no DOM (super veloz e leve)
+  const totalPages = Math.ceil(filteredAndSortedAuctions.length / pageSize) || 1;
+  const paginatedAuctions = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAndSortedAuctions.slice(start, start + pageSize);
+  }, [filteredAndSortedAuctions, currentPage, pageSize]);
+
+  // Estatísticas do Topo (computadas de forma leve)
   const stats = useMemo(() => {
     const total = alerts.length;
     let activeCount = 0;
@@ -465,27 +496,26 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     let tieredCount = 0;
     let bisCount = 0;
 
-    alerts.forEach(a => {
-      const timeInfo = getTimeRemaining(a.auction_end);
-      if (!timeInfo.isEnded) {
+    for (let i = 0; i < alerts.length; i++) {
+      const a = alerts[i];
+      const isEnded = (a._endTimeMs || 0) <= nowTimestamp;
+      if (!isEnded) {
         activeCount++;
-        if (timeInfo.totalSeconds < 3 * 3600) endingSoon++;
+        const diffSec = Math.floor(((a._endTimeMs || 0) - nowTimestamp) / 1000);
+        if (diffSec < 3 * 3600) endingSoon++;
       } else {
         endedCount++;
       }
-      const fipe = calculateCharFipe(a);
-      if (fipe.discountPct >= 20 || a.is_sniping_opportunity) opportunities++;
-      if (Array.isArray(a.items_data)) {
-        if (a.items_data.some(it => it?.tier > 0)) tieredCount++;
-        if (a.items_data.some(it => it?.name && BIS_KEYWORDS.some(k => it.name.toLowerCase().includes(k)))) bisCount++;
-      }
-    });
+      if ((a._fipe?.discountPct || 0) >= 20 || a.is_sniping_opportunity) opportunities++;
+      if (a._highestTier > 0) tieredCount++;
+      if (a._hasBis) bisCount++;
+    }
 
     return { total, activeCount, endedCount, opportunities, endingSoon, tieredCount, bisCount, favoritesCount: favorites.length };
   }, [alerts, favorites, nowTimestamp]);
 
   const handleShareAuction = (auction) => {
-    const fipe = calculateCharFipe(auction);
+    const fipe = auction._fipe || calculateCharFipe(auction);
     const text = `[Rubinot Bazaar] ${auction.character_name} (Lvl ${auction.level} - ${formatVocation(auction.vocation)}) | Preço: ${auction.current_bid} TC (FIPE: ~${fipe.avgFipe} TC) | Mundo: ${auction.world_name}`;
     navigator.clipboard.writeText(text);
     setCopiedLink(true);
@@ -511,7 +541,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             </h1>
             
             <p className="text-gray-300 font-sans text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
-              Consulte leilões ativos e o histórico dos últimos 30 dias de vendas do RubinOT. Filtre por skills avançadas, itens BiS/forja e clique em qualquer personagem para inspecionar tudo o que ele tinha!
+              Consulte leilões ativos e o histórico dos últimos 30 dias de vendas do RubinOT. Filtre por skills avançadas, itens BiS/forja e inspecione tudo em alta velocidade!
             </p>
           </div>
 
@@ -1138,7 +1168,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
       </div>
 
-      {/* 5. LISTAGEM DE LEILÕES (MODO CARDS OU MODO TABELA) */}
+      {/* 5. LISTAGEM DE LEILÕES COM PAGINAÇÃO ULTRA-RÁPIDA */}
       {loading ? (
         <div className="text-center py-20 text-gray-400 flex flex-col items-center gap-3">
           <div className="w-12 h-12 border-2 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
@@ -1160,7 +1190,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
       ) : viewMode === 'table' ? (
         
-        /* MODO TABELA SNIPER PRO */
+        /* MODO TABELA SNIPER PRO (PAGINADA) */
         <div className="bg-stone-950/90 border border-stone-800 rounded-2xl overflow-hidden shadow-2xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -1181,16 +1211,13 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-800/60 font-medium">
-                {filteredAndSortedAuctions.map(auction => {
+                {paginatedAuctions.map(auction => {
                   const aId = auction.id || auction.auction_id;
                   const isFav = favorites.includes(aId);
-                  const timeInfo = getTimeRemaining(auction.auction_end);
-                  const fipe = calculateCharFipe(auction);
+                  const timeInfo = getTimeRemaining(auction.auction_end, auction._endTimeMs);
+                  const fipe = auction._fipe;
                   const bidVal = Number(auction.current_bid) || 0;
                   const vocStr = formatVocation(auction.vocation);
-                  const hasTier = Array.isArray(auction.items_data) && auction.items_data.some(it => it && it.tier > 0);
-                  const highestTier = Array.isArray(auction.items_data) ? auction.items_data.reduce((max, it) => Math.max(max, it?.tier || 0), 0) : 0;
-                  const hasBis = checkCharHasBis(auction.items_data);
 
                   return (
                     <tr 
@@ -1211,8 +1238,8 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         <div className="font-bold text-white hover:text-yellow-400 flex items-center gap-1.5 flex-wrap">
                           <span>{auction.character_name}</span>
                           {auction.is_hunted && <span className="text-[10px] px-1 bg-red-600 text-white rounded font-bold">Hunted</span>}
-                          {hasBis && <span className="text-[10px] px-1 bg-purple-950 text-purple-300 border border-purple-500/40 rounded font-bold">💎 BiS</span>}
-                          {highestTier > 0 && <span className="text-[10px] px-1 bg-cyan-950 text-cyan-300 border border-cyan-500/30 rounded font-bold">⚡ T{highestTier}</span>}
+                          {auction._hasBis && <span className="text-[10px] px-1 bg-purple-950 text-purple-300 border border-purple-500/40 rounded font-bold">💎 BiS</span>}
+                          {auction._highestTier > 0 && <span className="text-[10px] px-1 bg-cyan-950 text-cyan-300 border border-cyan-500/30 rounded font-bold">⚡ T{auction._highestTier}</span>}
                         </div>
                       </td>
                       <td className="p-3 text-yellow-300 font-mono">{auction.world_name || 'Rubinot'}</td>
@@ -1226,14 +1253,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         {Array.isArray(auction.items_data) && auction.items_data.length > 0 ? (
                           <div className="flex items-center gap-1">
                             <span className="text-cyan-400 font-mono font-bold">{auction.items_data.length} itens</span>
-                            {hasBis && <span className="text-[10px] text-purple-400">✦ BiS</span>}
+                            {auction._hasBis && <span className="text-[10px] text-purple-400 font-bold">✦ BiS</span>}
                           </div>
                         ) : (
                           <span className="text-gray-600">-</span>
                         )}
                       </td>
                       <td className="p-3 font-bold text-yellow-400 font-mono">{bidVal.toLocaleString()} TC</td>
-                      <td className="p-3 text-gray-400 font-mono">~{fipe.avgFipe.toLocaleString()} TC</td>
+                      <td className="p-3 text-gray-400 font-mono">~{fipe?.avgFipe?.toLocaleString() || 0} TC</td>
                       <td className="p-3">
                         {timeInfo.isEnded ? (
                           <span className="text-gray-500 text-[11px]">Finalizado</span>
@@ -1262,17 +1289,15 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
       ) : (
 
-        /* MODO CARDS DETALHADOS */
+        /* MODO CARDS DETALHADOS (PAGINADOS: 24 POR PÁGINA) */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredAndSortedAuctions.map(auction => {
+          {paginatedAuctions.map(auction => {
             const aId = auction.id || auction.auction_id;
             const isFav = favorites.includes(aId);
-            const timeInfo = getTimeRemaining(auction.auction_end);
-            const fipe = calculateCharFipe(auction);
+            const timeInfo = getTimeRemaining(auction.auction_end, auction._endTimeMs);
+            const fipe = auction._fipe;
             const bidVal = Number(auction.current_bid) || 0;
             const lvl = Number(auction.level) || 1;
-            const highestTier = Array.isArray(auction.items_data) ? auction.items_data.reduce((max, it) => Math.max(max, it?.tier || 0), 0) : 0;
-            const hasBis = checkCharHasBis(auction.items_data);
 
             const vocStr = formatVocation(auction.vocation);
             const isMage = vocStr.includes('Sorcerer') || vocStr.includes('Druid');
@@ -1284,12 +1309,8 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               : isRP
               ? { name: 'Distance', val: auction.skills_data?.dist || '?', icon: <Target size={13} className="text-green-400" /> }
               : isEK
-              ? { name: 'Melee Skill', val: Math.max(auction.skills_data?.sword || 0, auction.skills_data?.axe || 0, auction.skills_data?.club || 0) || '?', icon: <Sword size={13} className="text-red-400" /> }
+              ? { name: 'Melee Skill', val: auction._maxMelee || '?', icon: <Sword size={13} className="text-red-400" /> }
               : { name: 'Skill', val: '?', icon: <Zap size={13} className="text-yellow-400" /> };
-
-            const maxMeleeVal = Math.max(auction.skills_data?.sword || 0, auction.skills_data?.axe || 0, auction.skills_data?.club || 0);
-            const isTopSkill = (isMage && (auction.mag_level || 0) >= 115) ||
-              (!isMage && (auction.skills_data?.dist >= 120 || maxMeleeVal >= 120 || (auction.mag_level || 0) >= 35));
 
             return (
               <div 
@@ -1302,7 +1323,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     ? 'border-red-500/60 shadow-red-500/10'
                     : timeInfo.isImminent
                     ? 'border-amber-500 shadow-amber-500/20 animate-pulse'
-                    : fipe.discountPct >= 20
+                    : (fipe?.discountPct || 0) >= 20
                     ? 'border-yellow-500/70 shadow-yellow-500/15'
                     : 'border-white/10 hover:border-yellow-500/40'
                 }`}
@@ -1320,25 +1341,25 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         <Star size={16} fill={isFav ? "currentColor" : "none"} />
                       </button>
 
-                      {hasBis && (
+                      {auction._hasBis && (
                         <span className="bg-purple-950/90 border border-purple-500/50 text-purple-300 text-[10px] font-black uppercase px-2 py-0.5 rounded flex items-center gap-1 shadow">
                           💎 BiS Gear
                         </span>
                       )}
 
-                      {highestTier > 0 && (
+                      {auction._highestTier > 0 && (
                         <span className="bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded flex items-center gap-1">
-                          ⚡ Tier {highestTier}
+                          ⚡ Tier {auction._highestTier}
                         </span>
                       )}
 
-                      {isTopSkill && (
+                      {auction._isTopSkill && (
                         <span className="bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded flex items-center gap-1">
                           🎯 Top Skill
                         </span>
                       )}
 
-                      {fipe.discountPct >= 20 && !timeInfo.isEnded && (
+                      {(fipe?.discountPct || 0) >= 20 && !timeInfo.isEnded && (
                         <span className="bg-emerald-500 text-stone-950 text-[10px] font-black uppercase px-2 py-0.5 rounded shadow flex items-center gap-1">
                           <Flame size={12} /> {fipe.discountPct}% Abaixo FIPE
                         </span>
@@ -1355,20 +1376,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         ? 'bg-amber-950/60 text-amber-300 border border-amber-500/40'
                         : 'bg-black/60 text-gray-400 border border-white/10'
                     }`}>
-                      <Clock size={12} className={timeInfo.isImminent ? 'animate-spin' : ''} />
+                      <Clock size={12} />
                       <span>{timeInfo.text}</span>
                     </div>
                   </div>
 
-                  {/* CABEÇALHO DO PERSONAGEM */}
+                  {/* CABEÇALHO DO PERSONAGEM (AVATAR LOCAL SEM TRAVAR REDE) */}
                   <div className="flex items-start gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-xl bg-stone-900 border border-white/10 flex items-center justify-center shrink-0 shadow-inner group-hover:border-yellow-500/50 transition-colors">
-                      <img 
-                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(auction.character_name)}&background=1c1917&color=eab308&bold=true`}
-                        alt={auction.character_name}
-                        className="w-10 h-10 rounded-lg object-cover"
-                      />
-                    </div>
+                    <CharAvatar name={auction.character_name} vocation={auction.vocation} />
 
                     <div className="flex-1 min-w-0">
                       <h3 className="text-base font-bold text-white group-hover:text-yellow-400 transition-colors truncate flex items-center gap-1.5">
@@ -1416,12 +1431,12 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         <Coins size={11} className="text-yellow-400" /> FIPE Real
                       </span>
                       <span className="font-bold text-amber-300">
-                        {fipe.avgFipe} TC
+                        {fipe?.avgFipe || 0} TC
                       </span>
                     </div>
                   </div>
 
-                  {/* ITENS INCLUSOS COM BADGE DE TIER E DESTAQUE BIS */}
+                  {/* ITENS INCLUSOS (COM LAZY LOADING E DESTAQUE BIS) */}
                   {Array.isArray(auction.items_data) && auction.items_data.length > 0 && (
                     <div className="flex items-center gap-1.5 mb-3 p-2 rounded-xl bg-black/40 border border-white/5 overflow-x-auto custom-scrollbar">
                       {auction.items_data.slice(0, 6).map((item, idx) => {
@@ -1432,6 +1447,8 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                             <img 
                               src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
                               alt={item?.name || 'Item'}
+                              loading="lazy"
+                              decoding="async"
                               title={`${item?.name || ''} ${item?.tier > 0 ? `[Tier ${item.tier}]` : ''} ${isBisItem ? '(BiS / Meta)' : ''}`}
                               className={`w-7 h-7 object-contain drop-shadow rounded p-0.5 border ${
                                 isBisItem 
@@ -1475,7 +1492,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     <div className="text-right">
                       <span className="text-[10px] text-gray-500 block">Avaliação FIPE:</span>
                       <span className="text-xs font-mono font-bold text-amber-300">
-                        ~{fipe.avgFipe.toLocaleString()} TC
+                        ~{fipe?.avgFipe?.toLocaleString() || 0} TC
                       </span>
                     </div>
                   </div>
@@ -1496,7 +1513,98 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
       )}
 
-      {/* 6. MODAL COMPLETO DE INSPEÇÃO: TUDO O QUE O PERSONAGEM TINHA! */}
+      {/* 6. BARRA DE PAGINAÇÃO ULTRA-RÁPIDA */}
+      {filteredAndSortedAuctions.length > pageSize && (
+        <div className="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+          <div className="text-xs text-gray-400 font-mono">
+            Exibindo <span className="text-white font-bold">{((currentPage - 1) * pageSize) + 1}</span> a <span className="text-white font-bold">{Math.min(currentPage * pageSize, filteredAndSortedAuctions.length)}</span> de <span className="text-yellow-400 font-bold">{filteredAndSortedAuctions.length}</span> leilões
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(1)}
+              className="p-2 rounded-lg bg-stone-950 border border-stone-800 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              title="Primeira Página"
+            >
+              <ChevronsLeft size={16} />
+            </button>
+
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="p-2 rounded-lg bg-stone-950 border border-stone-800 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              title="Página Anterior"
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            {/* Números das Páginas */}
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pNum = i + 1;
+              if (totalPages > 5) {
+                if (currentPage > 3 && currentPage < totalPages - 1) {
+                  pNum = currentPage - 2 + i;
+                } else if (currentPage >= totalPages - 1) {
+                  pNum = totalPages - 4 + i;
+                }
+              }
+
+              return (
+                <button
+                  key={pNum}
+                  type="button"
+                  onClick={() => setCurrentPage(pNum)}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold font-mono transition-all ${
+                    currentPage === pNum
+                      ? 'bg-yellow-500 text-stone-950 font-black shadow-md scale-105'
+                      : 'bg-stone-950 border border-stone-800 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {pNum}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              className="p-2 rounded-lg bg-stone-950 border border-stone-800 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              title="Próxima Página"
+            >
+              <ChevronRight size={16} />
+            </button>
+
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="p-2 rounded-lg bg-stone-950 border border-stone-800 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              title="Última Página"
+            >
+              <ChevronsRight size={16} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <span>Itens por página:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+              className="bg-stone-950 border border-stone-700 text-yellow-400 rounded-lg px-2 py-1 font-mono font-bold"
+            >
+              <option value={24}>24</option>
+              <option value={48}>48</option>
+              <option value={96}>96</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* 7. MODAL COMPLETO DE INSPEÇÃO: TUDO O QUE O PERSONAGEM TINHA! */}
       {selectedAuctionModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-stone-950 border-2 border-yellow-500/50 rounded-3xl p-6 max-w-3xl w-full max-h-[92vh] overflow-y-auto space-y-6 shadow-2xl relative">
@@ -1511,13 +1619,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
             {/* Cabeçalho do Personagem */}
             <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-stone-900 border-2 border-yellow-500/40 flex items-center justify-center shrink-0 shadow-lg">
-                <img 
-                  src={`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedAuctionModal.character_name)}&background=1c1917&color=eab308&bold=true`}
-                  alt={selectedAuctionModal.character_name}
-                  className="w-14 h-14 rounded-xl object-cover"
-                />
-              </div>
+              <CharAvatar name={selectedAuctionModal.character_name} vocation={selectedAuctionModal.vocation} size="lg" />
 
               <div>
                 <div className="text-xs text-yellow-400 font-bold uppercase tracking-wider flex items-center gap-2">
@@ -1532,7 +1634,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       Hunted
                     </span>
                   )}
-                  {checkCharHasBis(selectedAuctionModal.items_data) && (
+                  {selectedAuctionModal._hasBis && (
                     <span className="text-xs px-2 py-0.5 bg-purple-950 text-purple-300 border border-purple-500/50 rounded font-black uppercase">
                       💎 Com BiS
                     </span>
@@ -1588,6 +1690,8 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                           <img 
                             src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
                             alt={item?.name || 'Item'}
+                            loading="lazy"
+                            decoding="async"
                             className="w-9 h-9 object-contain bg-stone-900 rounded-lg p-1 border border-stone-700/50"
                             onError={(e) => { e.target.style.display = 'none'; }}
                           />
@@ -1668,7 +1772,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
             {/* 3. DOSSIÊ FINANCEIRO & AVALIAÇÃO FIPE RUBINOT */}
             {(() => {
-              const modalFipe = calculateCharFipe(selectedAuctionModal);
+              const modalFipe = selectedAuctionModal._fipe || calculateCharFipe(selectedAuctionModal);
               const bid = Number(selectedAuctionModal.current_bid) || 0;
 
               return (
@@ -1678,7 +1782,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       <DollarSign size={15} /> Comparativo com a Média de Mercado do RubinOT
                     </h3>
                     <span className="text-xs font-bold text-amber-300">
-                      {modalFipe.discountPct > 0 ? `${modalFipe.discountPct}% Abaixo da FIPE` : 'Preço de Mercado'}
+                      {(modalFipe.discountPct || 0) > 0 ? `${modalFipe.discountPct}% Abaixo da FIPE` : 'Preço de Mercado'}
                     </span>
                   </div>
                   
