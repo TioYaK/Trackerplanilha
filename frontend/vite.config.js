@@ -10,7 +10,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'ads.txt', 'Instalar_Worker.ps1'],
       workbox: {
         importScripts: ['/custom-sw.js'],
-        navigateFallbackDenylist: [/^\/ads\.txt/, /^\/Instalar_Worker/, /^\/api/]
+        navigateFallbackDenylist: [/^\/ads\.txt/, /^\/Instalar_Worker/, /^\/api\/(v1|worker|check-maker|get-character|manage-user|reset-password|worker-config)/]
       },
       manifest: {
         name: 'BattleStorm Tracker',

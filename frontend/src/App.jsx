@@ -53,46 +53,201 @@ const DEFAULT_VISIBLE_TABS = [
   'bank', 'market', 'loot', 'tracker', 'extreme', 'respawns', 'guild_perks'
 ];
 
+const ROUTE_TO_VIEW = {
+  '/': 'home',
+  '/home': 'home',
+  '/live': 'home',
+  '/api': 'developers',
+  '/developers': 'developers',
+  '/dev': 'developers',
+  '/devs': 'developers',
+  '/sorteio': 'sorteio',
+  '/sorteios': 'sorteio',
+  '/giveaway': 'sorteio',
+  '/attendance': 'attendance',
+  '/mortes': 'attendance',
+  '/frags': 'attendance',
+  '/tracker': 'tracker',
+  '/global': 'tracker',
+  '/analytics': 'analytics',
+  '/rankings': 'analytics',
+  '/contribute': 'contribute',
+  '/worker': 'contribute',
+  '/workers-vip': 'contribute',
+  '/bazaar': 'bazaar',
+  '/sniper': 'bazaar',
+  '/radar': 'radar',
+  '/spy': 'radar',
+  '/extreme': 'extreme',
+  '/bi': 'extreme',
+  '/planilha': 'planilha',
+  '/caves': 'planilha',
+  '/hunts': 'planilha',
+  '/planilha-live': 'planilha_live',
+  '/respawns': 'respawns',
+  '/regras': 'respawns',
+  '/roster': 'roster',
+  '/membros': 'roster',
+  '/bank': 'bank',
+  '/banco': 'bank',
+  '/market': 'market',
+  '/mercado': 'market',
+  '/perks': 'guild_perks',
+  '/guild-perks': 'guild_perks',
+  '/guild_perks': 'guild_perks',
+  '/pearks': 'guild_perks',
+  '/invite': 'invite',
+  '/invites': 'invite',
+  '/convite': 'invite',
+  '/admin': 'admin',
+  '/painel': 'admin',
+  '/workers': 'workers',
+  '/c2': 'workers',
+  '/admin-dashboard': 'admin_dashboard',
+  '/dashboard': 'admin_dashboard',
+  '/auth': 'auth',
+  '/login': 'auth',
+  '/cadastro': 'auth',
+  '/party': 'party',
+  '/player': 'players',
+  '/players': 'players',
+};
+
+const VIEW_TO_ROUTE = {
+  home: '/',
+  live: '/',
+  developers: '/api',
+  api: '/api',
+  sorteio: '/sorteio',
+  giveaway: '/sorteio',
+  attendance: '/attendance',
+  tracker: '/tracker',
+  analytics: '/analytics',
+  contribute: '/contribute',
+  bazaar: '/bazaar',
+  radar: '/radar',
+  extreme: '/extreme',
+  planilha: '/planilha',
+  planilha_live: '/planilha-live',
+  respawns: '/respawns',
+  roster: '/roster',
+  bank: '/bank',
+  market: '/market',
+  guild_perks: '/perks',
+  pearks: '/perks',
+  invite: '/invite',
+  admin: '/admin',
+  workers: '/workers',
+  admin_dashboard: '/admin-dashboard',
+  auth: '/auth',
+  players: '/players',
+  party: '/party',
+};
+
+const VIEW_TITLES = {
+  home: 'Rubinot Tracker | Portal Central',
+  live: 'Rubinot Tracker | Portal Central',
+  developers: 'Rubinot Tracker | API para Desenvolvedores ⚡',
+  sorteio: 'Rubinot Tracker | Sorteios da Comunidade 🎁',
+  attendance: 'Rubinot Tracker | Mural de Mortes & Frags',
+  tracker: 'Rubinot Tracker | Monitor Global de Players',
+  analytics: 'Rubinot Tracker | Rankings Globais',
+  contribute: 'Rubinot Tracker | Baixar Worker & Acesso VIP',
+  bazaar: 'Rubinot Tracker | Bazaar Sniper Mega Premium 💎',
+  radar: 'Rubinot Tracker | Radar de Inimigos (Warmode Spy) 👑',
+  extreme: 'Rubinot Tracker | Extreme BI & Inteligência Avançada 👑',
+  planilha: 'Rubinot Tracker | Controle de Hunts & Caves',
+  planilha_live: 'Rubinot Tracker | Monitor de Caves Ao Vivo',
+  respawns: 'Rubinot Tracker | Respawns & Regras',
+  roster: 'Rubinot Tracker | Exército da Guilda',
+  bank: 'Rubinot Tracker | Tesouraria da Guilda',
+  market: 'Rubinot Tracker | Mercado Interno',
+  guild_perks: 'Rubinot Tracker | Perks da Guilda',
+  invite: 'Rubinot Tracker | Solicitar Convite In-Game',
+  admin: 'Rubinot Tracker | Painel de Controle Admin',
+  workers: 'Rubinot Tracker | Comando & Controle (C2)',
+  admin_dashboard: 'Rubinot Tracker | Central de Inteligência de Workers',
+  auth: 'Rubinot Tracker | Entrar ou Cadastrar',
+  party: 'Rubinot Tracker | Painel de Party',
+};
+
+function parseCurrentLocation() {
+  if (typeof window === 'undefined') return { view: 'home', player: null };
+  const rawPath = window.location.pathname.toLowerCase();
+  const path = (rawPath.length > 1 && rawPath.endsWith('/')) ? rawPath.slice(0, -1) : rawPath;
+
+  if (path.startsWith('/player/')) {
+    const rawName = window.location.pathname.slice(8);
+    const decoded = decodeURIComponent(rawName).trim();
+    if (decoded) return { view: 'players', player: decoded };
+  }
+  if (path.startsWith('/players/')) {
+    const rawName = window.location.pathname.slice(9);
+    const decoded = decodeURIComponent(rawName).trim();
+    if (decoded) return { view: 'players', player: decoded };
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const queryPlayer = searchParams.get('player') || searchParams.get('name') || searchParams.get('char');
+  if ((path === '/player' || path === '/players') && queryPlayer) {
+    return { view: 'players', player: decodeURIComponent(queryPlayer).trim() };
+  }
+
+  const mappedView = ROUTE_TO_VIEW[path] || 'home';
+  return { view: mappedView, player: queryPlayer ? decodeURIComponent(queryPlayer).trim() : null };
+}
+
 export default function App() {
   const { user, profile, loading, logout } = useAuth();
-  const [currentView, setCurrentView] = useState(() => {
-    const path = window.location.pathname.toLowerCase();
-    if (path === '/invite' || path === '/invites') return 'invite';
-    if (path === '/sorteio' || path === '/sorteios' || path === '/giveaway') return 'sorteio';
-    return 'home';
-  });
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [currentView, setCurrentView] = useState(() => parseCurrentLocation().view);
+  const [selectedPlayer, setSelectedPlayer] = useState(() => parseCurrentLocation().player);
   const [selectedParty, setSelectedParty] = useState(null);
   const [visibleTabs, setVisibleTabs] = useState(null);
   const [hasActiveWorker, setHasActiveWorker] = useState(false);
 
-  const navigateView = (view) => {
+  const navigateView = (view, extra = {}) => {
     setCurrentView(view);
     if (typeof window !== 'undefined') {
-      if (view === 'sorteio') {
-        window.history.pushState({}, '', '/sorteio');
-      } else if (view === 'invite') {
-        window.history.pushState({}, '', '/invite');
-      } else if (view === 'home' || view === 'live') {
-        window.history.pushState({}, '', '/');
+      let targetPath = VIEW_TO_ROUTE[view] || '/';
+      let title = VIEW_TITLES[view] || 'Rubinot Tracker';
+
+      if (view === 'players') {
+        const pName = extra.player || selectedPlayer;
+        if (pName) {
+          targetPath = `/player/${encodeURIComponent(pName)}`;
+          title = `Rubinot Tracker | ${pName}`;
+        }
+      }
+
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ view, ...extra }, '', targetPath);
+      }
+      document.title = title;
+
+      if (extra.smooth !== false) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
   };
 
   useEffect(() => {
     const handlePopState = () => {
-      const path = window.location.pathname.toLowerCase();
-      if (path === '/sorteio' || path === '/sorteios' || path === '/giveaway') {
-        setCurrentView('sorteio');
-      } else if (path === '/invite' || path === '/invites') {
-        setCurrentView('invite');
-      } else {
-        setCurrentView('home');
+      const { view, player } = parseCurrentLocation();
+      setCurrentView(view);
+      if (player) {
+        setSelectedPlayer(player);
       }
+      const title = VIEW_TITLES[view] || (view === 'players' && player ? `Rubinot Tracker | ${player}` : 'Rubinot Tracker');
+      document.title = title;
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  useEffect(() => {
+    const title = VIEW_TITLES[currentView] || (currentView === 'players' && selectedPlayer ? `Rubinot Tracker | ${selectedPlayer}` : 'Rubinot Tracker');
+    document.title = title;
+  }, [currentView, selectedPlayer]);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'pifot16@gmail.com';
   const isGuildMember = profile?.status === 'active';
@@ -212,21 +367,21 @@ export default function App() {
 
   const handlePlayerClick = (playerName) => {
     setSelectedPlayer(playerName);
-    setCurrentView('players');
+    navigateView('players', { player: playerName });
   };
 
   const handlePartyClick = (partyObj) => {
     setSelectedParty(partyObj);
-    setCurrentView('party');
+    navigateView('party');
   };
 
   const renderView = () => {
     // 1. Tela de Login / Cadastro
     if (currentView === 'auth') {
-      return <AuthScreen onBack={() => setCurrentView('live')} />;
+      return <AuthScreen onBack={() => navigateView('live')} />;
     }
 
-    // 2. Abas Públicas (Acesso Aberto para todo o Rubinot)
+    // 2. Abas Públicas & Abertas para todo o Rubinot
     if (currentView === 'home' || currentView === 'live') {
       return (
         <RubinotHome 
@@ -261,12 +416,18 @@ export default function App() {
       );
     }
     if (currentView === 'contribute') return <Contribute />;
+    if (currentView === 'invite') {
+      return <InviteRequest defaultCharacter={profile?.main_character || ''} isPublic={!user} />;
+    }
+    if (currentView === 'guild_perks' || currentView === 'pearks') {
+      return <GuildPerks isAdmin={isAdmin} isPublic={!user || !isGuildMember} />;
+    }
     if (currentView === 'players') {
       return (
         <div className="p-8 max-w-7xl mx-auto w-full">
           <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Investigação de Membro</h2>
           <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência, histórico criminal e telemetria do jogador.</p>
-          <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} onSelectPlayer={setSelectedPlayer} />
+          <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} onSelectPlayer={handlePlayerClick} />
         </div>
       );
     }
@@ -278,8 +439,8 @@ export default function App() {
         <PremiumGate 
           featureName="Bazaar Sniper Mega Premium 💎"
           featureDescription="O sistema definitivo de arbitragem e monitoramento de leilões do Rubinot. Detecte chares raros e oportunidades lucrativas até 60% abaixo do preço de mercado antes de todo mundo."
-          onNavigate={setCurrentView}
-          onLogin={() => setCurrentView('auth')}
+          onNavigate={navigateView}
+          onLogin={() => navigateView('auth')}
         />
       );
     }
@@ -290,8 +451,8 @@ export default function App() {
         <PremiumGate 
           featureName="Radar de Inimigos (Warmode Spy) 👑"
           featureDescription="Monitore movimentações de guildas rivais em tempo real, detecção de logins de makers, alertas de invasão de respawn e relatórios de frag táticos."
-          onNavigate={setCurrentView}
-          onLogin={() => setCurrentView('auth')}
+          onNavigate={navigateView}
+          onLogin={() => navigateView('auth')}
         />
       );
     }
@@ -302,32 +463,30 @@ export default function App() {
         <PremiumGate 
           featureName="Extreme BI & Inteligência Avançada 👑"
           featureDescription="Business Intelligence profundo do servidor com gráficos de telemetria, curva de XP acumulada e dossiê investigativo."
-          onNavigate={setCurrentView}
-          onLogin={() => setCurrentView('auth')}
+          onNavigate={navigateView}
+          onLogin={() => navigateView('auth')}
         />
       );
     }
 
     // 4. Abas de Gestão da Guilda 🛡️ (Gated estritamente para membros Shell Patrocina)
-    const guildViews = ['planilha', 'planilha_live', 'respawns', 'roster', 'bank', 'market', 'party', 'guild_perks', 'pearks', 'invite'];
+    const guildViews = ['planilha', 'planilha_live', 'respawns', 'roster', 'bank', 'market', 'party'];
     if (guildViews.includes(currentView)) {
       const featureTitles = {
         planilha: 'Controle de Hunts & Caves',
         planilha_live: 'Monitor de Caves (Ao Vivo)',
-        invite: 'Convites In-Game da Guilda',
         respawns: 'Respawns & Regras',
         roster: 'Exército da Guilda',
         bank: 'Tesouraria da Guilda',
-        market: 'Mercado Interno',
-        guild_perks: 'Perks da Guilda'
+        market: 'Mercado Interno'
       };
 
       if (!user) {
         return (
           <GuildGate 
             featureName={featureTitles[currentView] || 'Área Restrita da Guilda Battle Storm'}
-            onLogin={() => setCurrentView('auth')}
-            onNavigate={setCurrentView}
+            onLogin={() => navigateView('auth')}
+            onNavigate={navigateView}
           />
         );
       }
@@ -341,7 +500,7 @@ export default function App() {
                 Sua conta (Main: <strong>{profile.main_character}</strong>) foi registrada com sucesso, mas o acesso aos respawns da guilda precisa de ativação de um Administrador.
               </p>
               <button
-                onClick={() => setCurrentView('home')}
+                onClick={() => navigateView('home')}
                 className="bg-yellow-600/30 hover:bg-yellow-600/50 border border-yellow-500 text-yellow-300 px-4 py-2 rounded text-xs font-bold transition-colors"
               >
                 Navegar no Portal Público
@@ -355,8 +514,8 @@ export default function App() {
         return (
           <GuildGate 
             featureName={featureTitles[currentView] || 'Área Restrita da Guilda Battle Storm'}
-            onLogin={() => setCurrentView('auth')}
-            onNavigate={setCurrentView}
+            onLogin={() => navigateView('auth')}
+            onNavigate={navigateView}
           />
         );
       }
@@ -369,16 +528,13 @@ export default function App() {
         case 'bank': return <GuildBank isAdmin={isAdmin} />;
         case 'market': return <GuildMarket isAdmin={isAdmin} />;
         case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
-        case 'guild_perks':
-        case 'pearks': return <GuildPerks isAdmin={isAdmin} />;
-        case 'invite': return <InviteRequest defaultCharacter={profile?.main_character || ''} isPublic={false} />;
       }
     }
 
     // 5. Abas Administrativas ⚙️
     if (['admin', 'workers', 'admin_dashboard'].includes(currentView)) {
       if (!isAdmin) {
-        return <GuildGate featureName="Painel Administrativo" onLogin={() => setCurrentView('auth')} onNavigate={setCurrentView} />;
+        return <GuildGate featureName="Painel Administrativo" onLogin={() => navigateView('auth')} onNavigate={navigateView} />;
       }
       if (currentView === 'admin') return <AdminPanel />;
       if (currentView === 'workers') return <WorkerDashboard />;
@@ -387,7 +543,7 @@ export default function App() {
 
     return (
       <RubinotHome 
-        onNavigate={setCurrentView} 
+        onNavigate={navigateView} 
         onPlayerClick={handlePlayerClick} 
         isPremium={isPremium} 
         user={user} 
