@@ -636,6 +636,16 @@ app.post('/admin/force-ts3', async (req, res) => {
   }
 });
 
+app.all('/admin/force-bazaar', async (req, res) => {
+  try {
+    console.log('[API_ADMIN] Comando manual recebido: forçar rastreio completo do Char Bazaar!');
+    runFetchBazaar().catch(e => console.error('[API_ADMIN] Erro assíncrono em runFetchBazaar:', e.message));
+    res.json({ success: true, message: 'Rastreio completo do Bazaar iniciado em segundo plano!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',

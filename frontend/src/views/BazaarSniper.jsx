@@ -331,15 +331,48 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('bazaar_alerts')
-        .select('*')
-        .order('auction_end', { ascending: false })
-        .limit(600);
+      const nowIso = new Date().toISOString();
 
-      if (error) throw error;
+      // Busca abrangente: 100% dos leilões ativos (range 0..999 e 1000..1999) + 1.000 do histórico recente
+      const [active1, active2, history] = await Promise.all([
+        supabase
+          .from('bazaar_alerts')
+          .select('*')
+          .gt('auction_end', nowIso)
+          .order('auction_end', { ascending: true })
+          .range(0, 999),
+        supabase
+          .from('bazaar_alerts')
+          .select('*')
+          .gt('auction_end', nowIso)
+          .order('auction_end', { ascending: true })
+          .range(1000, 1999),
+        supabase
+          .from('bazaar_alerts')
+          .select('*')
+          .lte('auction_end', nowIso)
+          .order('auction_end', { ascending: false })
+          .limit(1000)
+      ]);
 
-      const preprocessed = (data || []).map(a => {
+      const allRows = [
+        ...(active1.data || []),
+        ...(active2.data || []),
+        ...(history.data || [])
+      ];
+
+      // Deduplicação por auction_id
+      const map = new Map();
+      for (let i = 0; i < allRows.length; i++) {
+        const item = allRows[i];
+        const key = item.auction_id || item.id;
+        if (key && !map.has(key)) {
+          map.set(key, item);
+        }
+      }
+      const data = Array.from(map.values());
+
+      const preprocessed = data.map(a => {
         const fipe = calculateCharFipe(a);
         const items = Array.isArray(a.items_data) ? a.items_data : [];
         let hasSanguine = false;
@@ -616,23 +649,26 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     let sanguineCount = 0;
     let soulCount = 0;
 
+    let sanguineOrSoulCount = 0;
+
     for (let i = 0; i < alerts.length; i++) {
       const a = alerts[i];
       const isEnded = (a._endTimeMs || 0) <= nowTimestamp;
       if (!isEnded) {
         activeCount++;
         const diffSec = Math.floor(((a._endTimeMs || 0) - nowTimestamp) / 1000);
-        if (diffSec < 3 * 3600) endingSoon++;
+        if (diffSec < 3 * 3600 && diffSec > 0) endingSoon++;
       } else {
         endedCount++;
       }
       if ((a._fipe?.discountPct || 0) >= 20 || a.is_sniping_opportunity) opportunities++;
-      if (a._highestTier > 0) tieredCount++;
+      if ((a._highestTier || 0) > 0) tieredCount++;
       if (a._hasSanguine) sanguineCount++;
       if (a._hasSoul) soulCount++;
+      if (a._hasSanguineOrSoul) sanguineOrSoulCount++;
     }
 
-    return { total, activeCount, endedCount, opportunities, endingSoon, tieredCount, sanguineCount, soulCount, favoritesCount: favorites.length };
+    return { total, activeCount, endedCount, opportunities, endingSoon, tieredCount, sanguineCount, soulCount, sanguineOrSoulCount, favoritesCount: favorites.length };
   }, [alerts, favorites, nowTimestamp]);
 
   const handleShareAuction = (auction) => {
@@ -811,7 +847,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-1.5">
                   <label className="text-xs font-bold text-white flex items-center justify-between">
                     <span>Filtro de Grails BiS</span>
-                    <span className="text-[10px] text-red-400 font-mono font-bold">31 Sanguine • 85 Soul</span>
+                    <span className="text-[10px] text-red-400 font-mono font-bold">{stats.sanguineCount} Sanguine • {stats.soulCount} Soul</span>
                   </label>
                   <select
                     value={itemSetFilter}
@@ -819,16 +855,16 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-xs text-yellow-300 font-bold focus:outline-none focus:border-yellow-500"
                   >
                     <option value="all">Qualquer Equipamento</option>
-                    <option value="sanguine">🩸 Apenas com Sanguine (Rotten Blood BiS Supremo - 31 chars)</option>
-                    <option value="soulwar">💀 Apenas com Soulwar (Soulstalkers, Shells, Maimer - 85 chars)</option>
-                    <option value="sanguine_or_soul">👑 Possui Sanguine OU Soulwar (91 chars)</option>
+                    <option value="sanguine">🩸 Apenas com Sanguine (Rotten Blood BiS - {stats.sanguineCount} chars)</option>
+                    <option value="soulwar">💀 Apenas com Soulwar (Soulstalkers, Shells, Maimer - {stats.soulCount} chars)</option>
+                    <option value="sanguine_or_soul">👑 Possui Sanguine OU Soulwar ({stats.sanguineOrSoulCount} chars)</option>
                   </select>
                 </div>
 
                 <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-1.5">
                   <label className="text-xs font-bold text-white flex items-center justify-between">
                     <span>Nível de Tier da Forja</span>
-                    <span className="text-[10px] text-cyan-400 font-mono font-bold">172 chars com Tier</span>
+                    <span className="text-[10px] text-cyan-400 font-mono font-bold">{stats.tieredCount} chars com Tier</span>
                   </label>
                   <select
                     value={itemTierFilter}
@@ -1238,14 +1274,53 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
         </div>
 
-        {/* Chips Rápidos com SANGUINE e SOULWAR destacados */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
+        {/* Seletor Rápido de Status & Chips Meta */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/5">
+          
+          {/* Abas Rápidas de Status: Ativos Agora vs Todos vs Histórico */}
+          <div className="flex items-center gap-1 bg-stone-900/90 border border-stone-800 rounded-xl p-1 shadow-inner">
+            <button
+              type="button"
+              onClick={() => { setStatusFilter('active'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                statusFilter === 'active'
+                  ? 'bg-emerald-500 text-stone-950 font-black shadow-md shadow-emerald-500/20'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>🟢 Ativos ({stats.activeCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                statusFilter === 'all'
+                  ? 'bg-yellow-500 text-stone-950 font-black shadow-md shadow-yellow-500/20'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <span>🌟 Todos ({stats.total})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStatusFilter('ended'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                statusFilter === 'ended'
+                  ? 'bg-purple-600 text-white font-black shadow-md shadow-purple-600/20'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <span>📚 Histórico ({stats.endedCount})</span>
+            </button>
+          </div>
+
           <div className="flex flex-wrap gap-1.5">
             {[
               { id: 'all', label: '🌟 Todos' },
               { id: 'sanguine', label: `🩸 Com Sanguine (${stats.sanguineCount})` },
               { id: 'soulwar', label: `💀 Com Soulwar (${stats.soulCount})` },
-              { id: 'sanguine_or_soul', label: '👑 Sanguine ou Soul (91)' },
+              { id: 'sanguine_or_soul', label: `👑 Sanguine ou Soul (${stats.sanguineOrSoulCount})` },
               { id: 'tier2_plus', label: '⚡ Tier 2+' },
               { id: 'high_skills', label: '🎯 Skills 120+ / ML Alto' },
               { id: 'opportunity', label: '🔥 Pechinchas FIPE' },
