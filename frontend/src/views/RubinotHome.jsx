@@ -4,7 +4,7 @@ import { parseUtcDate } from '../lib/tibiaUtils';
 import { 
   Globe, Activity, Skull, Trophy, Gem, Cpu, Calculator, 
   Search, Shield, ArrowRight, RefreshCw, Users, Server, 
-  ExternalLink, CheckCircle2, ChevronRight, Zap, Sparkles, Copy, Check
+  ExternalLink, CheckCircle2, ChevronRight, Zap, Sparkles, Copy, Check, Gift
 } from 'lucide-react';
 
 const RUBINOT_WORLDS = [
@@ -326,6 +326,37 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           </div>
         </div>
 
+      </div>
+
+      {/* BANNER OFICIAL DE SORTEIO ATIVO 🎁 */}
+      <div 
+        onClick={() => onNavigate('sorteio')}
+        className="cursor-pointer group relative overflow-hidden rounded-2xl border-2 border-yellow-500/50 bg-gradient-to-r from-amber-950/60 via-black/90 to-yellow-950/60 p-5 shadow-2xl transition-all hover:border-yellow-400 hover:shadow-tibia-glow flex flex-col sm:flex-row items-center justify-between gap-4"
+      >
+        <div className="flex items-center gap-4 text-center sm:text-left">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-600 border border-yellow-300 flex items-center justify-center text-black text-2xl font-bold shrink-0 shadow-lg group-hover:scale-110 transition-transform">
+            🎁
+          </div>
+          <div>
+            <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
+              <span className="rounded-full bg-green-500/20 border border-green-500/40 px-2 py-0.5 text-[10px] font-bold uppercase text-green-400 animate-pulse flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Sorteio Oficial Aberto
+              </span>
+              <span className="text-[10px] text-yellow-400/80 font-bold uppercase">100% Gratuito</span>
+            </div>
+            <h4 className="text-lg sm:text-xl font-medieval font-bold text-gradient-gold group-hover:text-yellow-300 transition-colors">
+              Sorteio da Comunidade Rubinot & Battle Storm
+            </h4>
+            <p className="text-xs text-gray-300 font-sans">
+              Participe agora da rodada ativa! Concorra a Tibia Coins e prêmios em KKs. Inscrição rápida e sorteio com roleta ao vivo.
+            </p>
+          </div>
+        </div>
+
+        <button className="shrink-0 flex items-center gap-2 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 px-5 py-2.5 text-xs font-bold text-black shadow-lg transition-all group-hover:scale-105 active:scale-95">
+          <span>Participar do Sorteio</span>
+          <ArrowRight size={15} />
+        </button>
       </div>
 
       {/* 3. VITRINE DE SUPER RECURSOS (OS 3 PILARES DE CONVERSÃO & UTILIDADE) */}

@@ -5,7 +5,7 @@ import {
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
   Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
-  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu
+  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
@@ -48,6 +48,7 @@ export default function TopNav({
     // 🌐 Rubinot Público
     live: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
     home: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
+    sorteio: { label: 'Sorteios da Comunidade 🎁', icon: <Gift size={16} className="text-yellow-400" /> },
     attendance: { label: 'Mural de Mortes & Frags', icon: <CalendarDays size={16} /> },
     tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
     analytics: { label: 'Rankings Globais', icon: <TrendingDown size={16} /> },
@@ -78,7 +79,7 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'attendance', 'tracker', 'analytics', 'contribute']
+      items: ['live', 'sorteio', 'attendance', 'tracker', 'analytics', 'contribute']
     },
     {
       title: 'Guilda Battle Storm',

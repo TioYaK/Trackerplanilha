@@ -33,6 +33,7 @@ const AdminDashboard = lazy(() => import('./views/AdminDashboard'));
 const OnboardingScreen = lazy(() => import('./views/OnboardingScreen'));
 const WorkerDashboard = lazy(() => import('./views/WorkerDashboard'));
 const GuildPerks = lazy(() => import('./views/GuildPerks'));
+const GiveawayDraw = lazy(() => import('./views/GiveawayDraw'));
 
 function ModuleFallback() {
   return (
@@ -56,12 +57,41 @@ export default function App() {
   const [currentView, setCurrentView] = useState(() => {
     const path = window.location.pathname.toLowerCase();
     if (path === '/invite' || path === '/invites') return 'invite';
+    if (path === '/sorteio' || path === '/sorteios' || path === '/giveaway') return 'sorteio';
     return 'home';
   });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedParty, setSelectedParty] = useState(null);
   const [visibleTabs, setVisibleTabs] = useState(null);
   const [hasActiveWorker, setHasActiveWorker] = useState(false);
+
+  const navigateView = (view) => {
+    setCurrentView(view);
+    if (typeof window !== 'undefined') {
+      if (view === 'sorteio') {
+        window.history.pushState({}, '', '/sorteio');
+      } else if (view === 'invite') {
+        window.history.pushState({}, '', '/invite');
+      } else if (view === 'home' || view === 'live') {
+        window.history.pushState({}, '', '/');
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname.toLowerCase();
+      if (path === '/sorteio' || path === '/sorteios' || path === '/giveaway') {
+        setCurrentView('sorteio');
+      } else if (path === '/invite' || path === '/invites') {
+        setCurrentView('invite');
+      } else {
+        setCurrentView('home');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'pifot16@gmail.com';
   const isGuildMember = profile?.status === 'active';
@@ -167,10 +197,20 @@ export default function App() {
     if (currentView === 'home' || currentView === 'live') {
       return (
         <RubinotHome 
-          onNavigate={setCurrentView} 
+          onNavigate={navigateView} 
           onPlayerClick={handlePlayerClick} 
           isPremium={isPremium} 
           user={user} 
+        />
+      );
+    }
+    if (currentView === 'sorteio' || currentView === 'giveaway') {
+      return (
+        <GiveawayDraw 
+          isAdmin={isAdmin} 
+          user={user} 
+          profile={profile} 
+          onNavigate={navigateView} 
         />
       );
     }
@@ -316,7 +356,7 @@ export default function App() {
     <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex flex-col">
       <TopNav
         currentView={currentView}
-        setCurrentView={setCurrentView}
+        setCurrentView={navigateView}
         isAdmin={isAdmin}
         isPremium={isPremium}
         isGuildMember={isGuildMember}
@@ -325,8 +365,8 @@ export default function App() {
         visibleTabs={visibleTabs ?? DEFAULT_VISIBLE_TABS}
       />
       
-      {/* Banner de Publicidade (Oculto para assinantes Premium!) */}
-      {!isPremium && currentView !== 'auth' && (
+      {/* Banner de Publicidade Oficial */}
+      {currentView !== 'auth' && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-2">
           <AdBanner />
         </div>
