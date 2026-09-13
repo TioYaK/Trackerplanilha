@@ -52,14 +52,14 @@ export default function TopNav({
     analytics: { label: 'Rankings Globais', icon: <TrendingDown size={16} /> },
     contribute: { label: 'Baixar Worker (VIP Grátis)', icon: <Cpu size={16} className="text-green-400" /> },
 
-    // 🛡️ Espaço da Guilda
+    // 🛡️ Guilda Shell Patrocina
     planilha: { label: 'Controle de Hunts & Caves', icon: <FileSpreadsheet size={16} /> },
     respawns: { label: 'Respawns & Regras', icon: <ShieldAlert size={16} /> },
     roster: { label: 'Exército da Guilda', icon: <Users size={16} /> },
     bank: { label: 'Tesouraria da Guilda', icon: <Landmark size={16} /> },
     market: { label: 'Mercado Interno (Trocas)', icon: <Store size={16} /> },
     guild_perks: { label: 'Perks da Guilda', icon: <Award size={16} /> },
-    invite: { label: 'Solicitar Convite', icon: <UserPlus size={16} /> },
+    invite: { label: 'Recrutamento Shell Patrocina', icon: <UserPlus size={16} className="text-yellow-400" /> },
 
     // 💎 Mega Premium
     bazaar: { label: 'Bazaar Sniper 💎', icon: <Gem size={16} className="text-yellow-400" /> },
@@ -79,7 +79,7 @@ export default function TopNav({
       items: ['live', 'attendance', 'tracker', 'analytics', 'contribute']
     },
     {
-      title: 'Espaço da Guilda',
+      title: 'Guilda Shell Patrocina',
       icon: <Shield size={18} />,
       badge: !isGuildMember ? '🔒' : null,
       items: ['planilha', 'respawns', 'roster', 'bank', 'market', 'guild_perks', 'invite']

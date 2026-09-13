@@ -210,8 +210,18 @@ export default function App() {
       );
     }
 
-    // 4. Abas de Gestão da Guilda 🛡️ (Gated para não membros)
-    const guildViews = ['planilha', 'respawns', 'roster', 'bank', 'market', 'party', 'guild_perks', 'pearks', 'invite'];
+    // 3.1 Recrutamento Oficial & Convite Shell Patrocina (Acesso livre para quem quer ingressar ou alts)
+    if (currentView === 'invite') {
+      return (
+        <InviteRequest 
+          isPublic={!isAdmin} 
+          defaultCharacter={profile?.main_character || ''} 
+        />
+      );
+    }
+
+    // 4. Abas de Gestão da Guilda 🛡️ (Gated para membros Shell Patrocina)
+    const guildViews = ['planilha', 'respawns', 'roster', 'bank', 'market', 'party', 'guild_perks', 'pearks'];
     if (guildViews.includes(currentView)) {
       if (!user) {
         return (
@@ -261,7 +271,6 @@ export default function App() {
         case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
         case 'guild_perks':
         case 'pearks': return <GuildPerks isAdmin={isAdmin} />;
-        case 'invite': return <InviteRequest />;
       }
     }
 
