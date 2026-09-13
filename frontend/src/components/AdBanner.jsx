@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ExternalLink, Sparkles, Shield, X } from 'lucide-react';
+import { ExternalLink, Sparkles, Megaphone, X } from 'lucide-react';
 
 /**
  * AdBanner Component
  * Suporta Google AdSense (com tratamento seguro para SPAs React) e
- * fallback elegante para Banners de Afiliados / Patrocinadores da Guilda.
+ * fallback elegante para Banners de Afiliados / "Anuncie Aqui".
  */
 export default function AdBanner({
   slot = import.meta.env.VITE_ADSENSE_SLOT || null,
@@ -12,10 +12,11 @@ export default function AdBanner({
   format = 'auto', // 'horizontal', 'rectangle', 'auto'
   responsive = true,
   className = '',
-  customTitle = 'Compre Tibia Coins com Entrega Rápida & Desconto',
-  customSubtitle = 'Parceiro Oficial da Guilda • Suprimentos de Hunt, Bless e Venda Segura',
+  customBadge = 'Publicidade Disponível',
+  customTitle = 'Anuncie Aqui no BattleStorm Tracker',
+  customSubtitle = 'Divulgue sua marca, stream, guilda ou serviços para centenas de jogadores diariamente',
   customLink = 'https://discord.gg',
-  customButtonText = 'Ver Ofertas',
+  customButtonText = 'Anuncie Conosco',
   allowDismiss = true,
 }) {
   const adRef = useRef(null);
@@ -99,10 +100,10 @@ export default function AdBanner({
           <div>
             <div className="flex items-center justify-center sm:justify-start gap-2">
               <span className="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-yellow-400 border border-yellow-500/30">
-                Parceiro Oficial
+                {customBadge}
               </span>
               <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                <Shield size={10} /> Espaço Publicitário
+                <Megaphone size={10} /> Destaque Sua Marca
               </span>
             </div>
             <h4 className="text-sm sm:text-base font-medieval text-gradient-gold font-bold leading-tight mt-0.5">
