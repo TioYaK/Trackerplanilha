@@ -378,15 +378,6 @@ export default function App() {
     );
   }
 
-  if (user && profile && !profile.onboarding_completed && profile.status === 'active') {
-    return (
-      <ErrorBoundary>
-        <Suspense fallback={<ModuleFallback />}>
-          <OnboardingScreen />
-        </Suspense>
-      </ErrorBoundary>
-    );
-  }
 
   const handlePlayerClick = (playerName, world = null) => {
     if (!playerName) return;
@@ -455,8 +446,8 @@ export default function App() {
     if (currentView === 'players') {
       return (
         <div className="p-8 max-w-7xl mx-auto w-full">
-          <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Investigação de Membro</h2>
-          <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência, histórico criminal e telemetria do jogador.</p>
+          <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Dossiê Tático de Jogador</h2>
+          <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência, histórico de combate, rankings e telemetria do guerreiro.</p>
           <PlayerDashboard 
             playerName={selectedPlayer} 
             isAdmin={isAdmin} 

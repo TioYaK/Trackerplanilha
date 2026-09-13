@@ -29,7 +29,7 @@ export default function AdminPanel({ currentVisibleTabs }) {
     { id: 'loot', label: 'Loot Split' },
     { id: 'tracker', label: 'Censo Macro' },
     { id: 'extreme', label: 'Extreme BI' },
-    { id: 'analytics', label: 'Rankings & Tribunal' }
+    { id: 'analytics', label: 'Rankings & Highscores' }
   ];
 
   useEffect(() => {
