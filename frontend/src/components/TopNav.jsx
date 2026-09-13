@@ -67,6 +67,8 @@ export default function TopNav({
     contribute: { label: 'Baixar Worker (VIP Grátis)', icon: <Cpu size={16} className="text-green-400" /> },
 
     // 🛡️ Comunidade & Guildas
+    guild_war: { label: 'Comparador de Guildas & War 🎯', icon: <Swords size={16} className="text-red-400" /> },
+    party_finder: { label: 'Party Finder (Buscador de Time) 🏆', icon: <Users size={16} className="text-yellow-400" /> },
     roster: { label: 'Censo & Exército de Jogadores', icon: <Users size={16} /> },
     invite: { label: 'Solicitar Convite In-Game', icon: <UserPlus size={16} /> },
 
@@ -89,7 +91,7 @@ export default function TopNav({
     {
       title: 'Comunidade & Guildas',
       icon: <Users size={18} />,
-      items: ['roster', 'invite']
+      items: ['guild_war', 'party_finder', 'roster', 'invite']
     },
     {
       title: 'Mega Premium 💎',

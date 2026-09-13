@@ -43,6 +43,8 @@ const CharacterVersus = lazy(() => import('./views/CharacterVersus'));
 const LootSplitter = lazy(() => import('./views/LootSplitter'));
 const ExerciseCalculator = lazy(() => import('./views/ExerciseCalculator'));
 const HuntFinder = lazy(() => import('./views/HuntFinder'));
+const GuildVersus = lazy(() => import('./views/GuildVersus'));
+const PartyFinder = lazy(() => import('./views/PartyFinder'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import GlobalSearchModal from './components/GlobalSearchModal';
@@ -93,6 +95,12 @@ const ROUTE_TO_VIEW = {
   '/rankings': 'analytics',
   '/fame': 'fame',
   '/salao-da-fama': 'fame',
+  '/guild-war': 'guild_war',
+  '/war-comparator': 'guild_war',
+  '/comparador-guildas': 'guild_war',
+  '/party-finder': 'party_finder',
+  '/party-search': 'party_finder',
+  '/vagas': 'party_finder',
   '/loot': 'loot_splitter',
   '/loot-split': 'loot_splitter',
   '/divisao': 'loot_splitter',
@@ -159,6 +167,8 @@ const VIEW_TO_ROUTE = {
   tracker: '/tracker',
   analytics: '/analytics',
   fame: '/fame',
+  guild_war: '/guild-war',
+  party_finder: '/party-finder',
   loot_splitter: '/loot',
   exercise_calc: '/treino',
   hunt_finder: '/hunt-finder',
@@ -191,6 +201,8 @@ const VIEW_TO_ROUTE = {
 const VIEW_TITLES = {
   home: 'Rubinot Tracker | Portal Central',
   live: 'Rubinot Tracker | Portal Central',
+  guild_war: 'Rubinot Tracker | Comparador de Guildas & War Heatmap 🎯',
+  party_finder: 'Rubinot Tracker | Party Finder & Buscador de Time 🏆',
   loot_splitter: 'Rubinot Tracker | Divisão de Loot da Party 💰',
   exercise_calc: 'Rubinot Tracker | Calculadora de Treino & Weapons 🧮',
   hunt_finder: 'Rubinot Tracker | Hunt Finder 2.0 & Rotas 🗺️',
@@ -497,6 +509,12 @@ export default function App() {
     }
     if (currentView === 'fame') {
       return <Rankings initialTab="fame" isAdmin={isAdmin} onPlayerClick={handlePlayerClick} />;
+    }
+    if (currentView === 'guild_war') {
+      return <GuildVersus onPlayerClick={handlePlayerClick} onNavigate={navigateView} />;
+    }
+    if (currentView === 'party_finder') {
+      return <PartyFinder onPlayerClick={handlePlayerClick} onNavigate={navigateView} user={user} profile={profile} />;
     }
     if (currentView === 'sorteio' || currentView === 'giveaway') {
       return (
