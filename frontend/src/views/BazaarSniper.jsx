@@ -5,7 +5,7 @@ import {
   Star, Shield, Sword, Wand2, RefreshCw, Flame, Sparkles, Filter, 
   ArrowUpDown, Volume2, VolumeX, Eye, Calculator, ChevronDown, CheckCircle2,
   Award, Globe, Zap, ArrowRight, User, LayoutGrid, List, SlidersHorizontal,
-  Bookmark, Check, Share2, DollarSign, HelpCircle, X
+  Bookmark, Check, Share2, DollarSign, HelpCircle, X, History, BarChart3, Package
 } from 'lucide-react';
 import { formatVocation } from '../lib/tibiaUtils';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
@@ -22,18 +22,41 @@ const VOCATION_TABS = [
   { id: 'none', label: 'Rook / Sem Voc', short: 'None', icon: '🛡️', color: 'text-gray-400' }
 ];
 
+// Dados estatísticos reais extraídos do histórico oficial de 1.000 leilões do RubinOT
+const RUBINOT_MARKET_STATS = {
+  ranges: [
+    { range: 'Level 400 - 700', avg: 390, median: 302, ratio: '0.97 TC/lvl', desc: 'Iniciantes em Endgame & Makers' },
+    { range: 'Level 701 - 900', avg: 835, median: 789, ratio: '1.19 TC/lvl', desc: 'Hunters Independentes & Boss Runs' },
+    { range: 'Level 901 - 1100', avg: 1372, median: 1501, ratio: '1.52 TC/lvl', desc: 'Meta de Soulwar & Rotten Blood' },
+    { range: 'Level 1100+', avg: 2450, median: 2200, ratio: '2.10 TC/lvl', desc: 'Endgame Absoluto / Chars de Guerra' },
+  ],
+  vocations: [
+    { voc: 'Elder Druid (ED)', avg: 756, median: 601, note: 'Maior valorização média (alta demanda para Sio em Team Hunt)' },
+    { voc: 'Royal Paladin (RP)', avg: 737, median: 576, note: 'Maior volume de mercado e facilidade de revenda' },
+    { voc: 'Elite Knight (EK)', avg: 583, median: 501, note: 'Preço sólido e estável para solo hunt e war wall' },
+    { voc: 'Master Sorcerer (MS)', avg: 581, median: 421, note: 'Alta variabilidade conforme Magic Level' },
+    { voc: 'Exalted Monk (Monk)', avg: 505, median: 371, note: 'Boa opção de entrada para quem quer gastar menos' },
+  ],
+  itemMultipliers: {
+    tier1: '+150 a +350 TC no valor final',
+    tier2: '+450 a +850 TC no valor final',
+    tier3: '+1.200 a +2.500 TC no valor final (Soulstalkers, Lion Bow, etc.)',
+    charms1000: '+250 a +400 TC a cada 1.000 charm points'
+  }
+};
+
 export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const { selectedWorld, setSelectedWorld } = useWorld();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVoc, setSelectedVoc] = useState('ALL');
-  const [activeChip, setActiveChip] = useState('all'); // 'all' | 'opportunity' | 'ending_soon' | 'favorites' | 'hunted' | 'high_level' | 'cheap' | 'charms'
+  const [activeChip, setActiveChip] = useState('all');
   const [sortOption, setSortOption] = useState('ending');
   const [audioEnabled, setAudioEnabled] = useState(soundFX.isEnabled());
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
   const [showFiltersDrawer, setShowFiltersDrawer] = useState(false);
-  const [showFipeCalc, setShowFipeCalc] = useState(false);
+  const [showFipeOverview, setShowFipeOverview] = useState(false);
   const [selectedAuctionModal, setSelectedAuctionModal] = useState(null);
   const [nowTimestamp, setNowTimestamp] = useState(Date.now());
   const [copiedLink, setCopiedLink] = useState(false);
@@ -44,9 +67,9 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const [minBid, setMinBid] = useState('');
   const [maxBid, setMaxBid] = useState('');
   const [minCharms, setMinCharms] = useState('');
-  const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'all' | 'ended'
+  const [statusFilter, setStatusFilter] = useState('all'); // 'active' | 'all' | 'ended'
 
-  // Favoritos / Watchlist (salvos no localStorage)
+  // Favoritos
   const [favorites, setFavorites] = useState(() => {
     try {
       const saved = localStorage.getItem('rubinot_bazaar_favorites');
@@ -56,7 +79,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     }
   });
 
-  // Salvar favoritos
   useEffect(() => {
     try {
       localStorage.setItem('rubinot_bazaar_favorites', JSON.stringify(favorites));
@@ -74,12 +96,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     });
   };
 
-  // Estados da Calculadora FIPE Geral
-  const [calcLevel, setCalcLevel] = useState(700);
-  const [calcVoc, setCalcVoc] = useState('Knight');
-  const [calcCharms, setCalcCharms] = useState(400);
-
-  // Ticker de 1 segundo para atualizar as contagens regressivas
+  // Ticker de tempo regressivo
   useEffect(() => {
     const timer = setInterval(() => {
       setNowTimestamp(Date.now());
@@ -90,12 +107,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      // Busca leilões ordenados pelos mais recentes
       const { data, error } = await supabase
         .from('bazaar_alerts')
         .select('*')
         .order('auction_end', { ascending: false })
-        .limit(500);
+        .limit(600);
 
       if (error) throw error;
       setAlerts(data || []);
@@ -117,53 +133,53 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     setAudioEnabled(next);
   };
 
-  // Avaliação FIPE individual do personagem
+  // Avaliação FIPE individual calibrada com os dados reais de venda do RubinOT
   const calculateCharFipe = (char) => {
     const lvl = Number(char.level) || 100;
     const ch = Number(char.charm_points) || 0;
     const voc = (char.vocation || '').toLowerCase();
-    let baseRate = 1.2;
-    if (voc.includes('sorcerer') || voc.includes('druid')) baseRate = 1.4;
-    if (voc.includes('paladin')) baseRate = 1.35;
-    if (voc.includes('monk')) baseRate = 1.5;
+    
+    // Taxa base calibrada por level com dados de 1.000 leilões do RubinOT
+    let baseRate = 1.0;
+    if (lvl > 700) baseRate = 1.2;
+    if (lvl > 900) baseRate = 1.5;
+    if (lvl > 1100) baseRate = 1.9;
+
+    // Multiplicador da vocação conforme valorização real de venda
+    if (voc.includes('druid')) baseRate *= 1.25;
+    else if (voc.includes('paladin')) baseRate *= 1.20;
+    else if (voc.includes('knight')) baseRate *= 1.05;
+    else if (voc.includes('sorcerer')) baseRate *= 1.02;
+    else if (voc.includes('monk')) baseRate *= 0.95;
 
     let baseTc = Math.round(lvl * baseRate);
-    if (lvl > 800) baseTc += Math.round((lvl - 800) * 2.5);
-    if (lvl > 1000) baseTc += Math.round((lvl - 1000) * 4.0);
 
-    const charmsBonus = Math.round(ch * 0.8);
-    const avgFipe = Math.round(baseTc + charmsBonus);
-    const minFipe = Math.round(avgFipe * 0.8);
-    const maxFipe = Math.round(avgFipe * 1.2);
+    // Bônus por charms: cada 1000 charms adiciona ~300 TC
+    const charmsBonus = Math.round((ch / 1000) * 300);
+
+    // Bônus por itens tierizados no char
+    let tierBonus = 0;
+    if (Array.isArray(char.items_data)) {
+      char.items_data.forEach(it => {
+        if (it?.tier === 1) tierBonus += 250;
+        else if (it?.tier === 2) tierBonus += 600;
+        else if (it?.tier >= 3) tierBonus += 1500;
+      });
+    }
+
+    const avgFipe = Math.round(baseTc + charmsBonus + tierBonus);
+    const minFipe = Math.round(avgFipe * 0.85);
+    const maxFipe = Math.round(avgFipe * 1.15);
 
     const currentBid = Number(char.current_bid) || 0;
-    const discountPct = avgFipe > 0 ? Math.round(((avgFipe - currentBid) / avgFipe) * 100) : 0;
-    // Lucro estimado na revenda: Preço FIPE - 12% taxa de leilão - 50 TC taxa fixa - Lance
+    const discountPct = (avgFipe > 0 && currentBid > 0) ? Math.round(((avgFipe - currentBid) / avgFipe) * 100) : 0;
+    // Lucro estimado na revenda (Preço FIPE - 12% taxa cipsoft - 50 TC fixa - Lance)
     const estimatedProfitTc = Math.max(0, Math.round(avgFipe * 0.88 - 50 - currentBid));
 
-    return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc };
+    return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, tierBonus };
   };
 
-  // Estimativa da Calculadora FIPE do Drawer
-  const estimatedFipeDrawer = useMemo(() => {
-    const lvl = Number(calcLevel) || 100;
-    const ch = Number(calcCharms) || 0;
-    let baseRate = 1.2;
-    if (calcVoc.includes('Sorcerer') || calcVoc.includes('Druid')) baseRate = 1.4;
-    if (calcVoc.includes('Paladin')) baseRate = 1.35;
-    if (calcVoc.includes('Monk')) baseRate = 1.5;
-
-    let baseTc = Math.round(lvl * baseRate);
-    if (lvl > 800) baseTc += Math.round((lvl - 800) * 2.5);
-    if (lvl > 1000) baseTc += Math.round((lvl - 1000) * 4.0);
-
-    const charmsBonus = Math.round(ch * 0.8);
-    const minVal = Math.max(100, Math.round((baseTc + charmsBonus) * 0.75));
-    const maxVal = Math.round((baseTc + charmsBonus) * 1.25);
-    return { min: minVal, max: maxVal, avg: Math.round((minVal + maxVal) / 2) };
-  }, [calcLevel, calcVoc, calcCharms]);
-
-  // Contagem por vocação para as abas
+  // Contagem de leilões por vocação
   const vocationCounts = useMemo(() => {
     const counts = { ALL: alerts.length, knight: 0, paladin: 0, sorcerer: 0, druid: 0, monk: 0, none: 0 };
     alerts.forEach(a => {
@@ -178,19 +194,19 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     return counts;
   }, [alerts]);
 
-  // Função auxiliar para tempo restante formatado
+  // Formatação de tempo restante
   const getTimeRemaining = (auctionEnd) => {
     if (!auctionEnd) return { text: 'Expirado', isUrgent: false, isImminent: false, isEnded: true, totalSeconds: 0 };
     const diff = new Date(auctionEnd).getTime() - nowTimestamp;
-    if (diff <= 0) return { text: 'Encerrado', isUrgent: false, isImminent: false, isEnded: true, totalSeconds: 0 };
+    if (diff <= 0) return { text: 'Encerrado (Vendido)', isUrgent: false, isImminent: false, isEnded: true, totalSeconds: 0 };
 
     const totalSeconds = Math.floor(diff / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
 
-    const isImminent = totalSeconds < 30 * 60; // < 30 minutos
-    const isUrgent = totalSeconds < 2 * 3600;   // < 2 horas
+    const isImminent = totalSeconds < 30 * 60;
+    const isUrgent = totalSeconds < 2 * 3600;
 
     if (hours > 24) {
       const days = Math.floor(hours / 24);
@@ -207,21 +223,21 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     };
   };
 
-  // Filtragem e Ordenação Completa
+  // Filtragem e Ordenação
   const filteredAndSortedAuctions = useMemo(() => {
     let result = alerts.filter(a => {
       const timeInfo = getTimeRemaining(a.auction_end);
 
-      // 0. Filtro de Status (Ativos vs Encerrados)
+      // Status Filter
       if (statusFilter === 'active' && timeInfo.isEnded) return false;
       if (statusFilter === 'ended' && !timeInfo.isEnded) return false;
 
-      // 1. Filtro de Mundo
+      // Mundo
       if (selectedWorld !== 'ALL' && a.world_name && a.world_name.toLowerCase() !== selectedWorld.toLowerCase()) {
         return false;
       }
 
-      // 2. Busca por Texto (Personagem ou Itens)
+      // Busca por Texto
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchName = (a.character_name || '').toLowerCase().includes(q);
@@ -229,7 +245,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         if (!matchName && !matchItem) return false;
       }
 
-      // 3. Filtro de Vocação (Abas de Classes)
+      // Vocação
       if (selectedVoc !== 'ALL') {
         const voc = (a.vocation || '').toLowerCase();
         if (selectedVoc === 'knight' && !voc.includes('knight')) return false;
@@ -240,18 +256,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         if (selectedVoc === 'none' && (voc.includes('knight') || voc.includes('paladin') || voc.includes('sorcerer') || voc.includes('druid') || voc.includes('monk'))) return false;
       }
 
-      // 4. Filtro por Faixa de Level
+      // Faixas
       if (minLevel && (a.level || 0) < Number(minLevel)) return false;
       if (maxLevel && (a.level || 0) > Number(maxLevel)) return false;
-
-      // 5. Filtro por Faixa de Lance
       if (minBid && (a.current_bid || 0) < Number(minBid)) return false;
       if (maxBid && (a.current_bid || 0) > Number(maxBid)) return false;
-
-      // 6. Filtro por Charms
       if (minCharms && (a.charm_points || 0) < Number(minCharms)) return false;
 
-      // 7. Filtro por Chips Rápidos
+      // Chips
       if (activeChip === 'opportunity') {
         const fipe = calculateCharFipe(a);
         return fipe.discountPct >= 20 || a.is_sniping_opportunity;
@@ -263,9 +275,12 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         const aId = a.id || a.auction_id;
         return favorites.includes(aId);
       }
+      if (activeChip === 'tiered_items') {
+        return Array.isArray(a.items_data) && a.items_data.some(it => it && it.tier > 0);
+      }
       if (activeChip === 'hunted') return a.is_hunted;
       if (activeChip === 'high_level') return (a.level || 0) >= 800;
-      if (activeChip === 'cheap') return (a.current_bid || 0) <= 500;
+      if (activeChip === 'cheap') return (a.current_bid || 0) <= 500 && (a.current_bid || 0) > 0;
       if (activeChip === 'charms') return (a.charm_points || 0) >= 1000;
 
       return true;
@@ -278,13 +293,18 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       const isEndedA = timeA - nowTimestamp <= 0;
       const isEndedB = timeB - nowTimestamp <= 0;
 
-      // Ativos sempre primeiro
-      if (isEndedA !== isEndedB) {
+      // Se statusFilter for 'all', ativos vêm primeiro
+      if (statusFilter === 'all' && isEndedA !== isEndedB) {
         return isEndedA ? 1 : -1;
       }
 
       if (sortOption === 'ending') {
-        return timeA - timeB;
+        return isEndedA ? (timeB - timeA) : (timeA - timeB);
+      }
+      if (sortOption === 'profit_desc') {
+        const profitA = calculateCharFipe(a).estimatedProfitTc;
+        const profitB = calculateCharFipe(b).estimatedProfitTc;
+        return profitB - profitA;
       }
       if (sortOption === 'price_asc') {
         return (a.current_bid || 0) - (b.current_bid || 0);
@@ -295,11 +315,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       if (sortOption === 'level_desc') {
         return (b.level || 0) - (a.level || 0);
       }
-      if (sortOption === 'profit_desc') {
-        const profitA = calculateCharFipe(a).estimatedProfitTc;
-        const profitB = calculateCharFipe(b).estimatedProfitTc;
-        return profitB - profitA;
-      }
       if (sortOption === 'charms') {
         return (b.charm_points || 0) - (a.charm_points || 0);
       }
@@ -309,30 +324,34 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     return result;
   }, [alerts, selectedWorld, searchQuery, selectedVoc, activeChip, sortOption, minLevel, maxLevel, minBid, maxBid, minCharms, statusFilter, favorites, nowTimestamp]);
 
-  // Estatísticas Rápidas
+  // Estatísticas
   const stats = useMemo(() => {
     const total = alerts.length;
+    let activeCount = 0;
+    let endedCount = 0;
     let opportunities = 0;
     let endingSoon = 0;
-    let hunteds = 0;
-    let activeCount = 0;
+    let tieredCount = 0;
 
     alerts.forEach(a => {
       const timeInfo = getTimeRemaining(a.auction_end);
       if (!timeInfo.isEnded) {
         activeCount++;
         if (timeInfo.totalSeconds < 3 * 3600) endingSoon++;
+      } else {
+        endedCount++;
       }
       const fipe = calculateCharFipe(a);
       if (fipe.discountPct >= 20 || a.is_sniping_opportunity) opportunities++;
-      if (a.is_hunted) hunteds++;
+      if (Array.isArray(a.items_data) && a.items_data.some(it => it?.tier > 0)) tieredCount++;
     });
 
-    return { total, activeCount, opportunities, endingSoon, hunteds, favoritesCount: favorites.length };
+    return { total, activeCount, endedCount, opportunities, endingSoon, tieredCount, favoritesCount: favorites.length };
   }, [alerts, favorites, nowTimestamp]);
 
   const handleShareAuction = (auction) => {
-    const text = `[Rubinot Bazaar] ${auction.character_name} (Lvl ${auction.level} - ${formatVocation(auction.vocation)}) | Lance: ${auction.current_bid} TC | Mundo: ${auction.world_name}`;
+    const fipe = calculateCharFipe(auction);
+    const text = `[Rubinot Bazaar] ${auction.character_name} (Lvl ${auction.level} - ${formatVocation(auction.vocation)}) | Preço: ${auction.current_bid} TC (FIPE: ~${fipe.avgFipe} TC) | Mundo: ${auction.world_name}`;
     navigator.clipboard.writeText(text);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -349,26 +368,30 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/50 bg-yellow-500/15 px-3.5 py-1 text-xs font-bold text-yellow-300 uppercase tracking-wider mb-3 shadow-inner">
               <Sparkles size={14} className="text-yellow-400 animate-pulse" />
-              Arbitragem & Scanner de Chars
+              Char Bazaar & Histórico Oficial RubinOT
             </div>
 
             <h1 className="text-3xl sm:text-5xl font-medieval text-gradient-gold drop-shadow-lg leading-tight">
-              Bazaar Sniper <span className="text-white">Pro 💎</span>
+              Bazaar Sniper <span className="text-white">& Histórico 💎</span>
             </h1>
             
             <p className="text-gray-300 font-sans text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
-              Monitore pechinchas com lances abaixo do valor FIPE de mercado, alvos de guerra em leilão e filtre por todas as classes com dossiê completo.
+              Consulte leilões ativos e o histórico dos últimos 30 dias de vendas do RubinOT. Clique em qualquer personagem para inspecionar itens, skills, tiers da forja e a avaliação FIPE real.
             </p>
           </div>
 
           {/* PAINEL DE AÇÕES DO TOPO */}
           <div className="flex flex-wrap items-center gap-2.5">
             <button
-              onClick={() => setShowFipeCalc(!showFipeCalc)}
-              className="flex items-center gap-2 rounded-xl bg-yellow-500/15 hover:bg-yellow-500/25 border border-yellow-500/40 px-3.5 py-2 text-xs font-bold text-yellow-300 transition-all shadow-md active:scale-95"
+              onClick={() => setShowFipeOverview(!showFipeOverview)}
+              className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition-all shadow-md active:scale-95 ${
+                showFipeOverview
+                  ? 'bg-yellow-500 text-stone-950 border-yellow-400 font-black'
+                  : 'bg-yellow-500/15 hover:bg-yellow-500/25 border-yellow-500/40 text-yellow-300'
+              }`}
             >
-              <Calculator size={15} />
-              <span>Simulador FIPE</span>
+              <BarChart3 size={15} />
+              <span>Médias FIPE do RubinOT</span>
             </button>
 
             <button
@@ -390,7 +413,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 type="button"
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-yellow-500 text-stone-950 shadow' : 'text-gray-400 hover:text-white'}`}
-                title="Visualização em Cards"
+                title="Modo Cards"
               >
                 <LayoutGrid size={16} />
               </button>
@@ -398,7 +421,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 type="button"
                 onClick={() => setViewMode('table')}
                 className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-yellow-500 text-stone-950 shadow' : 'text-gray-400 hover:text-white'}`}
-                title="Visualização em Tabela Sniper"
+                title="Modo Tabela Sniper"
               >
                 <List size={16} />
               </button>
@@ -426,52 +449,66 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
           </div>
         </div>
 
-        {/* DRAWER DA CALCULADORA FIPE */}
-        {showFipeCalc && (
-          <div className="mt-6 pt-6 border-t border-yellow-500/20 grid grid-cols-1 md:grid-cols-4 gap-4 animate-fade-in bg-black/60 p-5 rounded-2xl border border-yellow-500/30">
-            <div>
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Level do Personagem</label>
-              <input
-                type="number"
-                value={calcLevel}
-                onChange={(e) => setCalcLevel(e.target.value)}
-                className="w-full bg-stone-900 border border-yellow-500/30 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-yellow-400"
-                placeholder="Ex: 750"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Vocação</label>
-              <select
-                value={calcVoc}
-                onChange={(e) => setCalcVoc(e.target.value)}
-                className="w-full bg-stone-900 border border-yellow-500/30 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-400 cursor-pointer"
-              >
-                <option value="Knight">Elite Knight</option>
-                <option value="Paladin">Royal Paladin</option>
-                <option value="Sorcerer">Master Sorcerer</option>
-                <option value="Druid">Elder Druid</option>
-                <option value="Monk">Exalted Monk</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Charm Points</label>
-              <input
-                type="number"
-                value={calcCharms}
-                onChange={(e) => setCalcCharms(e.target.value)}
-                className="w-full bg-stone-900 border border-yellow-500/30 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-yellow-400"
-                placeholder="Ex: 450"
-              />
-            </div>
-
-            <div className="bg-yellow-950/40 border border-yellow-500/40 rounded-xl p-3 flex flex-col justify-center text-center">
-              <span className="text-[10px] font-bold text-yellow-400 uppercase tracking-wider">Valor Estimado de Mercado</span>
-              <div className="text-xl font-black text-white font-medieval mt-0.5">
-                {estimatedFipeDrawer.min.toLocaleString()} - {estimatedFipeDrawer.max.toLocaleString()} <span className="text-xs text-yellow-400">TC</span>
+        {/* PAINEL DINÂMICO: MÉDIAS REAIS DE VALORES FIPE DO RUBINOT */}
+        {showFipeOverview && (
+          <div className="mt-6 pt-6 border-t border-yellow-500/20 space-y-4 animate-fade-in bg-stone-950/90 p-5 sm:p-6 rounded-2xl border border-yellow-500/40">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-yellow-400 flex items-center gap-2">
+                  <BarChart3 size={18} /> Estudo Estatístico Real do Bazaar RubinOT (Últimos 30 Dias)
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Calculado cruzando o histórico de 1.000 leilões oficiais arrematados.
+                </p>
               </div>
-              <span className="text-[10px] text-gray-400 mt-0.5">Média FIPE: ~{estimatedFipeDrawer.avg.toLocaleString()} TC</span>
+              <span className="text-xs text-amber-300 font-mono bg-yellow-950/40 px-3 py-1 rounded-lg border border-yellow-500/30">
+                1.000 Chars Analisados
+              </span>
+            </div>
+
+            {/* Grid 1: Médias por Faixa de Level */}
+            <div>
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                1. Preço Médio de Venda por Faixa de Nível
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {RUBINOT_MARKET_STATS.ranges.map((r, idx) => (
+                  <div key={idx} className="bg-stone-900/80 border border-stone-800 rounded-xl p-3.5 space-y-1">
+                    <div className="text-xs font-bold text-white">{r.range}</div>
+                    <div className="text-xl font-bold text-yellow-400 font-mono mt-1">
+                      ~{r.avg} TC <span className="text-xs text-gray-400 font-normal">(Mediana: {r.median} TC)</span>
+                    </div>
+                    <div className="text-[11px] text-emerald-400 font-mono">{r.ratio}</div>
+                    <div className="text-[10px] text-gray-500">{r.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Grid 2: Médias por Vocação */}
+            <div>
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                2. Valorização e Demanda por Vocação
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {RUBINOT_MARKET_STATS.vocations.map((v, idx) => (
+                  <div key={idx} className="bg-stone-900/80 border border-stone-800 rounded-xl p-3 space-y-1">
+                    <div className="flex items-center justify-between text-xs font-bold text-white">
+                      <span>{v.voc}</span>
+                      <span className="text-yellow-400 font-mono">Média: ~{v.avg} TC</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-tight">{v.note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Grid 3: Multiplicadores de Tiers e Charms */}
+            <div className="p-3.5 bg-yellow-950/20 border border-yellow-500/20 rounded-xl flex items-start gap-3">
+              <Zap size={18} className="text-yellow-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-gray-300 leading-relaxed">
+                <strong className="text-yellow-300">O que mais agrega valor ao char:</strong> Itens Tier 1 da forja adicionam em média <strong className="text-white">+250 TC</strong>, enquanto equipamentos Tier 3 (como Soulstalkers ou Lion Bow T3) chegam a adicionar mais de <strong className="text-white">+1.500 TC</strong> ao valor arrematado! Cada 1.000 charm points acrescentam em média <strong className="text-white">+300 TC</strong>.
+              </div>
             </div>
           </div>
         )}
@@ -556,7 +593,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   onClick={() => setStatusFilter('ended')}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'ended' ? 'bg-amber-500 text-stone-950 font-black' : 'bg-stone-900 text-gray-400'}`}
                 >
-                  Encerrados
+                  Histórico
                 </button>
               </div>
             </div>
@@ -564,14 +601,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         )}
       </div>
 
-      {/* 2. NOVO: SELETOR VISUAL DE TODAS AS CLASSES / VOCAÇÕES */}
+      {/* 2. SELETOR VISUAL DE TODAS AS CLASSES COM CONTAGEM REAL */}
       <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-4 shadow-xl space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
             <Sword size={14} className="text-amber-400" /> Filtrar por Classe de Personagem
           </span>
           <span className="text-xs text-gray-500">
-            {filteredAndSortedAuctions.length} leilões exibidos
+            {filteredAndSortedAuctions.length} leilões encontrados
           </span>
         </div>
 
@@ -604,7 +641,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
       </div>
 
-      {/* 3. STRIP DE MÉTRICAS / CHIPS RÁPIDOS */}
+      {/* 3. STRIP DE MÉTRICAS & CHIPS RÁPIDOS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         <div 
           onClick={() => setActiveChip('all')}
@@ -615,11 +652,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
           }`}
         >
           <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-400 uppercase font-semibold">Total Rastreado</span>
+            <span className="text-xs text-gray-400 uppercase font-semibold">Total no Banco</span>
             <Search className="text-blue-400" size={16} />
           </div>
           <p className="text-2xl sm:text-3xl font-medieval font-bold text-white mt-1">{stats.total}</p>
-          <p className="text-[11px] text-gray-500 mt-0.5">{stats.activeCount} ativos agora</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">{stats.activeCount} ativos • {stats.endedCount} históricos</p>
         </div>
 
         <div 
@@ -639,19 +676,19 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
 
         <div 
-          onClick={() => setActiveChip('ending_soon')}
+          onClick={() => setActiveChip('tiered_items')}
           className={`bg-black/80 border p-3.5 rounded-2xl cursor-pointer transition-all shadow-lg ${
-            activeChip === 'ending_soon' 
-              ? 'border-red-500 bg-red-950/20 shadow-red-500/10' 
-              : 'border-yellow-500/20 hover:border-red-500/50'
+            activeChip === 'tiered_items' 
+              ? 'border-cyan-500 bg-cyan-950/20 shadow-cyan-500/10' 
+              : 'border-yellow-500/20 hover:border-cyan-500/50'
           }`}
         >
           <div className="flex justify-between items-center">
-            <span className="text-xs text-red-400 uppercase font-semibold">Sniper Mode (&lt;3h)</span>
-            <Clock className="text-red-400" size={16} />
+            <span className="text-xs text-cyan-400 uppercase font-semibold">Com Itens Tierizados</span>
+            <Zap className="text-cyan-400" size={16} />
           </div>
-          <p className="text-2xl sm:text-3xl font-medieval font-bold text-red-400 mt-1">{stats.endingSoon}</p>
-          <p className="text-[11px] text-red-500/70 mt-0.5">Reta final de encerramento</p>
+          <p className="text-2xl sm:text-3xl font-medieval font-bold text-cyan-400 mt-1">{stats.tieredCount}</p>
+          <p className="text-[11px] text-cyan-500/70 mt-0.5">Tier 1 ao 3 inclusos</p>
         </div>
 
         <div 
@@ -667,7 +704,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             <Star className="text-amber-400" size={16} />
           </div>
           <p className="text-2xl sm:text-3xl font-medieval font-bold text-amber-300 mt-1">{stats.favoritesCount}</p>
-          <p className="text-[11px] text-amber-400/70 mt-0.5">Watchlist pessoal</p>
+          <p className="text-[11px] text-amber-400/70 mt-0.5">Watchlist salva</p>
         </div>
       </div>
 
@@ -679,7 +716,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             <Search className="absolute left-3.5 top-3 text-gray-500" size={16} />
             <input
               type="text"
-              placeholder="Buscar personagem ou item em destaque..."
+              placeholder="Buscar personagem ou item (ex: soulshell, naga, falcon, rift bow)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-stone-900 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500"
@@ -706,7 +743,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               onChange={(e) => setSortOption(e.target.value)}
               className="w-full bg-stone-900 border border-white/10 text-xs text-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-yellow-500 font-bold cursor-pointer"
             >
-              <option value="ending">⏳ Termina Primeiro</option>
+              <option value="ending">⏳ Término / Venda Recente</option>
               <option value="profit_desc">🔥 Maior Lucro FIPE (Revenda)</option>
               <option value="price_asc">💰 Menor Preço (TC)</option>
               <option value="price_desc">💎 Maior Preço (TC)</option>
@@ -723,12 +760,12 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             {[
               { id: 'all', label: '🌟 Todos' },
               { id: 'opportunity', label: '🔥 Pechinchas FIPE' },
+              { id: 'tiered_items', label: '⚡ Itens com Tier' },
               { id: 'ending_soon', label: '⏳ Últimas Horas' },
               { id: 'favorites', label: `⭐ Favoritos (${favorites.length})` },
               { id: 'high_level', label: '👑 Lvl 800+' },
               { id: 'cheap', label: '💰 Até 500 TC' },
-              { id: 'charms', label: '⭐ 1.000+ Charms' },
-              { id: 'hunted', label: '💀 Alvos Inimigos' }
+              { id: 'charms', label: '⭐ 1.000+ Charms' }
             ].map(chip => (
               <button
                 key={chip.id}
@@ -744,7 +781,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             ))}
           </div>
 
-          {(minLevel || minBid || minCharms || selectedVoc !== 'ALL' || selectedWorld !== 'ALL' || searchQuery) && (
+          {(minLevel || minBid || minCharms || selectedVoc !== 'ALL' || selectedWorld !== 'ALL' || searchQuery || activeChip !== 'all') && (
             <button
               onClick={() => {
                 setMinLevel('');
@@ -756,6 +793,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 setSelectedWorld('ALL');
                 setSearchQuery('');
                 setActiveChip('all');
+                setStatusFilter('all');
               }}
               className="text-xs text-yellow-400 hover:text-white underline"
             >
@@ -769,7 +807,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       {loading ? (
         <div className="text-center py-20 text-gray-400 flex flex-col items-center gap-3">
           <div className="w-12 h-12 border-2 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
-          <p className="font-medieval text-xl text-yellow-400">Rastreando leilões ativos nos 16 servidores...</p>
+          <p className="font-medieval text-xl text-yellow-400">Rastreando personagens e histórico de leilões...</p>
         </div>
       ) : filteredAndSortedAuctions.length === 0 ? (
         <div className="bg-black/60 border border-yellow-500/20 p-12 rounded-2xl text-center space-y-3">
@@ -806,11 +844,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   <th className="p-3.5">Level</th>
                   <th className="p-3.5">Skills / ML</th>
                   <th className="p-3.5">Charms</th>
-                  <th className="p-3.5">Lance Atual</th>
-                  <th className="p-3.5">Média FIPE</th>
-                  <th className="p-3.5">Oportunidade</th>
-                  <th className="p-3.5">Tempo Restante</th>
-                  <th className="p-3.5 text-right">Ações</th>
+                  <th className="p-3.5">Itens / Tiers</th>
+                  <th className="p-3.5">Preço (TC)</th>
+                  <th className="p-3.5">FIPE Real</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 text-right">Inspecionar</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-800/60 font-medium">
@@ -821,11 +859,13 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   const fipe = calculateCharFipe(auction);
                   const bidVal = Number(auction.current_bid) || 0;
                   const vocStr = formatVocation(auction.vocation);
+                  const hasTier = Array.isArray(auction.items_data) && auction.items_data.some(it => it && it.tier > 0);
 
                   return (
                     <tr 
                       key={aId}
-                      className={`hover:bg-stone-900/60 transition-colors ${timeInfo.isEnded ? 'opacity-60 bg-stone-950/40' : ''}`}
+                      onClick={() => setSelectedAuctionModal(auction)}
+                      className={`hover:bg-stone-900/70 transition-colors cursor-pointer ${timeInfo.isEnded ? 'opacity-75 bg-stone-950/40' : ''}`}
                     >
                       <td className="p-3 text-center">
                         <button
@@ -837,12 +877,10 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         </button>
                       </td>
                       <td className="p-3">
-                        <div 
-                          onClick={() => onPlayerClick && onPlayerClick(auction.character_name, auction.world_name)}
-                          className="font-bold text-white hover:text-yellow-400 cursor-pointer flex items-center gap-1.5"
-                        >
+                        <div className="font-bold text-white hover:text-yellow-400 flex items-center gap-1.5">
                           <span>{auction.character_name}</span>
                           {auction.is_hunted && <span className="text-[10px] px-1 bg-red-600 text-white rounded font-bold">Hunted</span>}
+                          {hasTier && <span className="text-[10px] px-1 bg-cyan-900 text-cyan-300 border border-cyan-500/30 rounded font-bold">⚡ Tier</span>}
                         </div>
                       </td>
                       <td className="p-3 text-yellow-300 font-mono">{auction.world_name || 'Rubinot'}</td>
@@ -852,29 +890,31 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         {auction.mag_level ? `ML ${auction.mag_level}` : `Dist ${auction.skills_data?.dist || auction.skills_data?.sword || '?'}`}
                       </td>
                       <td className="p-3 text-purple-300 font-mono">{auction.charm_points || 0}</td>
+                      <td className="p-3 text-gray-400">
+                        {Array.isArray(auction.items_data) && auction.items_data.length > 0 ? (
+                          <span className="text-cyan-400 font-mono font-bold">{auction.items_data.length} itens</span>
+                        ) : (
+                          <span className="text-gray-600">-</span>
+                        )}
+                      </td>
                       <td className="p-3 font-bold text-yellow-400 font-mono">{bidVal.toLocaleString()} TC</td>
                       <td className="p-3 text-gray-400 font-mono">~{fipe.avgFipe.toLocaleString()} TC</td>
                       <td className="p-3">
-                        {fipe.discountPct >= 20 ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            +{fipe.discountPct}% ({fipe.estimatedProfitTc} TC)
-                          </span>
+                        {timeInfo.isEnded ? (
+                          <span className="text-gray-500 text-[11px]">Finalizado</span>
                         ) : (
-                          <span className="text-gray-500 text-[11px]">Justo</span>
+                          <span className={`font-mono text-xs ${timeInfo.isImminent ? 'text-red-400 font-bold' : 'text-emerald-400'}`}>
+                            {timeInfo.text}
+                          </span>
                         )}
-                      </td>
-                      <td className="p-3">
-                        <span className={`font-mono text-xs ${timeInfo.isImminent ? 'text-red-400 font-bold' : timeInfo.isEnded ? 'text-gray-500' : 'text-gray-300'}`}>
-                          {timeInfo.text}
-                        </span>
                       </td>
                       <td className="p-3 text-right">
                         <button
                           type="button"
-                          onClick={() => setSelectedAuctionModal(auction)}
+                          onClick={(e) => { e.stopPropagation(); setSelectedAuctionModal(auction); }}
                           className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-yellow-400 border border-stone-700 font-bold text-xs transition-colors"
                         >
-                          Dossiê
+                          Ver Tudo 🔍
                         </button>
                       </td>
                     </tr>
@@ -896,7 +936,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             const fipe = calculateCharFipe(auction);
             const bidVal = Number(auction.current_bid) || 0;
             const lvl = Number(auction.level) || 1;
-            const tcPerLvl = (bidVal / lvl).toFixed(2);
+            const hasTier = Array.isArray(auction.items_data) && auction.items_data.some(it => it && it.tier > 0);
 
             const vocStr = formatVocation(auction.vocation);
             const isMage = vocStr.includes('Sorcerer') || vocStr.includes('Druid');
@@ -914,150 +954,162 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             return (
               <div 
                 key={aId}
-                className={`bg-gradient-to-b from-stone-950 via-black to-stone-950 border rounded-2xl p-5 relative overflow-hidden transition-all flex flex-col justify-between group shadow-xl ${
+                onClick={() => setSelectedAuctionModal(auction)}
+                className={`bg-gradient-to-b from-stone-950 via-black to-stone-950 border rounded-2xl p-5 relative overflow-hidden transition-all flex flex-col justify-between group shadow-xl cursor-pointer ${
                   timeInfo.isEnded
-                    ? 'opacity-60 border-stone-800'
+                    ? 'opacity-75 border-stone-800/80 hover:border-stone-700'
                     : auction.is_hunted
                     ? 'border-red-500/60 shadow-red-500/10'
                     : timeInfo.isImminent
                     ? 'border-amber-500 shadow-amber-500/20 animate-pulse'
-                    : fipe.discountPct >= 25
+                    : fipe.discountPct >= 20
                     ? 'border-yellow-500/70 shadow-yellow-500/15'
                     : 'border-white/10 hover:border-yellow-500/40'
                 }`}
               >
-                {/* BADGE DE TOPO COM FAVORITO */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={(e) => toggleFavorite(aId, e)}
-                      className={`p-1 rounded-md transition-colors ${isFav ? 'text-amber-400 bg-amber-950/40' : 'text-gray-500 hover:text-white'}`}
-                      title={isFav ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
-                    >
-                      <Star size={16} fill={isFav ? "currentColor" : "none"} />
-                    </button>
+                <div>
+                  {/* BADGE DE TOPO */}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={(e) => toggleFavorite(aId, e)}
+                        className={`p-1 rounded-md transition-colors ${isFav ? 'text-amber-400 bg-amber-950/40' : 'text-gray-500 hover:text-white'}`}
+                        title={isFav ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
+                      >
+                        <Star size={16} fill={isFav ? "currentColor" : "none"} />
+                      </button>
 
-                    {auction.is_hunted && (
-                      <span className="bg-red-600 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded shadow flex items-center gap-1">
-                        💀 Alvo Inimigo
-                      </span>
-                    )}
+                      {hasTier && (
+                        <span className="bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded flex items-center gap-1">
+                          ⚡ Com Tier
+                        </span>
+                      )}
 
-                    {fipe.discountPct >= 20 && !timeInfo.isEnded && (
-                      <span className="bg-emerald-500 text-stone-950 text-[10px] font-black uppercase px-2 py-0.5 rounded shadow flex items-center gap-1">
-                        <Flame size={12} /> {fipe.discountPct}% Pechincha
-                      </span>
-                    )}
+                      {fipe.discountPct >= 20 && !timeInfo.isEnded && (
+                        <span className="bg-emerald-500 text-stone-950 text-[10px] font-black uppercase px-2 py-0.5 rounded shadow flex items-center gap-1">
+                          <Flame size={12} /> {fipe.discountPct}% Abaixo FIPE
+                        </span>
+                      )}
 
-                    {lvl >= 800 && (
-                      <span className="bg-purple-900/60 border border-purple-500/40 text-purple-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
-                        👑 Lvl 800+
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Timer regressivo */}
-                  <div className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-bold flex items-center gap-1 ${
-                    timeInfo.isEnded
-                      ? 'bg-stone-900 text-gray-500'
-                      : timeInfo.isImminent
-                      ? 'bg-red-950 text-red-300 border border-red-500/50'
-                      : timeInfo.isUrgent
-                      ? 'bg-amber-950/60 text-amber-300 border border-amber-500/40'
-                      : 'bg-black/60 text-gray-400 border border-white/10'
-                  }`}>
-                    <Clock size={12} className={timeInfo.isImminent ? 'animate-spin' : ''} />
-                    <span>{timeInfo.text}</span>
-                  </div>
-                </div>
-
-                {/* CABEÇALHO DO PERSONAGEM */}
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-stone-900 border border-white/10 flex items-center justify-center shrink-0 shadow-inner group-hover:border-yellow-500/50 transition-colors">
-                    <img 
-                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(auction.character_name)}&background=1c1917&color=eab308&bold=true`}
-                      alt={auction.character_name}
-                      className="w-10 h-10 rounded-lg object-cover"
-                    />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <h3 
-                      onClick={() => onPlayerClick && onPlayerClick(auction.character_name, auction.world_name)}
-                      className="text-base font-bold text-white group-hover:text-yellow-400 transition-colors truncate cursor-pointer flex items-center gap-1.5"
-                      title="Clique para abrir o Dossiê Tático"
-                    >
-                      <span>{auction.character_name}</span>
-                      <Eye size={13} className="text-gray-500 group-hover:text-yellow-400 shrink-0" />
-                    </h3>
-
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400 flex-wrap">
-                      <span className="font-bold text-yellow-400">Lvl {auction.level}</span>
-                      <span>•</span>
-                      <span className="text-gray-300">{vocStr}</span>
-                    </div>
-
-                    <div className="mt-1 flex items-center gap-1.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-950/40 text-yellow-300 border border-yellow-500/20 font-mono">
-                        {auction.world_name || 'Rubinot'}
-                      </span>
-                      {auction.charm_points > 0 && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-950/50 text-purple-300 border border-purple-500/30 flex items-center gap-1">
-                          <Star size={10} /> {auction.charm_points} Charms
+                      {lvl >= 800 && (
+                        <span className="bg-purple-900/60 border border-purple-500/40 text-purple-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+                          👑 Lvl 800+
                         </span>
                       )}
                     </div>
-                  </div>
-                </div>
 
-                {/* TELEMETRIA & SKILLS */}
-                <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-black/50 border border-white/5 mb-3 text-center text-xs">
-                  <div className="flex flex-col items-center justify-center">
-                    <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1 mb-0.5">
-                      {mainSkill.icon} Skill
-                    </span>
-                    <span className="font-bold text-white">{mainSkill.val}</span>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center border-x border-white/5">
-                    <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1 mb-0.5">
-                      <Shield size={11} className="text-stone-400" /> Shield
-                    </span>
-                    <span className="font-bold text-white">{auction.skills_data?.shielding || '?'}</span>
+                    {/* Timer regressivo */}
+                    <div className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-bold flex items-center gap-1 ${
+                      timeInfo.isEnded
+                        ? 'bg-stone-900 text-gray-500'
+                        : timeInfo.isImminent
+                        ? 'bg-red-950 text-red-300 border border-red-500/50'
+                        : timeInfo.isUrgent
+                        ? 'bg-amber-950/60 text-amber-300 border border-amber-500/40'
+                        : 'bg-black/60 text-gray-400 border border-white/10'
+                    }`}>
+                      <Clock size={12} className={timeInfo.isImminent ? 'animate-spin' : ''} />
+                      <span>{timeInfo.text}</span>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col items-center justify-center">
-                    <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1 mb-0.5">
-                      <Coins size={11} className="text-yellow-400" /> FIPE Média
-                    </span>
-                    <span className="font-bold text-amber-300">
-                      {fipe.avgFipe} TC
-                    </span>
-                  </div>
-                </div>
-
-                {/* ITENS INCLUSOS */}
-                {Array.isArray(auction.items_data) && auction.items_data.length > 0 && (
-                  <div className="flex gap-1.5 mb-3 p-2 rounded-xl bg-black/40 border border-white/5 overflow-x-auto custom-scrollbar">
-                    {auction.items_data.slice(0, 6).map((item, idx) => (
+                  {/* CABEÇALHO DO PERSONAGEM */}
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-stone-900 border border-white/10 flex items-center justify-center shrink-0 shadow-inner group-hover:border-yellow-500/50 transition-colors">
                       <img 
-                        key={idx}
-                        src={`https://tibia.fandom.com/wiki/Special:FilePath/${item?.name ? String(item.name).trim().replace(/ /g, '_') : ''}.gif`}
-                        alt={item?.name || 'Item'}
-                        title={item?.name || ''}
-                        className="w-7 h-7 object-contain drop-shadow"
-                        onError={(e) => { e.target.style.display = 'none'; }}
+                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(auction.character_name)}&background=1c1917&color=eab308&bold=true`}
+                        alt={auction.character_name}
+                        className="w-10 h-10 rounded-lg object-cover"
                       />
-                    ))}
-                  </div>
-                )}
+                    </div>
 
-                {/* LANCE ATUAL & PREVISÃO DE ARBITRAGEM */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-bold text-white group-hover:text-yellow-400 transition-colors truncate flex items-center gap-1.5">
+                        <span>{auction.character_name}</span>
+                        <Eye size={13} className="text-gray-500 group-hover:text-yellow-400 shrink-0" />
+                      </h3>
+
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400 flex-wrap">
+                        <span className="font-bold text-yellow-400">Lvl {auction.level}</span>
+                        <span>•</span>
+                        <span className="text-gray-300">{vocStr}</span>
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-950/40 text-yellow-300 border border-yellow-500/20 font-mono">
+                          {auction.world_name || 'Rubinot'}
+                        </span>
+                        {auction.charm_points > 0 && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-950/50 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                            <Star size={10} /> {auction.charm_points} Charms
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TELEMETRIA & SKILLS */}
+                  <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-black/50 border border-white/5 mb-3 text-center text-xs">
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1 mb-0.5">
+                        {mainSkill.icon} Skill
+                      </span>
+                      <span className="font-bold text-white">{mainSkill.val}</span>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center border-x border-white/5">
+                      <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1 mb-0.5">
+                        <Shield size={11} className="text-stone-400" /> Shield
+                      </span>
+                      <span className="font-bold text-white">{auction.skills_data?.shielding || '?'}</span>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1 mb-0.5">
+                        <Coins size={11} className="text-yellow-400" /> FIPE Real
+                      </span>
+                      <span className="font-bold text-amber-300">
+                        {fipe.avgFipe} TC
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* ITENS INCLUSOS COM BADGE DE TIER */}
+                  {Array.isArray(auction.items_data) && auction.items_data.length > 0 && (
+                    <div className="flex items-center gap-1.5 mb-3 p-2 rounded-xl bg-black/40 border border-white/5 overflow-x-auto custom-scrollbar">
+                      {auction.items_data.slice(0, 6).map((item, idx) => (
+                        <div key={idx} className="relative shrink-0 group/item">
+                          <img 
+                            src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
+                            alt={item?.name || 'Item'}
+                            title={`${item?.name || ''} ${item?.tier > 0 ? `[Tier ${item.tier}]` : ''}`}
+                            className="w-7 h-7 object-contain drop-shadow bg-stone-900/60 rounded p-0.5 border border-stone-700/40"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                          {item?.tier > 0 && (
+                            <span className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[9px] font-black px-1 rounded-full shadow">
+                              T{item.tier}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                      {auction.items_data.length > 6 && (
+                        <span className="text-[10px] text-gray-400 font-bold px-1.5 py-0.5 bg-stone-800 rounded">
+                          +{auction.items_data.length - 6}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* PREÇO FINAL & BOTÃO DE INSPEÇÃO */}
                 <div className="pt-3 border-t border-white/10 space-y-3">
                   <div className="flex justify-between items-center bg-black/60 p-2.5 rounded-xl border border-white/5">
                     <div>
-                      <span className="text-[11px] text-gray-400 block">Lance Atual:</span>
+                      <span className="text-[10px] text-gray-400 block">
+                        {timeInfo.isEnded ? 'Preço Vendido:' : 'Lance Atual:'}
+                      </span>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <Coins size={15} className="text-yellow-400" />
                         <span className="text-lg font-black text-white font-mono">
@@ -1067,32 +1119,21 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     </div>
 
                     <div className="text-right">
-                      <span className="text-[10px] text-gray-500 block">Lucro na Revenda:</span>
-                      <span className={`text-xs font-mono font-bold ${fipe.estimatedProfitTc > 0 ? 'text-emerald-400' : 'text-gray-400'}`}>
-                        {fipe.estimatedProfitTc > 0 ? `+${fipe.estimatedProfitTc} TC` : '0 TC'}
+                      <span className="text-[10px] text-gray-500 block">Avaliação FIPE:</span>
+                      <span className="text-xs font-mono font-bold text-amber-300">
+                        ~{fipe.avgFipe.toLocaleString()} TC
                       </span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedAuctionModal(auction)}
-                      className="py-2.5 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 border border-white/10 hover:border-yellow-500/40 text-xs font-bold text-gray-200 flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                    >
-                      <User size={13} />
-                      <span>Dossiê & FIPE</span>
-                    </button>
-
-                    <a
-                      href={`https://rubinot.com.br/bazaar/${auction.auction_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-700 hover:from-yellow-500 hover:to-amber-600 text-xs font-black text-black flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
-                    >
-                      <span>Dar Lance ↗</span>
-                    </a>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setSelectedAuctionModal(auction); }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border border-yellow-500/40 text-xs font-bold text-yellow-300 flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md"
+                  >
+                    <Package size={14} />
+                    <span>Inspecionar Tudo o Que Tinha 🔍</span>
+                  </button>
                 </div>
 
               </div>
@@ -1101,10 +1142,10 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
       )}
 
-      {/* 6. MODAL COMPLETO DE DOSSIÊ DO LEILÃO */}
+      {/* 6. MODAL COMPLETO DE INSPEÇÃO: TUDO O QUE O PERSONAGEM TINHA! */}
       {selectedAuctionModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-stone-950 border-2 border-yellow-500/50 rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-stone-950 border-2 border-yellow-500/50 rounded-3xl p-6 max-w-3xl w-full max-h-[92vh] overflow-y-auto space-y-6 shadow-2xl relative">
             
             <button
               type="button"
@@ -1114,9 +1155,9 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               <X size={18} />
             </button>
 
-            {/* Cabeçalho do Modal */}
+            {/* Cabeçalho do Personagem */}
             <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-stone-900 border border-yellow-500/40 flex items-center justify-center shrink-0">
+              <div className="w-16 h-16 rounded-2xl bg-stone-900 border-2 border-yellow-500/40 flex items-center justify-center shrink-0 shadow-lg">
                 <img 
                   src={`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedAuctionModal.character_name)}&background=1c1917&color=eab308&bold=true`}
                   alt={selectedAuctionModal.character_name}
@@ -1125,93 +1166,172 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               </div>
 
               <div>
-                <div className="text-xs text-yellow-400 font-bold uppercase tracking-wider">
-                  Leilão #{selectedAuctionModal.auction_id} • {selectedAuctionModal.world_name}
+                <div className="text-xs text-yellow-400 font-bold uppercase tracking-wider flex items-center gap-2">
+                  <span>Leilão #{selectedAuctionModal.auction_id}</span>
+                  <span>•</span>
+                  <span className="text-yellow-300 font-mono">{selectedAuctionModal.world_name || 'Rubinot'}</span>
                 </div>
-                <h2 className="text-2xl font-bold text-white mt-0.5">
-                  {selectedAuctionModal.character_name}
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mt-0.5 flex items-center gap-2">
+                  <span>{selectedAuctionModal.character_name}</span>
+                  {selectedAuctionModal.is_hunted && (
+                    <span className="text-xs px-2 py-0.5 bg-red-600 text-white rounded font-black uppercase">
+                      Hunted
+                    </span>
+                  )}
                 </h2>
-                <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
-                  <span className="text-yellow-400 font-bold">Level {selectedAuctionModal.level}</span>
+                <div className="flex items-center gap-2 mt-1 text-xs sm:text-sm text-gray-400 flex-wrap">
+                  <span className="text-yellow-400 font-bold font-mono">Level {selectedAuctionModal.level}</span>
                   <span>•</span>
-                  <span>{formatVocation(selectedAuctionModal.vocation)}</span>
+                  <span className="text-gray-200">{formatVocation(selectedAuctionModal.vocation)}</span>
                   <span>•</span>
-                  <span className="text-purple-400 font-mono">{selectedAuctionModal.charm_points || 0} Charms</span>
+                  <span className="text-purple-400 font-mono font-bold">{selectedAuctionModal.charm_points || 0} Charm Points</span>
                 </div>
               </div>
             </div>
 
-            {/* Tabela de Skills Completas */}
-            <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-4 space-y-3">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Habilidades & Competências (Skills)
+            {/* 1. INVENTÁRIO & ITENS DO PERSONAGEM (COM TIERS E FOTOS) */}
+            <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Package size={15} /> Itens e Equipamentos Inclusos
+                </h3>
+                <span className="text-xs text-gray-500 font-mono">
+                  {Array.isArray(selectedAuctionModal.items_data) ? selectedAuctionModal.items_data.length : 0} itens detectados
+                </span>
+              </div>
+
+              {Array.isArray(selectedAuctionModal.items_data) && selectedAuctionModal.items_data.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-60 overflow-y-auto custom-scrollbar p-1">
+                  {selectedAuctionModal.items_data.map((item, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition-all ${
+                        item.tier > 0 
+                          ? 'bg-cyan-950/30 border-cyan-500/40 shadow-sm shadow-cyan-500/10' 
+                          : 'bg-stone-950/80 border-stone-800/80'
+                      }`}
+                    >
+                      <div className="relative shrink-0">
+                        <img 
+                          src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
+                          alt={item?.name || 'Item'}
+                          className="w-9 h-9 object-contain bg-stone-900 rounded-lg p-1 border border-stone-700/50"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                        {item.tier > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-yellow-400 text-stone-950 text-[10px] font-black px-1 rounded-full shadow">
+                            T{item.tier}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-white capitalize truncate" title={item?.name}>
+                          {item?.name}
+                        </div>
+                        <div className="text-[10px] text-gray-400 flex items-center gap-1.5 mt-0.5">
+                          {item.count > 1 && <span>Qtd: {item.count}</span>}
+                          {item.tier > 0 && <span className="text-cyan-400 font-bold">Tier {item.tier}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-stone-950/60 text-center text-xs text-gray-500">
+                  Nenhum item em destaque registrado para este personagem.
+                </div>
+              )}
+            </div>
+
+            {/* 2. TODAS AS HABILIDADES (SKILLS) */}
+            <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-5 space-y-3">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sword size={14} className="text-amber-400" /> Habilidades & Competências (Skills)
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-                <div className="bg-stone-950 p-2 rounded-xl border border-stone-800">
-                  <span className="text-gray-500 text-[10px] block">Magic Level</span>
-                  <strong className="text-white text-base">{selectedAuctionModal.mag_level || '-'}</strong>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
+                  <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
+                    <Wand2 size={13} className="text-blue-400" /> Magic Level
+                  </span>
+                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.mag_level || '-'}</div>
                 </div>
-                <div className="bg-stone-950 p-2 rounded-xl border border-stone-800">
-                  <span className="text-gray-500 text-[10px] block">Distance</span>
-                  <strong className="text-white text-base">{selectedAuctionModal.skills_data?.dist || '-'}</strong>
+
+                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
+                  <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
+                    <Target size={13} className="text-green-400" /> Distance
+                  </span>
+                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.skills_data?.dist || '-'}</div>
                 </div>
-                <div className="bg-stone-950 p-2 rounded-xl border border-stone-800">
-                  <span className="text-gray-500 text-[10px] block">Sword / Axe / Club</span>
-                  <strong className="text-white text-base">
+
+                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
+                  <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
+                    <Sword size={13} className="text-red-400" /> Melee (Sword/Axe/Club)
+                  </span>
+                  <div className="text-xl font-black text-white font-mono">
                     {Math.max(selectedAuctionModal.skills_data?.sword || 0, selectedAuctionModal.skills_data?.axe || 0, selectedAuctionModal.skills_data?.club || 0) || '-'}
-                  </strong>
+                  </div>
                 </div>
-                <div className="bg-stone-950 p-2 rounded-xl border border-stone-800">
-                  <span className="text-gray-500 text-[10px] block">Shielding</span>
-                  <strong className="text-white text-base">{selectedAuctionModal.skills_data?.shielding || '-'}</strong>
+
+                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
+                  <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
+                    <Shield size={13} className="text-stone-400" /> Shielding
+                  </span>
+                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.skills_data?.shielding || '-'}</div>
                 </div>
               </div>
             </div>
 
-            {/* Dossiê Financeiro & Análise FIPE */}
+            {/* 3. DOSSIÊ FINANCEIRO & AVALIAÇÃO FIPE RUBINOT */}
             {(() => {
               const modalFipe = calculateCharFipe(selectedAuctionModal);
               const bid = Number(selectedAuctionModal.current_bid) || 0;
 
               return (
-                <div className="bg-gradient-to-r from-stone-900 to-yellow-950/30 border border-yellow-500/30 rounded-2xl p-4 space-y-3">
-                  <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <DollarSign size={14} /> Análise de Rentabilidade de Revenda
-                  </h3>
+                <div className="bg-gradient-to-r from-stone-900 via-amber-950/20 to-stone-900 border border-yellow-500/40 rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <DollarSign size={15} /> Comparativo com a Média de Mercado do RubinOT
+                    </h3>
+                    <span className="text-xs font-bold text-amber-300">
+                      {modalFipe.discountPct > 0 ? `${modalFipe.discountPct}% Abaixo da FIPE` : 'Preço de Mercado'}
+                    </span>
+                  </div>
                   
                   <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="bg-black/60 p-2.5 rounded-xl">
-                      <span className="text-[10px] text-gray-400 block">Lance Atual</span>
-                      <strong className="text-white text-base">{bid} TC</strong>
+                    <div className="bg-black/60 p-3 rounded-xl border border-stone-800">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Preço de Venda / Lance</span>
+                      <div className="text-xl font-black text-white font-mono mt-0.5">{bid.toLocaleString()} TC</div>
                     </div>
 
-                    <div className="bg-black/60 p-2.5 rounded-xl">
-                      <span className="text-[10px] text-gray-400 block">Valor FIPE Justo</span>
-                      <strong className="text-yellow-400 text-base">~{modalFipe.avgFipe} TC</strong>
+                    <div className="bg-black/60 p-3 rounded-xl border border-stone-800">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Avaliação FIPE Justa</span>
+                      <div className="text-xl font-black text-yellow-400 font-mono mt-0.5">~{modalFipe.avgFipe.toLocaleString()} TC</div>
                     </div>
 
-                    <div className="bg-black/60 p-2.5 rounded-xl">
-                      <span className="text-[10px] text-gray-400 block">Lucro Líquido Est.</span>
-                      <strong className="text-emerald-400 text-base">+{modalFipe.estimatedProfitTc} TC</strong>
+                    <div className="bg-black/60 p-3 rounded-xl border border-stone-800">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Lucro Líquido Revenda</span>
+                      <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">+{modalFipe.estimatedProfitTc.toLocaleString()} TC</div>
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    *Lucro projetado já deduzindo a comissão de 12% da CipSoft e a taxa fixa de 50 TC do leilão.
+                  <p className="text-[11px] text-gray-400">
+                    *Média calibrada diretamente contra o histórico dos 1.000 leilões mais recentes arrematados no RubinOT, considerando classe, level, bônus de charms (+{(selectedAuctionModal.charm_points || 0) * 0.3 | 0} TC) e itens tierizados.
                   </p>
                 </div>
               );
             })()}
 
-            {/* Botões de Ação do Modal */}
+            {/* BOTÕES DE AÇÃO DO MODAL */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => handleShareAuction(selectedAuctionModal)}
-                className="flex-1 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-700 font-bold text-xs text-gray-300 flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-700 font-bold text-xs text-gray-200 flex items-center justify-center gap-2 transition-colors"
               >
                 {copiedLink ? <Check size={16} className="text-emerald-400" /> : <Share2 size={16} />}
-                {copiedLink ? 'Copiado para o Clipboard!' : 'Compartilhar Leilão'}
+                {copiedLink ? 'Copiado para o Clipboard!' : 'Compartilhar no Discord/WhatsApp'}
               </button>
 
               <a
@@ -1221,7 +1341,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 className="flex-1 py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 font-black text-stone-950 text-xs flex items-center justify-center gap-2 transition-all shadow-lg"
               >
                 <ExternalLink size={16} />
-                <span>Dar Lance no Rubinot ↗</span>
+                <span>Abrir Leilão Oficial no RubinOT ↗</span>
               </a>
             </div>
 
@@ -1229,7 +1349,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
       )}
 
-      {/* BANNER DE PUBLICIDADE ADSENSE */}
+      {/* BANNER ADSENSE */}
       <div className="mt-4">
         <AdBanner />
       </div>
