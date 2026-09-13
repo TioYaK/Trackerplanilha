@@ -3,7 +3,24 @@ import { apiClient } from '../apiClient.js';
 import { scrapeHighscores } from '../lib/rubinotScraper.js';
 import 'dotenv/config';
 
-const RUBINOT_WORLDS = ['Auroria', 'Belaria', 'Bellum', 'Tenebrium', 'Vesperia', 'Malveria'];
+const RUBINOT_WORLDS = [
+  'Auroria',
+  'Belaria',
+  'Bellum',
+  'Drakaria',
+  'Eldrian',
+  'Elysian',
+  'Infernum I',
+  'Infernum II',
+  'Infernum III',
+  'Lunarian',
+  'Malveria',
+  'Mystian',
+  'Obsidian',
+  'Solarian',
+  'Tenebrium',
+  'Vesperia'
+];
 let currentWorldIndex = 0;
 
 export const runFetchHighscores = async (vocationStr) => {
@@ -11,7 +28,7 @@ export const runFetchHighscores = async (vocationStr) => {
     const voc = vocationStr === 'ALL' ? null : 
                 vocationStr.charAt(0).toUpperCase() + vocationStr.slice(1).toLowerCase();
                 
-    // Roda em pares de mundos para cobrir os 6 mundos do Rubinot com igual prioridade
+    // Roda em pares de mundos para cobrir os 16 mundos do Rubinot com igual prioridade
     const world1 = RUBINOT_WORLDS[currentWorldIndex];
     const world2 = RUBINOT_WORLDS[(currentWorldIndex + 1) % RUBINOT_WORLDS.length];
     currentWorldIndex = (currentWorldIndex + 2) % RUBINOT_WORLDS.length;
@@ -21,12 +38,14 @@ export const runFetchHighscores = async (vocationStr) => {
     let playersW1 = [];
     let playersW2 = [];
     try {
-      playersW1 = await scrapeHighscores(world1, null, 10, voc) || [];
+      const resW1 = await scrapeHighscores(world1, null, 10, voc) || [];
+      playersW1 = resW1.map(p => ({ ...p, world: world1 }));
     } catch (e1) {
       console.warn(`[JOB] Falha ao raspar highscore de ${world1}:`, e1.message);
     }
     try {
-      playersW2 = await scrapeHighscores(world2, null, 10, voc) || [];
+      const resW2 = await scrapeHighscores(world2, null, 10, voc) || [];
+      playersW2 = resW2.map(p => ({ ...p, world: world2 }));
     } catch (e2) {
       console.warn(`[JOB] Falha ao raspar highscore de ${world2}:`, e2.message);
     }
@@ -144,7 +163,8 @@ export const runFetchHighscores = async (vocationStr) => {
         xp_total: player.experience,
         last_active: last_active,
         session_start_xp: session_start_xp,
-        session_start_time: session_start_time
+        session_start_time: session_start_time,
+        world: player.world || null
       });
     }
 

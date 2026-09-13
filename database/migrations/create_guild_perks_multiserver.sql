@@ -24,15 +24,25 @@ BEGIN
     END IF;
 END $$;
 
--- Insere as configurações padrão para todos os 6 servidores caso não existam
+-- Insere as configurações padrão para todos os 16 servidores caso não existam
 INSERT INTO public.guild_perk_settings (world, guild_name, bank_recipient, fee_amount, fee_currency, cycle_days, max_slots, min_weekly_xp)
 VALUES 
     ('Auroria', 'Shellpatrocina', 'Bank Rubin Auroria', 50, 'RC', 30, 25, 1),
     ('Belaria', 'Battlestorm Belaria', 'Bank Rubin Belaria', 50, 'RC', 30, 25, 1),
     ('Bellum', 'Battlestorm Bellum', 'Bank Rubin Bellum', 50, 'RC', 30, 25, 1),
+    ('Drakaria', 'Battlestorm Drakaria', 'Bank Rubin Drakaria', 50, 'RC', 30, 25, 1),
+    ('Eldrian', 'Battlestorm Eldrian', 'Bank Rubin Eldrian', 50, 'RC', 30, 25, 1),
+    ('Elysian', 'Battlestorm Elysian', 'Bank Rubin Elysian', 50, 'RC', 30, 25, 1),
+    ('Infernum I', 'Battlestorm Infernum I', 'Bank Rubin Infernum I', 50, 'RC', 30, 25, 1),
+    ('Infernum II', 'Battlestorm Infernum II', 'Bank Rubin Infernum II', 50, 'RC', 30, 25, 1),
+    ('Infernum III', 'Battlestorm Infernum III', 'Bank Rubin Infernum III', 50, 'RC', 30, 25, 1),
+    ('Lunarian', 'Battlestorm Lunarian', 'Bank Rubin Lunarian', 50, 'RC', 30, 25, 1),
+    ('Malveria', 'Battlestorm Malveria', 'Bank Rubin Malveria', 50, 'RC', 30, 25, 1),
+    ('Mystian', 'Battlestorm Mystian', 'Bank Rubin Mystian', 50, 'RC', 30, 25, 1),
+    ('Obsidian', 'Battlestorm Obsidian', 'Bank Rubin Obsidian', 50, 'RC', 30, 25, 1),
+    ('Solarian', 'Battlestorm Solarian', 'Bank Rubin Solarian', 50, 'RC', 30, 25, 1),
     ('Tenebrium', 'Battlestorm Retro', 'Bank Rubin Tenebrium', 50, 'RC', 30, 25, 1),
-    ('Vesperia', 'Battlestorm Vesperia', 'Bank Rubin Vesperia', 50, 'RC', 30, 25, 1),
-    ('Malveria', 'Battlestorm Malveria', 'Bank Rubin Malveria', 50, 'RC', 30, 25, 1)
+    ('Vesperia', 'Battlestorm Vesperia', 'Bank Rubin Vesperia', 50, 'RC', 30, 25, 1)
 ON CONFLICT (world) DO UPDATE 
 SET guild_name = EXCLUDED.guild_name
 WHERE public.guild_perk_settings.guild_name IS NULL;

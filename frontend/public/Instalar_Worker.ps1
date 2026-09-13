@@ -19,7 +19,7 @@ If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 
 Write-Host ""
 Write-Host "======================================================" -ForegroundColor Cyan
-Write-Host "   RUBINOT WORKER - Telemetria Distribuida (6 Servidores)" -ForegroundColor Cyan
+Write-Host "   RUBINOT WORKER - Telemetria Distribuida (16 Servidores)" -ForegroundColor Cyan
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host ""
 

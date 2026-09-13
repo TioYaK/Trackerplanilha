@@ -232,7 +232,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
             </h1>
             
             <p className="text-gray-300 font-sans text-sm sm:text-base mt-2 max-w-2xl leading-relaxed">
-              Monitoramento em tempo real, telemetria avançada, arbitragem de leilões e estatísticas completas para toda a comunidade dos 6 servidores de Rubinot.
+              Monitoramento em tempo real, telemetria avançada, arbitragem de leilões e estatísticas completas para toda a comunidade dos 16 servidores de Rubinot.
             </p>
           </div>
 
@@ -321,7 +321,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           <div>
             <div className="text-xs text-gray-400 uppercase font-semibold">Mundos Cobertos</div>
             <div className="text-2xl font-medieval font-bold text-purple-300">
-              6 Servidores
+              16 Servidores
             </div>
           </div>
         </div>
@@ -603,7 +603,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
               Crie Bots de Discord e Ferramentas com Nossos Dados
             </h3>
             <p className="text-xs text-gray-300 font-sans mt-1 max-w-xl">
-              Alugue acesso à API oficial de telemetria do Rubinot. Telemetria dos 6 mundos, radar de mortes e status de personagens em tempo real.
+              Alugue acesso à API oficial de telemetria do Rubinot. Telemetria dos 16 mundos, radar de mortes e status de personagens em tempo real.
             </p>
           </div>
         </div>

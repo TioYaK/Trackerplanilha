@@ -82,7 +82,7 @@ export default function Contribute() {
           Rede de Telemetria Distribuída
         </h2>
         <p className="text-gray-400 font-sans text-lg max-w-3xl mx-auto leading-relaxed">
-          Nossa inteligência artificial varre e monitora milhares de personagens nos 6 servidores do Rubinot. Para que o nosso painel seja ultrarrápido e descentralizado, nós construímos uma <strong>Rede Compartilhada de Telemetria</strong>. Conecte um nó worker para apoiar a infraestrutura e desbloquear acesso VIP imediato!
+          Nossa inteligência artificial varre e monitora milhares de personagens nos 16 servidores do Rubinot. Para que o nosso painel seja ultrarrápido e descentralizado, nós construímos uma <strong>Rede Compartilhada de Telemetria</strong>. Conecte um nó worker para apoiar a infraestrutura e desbloquear acesso VIP imediato!
         </p>
 
         {localWorker && (
@@ -173,7 +173,7 @@ export default function Contribute() {
               Mural de Contribuidores & Nós de Telemetria
             </h3>
             <p className="text-sm text-gray-400">
-              Apoiadores e membros da comunidade que conectaram seus computadores para manter a telemetria e o radar dos 6 mundos ativos 24/7.
+              Apoiadores e membros da comunidade que conectaram seus computadores para manter a telemetria e o radar dos 16 mundos ativos 24/7.
             </p>
           </div>
           <div className="text-xs text-gray-500 font-mono bg-black/40 px-3 py-1.5 rounded border border-gray-800 self-start sm:self-auto">

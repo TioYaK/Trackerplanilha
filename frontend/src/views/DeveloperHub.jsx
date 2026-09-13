@@ -6,6 +6,7 @@ import {
   AlertCircle, Trash2, Eye, EyeOff, Play, Send, ChevronRight, Lock, Sparkles, Gem, HelpCircle, X
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
+import { WORLDS_LIST } from '../context/WorldContext';
 
 const API_BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://trackerplanilha.vercel.app';
 
@@ -272,13 +273,13 @@ print(data)`;
               </h1>
 
               <p className="text-gray-300 font-sans text-sm sm:text-base mt-2 max-w-2xl leading-relaxed">
-                A infraestrutura de dados mais veloz e completa do Rubinot. Telemetria dos 6 servidores, radar de mortes instantâneo, monitoramento de makers e leilões direto no seu bot de Discord ou painel.
+                A infraestrutura de dados mais veloz e completa do Rubinot. Telemetria dos 16 servidores, radar de mortes instantâneo, monitoramento de makers e leilões direto no seu bot de Discord ou painel.
               </p>
 
               <div className="flex flex-wrap items-center gap-4 mt-6">
                 <div className="flex items-center gap-1.5 text-xs text-green-400 font-bold bg-green-950/50 border border-green-500/30 px-3 py-1.5 rounded-lg">
                   <span className="w-2 h-2 rounded-full bg-green-400 animate-ping" />
-                  6 Mundos Conectados
+                  16 Mundos Conectados
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-yellow-400 font-bold bg-yellow-950/50 border border-yellow-500/30 px-3 py-1.5 rounded-lg">
                   <Zap size={13} />
@@ -465,13 +466,10 @@ print(data)`;
                         onChange={(e) => setTestParams({ ...testParams, world: e.target.value })}
                         className="w-full rounded-lg bg-black/60 border border-tibia-border px-3 py-2 text-sm text-white focus:border-yellow-500 outline-none"
                       >
-                        <option value="ALL">🌐 Todos os 6 Servidores (Global)</option>
-                        <option value="Auroria">Auroria</option>
-                        <option value="Belaria">Belaria</option>
-                        <option value="Bellum">Bellum</option>
-                        <option value="Tenebrium">Tenebrium</option>
-                        <option value="Vesperia">Vesperia</option>
-                        <option value="Malveria">Malveria</option>
+                        <option value="ALL">🌐 Todos os 16 Servidores (Global)</option>
+                        {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => (
+                          <option key={w.id} value={w.id}>{w.icon} {w.name}</option>
+                        ))}
                       </select>
                     </div>
                   )}

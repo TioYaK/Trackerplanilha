@@ -2,18 +2,38 @@ export const WORLDS_CONFIG = [
   { world: 'Auroria', guild: 'Shellpatrocina', defaultBank: 'Bank Rubin Auroria', icon: '🛡️' },
   { world: 'Belaria', guild: 'Battlestorm Belaria', defaultBank: 'Bank Rubin Belaria', icon: '⚔️' },
   { world: 'Bellum', guild: 'Battlestorm Bellum', defaultBank: 'Bank Rubin Bellum', icon: '⚡' },
+  { world: 'Drakaria', guild: 'Battlestorm Drakaria', defaultBank: 'Bank Rubin Drakaria', icon: '🐉' },
+  { world: 'Eldrian', guild: 'Battlestorm Eldrian', defaultBank: 'Bank Rubin Eldrian', icon: '🌿' },
+  { world: 'Elysian', guild: 'Battlestorm Elysian', defaultBank: 'Bank Rubin Elysian', icon: '✨' },
+  { world: 'Infernum I', guild: 'Battlestorm Infernum I', defaultBank: 'Bank Rubin Infernum I', icon: '🔥' },
+  { world: 'Infernum II', guild: 'Battlestorm Infernum II', defaultBank: 'Bank Rubin Infernum II', icon: '🌋' },
+  { world: 'Infernum III', guild: 'Battlestorm Infernum III', defaultBank: 'Bank Rubin Infernum III', icon: '☄️' },
+  { world: 'Lunarian', guild: 'Battlestorm Lunarian', defaultBank: 'Bank Rubin Lunarian', icon: '🌙' },
+  { world: 'Malveria', guild: 'Battlestorm Malveria', defaultBank: 'Bank Rubin Malveria', icon: '🏹' },
+  { world: 'Mystian', guild: 'Battlestorm Mystian', defaultBank: 'Bank Rubin Mystian', icon: '🔮' },
+  { world: 'Obsidian', guild: 'Battlestorm Obsidian', defaultBank: 'Bank Rubin Obsidian', icon: '💎' },
+  { world: 'Solarian', guild: 'Battlestorm Solarian', defaultBank: 'Bank Rubin Solarian', icon: '☀️' },
   { world: 'Tenebrium', guild: 'Battlestorm Retro', defaultBank: 'Bank Rubin Tenebrium', icon: '💀' },
-  { world: 'Vesperia', guild: 'Battlestorm Vesperia', defaultBank: 'Bank Rubin Vesperia', icon: '🦅' },
-  { world: 'Malveria', guild: 'Battlestorm Malveria', defaultBank: 'Bank Rubin Malveria', icon: '🏹' }
+  { world: 'Vesperia', guild: 'Battlestorm Vesperia', defaultBank: 'Bank Rubin Vesperia', icon: '🦅' }
 ];
 
 export const WORLD_GUILD_MAP = {
   'Auroria': 'Shellpatrocina',
   'Belaria': 'Battlestorm Belaria',
   'Bellum': 'Battlestorm Bellum',
+  'Drakaria': 'Battlestorm Drakaria',
+  'Eldrian': 'Battlestorm Eldrian',
+  'Elysian': 'Battlestorm Elysian',
+  'Infernum I': 'Battlestorm Infernum I',
+  'Infernum II': 'Battlestorm Infernum II',
+  'Infernum III': 'Battlestorm Infernum III',
+  'Lunarian': 'Battlestorm Lunarian',
+  'Malveria': 'Battlestorm Malveria',
+  'Mystian': 'Battlestorm Mystian',
+  'Obsidian': 'Battlestorm Obsidian',
+  'Solarian': 'Battlestorm Solarian',
   'Tenebrium': 'Battlestorm Retro',
-  'Vesperia': 'Battlestorm Vesperia',
-  'Malveria': 'Battlestorm Malveria'
+  'Vesperia': 'Battlestorm Vesperia'
 };
 
 /**

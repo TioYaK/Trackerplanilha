@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { parseUtcDate } from '../lib/tibiaUtils';
 import { Shield, UserPlus, Info, CheckCircle2, AlertCircle, RefreshCw, Server, Send } from 'lucide-react';
+import { WORLDS_LIST } from '../context/WorldContext';
 
 export default function InviteRequest({ isPublic = false, defaultCharacter = '' }) {
   const [clientId] = useState(() => {
@@ -35,9 +36,19 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
     'Auroria': 'Shellpatrocina',
     'Belaria': 'Battlestorm Belaria',
     'Bellum': 'Battlestorm Bellum',
+    'Drakaria': 'Battlestorm Drakaria',
+    'Eldrian': 'Battlestorm Eldrian',
+    'Elysian': 'Battlestorm Elysian',
+    'Infernum I': 'Battlestorm Infernum I',
+    'Infernum II': 'Battlestorm Infernum II',
+    'Infernum III': 'Battlestorm Infernum III',
+    'Lunarian': 'Battlestorm Lunarian',
+    'Malveria': 'Battlestorm Malveria',
+    'Mystian': 'Battlestorm Mystian',
+    'Obsidian': 'Battlestorm Obsidian',
+    'Solarian': 'Battlestorm Solarian',
     'Tenebrium': 'Battlestorm Retro',
-    'Vesperia': 'Battlestorm Vesperia',
-    'Malveria': 'Battlestorm Malveria'
+    'Vesperia': 'Battlestorm Vesperia'
   };
 
   const fetchRecentInvites = async () => {
@@ -151,31 +162,18 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                 Convites In-Game • Guildas do Rubinot
               </h1>
               <p className="text-gray-300 font-sans text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-                Emissão automatizada de convites in-game para qualquer guilda nos 6 servidores da rede Rubinot.
+                Emissão automatizada de convites in-game para qualquer guilda nos 16 servidores da rede Rubinot.
               </p>
             </div>
           </div>
 
           {/* BADGES DOS MUNDOS COBERTOS */}
           <div className="flex flex-wrap gap-2 text-xs shrink-0 max-w-md">
-            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>🛡️</span> <span>Auroria</span>
-            </div>
-            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>⚔️</span> <span>Belaria</span>
-            </div>
-            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>⚡</span> <span>Bellum</span>
-            </div>
-            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>💀</span> <span>Tenebrium</span>
-            </div>
-            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>🦅</span> <span>Vesperia</span>
-            </div>
-            <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
-              <span>🏹</span> <span>Malveria</span>
-            </div>
+            {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => (
+              <div key={w.id} className="px-2.5 py-1 rounded-lg bg-black/60 border border-white/15 text-gray-300 font-sans flex items-center gap-1.5">
+                <span>{w.icon}</span> <span>{w.name}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -218,12 +216,9 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                   onChange={(e) => setWorld(e.target.value)}
                   className="w-full bg-[#101010] border border-tibia-border rounded-lg py-2.5 px-3.5 focus:outline-none focus:border-tibia-highlight text-white font-sans text-sm transition-colors cursor-pointer"
                 >
-                  <option value="Auroria">Auroria (Open-PvP)</option>
-                  <option value="Belaria">Belaria (Open-PvP)</option>
-                  <option value="Bellum">Bellum (Open-PvP)</option>
-                  <option value="Tenebrium">Tenebrium (Retro Open-PvP)</option>
-                  <option value="Vesperia">Vesperia (Open-PvP)</option>
-                  <option value="Malveria">Malveria (Open-PvP)</option>
+                  {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => (
+                    <option key={w.id} value={w.id}>{w.icon} {w.name} ({w.type})</option>
+                  ))}
                 </select>
               </div>
 

@@ -1,4 +1,4 @@
-﻿import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
 // Cache em memória para Rate Limiting (workerId -> { count, resetAt })
 const workerRateLimits = new Map();
@@ -179,7 +179,7 @@ export default async function handler(req, res) {
         const { online_count, players } = payload || {};
         const count = parseInt(online_count, 10);
 
-        if (isNaN(count) || count < 0 || count > 5000) {
+        if (isNaN(count) || count < 0 || count > 50000) {
           return res.status(400).json({ error: 'Contagem de online invalida.' });
         }
 
@@ -217,7 +217,7 @@ export default async function handler(req, res) {
             level: level,
             vocation: String(c.vocation || 'Unknown').slice(0, 30),
             experience: isNaN(exp) ? 0 : exp,
-            world: String(c.world || 'Auroria').slice(0, 30),
+            world: c.world ? String(c.world).slice(0, 30) : null,
             rank: parseInt(c.rank, 10) || null,
             updated_at: new Date().toISOString()
           });

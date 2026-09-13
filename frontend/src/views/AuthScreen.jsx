@@ -3,6 +3,7 @@ import { useAuth } from '../components/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Shield, Mail, Lock, User, Crosshair, Headphones, LogIn, UserPlus } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
+import { WORLDS_LIST } from '../context/WorldContext';
 
 export default function AuthScreen({ onBack }) {
   const { login, register } = useAuth();
@@ -134,12 +135,9 @@ export default function AuthScreen({ onBack }) {
                     onChange={(e) => setWorld(e.target.value)}
                     className="w-full bg-black/50 border border-tibia-border rounded px-3 py-2 text-white font-sans text-xs focus:outline-none focus:border-tibia-highlight transition-colors"
                   >
-                    <option value="Auroria">🛡️ Auroria</option>
-                    <option value="Belaria">⚔️ Belaria</option>
-                    <option value="Bellum">⚡ Bellum</option>
-                    <option value="Tenebrium">💀 Tenebrium</option>
-                    <option value="Vesperia">🦅 Vesperia</option>
-                    <option value="Malveria">🏹 Malveria</option>
+                    {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => (
+                      <option key={w.id} value={w.id}>{w.icon} {w.name}</option>
+                    ))}
                   </select>
                 </div>
 

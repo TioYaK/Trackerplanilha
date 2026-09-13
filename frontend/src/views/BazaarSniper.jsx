@@ -54,7 +54,7 @@ export default function BazaarSniper() {
             Sniper de Char Bazaar
           </h1>
           <p className="text-gray-400 mt-1 font-sans">
-            Rastreamento automático de inimigos e pechinchas de alto nível nos 6 servidores do Rubinot.
+            Rastreamento automático de inimigos e pechinchas de alto nível nos 16 servidores do Rubinot.
           </p>
         </div>
 

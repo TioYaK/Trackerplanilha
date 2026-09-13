@@ -9,16 +9,9 @@ import {
   VolumeX, Calendar, Star, HelpCircle, UserPlus, Flame, Lock, Edit3, RefreshCw
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
+import { WORLDS_LIST } from '../context/WorldContext';
 
-const RUBINOT_WORLDS = [
-  'Todos os Mundos',
-  'Auroria',
-  'Belaria',
-  'Bellum',
-  'Tenebrium',
-  'Vesperia',
-  'Malveria'
-];
+const RUBINOT_WORLDS = WORLDS_LIST.map(w => w.id === 'ALL' ? 'Todos os Mundos' : w.name);
 
 const DEFAULT_GIVEAWAY = {
   id: 'round-1',

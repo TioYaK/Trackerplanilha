@@ -1,4 +1,4 @@
-﻿import fs from 'fs';
+import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 
@@ -87,7 +87,7 @@ export const apiClient = {
   },
 
   /**
-   * Envia censo e lista de jogadores online nos 6 servidores
+   * Envia censo e lista de jogadores online nos 16 servidores
    */
   async reportOnlines(onlineCount, players = []) {
     return await postTelemetry('REPORT_ONLINES', {

@@ -2,16 +2,33 @@ import { scrapeOnlines } from '../lib/rubinotScraper.js';
 import { supabase } from '../db.js';
 import { apiClient } from '../apiClient.js';
 
-const RUBINOT_WORLDS = ['Auroria', 'Belaria', 'Bellum', 'Tenebrium', 'Vesperia', 'Malveria'];
+const RUBINOT_WORLDS = [
+  'Auroria',
+  'Belaria',
+  'Bellum',
+  'Drakaria',
+  'Eldrian',
+  'Elysian',
+  'Infernum I',
+  'Infernum II',
+  'Infernum III',
+  'Lunarian',
+  'Malveria',
+  'Mystian',
+  'Obsidian',
+  'Solarian',
+  'Tenebrium',
+  'Vesperia'
+];
 
 export const runFetchOnlines = async () => {
-  console.log(`[JOB] Fetching online players across all Rubinot worlds...`);
+  console.log(`[JOB] Fetching online players across all 16 Rubinot worlds...`);
 
   try {
     const allWorldOnlines = {};
     const onlinePlayers = [];
 
-    // Coleta onlines de todos os 6 mundos do Rubinot
+    // Coleta onlines de todos os 16 mundos do Rubinot
     for (const world of RUBINOT_WORLDS) {
       try {
         const worldPlayers = await scrapeOnlines(world);
@@ -29,7 +46,7 @@ export const runFetchOnlines = async () => {
       return;
     }
 
-    console.log(`[JOB] Total de ${onlinePlayers.length} jogadores online coletados nos 6 mundos.`);
+    console.log(`[JOB] Total de ${onlinePlayers.length} jogadores online coletados nos 16 mundos.`);
 
     // Registra o total consolidado via ApiClient seguro (ou fallback direto)
     const apiRes = await apiClient.reportOnlines(onlinePlayers.length, onlinePlayers);
@@ -95,7 +112,7 @@ export const runFetchOnlines = async () => {
                 description: `O radar de satélite detectou a conexão imediata de alvos na lista negra:\n\n${targetDetails}\n\n*Preparem as traps e posicionem os scouts!*`,
                 color: 15158332, // Vermelho de Alerta
                 fields: [
-                  { name: 'Mundos', value: 'Rubinot (6 Mundos)', inline: true },
+                  { name: 'Mundos', value: 'Rubinot (16 Mundos)', inline: true },
                   { name: 'Total Online', value: `${onlinePlayers.length} players`, inline: true },
                   { name: 'Horário', value: new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: true }
                 ],

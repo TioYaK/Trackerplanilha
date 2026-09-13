@@ -3,6 +3,9 @@ import { X, Save, User, Camera, Trash2, Link as LinkIcon, AlertTriangle, ShieldA
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { formatVocation } from '../lib/tibiaUtils';
+import { WORLDS_LIST } from '../context/WorldContext';
+
+const ACTIVE_WORLDS = WORLDS_LIST.filter(w => w.id !== 'ALL');
 
 export default function ProfileModal({ onClose }) {
   const { user, profile, refreshProfile } = useAuth();
@@ -17,15 +20,14 @@ export default function ProfileModal({ onClose }) {
 
   const isAvatarBlocked = Boolean(profile?.avatar_blocked);
 
-  const [makers, setMakers] = useState(profile?.makers || {
-    Auroria: '',
-    Malveria: '',
-    Belaria: '',
-    Vesperia: '',
-    Bellum: '',
-    Tenebrium: ''
+  const [makers, setMakers] = useState(() => {
+    const init = {};
+    ACTIVE_WORLDS.forEach(w => {
+      init[w.id] = profile?.makers?.[w.id] || '';
+    });
+    return init;
   });
-  const [mainWorld, setMainWorld] = useState(() => profile?.makers?._world || 'Auroria');
+  const [mainWorld, setMainWorld] = useState(() => profile?.makers?._world || profile?.world || 'Auroria');
   const [guildName, setGuildName] = useState(() => profile?.guild_name || profile?.makers?._guild || '');
   const [characterStats, setCharacterStats] = useState({ level: 'N/A', vocation: 'Desconhecida' });
 
@@ -150,7 +152,7 @@ export default function ProfileModal({ onClose }) {
     try {
       // Coleta todos os makers informados em qualquer servidor
       const allEnteredMakers = [];
-      ['Auroria', 'Malveria', 'Belaria', 'Vesperia', 'Bellum', 'Tenebrium'].forEach(server => {
+      ACTIVE_WORLDS.map(w => w.id).forEach(server => {
         const list = (makers[server] || '').split(',').map(m => m.trim()).filter(Boolean);
         list.forEach(m => allEnteredMakers.push({ server, name: m }));
       });
@@ -357,12 +359,9 @@ export default function ProfileModal({ onClose }) {
                   onChange={(e) => setMainWorld(e.target.value)}
                   className="w-full bg-black/60 border border-tibia-border rounded p-2 text-white text-sm focus:border-tibia-primary focus:outline-none"
                 >
-                  <option value="Auroria">🛡️ Auroria (Rubinot)</option>
-                  <option value="Belaria">⚔️ Belaria</option>
-                  <option value="Bellum">⚡ Bellum (Retro-PvP)</option>
-                  <option value="Tenebrium">💀 Tenebrium (Retro)</option>
-                  <option value="Vesperia">🦅 Vesperia</option>
-                  <option value="Malveria">🏹 Malveria</option>
+                  {ACTIVE_WORLDS.map(w => (
+                    <option key={w.id} value={w.id}>{w.icon} {w.name} ({w.type})</option>
+                  ))}
                 </select>
               </div>
 
@@ -380,34 +379,28 @@ export default function ProfileModal({ onClose }) {
             </div>
           </div>
 
-          {/* Seção 2: Makers nos 6 Servidores */}
+          {/* Seção 2: Makers nos 16 Servidores */}
           <div className="bg-black/60 border border-tibia-border p-4 rounded-lg mb-6">
             <h3 className="text-sm font-bold text-gray-200 mb-1 border-b border-tibia-border pb-2 font-medieval">
-              🎭 Rede de Makers & Farm (6 Servidores)
+              🎭 Rede de Makers & Farm (16 Servidores)
             </h3>
             <p className="text-xs text-gray-400 mb-4 font-sans">
               Informe os nomes dos personagens que você usa para farmar em cada servidor (separe múltiplos por vírgula). Nenhum servidor é obrigatório.
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {[
-                { name: 'Auroria', icon: '🛡️' },
-                { name: 'Belaria', icon: '⚔️' },
-                { name: 'Bellum', icon: '⚡' },
-                { name: 'Tenebrium', icon: '💀' },
-                { name: 'Vesperia', icon: '🦅' },
-                { name: 'Malveria', icon: '🏹' }
-              ].map(({ name: server, icon }) => (
-                <div key={server}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 max-h-80 overflow-y-auto pr-1">
+              {ACTIVE_WORLDS.map(w => (
+                <div key={w.id} className="bg-black/30 p-2 rounded border border-white/5">
                   <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
-                    <span>{icon}</span> {server}
+                    <span>{w.icon}</span> <span>{w.name}</span>
+                    <span className="text-[10px] text-gray-500">({w.type})</span>
                   </label>
                   <input
                     type="text"
-                    value={makers[server] || ''}
-                    onChange={(e) => handleChange(server, e.target.value)}
+                    value={makers[w.id] || ''}
+                    onChange={(e) => handleChange(w.id, e.target.value)}
                     placeholder="Ex: Makerzinha, Farm Knight..."
-                    className="w-full bg-black/40 border border-gray-700 rounded p-2 text-white text-xs focus:border-yellow-500 focus:outline-none"
+                    className="w-full bg-black/40 border border-gray-700 rounded p-1.5 text-white text-xs focus:border-yellow-500 focus:outline-none"
                   />
                 </div>
               ))}

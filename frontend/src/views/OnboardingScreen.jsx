@@ -2,20 +2,24 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
 import { Shield, Swords, Save, AlertTriangle } from 'lucide-react';
+import { WORLDS_LIST } from '../context/WorldContext';
+
+const ACTIVE_WORLDS = WORLDS_LIST.filter(w => w.id !== 'ALL');
 
 export default function OnboardingScreen() {
   const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // State para os makers (texto separado por vírgula)
-  const [makers, setMakers] = useState({
-    Auroria: '',
-    Malveria: '',
-    Belaria: '',
-    Vesperia: '',
-    Bellum: '',
-    Tenebrium: ''
+  const [primaryWorld, setPrimaryWorld] = useState(() => profile?.makers?._world || profile?.world || 'Auroria');
+
+  // State para os makers (texto separado por vírgula) de todos os 16 mundos
+  const [makers, setMakers] = useState(() => {
+    const init = {};
+    ACTIVE_WORLDS.forEach(w => {
+      init[w.id] = profile?.makers?.[w.id] || '';
+    });
+    return init;
   });
 
   const handleChange = (server, value) => {
@@ -27,23 +31,27 @@ export default function OnboardingScreen() {
     setError('');
 
     // Clean up makers to avoid trailing commas and empty spaces
-    const cleanMakers = {};
+    const cleanMakers = { _world: primaryWorld };
+    let totalMakersCount = 0;
+    const allEnteredNames = [];
+
     Object.keys(makers).forEach(server => {
-      const list = makers[server].split(',').map(m => m.trim()).filter(m => m);
+      if (server.startsWith('_')) return;
+      const list = (makers[server] || '').split(',').map(m => m.trim()).filter(m => m);
       if (list.length > 0) {
         cleanMakers[server] = list.join(', ');
+        totalMakersCount += list.length;
+        allEnteredNames.push(...list);
       }
     });
 
-    const auroriaMakersList = (cleanMakers.Auroria || '').split(',').map(m => m.trim()).filter(m => m);
-
-    if (auroriaMakersList.length === 0) {
-      setError('Você precisa registrar pelo menos 1 maker no servidor Auroria (obrigatório).');
+    if (totalMakersCount === 0) {
+      setError(`Você precisa registrar pelo menos 1 maker secundário.`);
       return;
     }
     
-    const isMainInAuroria = auroriaMakersList.some(m => m.toLowerCase() === profile?.main_character?.toLowerCase());
-    if (isMainInAuroria) {
+    const isMainInMakers = allEnteredNames.some(m => m.toLowerCase() === profile?.main_character?.toLowerCase());
+    if (isMainInMakers) {
       setError(`Você não pode colocar seu Main (${profile?.main_character}) na lista de Makers.`);
       return;
     }
@@ -56,8 +64,8 @@ export default function OnboardingScreen() {
         .select('id, main_character, makers');
       if (profErr) throw profErr;
 
-      // Validação de cada char de Auroria
-      for (const makerName of auroriaMakersList) {
+      // Validação de cada char informado
+      for (const makerName of allEnteredNames) {
         
         // A. Verificar Duplicidade (Global)
         for (const p of allProfiles) {
@@ -161,37 +169,57 @@ export default function OnboardingScreen() {
           )}
 
           <div className="bg-tibia-primary/10 border border-tibia-primary/30 p-4 rounded-lg">
-            <h3 className="text-lg font-bold text-tibia-primary flex items-center mb-2">
-              <Swords className="mr-2" size={18} /> Servidor Principal (Auroria)
-            </h3>
-            <p className="text-xs text-gray-400 mb-4">Você <strong>precisa</strong> ter pelo menos um maker secundário registrado em Auroria.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+              <h3 className="text-lg font-bold text-tibia-primary flex items-center">
+                <Swords className="mr-2" size={18} /> Servidor Principal & Makers
+              </h3>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-400 font-sans">Seu Mundo:</label>
+                <select
+                  value={primaryWorld}
+                  onChange={(e) => setPrimaryWorld(e.target.value)}
+                  className="bg-black/80 border border-yellow-500/40 text-xs text-yellow-300 rounded px-2.5 py-1.5 focus:outline-none focus:border-yellow-500 font-bold cursor-pointer"
+                >
+                  {ACTIVE_WORLDS.map(w => (
+                    <option key={w.id} value={w.id}>{w.icon} {w.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">Cadastre seus makers secundários utilizados para farmar ou dar suporte.</p>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Makers em Auroria *</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Makers em {primaryWorld}
+              </label>
               <input
                 type="text"
-                required
-                value={makers.Auroria}
-                onChange={(e) => handleChange('Auroria', e.target.value)}
+                value={makers[primaryWorld] || ''}
+                onChange={(e) => handleChange(primaryWorld, e.target.value)}
                 placeholder="Ex: Makerzinha, Druid Maker (separe por vírgulas se for mais de um)"
-                className="w-full bg-black/60 border border-tibia-border rounded p-2 text-white focus:border-tibia-primary focus:outline-none"
+                className="w-full bg-black/60 border border-tibia-border rounded p-2 text-white focus:border-tibia-primary focus:outline-none text-sm"
               />
             </div>
           </div>
 
           <div className="bg-black/60 border border-tibia-border p-4 rounded-lg">
-            <h3 className="text-lg font-bold text-gray-300 mb-4 border-b border-tibia-border pb-2">Outros Servidores (Opcional)</h3>
-            <p className="text-xs text-gray-500 mb-4">Caso possua makers farmando em outros servidores, registre-os abaixo (separe por vírgula).</p>
+            <h3 className="text-lg font-bold text-gray-300 mb-2 border-b border-tibia-border pb-2">
+              Outros Servidores do Rubinot (Opcional)
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">Caso possua makers farmando em outros servidores do Rubinot, registre-os abaixo (separe por vírgula).</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {['Malveria', 'Belaria', 'Vesperia', 'Bellum', 'Tenebrium'].map((server) => (
-                <div key={server}>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">{server}</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 max-h-72 overflow-y-auto pr-1">
+              {ACTIVE_WORLDS.filter(w => w.id !== primaryWorld).map((w) => (
+                <div key={w.id} className="bg-black/30 p-2 rounded border border-white/5">
+                  <label className="block text-xs font-medium text-gray-400 mb-1 flex items-center gap-1.5">
+                    <span>{w.icon}</span> <span>{w.name}</span>
+                    <span className="text-[10px] text-gray-500">({w.type})</span>
+                  </label>
                   <input
                     type="text"
-                    value={makers[server]}
-                    onChange={(e) => handleChange(server, e.target.value)}
+                    value={makers[w.id] || ''}
+                    onChange={(e) => handleChange(w.id, e.target.value)}
                     placeholder="Nome do(s) char(s)..."
-                    className="w-full bg-black/40 border border-tibia-border rounded p-2 text-white text-sm focus:border-gray-500 focus:outline-none"
+                    className="w-full bg-black/40 border border-tibia-border rounded p-1.5 text-white text-xs focus:border-gray-500 focus:outline-none"
                   />
                 </div>
               ))}
