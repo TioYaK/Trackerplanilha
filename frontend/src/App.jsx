@@ -35,6 +35,10 @@ const WorkerDashboard = lazy(() => import('./views/WorkerDashboard'));
 const GuildPerks = lazy(() => import('./views/GuildPerks'));
 const GiveawayDraw = lazy(() => import('./views/GiveawayDraw'));
 const DeveloperHub = lazy(() => import('./views/DeveloperHub'));
+const PrivacyPolicy = lazy(() => import('./views/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./views/TermsOfService'));
+const AboutUs = lazy(() => import('./views/AboutUs'));
+import Footer from './components/Footer';
 
 function ModuleFallback() {
   return (
@@ -111,6 +115,12 @@ const ROUTE_TO_VIEW = {
   '/party': 'party',
   '/player': 'players',
   '/players': 'players',
+  '/privacy': 'privacy',
+  '/privacidade': 'privacy',
+  '/terms': 'terms',
+  '/termos': 'terms',
+  '/about': 'about',
+  '/sobre': 'about',
 };
 
 const VIEW_TO_ROUTE = {
@@ -142,6 +152,9 @@ const VIEW_TO_ROUTE = {
   auth: '/auth',
   players: '/players',
   party: '/party',
+  privacy: '/privacy',
+  terms: '/terms',
+  about: '/about',
 };
 
 const VIEW_TITLES = {
@@ -154,6 +167,9 @@ const VIEW_TITLES = {
   analytics: 'Rubinot Tracker | Rankings Globais',
   contribute: 'Rubinot Tracker | Baixar Worker & Acesso VIP',
   bazaar: 'Rubinot Tracker | Bazaar Sniper Mega Premium 💎',
+  privacy: 'Rubinot Tracker | Política de Privacidade',
+  terms: 'Rubinot Tracker | Termos de Serviço',
+  about: 'Rubinot Tracker | Sobre a Plataforma',
   radar: 'Rubinot Tracker | Radar de Inimigos (Warmode Spy) 👑',
   extreme: 'Rubinot Tracker | Extreme BI & Inteligência Avançada 👑',
   planilha: 'Rubinot Tracker | Controle de Hunts & Caves',
@@ -542,6 +558,10 @@ export default function App() {
       if (currentView === 'admin_dashboard') return <AdminDashboard />;
     }
 
+    if (currentView === 'privacy') return <PrivacyPolicy onNavigate={navigateView} />;
+    if (currentView === 'terms') return <TermsOfService onNavigate={navigateView} />;
+    if (currentView === 'about') return <AboutUs onNavigate={navigateView} />;
+
     return (
       <RubinotHome 
         onNavigate={navigateView} 
@@ -566,8 +586,8 @@ export default function App() {
         visibleTabs={visibleTabs ?? DEFAULT_VISIBLE_TABS}
       />
       
-      {/* Banner de Publicidade Oficial */}
-      {currentView !== 'auth' && (
+      {/* Banner de Publicidade Oficial (nunca exibe em telas de login ou institucionais para cumprir regras do AdSense) */}
+      {!['auth', 'privacy', 'terms', 'about'].includes(currentView) && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-2">
           <AdBanner />
         </div>
@@ -580,6 +600,8 @@ export default function App() {
           </Suspense>
         </ErrorBoundary>
       </main>
+
+      <Footer onNavigate={navigateView} />
     </div>
   );
 }

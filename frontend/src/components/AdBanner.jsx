@@ -28,8 +28,12 @@ export default function AdBanner({
   const isAdSenseConfigured = client && client.startsWith('ca-pub-') && !client.includes('XXXX');
   const hasSpecificSlot = slot && slot !== '1234567890' && /^\d+$/.test(slot);
 
+  // Só renderiza a tag oficial do Google AdSense se houver CLIENT E SLOT numérico válido configurado.
+  // Sem slot específico, exibe o banner de patrocínio comunitário para evitar telas com blocos vazios (violação do AdSense).
+  const isAdSenseActive = isAdSenseConfigured && hasSpecificSlot && !adBlocked;
+
   useEffect(() => {
-    if (!isAdSenseConfigured || dismissed) return;
+    if (!isAdSenseActive || dismissed) return;
 
     // Inicializa o anúncio no slot com segurança para SPAs
     const timer = setTimeout(() => {
@@ -39,18 +43,17 @@ export default function AdBanner({
           setAdLoaded(true);
         }
       } catch (err) {
-        // Ignora erro de slot duplicado ou bloqueado no React
         setAdBlocked(true);
       }
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [slot, isAdSenseConfigured, dismissed]);
+  }, [slot, isAdSenseActive, dismissed]);
 
   if (dismissed) return null;
 
-  // Se o AdSense estiver configurado com credenciais válidas e não bloqueado, renderiza o slot oficial do Google
-  if (isAdSenseConfigured && !adBlocked) {
+  // Se o AdSense estiver configurado com credenciais completas (Client + Slot) e não bloqueado:
+  if (isAdSenseActive) {
     return (
       <div className={`relative my-4 overflow-hidden rounded-xl border border-yellow-500/25 bg-black/70 p-3 text-center shadow-2xl backdrop-blur-sm ${className}`}>
         {allowDismiss && (

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../components/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Shield, Mail, Lock, User, Crosshair, Headphones, LogIn, UserPlus } from 'lucide-react';
-import AdBanner from '../components/AdBanner';
 import { WORLDS_LIST } from '../context/WorldContext';
 
 export default function AuthScreen({ onBack }) {
@@ -219,11 +218,6 @@ export default function AuthScreen({ onBack }) {
             </button>
           </div>
         )}
-      </div>
-
-      {/* Banner de Anúncio / Patrocinador na Tela de Login */}
-      <div className="max-w-md w-full mt-4">
-        <AdBanner allowDismiss={false} />
       </div>
     </div>
   );

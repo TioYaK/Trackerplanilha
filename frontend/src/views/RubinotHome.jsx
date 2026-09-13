@@ -5,7 +5,8 @@ import { useWorld } from '../context/WorldContext';
 import { 
   Globe, Activity, Skull, Trophy, Gem, Cpu, Calculator, 
   Search, Shield, ArrowRight, RefreshCw, Users, Server, 
-  ExternalLink, CheckCircle2, ChevronRight, Zap, Sparkles, Copy, Check, Gift
+  ExternalLink, CheckCircle2, ChevronRight, Zap, Sparkles, Copy, Check, Gift,
+  BookOpen, HelpCircle
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 
@@ -716,6 +717,129 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* SEÇÃO EDITORIAL & INSTITUCIONAL (CONTEÚDO DE ALTO VALOR • GOOGLE ADSENSE) */}
+      {/* ========================================================================= */}
+      <div className="mt-8 space-y-6">
+        
+        {/* Painel Informativo 1: Sobre a Plataforma e Missão */}
+        <div className="bg-tibia-card border-2 border-tibia-border rounded-xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/40 text-yellow-400">
+              <BookOpen size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-medieval font-bold text-tibia-highlight">
+                Rubinot Tracker • Monitoramento Global & Inteligência de Combate
+              </h2>
+              <p className="text-xs text-gray-400 font-sans">
+                A plataforma líder em análise de dados, telemetria em tempo real e automações para os 16 servidores da rede Rubinot.
+              </p>
+            </div>
+          </div>
+
+          <div className="text-gray-300 text-xs sm:text-sm leading-relaxed space-y-3 font-sans">
+            <p>
+              O <strong>Rubinot Tracker</strong> é uma plataforma comunitária aberta, desenvolvida para fornecer aos jogadores, generais de guilda e estrategistas de combate uma visão analítica profunda sobre tudo o que acontece nos servidores do jogo. Através de coletores de telemetria distribuídos com arquitetura Zero-Trust, a plataforma monitora continuamente flutuações de jogadores online, mortes em combate (PvP e PvE), pontuações do ranking de experiência (Level Rush) e leilões ativos de personagens no mercado oficial.
+            </p>
+            <p>
+              Nossa missão é democratizar o acesso a informações táticas que antes exigiam dezenas de planilhas manuais. Com ferramentas integradas como o <strong>Mural de Mortes em Tempo Real</strong>, o <strong>Bazaar Sniper</strong> para detecção de oportunidades de compra de personagens e a <strong>Calculadora de Loot da Party</strong>, capacitamos equipes a tomarem decisões rápidas e estratégicas dentro e fora do jogo.
+            </p>
+          </div>
+        </div>
+
+        {/* Painel Informativo 2: Guia dos 16 Servidores e Tipos de PvP */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          <div className="bg-black/60 border border-yellow-500/30 rounded-xl p-5 flex flex-col justify-between">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-950/40 border border-red-500/40 text-red-400 text-xs font-bold uppercase mb-2">
+                ⚔️ Open-PvP
+              </div>
+              <h3 className="text-base font-medieval font-bold text-white mb-2">Servidores Open PvP</h3>
+              <p className="text-xs text-gray-400 leading-relaxed font-sans">
+                Combate aberto com sistema padrão de skulls e penalidades de morte moderadas. Ideal para batalhas táticas e disputas territoriais equilibradas.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-white/10 text-xs text-yellow-400 font-sans">
+              <strong>Mundos:</strong> Auroria, Belaria, Drakaria, Malveria, Vesperia.
+            </div>
+          </div>
+
+          <div className="bg-black/60 border border-yellow-500/30 rounded-xl p-5 flex flex-col justify-between">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-950/40 border border-orange-500/40 text-orange-400 text-xs font-bold uppercase mb-2">
+                ⚡ Retro-PvP
+              </div>
+              <h3 className="text-base font-medieval font-bold text-white mb-2">Servidores Retro PvP</h3>
+              <p className="text-xs text-gray-400 leading-relaxed font-sans">
+                Regras clássicas de combate sem safe mode, onde runas em área atingem aliados e inimigos. Máxima intensidade para guerras e confrontos de alto risco.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-white/10 text-xs text-yellow-400 font-sans">
+              <strong>Mundos:</strong> Bellum, Infernum I, Infernum II, Infernum III, Tenebrium.
+            </div>
+          </div>
+
+          <div className="bg-black/60 border border-yellow-500/30 rounded-xl p-5 flex flex-col justify-between">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-green-950/40 border border-green-500/40 text-green-400 text-xs font-bold uppercase mb-2">
+                🌿 Optional-PvP
+              </div>
+              <h3 className="text-base font-medieval font-bold text-white mb-2">Servidores Optional PvP</h3>
+              <p className="text-xs text-gray-400 leading-relaxed font-sans">
+                Ambiente focado em progressão PvE, chefões, hunts em grupo e exploração com proteção contra ataques de outros jogadores fora do modo de guerra declarada.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-white/10 text-xs text-yellow-400 font-sans">
+              <strong>Mundos:</strong> Eldrian, Elysian, Lunarian, Mystian, Obsidian, Solarian.
+            </div>
+          </div>
+
+        </div>
+
+        {/* Painel Informativo 3: Perguntas Frequentes (FAQ) */}
+        <div className="bg-tibia-card border-2 border-tibia-border rounded-xl p-6 sm:p-8 shadow-xl">
+          <div className="flex items-center gap-2 mb-4 text-tibia-highlight font-medieval text-lg font-bold">
+            <HelpCircle size={20} className="text-yellow-400" />
+            Perguntas Frequentes sobre o Rubinot Tracker
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
+            
+            <div className="p-4 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+              <h4 className="font-bold text-yellow-400 text-sm">Como os dados da plataforma são atualizados?</h4>
+              <p className="text-gray-300 leading-relaxed">
+                Nossa infraestrutura distribuída executa verificações a cada poucos segundos nos servidores oficiais, indexando mortes, onlines e variações de pontuação com persistência redundante e push em tempo real.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+              <h4 className="font-bold text-yellow-400 text-sm">A plataforma é gratuita para todos os jogadores?</h4>
+              <p className="text-gray-300 leading-relaxed">
+                Sim! Todos os módulos essenciais — incluindo o monitor global de mortes, visualizador de onlines, fila de convites e calculadora de loot — são 100% gratuitos e abertos para a comunidade.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+              <h4 className="font-bold text-yellow-400 text-sm">Como funciona o sistema de convites automáticos?</h4>
+              <p className="text-gray-300 leading-relaxed">
+                Ao solicitar um convite através da página de Recrutamento, o pedido entra em uma fila segura. Nossos robôs autenticados conectam-se ao painel oficial e emitem o convite in-game automaticamente em instantes.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+              <h4 className="font-bold text-yellow-400 text-sm">Posso integrar o Rubinot Tracker com o bot da minha guilda?</h4>
+              <p className="text-gray-300 leading-relaxed">
+                Sim! Disponibilizamos uma API REST pública documentada no <a href="/api" className="text-yellow-400 hover:underline">Developer Hub</a> para desenvolvedores consumirem endpoints de telemetria, mortes recentes e dados de personagens.
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
 
     </div>
   );
