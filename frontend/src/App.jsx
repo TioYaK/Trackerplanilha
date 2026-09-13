@@ -9,6 +9,7 @@ import { LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
 // Lazy-loaded Views & Components
+const RubinotHome = lazy(() => import('./views/RubinotHome'));
 const LiveDashboard = lazy(() => import('./views/LiveDashboard'));
 const GlobalTracker = lazy(() => import('./components/GlobalTracker'));
 const PlanilhaManager = lazy(() => import('./views/PlanilhaManager'));
@@ -161,7 +162,16 @@ export default function App() {
     }
 
     // 2. Abas Públicas (Acesso Aberto para todo o Rubinot)
-    if (currentView === 'live') return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
+    if (currentView === 'home' || currentView === 'live') {
+      return (
+        <RubinotHome 
+          onNavigate={setCurrentView} 
+          onPlayerClick={handlePlayerClick} 
+          isPremium={isPremium} 
+          user={user} 
+        />
+      );
+    }
     if (currentView === 'attendance') return <WarAttendance onPlayerClick={handlePlayerClick} />;
     if (currentView === 'tracker') return <GlobalTracker onPlayerClick={handlePlayerClick} />;
     if (currentView === 'analytics') return <Rankings isAdmin={isAdmin} />;
@@ -214,10 +224,11 @@ export default function App() {
     }
 
     // 4. Abas de Gestão da Guilda 🛡️ (Gated estritamente para membros Shell Patrocina)
-    const guildViews = ['planilha', 'respawns', 'roster', 'bank', 'market', 'party', 'guild_perks', 'pearks', 'invite'];
+    const guildViews = ['planilha', 'planilha_live', 'respawns', 'roster', 'bank', 'market', 'party', 'guild_perks', 'pearks', 'invite'];
     if (guildViews.includes(currentView)) {
       const featureTitles = {
         planilha: 'Controle de Hunts & Caves',
+        planilha_live: 'Monitor de Caves (Ao Vivo)',
         invite: 'Convites In-Game da Guilda',
         respawns: 'Respawns & Regras',
         roster: 'Exército da Guilda',
@@ -245,7 +256,7 @@ export default function App() {
                 Sua conta (Main: <strong>{profile.main_character}</strong>) foi registrada com sucesso, mas o acesso aos respawns da guilda precisa de ativação de um Administrador.
               </p>
               <button
-                onClick={() => setCurrentView('live')}
+                onClick={() => setCurrentView('home')}
                 className="bg-yellow-600/30 hover:bg-yellow-600/50 border border-yellow-500 text-yellow-300 px-4 py-2 rounded text-xs font-bold transition-colors"
               >
                 Navegar no Portal Público
@@ -267,6 +278,7 @@ export default function App() {
 
       switch (currentView) {
         case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
+        case 'planilha_live': return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
         case 'respawns': return <RespawnTracker isAdmin={isAdmin} />;
         case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
         case 'bank': return <GuildBank isAdmin={isAdmin} />;
@@ -288,7 +300,14 @@ export default function App() {
       if (currentView === 'admin_dashboard') return <AdminDashboard />;
     }
 
-    return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
+    return (
+      <RubinotHome 
+        onNavigate={setCurrentView} 
+        onPlayerClick={handlePlayerClick} 
+        isPremium={isPremium} 
+        user={user} 
+      />
+    );
   };
 
   return (

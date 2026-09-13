@@ -46,7 +46,8 @@ export default function TopNav({
   // Mapeamento de views e ícones nos 4 níveis
   const viewsData = {
     // 🌐 Rubinot Público
-    live: { label: 'Visão Geral & Onlines', icon: <Activity size={16} /> },
+    live: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
+    home: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
     attendance: { label: 'Mural de Mortes & Frags', icon: <CalendarDays size={16} /> },
     tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
     analytics: { label: 'Rankings Globais', icon: <TrendingDown size={16} /> },
@@ -54,6 +55,7 @@ export default function TopNav({
 
     // 🛡️ Guilda Shell Patrocina
     planilha: { label: 'Controle de Hunts & Caves', icon: <FileSpreadsheet size={16} /> },
+    planilha_live: { label: 'Monitor de Caves (Ao Vivo)', icon: <Activity size={16} /> },
     respawns: { label: 'Respawns & Regras', icon: <ShieldAlert size={16} /> },
     roster: { label: 'Exército da Guilda', icon: <Users size={16} /> },
     bank: { label: 'Tesouraria da Guilda', icon: <Landmark size={16} /> },
@@ -82,7 +84,7 @@ export default function TopNav({
       title: 'Guilda Shell Patrocina',
       icon: <Shield size={18} />,
       badge: !isGuildMember ? '🔒' : null,
-      items: ['planilha', 'respawns', 'roster', 'bank', 'market', 'guild_perks', 'invite']
+      items: ['planilha', 'planilha_live', 'respawns', 'roster', 'bank', 'market', 'guild_perks', 'invite']
     },
     {
       title: 'Mega Premium 💎',
