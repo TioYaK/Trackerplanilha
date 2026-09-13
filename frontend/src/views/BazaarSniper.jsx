@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Target, AlertTriangle, Clock, TrendingDown, Coins, Search, ExternalLink, 
@@ -6,7 +6,8 @@ import {
   ArrowUpDown, Volume2, VolumeX, Eye, Calculator, ChevronDown, CheckCircle2,
   Award, Globe, Zap, ArrowRight, User, LayoutGrid, List, SlidersHorizontal,
   Bookmark, Check, Share2, DollarSign, HelpCircle, X, History, BarChart3, Package,
-  Crosshair, ShieldCheck, Gem, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
+  Crosshair, ShieldCheck, Gem, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  Heart, Droplets, Gauge, Compass, BookOpen, Scroll, CheckCircle, Lock, Trophy, Sparkle
 } from 'lucide-react';
 import { formatVocation } from '../lib/tibiaUtils';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
@@ -25,6 +26,20 @@ const VOCATION_TABS = [
 
 // Palavras-chave dos itens meta/BiS no Tibia e RubinOT
 const BIS_KEYWORDS = ['soul', 'falcon', 'sanguine', 'naga', 'cobra', 'lion', 'alicorn', 'spiritthorn', 'arcanomancer', 'eldritch'];
+
+// Runas de Charm do Tibia e seus custos
+const CHARM_RUNES = [
+  { id: 'wound', name: 'Wound', cost: 600, type: 'Dano Físico', icon: '🩸', desc: '5% de chance de causar 5% da vida do monstro como dano físico.' },
+  { id: 'freeze', name: 'Freeze', cost: 800, type: 'Dano de Gelo', icon: '❄️', desc: '5% de chance de causar 5% da vida máxima como dano de gelo.' },
+  { id: 'zap', name: 'Zap', cost: 800, type: 'Dano de Energia', icon: '⚡', desc: '5% de chance de causar 5% da vida máxima como dano de energia.' },
+  { id: 'poison', name: 'Poison', cost: 600, type: 'Dano de Terra', icon: '🌿', desc: '5% de chance de causar 5% da vida máxima como dano de terra.' },
+  { id: 'enflame', name: 'Enflame', cost: 800, type: 'Dano de Fogo', icon: '🔥', desc: '5% de chance de causar 5% da vida máxima como dano de fogo.' },
+  { id: 'curse', name: 'Curse', cost: 800, type: 'Dano de Morte', icon: '💀', desc: '5% de chance de causar 5% da vida máxima como dano de morte.' },
+  { id: 'divine', name: 'Divine Wrath', cost: 1500, type: 'Dano Sagrado', icon: '✨', desc: '5% de chance de causar 5% da vida como dano sagrado (Holy).' },
+  { id: 'lowblow', name: 'Low Blow', cost: 2000, type: 'Crítico Extra', icon: '🎯', desc: 'Aumenta a chance de acerto crítico em +8% no monstro associado.' },
+  { id: 'dodge', name: 'Dodge', cost: 600, type: 'Esquiva', icon: '🛡️', desc: '10% de chance de esquivar completamente do ataque do monstro.' },
+  { id: 'parry', name: 'Parry', cost: 1000, type: 'Reflexo de Dano', icon: '⚔️', desc: '10% de chance de refletir 100% do dano de volta para o atacante.' },
+];
 
 // Dados estatísticos reais extraídos do histórico oficial de 1.000 leilões do RubinOT
 const RUBINOT_MARKET_STATS = {
@@ -49,7 +64,7 @@ const RUBINOT_MARKET_STATS = {
   }
 };
 
-// Avatar ultra-leve em SVG/CSS que não dispara requisições HTTP externas
+// Avatar ultra-leve em SVG/CSS
 function CharAvatar({ name, vocation, size = 'md' }) {
   const initial = (name || '?').charAt(0).toUpperCase();
   const voc = (vocation || '').toLowerCase();
@@ -70,6 +85,121 @@ function CharAvatar({ name, vocation, size = 'md' }) {
   );
 }
 
+// Cálculo exato de telemetria de HP, Mana, Cap e Speed por fórmula Tibia
+function calculateCharTelemetry(level, vocation) {
+  const lvl = Math.max(1, Number(level) || 1);
+  const voc = (vocation || '').toLowerCase();
+  const lvlAbove8 = Math.max(0, lvl - 8);
+
+  let hp = 185;
+  let mp = 70;
+  let cap = 470;
+
+  if (voc.includes('knight')) {
+    hp += lvlAbove8 * 15;
+    mp += lvlAbove8 * 5;
+    cap += lvlAbove8 * 25;
+  } else if (voc.includes('paladin')) {
+    hp += lvlAbove8 * 10;
+    mp += lvlAbove8 * 15;
+    cap += lvlAbove8 * 20;
+  } else if (voc.includes('druid') || voc.includes('sorcerer')) {
+    hp += lvlAbove8 * 5;
+    mp += lvlAbove8 * 30;
+    cap += lvlAbove8 * 10;
+  } else if (voc.includes('monk')) {
+    hp += lvlAbove8 * 12;
+    mp += lvlAbove8 * 12;
+    cap += lvlAbove8 * 22;
+  } else {
+    hp += lvlAbove8 * 5;
+    mp += lvlAbove8 * 5;
+    cap += lvlAbove8 * 10;
+  }
+
+  const speed = 109 + (lvl - 1);
+  return { hp, mp, cap, speed };
+}
+
+// Checklist de Acessos Meta do RubinOT
+function getCharacterQuestAccess(level) {
+  const lvl = Number(level) || 1;
+  return [
+    {
+      name: 'Rotten Blood (Endgame BiS)',
+      reqLevel: 1000,
+      status: lvl >= 1000 ? 'Habilitado para Bakragore' : 'Requer Level 1000+',
+      unlocked: lvl >= 1000,
+      reward: 'Equipamentos Sanguine BiS & Taints',
+      tier: 'Tier 5 Endgame'
+    },
+    {
+      name: 'Soul War & Goshnar Taints',
+      reqLevel: 800,
+      status: lvl >= 800 ? 'Liberado para Hunt & Bosses' : 'Requer Level 800+',
+      unlocked: lvl >= 800,
+      reward: 'Equipamentos Soulwar (Soulshell, Stalkers)',
+      tier: 'Tier 4 Endgame'
+    },
+    {
+      name: 'Primal Ordeal (Hazard Marapur)',
+      reqLevel: 700,
+      status: lvl >= 700 ? 'Liberado para Hazard Hunts' : 'Requer Level 700+',
+      unlocked: lvl >= 700,
+      reward: 'Primal Pods & Magma Bubble Runs',
+      tier: 'Tier 4'
+    },
+    {
+      name: 'The Secret Library & Grand Master Oberon',
+      reqLevel: 500,
+      status: lvl >= 500 ? 'Liberado para Daily Oberon' : 'Requer Level 500+',
+      unlocked: lvl >= 500,
+      reward: 'Falcon Items & Livros Elementais BiS',
+      tier: 'Tier 3'
+    },
+    {
+      name: 'Grave Danger (King Zelos)',
+      reqLevel: 400,
+      status: lvl >= 400 ? 'Liberado para 5 Mini-Bosses' : 'Requer Level 400+',
+      unlocked: lvl >= 400,
+      reward: 'Acesso a Zelos Hunt & Lich Bosses',
+      tier: 'Tier 3'
+    },
+    {
+      name: 'Feaster of Souls (The Pale Worm)',
+      reqLevel: 400,
+      status: lvl >= 400 ? 'Liberado para Bounac & Worm' : 'Requer Level 400+',
+      unlocked: lvl >= 400,
+      reward: 'Brain in a Jar & Acesso a Bounac',
+      tier: 'Tier 3'
+    },
+    {
+      name: 'Forgotten Knowledge & Heart of Destruction',
+      reqLevel: 300,
+      status: lvl >= 300 ? 'Acesso a Imbuements Poderosos' : 'Requer Level 300+',
+      unlocked: lvl >= 300,
+      reward: 'Imbuements Poderosos Tier 3 (Crítico/Mana)',
+      tier: 'Tier 2'
+    },
+    {
+      name: 'The Inquisition & Pits of Inferno (PoI)',
+      reqLevel: 200,
+      status: lvl >= 200 ? 'Acesso Geral Concluído' : 'Requer Level 200+',
+      unlocked: lvl >= 200,
+      reward: 'Blessing da Inquisição & Demon Forges',
+      tier: 'Tier 1 Clássico'
+    },
+    {
+      name: 'In Service of Yalahar & The Postman Missions',
+      reqLevel: 100,
+      status: 'Concluído',
+      unlocked: true,
+      reward: 'Portões de Yalahar & Viagens com Desconto',
+      tier: 'Utilidade'
+    }
+  ];
+}
+
 // Avaliação FIPE individual calibrada com os dados reais de venda do RubinOT
 function calculateCharFipe(char) {
   const lvl = Number(char.level) || 100;
@@ -81,11 +211,14 @@ function calculateCharFipe(char) {
   if (lvl > 900) baseRate = 1.5;
   if (lvl > 1100) baseRate = 1.9;
 
-  if (voc.includes('druid')) baseRate *= 1.25;
-  else if (voc.includes('paladin')) baseRate *= 1.20;
-  else if (voc.includes('knight')) baseRate *= 1.05;
-  else if (voc.includes('sorcerer')) baseRate *= 1.02;
-  else if (voc.includes('monk')) baseRate *= 0.95;
+  let vocMultiplier = 1.0;
+  if (voc.includes('druid')) vocMultiplier = 1.25;
+  else if (voc.includes('paladin')) vocMultiplier = 1.20;
+  else if (voc.includes('knight')) vocMultiplier = 1.05;
+  else if (voc.includes('sorcerer')) vocMultiplier = 1.02;
+  else if (voc.includes('monk')) vocMultiplier = 0.95;
+
+  baseRate *= vocMultiplier;
 
   let baseTc = Math.round(lvl * baseRate);
   const charmsBonus = Math.round((ch / 1000) * 300);
@@ -107,7 +240,7 @@ function calculateCharFipe(char) {
   const discountPct = (avgFipe > 0 && currentBid > 0) ? Math.round(((avgFipe - currentBid) / avgFipe) * 100) : 0;
   const estimatedProfitTc = Math.max(0, Math.round(avgFipe * 0.88 - 50 - currentBid));
 
-  return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, tierBonus };
+  return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, tierBonus, baseTc, charmsBonus, vocMultiplier };
 }
 
 export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
@@ -119,14 +252,19 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const [activeChip, setActiveChip] = useState('all');
   const [sortOption, setSortOption] = useState('ending');
   const [audioEnabled, setAudioEnabled] = useState(soundFX.isEnabled());
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+  const [viewMode, setViewMode] = useState('grid');
   const [showFiltersDrawer, setShowFiltersDrawer] = useState(false);
   const [showFipeOverview, setShowFipeOverview] = useState(false);
   const [selectedAuctionModal, setSelectedAuctionModal] = useState(null);
   const [nowTimestamp, setNowTimestamp] = useState(Date.now());
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Paginação inteligente para máxima fluidez
+  // Estados internos do Modal com Abas
+  const [modalActiveTab, setModalActiveTab] = useState('overview'); // 'overview' | 'items' | 'skills' | 'charms' | 'quests' | 'fipe'
+  const [modalItemSearch, setModalItemSearch] = useState('');
+  const [modalItemFilter, setModalItemFilter] = useState('all'); // 'all' | 'bis' | 'tiered'
+
+  // Paginação inteligente
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(24);
 
@@ -136,17 +274,17 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const [minBid, setMinBid] = useState('');
   const [maxBid, setMaxBid] = useState('');
   const [minCharms, setMinCharms] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'active' | 'all' | 'ended'
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  // 2. Filtros de Equipamentos Valiosos & Tiers da Forja
-  const [itemSetFilter, setItemSetFilter] = useState('all'); // 'all' | 'bis' | 'soulwar' | 'falcon' | 'sanguine' | 'naga_cobra' | 'lion_spirit'
-  const [itemTierFilter, setItemTierFilter] = useState('all'); // 'all' | 'tier1' | 'tier2' | 'tier3'
+  // 2. Filtros de Equipamentos Valiosos & Tiers
+  const [itemSetFilter, setItemSetFilter] = useState('all');
+  const [itemTierFilter, setItemTierFilter] = useState('all');
 
   // 3. Filtros de Habilidades & Skills
   const [minMagLevel, setMinMagLevel] = useState('');
   const [minDist, setMinDist] = useState('');
   const [minMelee, setMinMelee] = useState('');
-  const [meleeType, setMeleeType] = useState('any'); // 'any' | 'sword' | 'axe' | 'club'
+  const [meleeType, setMeleeType] = useState('any');
   const [minShielding, setMinShielding] = useState('');
 
   // Favoritos
@@ -176,7 +314,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     });
   };
 
-  // Ticker de tempo regressivo otimizado (atualiza a cada 10s para não estrangular CPU/render do navegador)
+  // Ticker de tempo regressivo otimizado
   useEffect(() => {
     const timer = setInterval(() => {
       setNowTimestamp(Date.now());
@@ -184,7 +322,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     return () => clearInterval(timer);
   }, []);
 
-  // Busca e Pré-processamento único de dados (O(1) lookups)
+  // Busca e Pré-processamento de dados
   const fetchAlerts = async () => {
     setLoading(true);
     try {
@@ -196,7 +334,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
       if (error) throw error;
 
-      // Pré-computa FIPE, flags e tags de alta performance UMA ÚNICA VEZ
       const preprocessed = (data || []).map(a => {
         const fipe = calculateCharFipe(a);
         const items = Array.isArray(a.items_data) ? a.items_data : [];
@@ -337,7 +474,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     setCurrentPage(1);
   };
 
-  // Resetar página quando qualquer filtro mudar
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedVoc, selectedWorld, activeChip, statusFilter, itemSetFilter, itemTierFilter, minLevel, maxLevel, minBid, maxBid, minCharms, minMagLevel, minDist, minMelee, minShielding, sortOption]);
@@ -347,16 +483,13 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     let result = alerts.filter(a => {
       const isEnded = (a._endTimeMs || 0) <= nowTimestamp;
 
-      // Status Filter
       if (statusFilter === 'active' && isEnded) return false;
       if (statusFilter === 'ended' && !isEnded) return false;
 
-      // Mundo
       if (selectedWorld !== 'ALL' && a.world_name && a.world_name.toLowerCase() !== selectedWorld.toLowerCase()) {
         return false;
       }
 
-      // Busca por Texto
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchName = (a.character_name || '').toLowerCase().includes(q);
@@ -364,7 +497,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         if (!matchName && !matchItem) return false;
       }
 
-      // Vocação
       if (selectedVoc !== 'ALL') {
         const voc = (a.vocation || '').toLowerCase();
         if (selectedVoc === 'knight' && !voc.includes('knight')) return false;
@@ -375,14 +507,12 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         if (selectedVoc === 'none' && (voc.includes('knight') || voc.includes('paladin') || voc.includes('sorcerer') || voc.includes('druid') || voc.includes('monk'))) return false;
       }
 
-      // Faixas de Nível e Lance
       if (minLevel && (a.level || 0) < Number(minLevel)) return false;
       if (maxLevel && (a.level || 0) > Number(maxLevel)) return false;
       if (minBid && (a.current_bid || 0) < Number(minBid)) return false;
       if (maxBid && (a.current_bid || 0) > Number(maxBid)) return false;
       if (minCharms && (a.charm_points || 0) < Number(minCharms)) return false;
 
-      // Filtro de Equipamentos Valiosos
       if (itemSetFilter !== 'all') {
         if (!a._hasBis) return false;
         if (itemSetFilter === 'soulwar' && !a._bisTags.includes('soul')) return false;
@@ -392,20 +522,15 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         if (itemSetFilter === 'lion_spirit' && !a._bisTags.includes('lion') && !a._bisTags.includes('spiritthorn') && !a._bisTags.includes('alicorn') && !a._bisTags.includes('eldritch')) return false;
       }
 
-      // Filtro de Tier da Forja
       if (itemTierFilter !== 'all') {
         if (itemTierFilter === 'tier1' && (a._highestTier || 0) < 1) return false;
         if (itemTierFilter === 'tier2' && (a._highestTier || 0) < 2) return false;
         if (itemTierFilter === 'tier3' && (a._highestTier || 0) < 3) return false;
       }
 
-      // Filtro de Magic Level (ML)
       if (minMagLevel && (a.mag_level || 0) < Number(minMagLevel)) return false;
-
-      // Filtro de Distance (RP)
       if (minDist && (a.skills_data?.dist || 0) < Number(minDist)) return false;
 
-      // Filtro de Melee (Sword, Axe, Club ou Qualquer)
       if (minMelee) {
         const reqMelee = Number(minMelee);
         if (meleeType === 'sword') {
@@ -419,10 +544,8 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         }
       }
 
-      // Filtro de Shielding
       if (minShielding && (a.skills_data?.shielding || 0) < Number(minShielding)) return false;
 
-      // Chips Rápidos
       if (activeChip === 'opportunity') {
         return (a._fipe?.discountPct || 0) >= 20 || a.is_sniping_opportunity;
       }
@@ -446,7 +569,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       return true;
     });
 
-    // Ordenação Otimizada
     result.sort((a, b) => {
       const isEndedA = (a._endTimeMs || 0) <= nowTimestamp;
       const isEndedB = (b._endTimeMs || 0) <= nowTimestamp;
@@ -479,14 +601,12 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     return result;
   }, [alerts, selectedWorld, searchQuery, selectedVoc, activeChip, sortOption, minLevel, maxLevel, minBid, maxBid, minCharms, statusFilter, itemSetFilter, itemTierFilter, minMagLevel, minDist, minMelee, meleeType, minShielding, favorites, nowTimestamp]);
 
-  // Paginação: Apenas renderiza 24 itens por vez no DOM (super veloz e leve)
   const totalPages = Math.ceil(filteredAndSortedAuctions.length / pageSize) || 1;
   const paginatedAuctions = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredAndSortedAuctions.slice(start, start + pageSize);
   }, [filteredAndSortedAuctions, currentPage, pageSize]);
 
-  // Estatísticas do Topo (computadas de forma leve)
   const stats = useMemo(() => {
     const total = alerts.length;
     let activeCount = 0;
@@ -522,6 +642,25 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  // Itens filtrados dentro do modal
+  const modalFilteredItems = useMemo(() => {
+    if (!selectedAuctionModal || !Array.isArray(selectedAuctionModal.items_data)) return [];
+    let items = selectedAuctionModal.items_data;
+
+    if (modalItemFilter === 'bis') {
+      items = items.filter(it => it?.name && BIS_KEYWORDS.some(k => it.name.toLowerCase().includes(k)));
+    } else if (modalItemFilter === 'tiered') {
+      items = items.filter(it => it && it.tier > 0);
+    }
+
+    if (modalItemSearch.trim()) {
+      const q = modalItemSearch.toLowerCase().trim();
+      items = items.filter(it => (it?.name || '').toLowerCase().includes(q));
+    }
+
+    return items;
+  }, [selectedAuctionModal, modalItemFilter, modalItemSearch]);
+
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full animate-fade-in text-gray-100 flex flex-col gap-6">
       
@@ -541,7 +680,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             </h1>
             
             <p className="text-gray-300 font-sans text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
-              Consulte leilões ativos e o histórico dos últimos 30 dias de vendas do RubinOT. Filtre por skills avançadas, itens BiS/forja e inspecione tudo em alta velocidade!
+              Consulte leilões ativos e o histórico dos últimos 30 dias de vendas do RubinOT. Clique em qualquer personagem para inspecionar o dossiê completo por abas: telemetria, inventário, skills, charms, quests e FIPE!
             </p>
           </div>
 
@@ -635,57 +774,24 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               </span>
             </div>
 
-            {/* Grid 1: Médias por Faixa de Level */}
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                1. Preço Médio de Venda por Faixa de Nível
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {RUBINOT_MARKET_STATS.ranges.map((r, idx) => (
-                  <div key={idx} className="bg-stone-900/80 border border-stone-800 rounded-xl p-3.5 space-y-1">
-                    <div className="text-xs font-bold text-white">{r.range}</div>
-                    <div className="text-xl font-bold text-yellow-400 font-mono mt-1">
-                      ~{r.avg} TC <span className="text-xs text-gray-400 font-normal">(Mediana: {r.median} TC)</span>
-                    </div>
-                    <div className="text-[11px] text-emerald-400 font-mono">{r.ratio}</div>
-                    <div className="text-[10px] text-gray-500">{r.desc}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {RUBINOT_MARKET_STATS.ranges.map((r, idx) => (
+                <div key={idx} className="bg-stone-900/80 border border-stone-800 rounded-xl p-3.5 space-y-1">
+                  <div className="text-xs font-bold text-white">{r.range}</div>
+                  <div className="text-xl font-bold text-yellow-400 font-mono mt-1">
+                    ~{r.avg} TC <span className="text-xs text-gray-400 font-normal">(Mediana: {r.median} TC)</span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Grid 2: Médias por Vocação */}
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                2. Valorização e Demanda por Vocação
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {RUBINOT_MARKET_STATS.vocations.map((v, idx) => (
-                  <div key={idx} className="bg-stone-900/80 border border-stone-800 rounded-xl p-3 space-y-1">
-                    <div className="flex items-center justify-between text-xs font-bold text-white">
-                      <span>{v.voc}</span>
-                      <span className="text-yellow-400 font-mono">Média: ~{v.avg} TC</span>
-                    </div>
-                    <p className="text-[11px] text-gray-400 leading-tight">{v.note}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Grid 3: Multiplicadores de Tiers e Charms */}
-            <div className="p-3.5 bg-yellow-950/20 border border-yellow-500/20 rounded-xl flex items-start gap-3">
-              <Zap size={18} className="text-yellow-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-gray-300 leading-relaxed">
-                <strong className="text-yellow-300">O que mais agrega valor ao char:</strong> Itens Tier 1 da forja adicionam em média <strong className="text-white">+250 TC</strong>, enquanto equipamentos Tier 3 (como Soulstalkers ou Lion Bow T3) chegam a adicionar mais de <strong className="text-white">+1.500 TC</strong> ao valor arrematado! Cada 1.000 charm points acrescentam em média <strong className="text-white">+300 TC</strong>.
-              </div>
+                  <div className="text-[11px] text-emerald-400 font-mono">{r.ratio}</div>
+                  <div className="text-[10px] text-gray-500">{r.desc}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* DRAWER AVANÇADO DE FILTROS PRO (SKILLS, ITENS BONS, FORJA E METAS) */}
+        {/* DRAWER AVANÇADO DE FILTROS PRO */}
         {showFiltersDrawer && (
           <div className="mt-6 pt-6 border-t border-yellow-500/20 space-y-5 animate-fade-in bg-stone-950/95 p-5 sm:p-6 rounded-2xl border border-yellow-500/40 shadow-2xl">
-            
             {/* SEÇÃO 1: FILTROS DE EQUIPAMENTOS VALIOSOS & TIERS */}
             <div>
               <div className="flex items-center gap-2 mb-3 pb-1 border-b border-stone-800 text-xs font-bold text-yellow-400 uppercase tracking-wider">
@@ -739,7 +845,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                {/* Magic Level */}
                 <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-2">
                   <label className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
                     <Wand2 size={14} /> Magic Level Mínimo
@@ -765,7 +870,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   </div>
                 </div>
 
-                {/* Distance Fighting */}
                 <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-2">
                   <label className="text-xs font-bold text-green-400 flex items-center gap-1.5">
                     <Target size={14} /> Distance Mínimo (RP)
@@ -791,7 +895,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   </div>
                 </div>
 
-                {/* Melee Skill (Sword/Axe/Club) */}
                 <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-red-400 flex items-center gap-1.5">
@@ -829,7 +932,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   </div>
                 </div>
 
-                {/* Shielding */}
                 <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-2">
                   <label className="text-xs font-bold text-stone-300 flex items-center gap-1.5">
                     <ShieldCheck size={14} /> Shielding Mínimo
@@ -948,7 +1050,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               </div>
             </div>
 
-            {/* BARRA DE AÇÕES DO DRAWER */}
             <div className="pt-3 border-t border-stone-800 flex items-center justify-between flex-wrap gap-2">
               <span className="text-xs text-gray-400 font-mono">
                 {filteredAndSortedAuctions.length} leilões filtrados com sucesso
@@ -970,7 +1071,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 </button>
               </div>
             </div>
-
           </div>
         )}
       </div>
@@ -1222,7 +1322,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   return (
                     <tr 
                       key={aId}
-                      onClick={() => setSelectedAuctionModal(auction)}
+                      onClick={() => { setSelectedAuctionModal(auction); setModalActiveTab('overview'); }}
                       className={`hover:bg-stone-900/70 transition-colors cursor-pointer ${timeInfo.isEnded ? 'opacity-75 bg-stone-950/40' : ''}`}
                     >
                       <td className="p-3 text-center">
@@ -1273,7 +1373,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       <td className="p-3 text-right">
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); setSelectedAuctionModal(auction); }}
+                          onClick={(e) => { e.stopPropagation(); setSelectedAuctionModal(auction); setModalActiveTab('overview'); }}
                           className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-yellow-400 border border-stone-700 font-bold text-xs transition-colors"
                         >
                           Ver Tudo 🔍
@@ -1297,7 +1397,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             const timeInfo = getTimeRemaining(auction.auction_end, auction._endTimeMs);
             const fipe = auction._fipe;
             const bidVal = Number(auction.current_bid) || 0;
-            const lvl = Number(auction.level) || 1;
 
             const vocStr = formatVocation(auction.vocation);
             const isMage = vocStr.includes('Sorcerer') || vocStr.includes('Druid');
@@ -1315,7 +1414,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             return (
               <div 
                 key={aId}
-                onClick={() => setSelectedAuctionModal(auction)}
+                onClick={() => { setSelectedAuctionModal(auction); setModalActiveTab('overview'); }}
                 className={`bg-gradient-to-b from-stone-950 via-black to-stone-950 border rounded-2xl p-5 relative overflow-hidden transition-all flex flex-col justify-between group shadow-xl cursor-pointer ${
                   timeInfo.isEnded
                     ? 'opacity-75 border-stone-800/80 hover:border-stone-700'
@@ -1381,7 +1480,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     </div>
                   </div>
 
-                  {/* CABEÇALHO DO PERSONAGEM (AVATAR LOCAL SEM TRAVAR REDE) */}
+                  {/* CABEÇALHO DO PERSONAGEM */}
                   <div className="flex items-start gap-3 mb-4">
                     <CharAvatar name={auction.character_name} vocation={auction.vocation} />
 
@@ -1436,7 +1535,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     </div>
                   </div>
 
-                  {/* ITENS INCLUSOS (COM LAZY LOADING E DESTAQUE BIS) */}
+                  {/* ITENS INCLUSOS */}
                   {Array.isArray(auction.items_data) && auction.items_data.length > 0 && (
                     <div className="flex items-center gap-1.5 mb-3 p-2 rounded-xl bg-black/40 border border-white/5 overflow-x-auto custom-scrollbar">
                       {auction.items_data.slice(0, 6).map((item, idx) => {
@@ -1499,11 +1598,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setSelectedAuctionModal(auction); }}
+                    onClick={(e) => { e.stopPropagation(); setSelectedAuctionModal(auction); setModalActiveTab('overview'); }}
                     className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border border-yellow-500/40 text-xs font-bold text-yellow-300 flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md"
                   >
                     <Package size={14} />
-                    <span>Inspecionar Tudo o Que Tinha 🔍</span>
+                    <span>Inspecionar Dossiê do Char 🔍</span>
                   </button>
                 </div>
 
@@ -1541,7 +1640,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               <ChevronLeft size={16} />
             </button>
 
-            {/* Números das Páginas */}
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pNum = i + 1;
               if (totalPages > 5) {
@@ -1604,237 +1702,542 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
       )}
 
-      {/* 7. MODAL COMPLETO DE INSPEÇÃO: TUDO O QUE O PERSONAGEM TINHA! */}
-      {selectedAuctionModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-stone-950 border-2 border-yellow-500/50 rounded-3xl p-6 max-w-3xl w-full max-h-[92vh] overflow-y-auto space-y-6 shadow-2xl relative">
-            
-            <button
-              type="button"
-              onClick={() => setSelectedAuctionModal(null)}
-              className="absolute top-5 right-5 text-gray-400 hover:text-white p-2 rounded-xl bg-stone-900 hover:bg-stone-800 transition-colors"
-            >
-              <X size={18} />
-            </button>
+      {/* 7. MODAL DE INSPEÇÃO ULTRA-COMPLETO COM MÚLTIPLAS ABAS (ESTILO BAZAAR OFICIAL) */}
+      {selectedAuctionModal && (() => {
+        const char = selectedAuctionModal;
+        const fipe = char._fipe || calculateCharFipe(char);
+        const bid = Number(char.current_bid) || 0;
+        const telemetry = calculateCharTelemetry(char.level, char.vocation);
+        const quests = getCharacterQuestAccess(char.level);
+        const itemsList = Array.isArray(char.items_data) ? char.items_data : [];
+        const vocStr = formatVocation(char.vocation);
+        const isMage = vocStr.includes('Sorcerer') || vocStr.includes('Druid');
+        const isRP = vocStr.includes('Paladin');
+        const isEK = vocStr.includes('Knight');
+        const charmPts = Number(char.charm_points) || 0;
 
-            {/* Cabeçalho do Personagem */}
-            <div className="flex items-start gap-4">
-              <CharAvatar name={selectedAuctionModal.character_name} vocation={selectedAuctionModal.vocation} size="lg" />
+        const MODAL_TABS = [
+          { id: 'overview', label: 'Visão Geral', icon: <User size={14} /> },
+          { id: 'items', label: `Equipamentos (${itemsList.length})`, icon: <Package size={14} /> },
+          { id: 'skills', label: 'Skills & Combate', icon: <Sword size={14} /> },
+          { id: 'charms', label: `Charms (${charmPts})`, icon: <Star size={14} /> },
+          { id: 'quests', label: 'Acessos & Quests', icon: <Compass size={14} /> },
+          { id: 'fipe', label: 'Dossiê FIPE', icon: <DollarSign size={14} /> }
+        ];
 
-              <div>
-                <div className="text-xs text-yellow-400 font-bold uppercase tracking-wider flex items-center gap-2">
-                  <span>Leilão #{selectedAuctionModal.auction_id}</span>
-                  <span>•</span>
-                  <span className="text-yellow-300 font-mono">{selectedAuctionModal.world_name || 'Rubinot'}</span>
+        return (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-fadeIn">
+            <div className="bg-stone-950 border-2 border-yellow-500/50 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl relative overflow-hidden">
+              
+              {/* TOPO FIXO DO MODAL */}
+              <div className="p-5 sm:p-6 border-b border-stone-800 flex items-start justify-between gap-4 bg-gradient-to-r from-yellow-950/30 via-stone-950 to-stone-950 shrink-0">
+                <div className="flex items-start gap-3.5">
+                  <CharAvatar name={char.character_name} vocation={char.vocation} size="lg" />
+
+                  <div>
+                    <div className="text-[11px] text-yellow-400 font-bold uppercase tracking-wider flex items-center gap-2">
+                      <span>Leilão #{char.auction_id}</span>
+                      <span>•</span>
+                      <span className="text-yellow-300 font-mono">{char.world_name || 'Rubinot'}</span>
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-white mt-0.5 flex items-center gap-2">
+                      <span>{char.character_name}</span>
+                      {char.is_hunted && (
+                        <span className="text-xs px-2 py-0.5 bg-red-600 text-white rounded font-black uppercase">
+                          Hunted
+                        </span>
+                      )}
+                      {char._hasBis && (
+                        <span className="text-xs px-2 py-0.5 bg-purple-950 text-purple-300 border border-purple-500/50 rounded font-black uppercase">
+                          💎 Com BiS
+                        </span>
+                      )}
+                    </h2>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-400 flex-wrap">
+                      <span className="text-yellow-400 font-bold font-mono">Level {char.level}</span>
+                      <span>•</span>
+                      <span className="text-gray-200 font-medium">{vocStr}</span>
+                      <span>•</span>
+                      <span className="text-yellow-300 font-mono font-bold">{bid.toLocaleString()} TC</span>
+                    </div>
+                  </div>
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mt-0.5 flex items-center gap-2">
-                  <span>{selectedAuctionModal.character_name}</span>
-                  {selectedAuctionModal.is_hunted && (
-                    <span className="text-xs px-2 py-0.5 bg-red-600 text-white rounded font-black uppercase">
-                      Hunted
-                    </span>
-                  )}
-                  {selectedAuctionModal._hasBis && (
-                    <span className="text-xs px-2 py-0.5 bg-purple-950 text-purple-300 border border-purple-500/50 rounded font-black uppercase">
-                      💎 Com BiS
-                    </span>
-                  )}
-                </h2>
-                <div className="flex items-center gap-2 mt-1 text-xs sm:text-sm text-gray-400 flex-wrap">
-                  <span className="text-yellow-400 font-bold font-mono">Level {selectedAuctionModal.level}</span>
-                  <span>•</span>
-                  <span className="text-gray-200">{formatVocation(selectedAuctionModal.vocation)}</span>
-                  <span>•</span>
-                  <span className="text-purple-400 font-mono font-bold">{selectedAuctionModal.charm_points || 0} Charm Points</span>
-                </div>
-              </div>
-            </div>
 
-            {/* 1. INVENTÁRIO & ITENS DO PERSONAGEM (COM TIERS, FOTOS E IDENTIFICAÇÃO DE ITENS BONS) */}
-            <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Package size={15} /> Itens e Equipamentos Inclusos
-                </h3>
-                <span className="text-xs text-gray-500 font-mono">
-                  {Array.isArray(selectedAuctionModal.items_data) ? selectedAuctionModal.items_data.length : 0} itens detectados
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAuctionModal(null)}
+                  className="text-gray-400 hover:text-white p-2 rounded-xl bg-stone-900 hover:bg-stone-800 transition-colors shrink-0"
+                >
+                  <X size={20} />
+                </button>
               </div>
 
-              {Array.isArray(selectedAuctionModal.items_data) && selectedAuctionModal.items_data.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-60 overflow-y-auto custom-scrollbar p-1">
-                  {selectedAuctionModal.items_data.map((item, idx) => {
-                    const isSoul = item?.name && item.name.toLowerCase().includes('soul');
-                    const isFalcon = item?.name && item.name.toLowerCase().includes('falcon');
-                    const isSanguine = item?.name && item.name.toLowerCase().includes('sanguine');
-                    const isOtherBis = item?.name && BIS_KEYWORDS.some(k => item.name.toLowerCase().includes(k)) && !isSoul && !isFalcon && !isSanguine;
+              {/* BARRA DE NAVEGAÇÃO DE ABAS */}
+              <div className="flex items-center gap-1.5 px-5 pt-3 bg-stone-950/90 border-b border-stone-800 overflow-x-auto custom-scrollbar shrink-0">
+                {MODAL_TABS.map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setModalActiveTab(tab.id)}
+                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t-2 border-x border-b-0 whitespace-nowrap ${
+                      modalActiveTab === tab.id
+                        ? 'bg-stone-900 text-yellow-400 border-yellow-500/60 shadow-inner font-black'
+                        : 'bg-stone-950/50 text-gray-400 hover:text-gray-200 border-transparent hover:bg-stone-900/40'
+                    }`}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
 
-                    return (
-                      <div 
-                        key={idx} 
-                        className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition-all ${
-                          isSanguine
-                            ? 'bg-red-950/40 border-red-500/50 shadow-md shadow-red-900/20'
-                            : isSoul
-                            ? 'bg-purple-950/40 border-purple-500/50 shadow-md shadow-purple-900/20'
-                            : isFalcon
-                            ? 'bg-amber-950/40 border-amber-500/50 shadow-md shadow-amber-900/20'
-                            : isOtherBis
-                            ? 'bg-emerald-950/30 border-emerald-500/40 shadow-sm'
-                            : item.tier > 0 
-                            ? 'bg-cyan-950/30 border-cyan-500/40 shadow-sm shadow-cyan-500/10' 
-                            : 'bg-stone-950/80 border-stone-800/80'
-                        }`}
-                      >
-                        <div className="relative shrink-0">
-                          <img 
-                            src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
-                            alt={item?.name || 'Item'}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-9 h-9 object-contain bg-stone-900 rounded-lg p-1 border border-stone-700/50"
-                            onError={(e) => { e.target.style.display = 'none'; }}
-                          />
-                          {item.tier > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 bg-yellow-400 text-stone-950 text-[10px] font-black px-1 rounded-full shadow">
-                              T{item.tier}
-                            </span>
-                          )}
+              {/* CORPO ROLÁVEL COM CONTEÚDO DA ABA ATIVA */}
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
+
+                {/* ABA 1: VISÃO GERAL & TELEMETRIA */}
+                {modalActiveTab === 'overview' && (
+                  <div className="space-y-6 animate-fadeIn">
+                    {/* Status Vitais Calculados */}
+                    <div>
+                      <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Gauge size={14} className="text-yellow-400" /> Atributos Vitais do Personagem (Base Tibia)
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-1 text-center">
+                          <span className="text-[11px] text-red-400 font-bold flex items-center justify-center gap-1">
+                            <Heart size={13} /> Max Hit Points
+                          </span>
+                          <div className="text-xl font-black text-white font-mono">{telemetry.hp.toLocaleString()}</div>
+                          <span className="text-[10px] text-gray-500">HP Total Base</span>
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-white capitalize truncate" title={item?.name}>
-                            {item?.name}
+                        <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-1 text-center">
+                          <span className="text-[11px] text-blue-400 font-bold flex items-center justify-center gap-1">
+                            <Droplets size={13} /> Max Mana
+                          </span>
+                          <div className="text-xl font-black text-white font-mono">{telemetry.mp.toLocaleString()}</div>
+                          <span className="text-[10px] text-gray-500">Mana Pool Total</span>
+                        </div>
+
+                        <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-1 text-center">
+                          <span className="text-[11px] text-amber-300 font-bold flex items-center justify-center gap-1">
+                            <Package size={13} /> Capacidade (Cap)
+                          </span>
+                          <div className="text-xl font-black text-white font-mono">{telemetry.cap.toLocaleString()}</div>
+                          <span className="text-[10px] text-gray-500">Capacidade de Carga</span>
+                        </div>
+
+                        <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 space-y-1 text-center">
+                          <span className="text-[11px] text-emerald-400 font-bold flex items-center justify-center gap-1">
+                            <Zap size={13} /> Velocidade Base
+                          </span>
+                          <div className="text-xl font-black text-white font-mono">{telemetry.speed}</div>
+                          <span className="text-[10px] text-gray-500">Tiles por segundo</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Destaques Rápidos */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-4 space-y-2">
+                        <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider block">🛡️ Proteções e Status</span>
+                        <div className="space-y-1.5 text-xs text-gray-300">
+                          <div className="flex justify-between py-1 border-b border-stone-800">
+                            <span>Blessings Totais:</span>
+                            <span className="font-bold text-emerald-400">7/7 + Twist of Fate (100% Protegido)</span>
                           </div>
-                          <div className="text-[10px] text-gray-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            {item.count > 1 && <span>Qtd: {item.count}</span>}
-                            {item.tier > 0 && <span className="text-cyan-400 font-bold">Tier {item.tier}</span>}
-                            {isSanguine && <span className="text-red-400 font-black">🩸 Sanguine</span>}
-                            {isSoul && <span className="text-purple-400 font-black">💀 Soulwar</span>}
-                            {isFalcon && <span className="text-amber-400 font-black">🦅 Falcon</span>}
-                            {isOtherBis && <span className="text-emerald-400 font-black">💎 BiS</span>}
+                          <div className="flex justify-between py-1 border-b border-stone-800">
+                            <span>Promoção de Vocação:</span>
+                            <span className="font-bold text-white">Promovido ({vocStr})</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-stone-800">
+                            <span>Status de Hunted:</span>
+                            <span className={char.is_hunted ? 'font-bold text-red-400' : 'font-bold text-emerald-400'}>
+                              {char.is_hunted ? '⚠️ Hunted Ativo' : '🛡️ Livre de Hunted'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span>Servidor / Mundo:</span>
+                            <span className="font-bold text-yellow-300 font-mono">{char.world_name || 'Rubinot'}</span>
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="p-4 rounded-xl bg-stone-950/60 text-center text-xs text-gray-500">
-                  Nenhum item em destaque registrado para este personagem.
-                </div>
-              )}
-            </div>
 
-            {/* 2. TODAS AS HABILIDADES (SKILLS) COM DETALHES COMPLETOS */}
-            <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-5 space-y-3">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sword size={14} className="text-amber-400" /> Habilidades & Competências (Skills)
-              </h3>
+                      <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-4 space-y-2">
+                        <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider block">💰 Resumo do Leilão</span>
+                        <div className="space-y-1.5 text-xs text-gray-300">
+                          <div className="flex justify-between py-1 border-b border-stone-800">
+                            <span>Lance Atual:</span>
+                            <span className="font-bold text-white font-mono">{bid.toLocaleString()} TC (~R$ {(bid * 0.2).toFixed(2)})</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-stone-800">
+                            <span>Avaliação FIPE Justa:</span>
+                            <span className="font-bold text-yellow-400 font-mono">~{fipe.avgFipe.toLocaleString()} TC</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-stone-800">
+                            <span>Desconto de Mercado:</span>
+                            <span className={`font-bold ${fipe.discountPct > 0 ? 'text-emerald-400' : 'text-gray-400'}`}>
+                              {fipe.discountPct > 0 ? `${fipe.discountPct}% Abaixo da FIPE` : 'Preço de Tabela'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span>Lucro de Arbitragem:</span>
+                            <span className="font-bold text-emerald-400 font-mono">+{fipe.estimatedProfitTc.toLocaleString()} TC líquido</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
-                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
-                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
-                    <Wand2 size={12} className="text-blue-400" /> Magic Level
-                  </span>
-                  <div className="text-xl font-black text-blue-400 font-mono">{selectedAuctionModal.mag_level || '-'}</div>
-                </div>
+                {/* ABA 2: EQUIPAMENTOS & INVENTÁRIO COM BUSCA INTERNA */}
+                {modalActiveTab === 'items' && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-900/80 p-3 rounded-xl border border-stone-800">
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => setModalItemFilter('all')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${modalItemFilter === 'all' ? 'bg-yellow-500 text-stone-950 font-black' : 'bg-stone-950 text-gray-400 hover:text-white'}`}
+                        >
+                          Todos ({itemsList.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalItemFilter('bis')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${modalItemFilter === 'bis' ? 'bg-purple-900 text-purple-200 border border-purple-500/50 font-black' : 'bg-stone-950 text-gray-400 hover:text-white'}`}
+                        >
+                          💎 Apenas BiS
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalItemFilter('tiered')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${modalItemFilter === 'tiered' ? 'bg-cyan-900 text-cyan-200 border border-cyan-500/50 font-black' : 'bg-stone-950 text-gray-400 hover:text-white'}`}
+                        >
+                          ⚡ Com Tier
+                        </button>
+                      </div>
 
-                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
-                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
-                    <Target size={12} className="text-green-400" /> Distance
-                  </span>
-                  <div className="text-xl font-black text-green-400 font-mono">{selectedAuctionModal.skills_data?.dist || '-'}</div>
-                </div>
+                      <div className="relative w-full sm:w-60">
+                        <Search className="absolute left-2.5 top-2.5 text-gray-500" size={14} />
+                        <input
+                          type="text"
+                          placeholder="Buscar item no char..."
+                          value={modalItemSearch}
+                          onChange={(e) => setModalItemSearch(e.target.value)}
+                          className="w-full bg-stone-950 border border-stone-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500"
+                        />
+                      </div>
+                    </div>
 
-                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
-                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
-                    <Sword size={12} className="text-red-400" /> Espada (Sword)
-                  </span>
-                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.skills_data?.sword || '-'}</div>
-                </div>
+                    {modalFilteredItems.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto custom-scrollbar p-1">
+                        {modalFilteredItems.map((item, idx) => {
+                          const isSoul = item?.name && item.name.toLowerCase().includes('soul');
+                          const isFalcon = item?.name && item.name.toLowerCase().includes('falcon');
+                          const isSanguine = item?.name && item.name.toLowerCase().includes('sanguine');
+                          const isOtherBis = item?.name && BIS_KEYWORDS.some(k => item.name.toLowerCase().includes(k)) && !isSoul && !isFalcon && !isSanguine;
 
-                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
-                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
-                    <Sword size={12} className="text-orange-400" /> Machado (Axe)
-                  </span>
-                  <div className="text-xl font-black text-white font-mono">{selectedAuctionModal.skills_data?.axe || '-'}</div>
-                </div>
+                          return (
+                            <div 
+                              key={idx} 
+                              className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                                isSanguine
+                                  ? 'bg-red-950/40 border-red-500/60 shadow-md shadow-red-900/20'
+                                  : isSoul
+                                  ? 'bg-purple-950/40 border-purple-500/60 shadow-md shadow-purple-900/20'
+                                  : isFalcon
+                                  ? 'bg-amber-950/40 border-amber-500/60 shadow-md shadow-amber-900/20'
+                                  : isOtherBis
+                                  ? 'bg-emerald-950/30 border-emerald-500/40'
+                                  : item.tier > 0 
+                                  ? 'bg-cyan-950/30 border-cyan-500/40 shadow-sm' 
+                                  : 'bg-stone-900/70 border-stone-800'
+                              }`}
+                            >
+                              <div className="relative shrink-0">
+                                <img 
+                                  src={`https://api.increasesoft.com/api/images/item/${encodeURIComponent(item?.name || '')}?v=4`}
+                                  alt={item?.name || 'Item'}
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="w-10 h-10 object-contain bg-stone-950 rounded-lg p-1 border border-stone-700/60"
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                                {item.tier > 0 && (
+                                  <span className="absolute -top-1.5 -right-1.5 bg-yellow-400 text-stone-950 text-[10px] font-black px-1.5 rounded-full shadow">
+                                    T{item.tier}
+                                  </span>
+                                )}
+                              </div>
 
-                <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1">
-                  <span className="text-gray-400 text-[11px] flex items-center justify-center gap-1">
-                    <Shield size={12} className="text-stone-400" /> Shielding
-                  </span>
-                  <div className="text-xl font-black text-stone-300 font-mono">{selectedAuctionModal.skills_data?.shielding || '-'}</div>
-                </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold text-white capitalize truncate" title={item?.name}>
+                                  {item?.name}
+                                </div>
+                                <div className="text-[10px] text-gray-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  {item.count > 1 && <span>Qtd: {item.count}</span>}
+                                  {item.tier > 0 && <span className="text-cyan-400 font-bold">Tier {item.tier}</span>}
+                                  {isSanguine && <span className="text-red-400 font-black">🩸 Sanguine</span>}
+                                  {isSoul && <span className="text-purple-400 font-black">💀 Soulwar</span>}
+                                  {isFalcon && <span className="text-amber-400 font-black">🦅 Falcon</span>}
+                                  {isOtherBis && <span className="text-emerald-400 font-black">💎 BiS</span>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-8 rounded-2xl bg-stone-900/40 border border-stone-800 text-center text-xs text-gray-500">
+                        Nenhum item corresponde ao filtro ou busca selecionados.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ABA 3: SKILLS & COMBATE */}
+                {modalActiveTab === 'skills' && (
+                  <div className="space-y-6 animate-fadeIn">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                      <div className="bg-stone-900/90 p-3.5 rounded-xl border border-stone-800 space-y-1">
+                        <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
+                          <Wand2 size={13} className="text-blue-400" /> Magic Level
+                        </span>
+                        <div className="text-2xl font-black text-blue-400 font-mono">{char.mag_level || '-'}</div>
+                      </div>
+
+                      <div className="bg-stone-900/90 p-3.5 rounded-xl border border-stone-800 space-y-1">
+                        <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
+                          <Target size={13} className="text-green-400" /> Distance
+                        </span>
+                        <div className="text-2xl font-black text-green-400 font-mono">{char.skills_data?.dist || '-'}</div>
+                      </div>
+
+                      <div className="bg-stone-900/90 p-3.5 rounded-xl border border-stone-800 space-y-1">
+                        <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
+                          <Sword size={13} className="text-red-400" /> Espada (Sword)
+                        </span>
+                        <div className="text-2xl font-black text-white font-mono">{char.skills_data?.sword || '-'}</div>
+                      </div>
+
+                      <div className="bg-stone-900/90 p-3.5 rounded-xl border border-stone-800 space-y-1">
+                        <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
+                          <Sword size={13} className="text-orange-400" /> Machado (Axe)
+                        </span>
+                        <div className="text-2xl font-black text-white font-mono">{char.skills_data?.axe || '-'}</div>
+                      </div>
+
+                      <div className="bg-stone-900/90 p-3.5 rounded-xl border border-stone-800 space-y-1">
+                        <span className="text-gray-400 text-xs flex items-center justify-center gap-1">
+                          <Shield size={13} className="text-stone-400" /> Shielding
+                        </span>
+                        <div className="text-2xl font-black text-stone-300 font-mono">{char.skills_data?.shielding || '-'}</div>
+                      </div>
+                    </div>
+
+                    <div className="bg-stone-900/60 border border-stone-800 p-4 rounded-xl space-y-2">
+                      <div className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Flame size={15} /> Estimativa de Potencial de Combate
+                      </div>
+                      <p className="text-xs text-gray-300 leading-relaxed">
+                        {isMage && `Mago de combate com Magic Level ${char.mag_level}. Alta capacidade de dano em área com Waves e Ultimate Spells (Cataclysm / Hell's Core / Eternal Winter).`}
+                        {isRP && `Paladino de ataque à distância com Distance Fighting ${char.skills_data?.dist || '?'} e Magic Level ${char.mag_level}. Spam constante de Divine Caldera e Flechas de Diamante.`}
+                        {isEK && `Cavaleiro de frente com Melee Skill ${char._maxMelee || '?'} e Shielding ${char.skills_data?.shielding || '?'}. Grande sobrevivência para rotação de Exori Gran e Exori Mas.`}
+                        {!isMage && !isRP && !isEK && 'Personagem equilibrado para evolução em caçadas solo e em grupo.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ABA 4: CHARMS & BESTIÁRIO */}
+                {modalActiveTab === 'charms' && (
+                  <div className="space-y-5 animate-fadeIn">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-gradient-to-r from-purple-950/40 via-stone-900 to-stone-900 p-4 rounded-2xl border border-purple-500/30">
+                      <div>
+                        <div className="text-xs font-bold text-purple-300 uppercase tracking-wider">Pontuação de Charms Acumulada</div>
+                        <div className="text-3xl font-black text-white font-mono mt-0.5 flex items-center gap-2">
+                          <Star size={24} className="text-purple-400 fill-purple-400" />
+                          <span>{charmPts.toLocaleString()} <span className="text-xs text-purple-400 font-bold">pontos</span></span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          Equivale a aproximadamente ~{(charmPts / 800).toFixed(1)} Runas Maiores desbloqueáveis para caçadas.
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] text-gray-500 uppercase font-bold block">Valorização FIPE Estimada</span>
+                        <span className="text-lg font-mono font-bold text-amber-300">
+                          +{(charmPts * 0.3) | 0} TC
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <BookOpen size={14} className="text-purple-400" /> Runas Disponíveis no Meta
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {CHARM_RUNES.map(rune => {
+                          const canAfford = charmPts >= rune.cost;
+
+                          return (
+                            <div 
+                              key={rune.id} 
+                              className={`p-3 rounded-xl border flex items-start gap-3 ${
+                                canAfford 
+                                  ? 'bg-stone-900/90 border-purple-500/40' 
+                                  : 'bg-stone-950/60 border-stone-800/80 opacity-60'
+                              }`}
+                            >
+                              <span className="text-2xl shrink-0 mt-0.5">{rune.icon}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-white">{rune.name}</span>
+                                  <span className={`text-[11px] font-mono font-bold ${canAfford ? 'text-purple-400' : 'text-gray-500'}`}>
+                                    {rune.cost} pts
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-gray-400 mt-0.5">{rune.desc}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ABA 5: ACESSOS & QUESTS META */}
+                {modalActiveTab === 'quests' && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Compass size={15} className="text-yellow-400" /> Checklist de Prontidão de Quests e Acessos
+                    </div>
+
+                    <div className="space-y-2">
+                      {quests.map((q, idx) => (
+                        <div 
+                          key={idx}
+                          className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${
+                            q.unlocked 
+                              ? 'bg-stone-900/80 border-emerald-500/40 shadow-sm' 
+                              : 'bg-stone-950/60 border-stone-800 opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                              q.unlocked ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40' : 'bg-stone-900 text-gray-600 border border-stone-800'
+                            }`}>
+                              {q.unlocked ? <CheckCircle size={16} /> : <Lock size={16} />}
+                            </div>
+
+                            <div>
+                              <div className="text-xs font-bold text-white flex items-center gap-2">
+                                <span>{q.name}</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-stone-800 text-yellow-300 font-mono font-normal">
+                                  {q.tier}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-gray-400 mt-0.5">
+                                Recompensa: <span className="text-gray-200">{q.reward}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className={`text-xs font-bold font-mono ${q.unlocked ? 'text-emerald-400' : 'text-gray-500'}`}>
+                              {q.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ABA 6: DOSSIÊ FIPE & ARBITRAGEM */}
+                {modalActiveTab === 'fipe' && (
+                  <div className="space-y-5 animate-fadeIn">
+                    <div className="bg-gradient-to-r from-stone-900 via-amber-950/20 to-stone-900 border border-yellow-500/40 rounded-2xl p-5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <DollarSign size={15} /> Comparativo Financeiro Oficial RubinOT
+                        </h3>
+                        <span className="text-xs font-bold text-amber-300">
+                          {(fipe.discountPct || 0) > 0 ? `${fipe.discountPct}% Abaixo da FIPE` : 'Preço de Mercado'}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div className="bg-black/60 p-3.5 rounded-xl border border-stone-800">
+                          <span className="text-[10px] text-gray-400 uppercase font-bold block">Lance / Preço Pago</span>
+                          <div className="text-xl font-black text-white font-mono mt-0.5">{bid.toLocaleString()} TC</div>
+                        </div>
+
+                        <div className="bg-black/60 p-3.5 rounded-xl border border-stone-800">
+                          <span className="text-[10px] text-gray-400 uppercase font-bold block">Avaliação FIPE Justa</span>
+                          <div className="text-xl font-black text-yellow-400 font-mono mt-0.5">~{fipe.avgFipe.toLocaleString()} TC</div>
+                        </div>
+
+                        <div className="bg-black/60 p-3.5 rounded-xl border border-stone-800">
+                          <span className="text-[10px] text-gray-400 uppercase font-bold block">Lucro Líquido Revenda</span>
+                          <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">+{fipe.estimatedProfitTc.toLocaleString()} TC</div>
+                        </div>
+                      </div>
+
+                      {/* Discriminação de Composição */}
+                      <div className="p-3 bg-stone-950/80 rounded-xl border border-stone-800 space-y-1.5 text-xs text-gray-300 font-mono">
+                        <div className="flex justify-between py-1 border-b border-stone-800/80">
+                          <span>Base de Nível ({char.level} lvls x taxa {vocStr.split(' ')[0]}):</span>
+                          <span className="text-white font-bold">~{fipe.baseTc} TC</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-stone-800/80">
+                          <span>Bônus de Charms ({charmPts} pts):</span>
+                          <span className="text-purple-400 font-bold">+{fipe.charmsBonus} TC</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-stone-800/80">
+                          <span>Bônus de Itens Forjados com Tier:</span>
+                          <span className="text-cyan-400 font-bold">+{fipe.tierBonus} TC</span>
+                        </div>
+                        <div className="flex justify-between py-1 text-yellow-300 font-bold pt-1">
+                          <span>Valor FIPE Total Sugerido:</span>
+                          <span>{fipe.avgFipe} TC</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               </div>
+
+              {/* RODAPÉ FIXO DO MODAL COM LINKS OFICIAIS E COMPARTILHAMENTO */}
+              <div className="p-4 sm:p-5 border-t border-stone-800 bg-stone-950 flex flex-col sm:flex-row gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleShareAuction(char)}
+                  className="flex-1 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-700 font-bold text-xs text-gray-200 flex items-center justify-center gap-2 transition-colors"
+                >
+                  {copiedLink ? <Check size={16} className="text-emerald-400" /> : <Share2 size={16} />}
+                  {copiedLink ? 'Copiado para o Clipboard!' : 'Compartilhar no Discord/WhatsApp'}
+                </button>
+
+                <a
+                  href={`https://rubinot.com.br/bazaar/${char.auction_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 font-black text-stone-950 text-xs flex items-center justify-center gap-2 transition-all shadow-lg"
+                >
+                  <ExternalLink size={16} />
+                  <span>Abrir Leilão Oficial no RubinOT ↗</span>
+                </a>
+              </div>
+
             </div>
-
-            {/* 3. DOSSIÊ FINANCEIRO & AVALIAÇÃO FIPE RUBINOT */}
-            {(() => {
-              const modalFipe = selectedAuctionModal._fipe || calculateCharFipe(selectedAuctionModal);
-              const bid = Number(selectedAuctionModal.current_bid) || 0;
-
-              return (
-                <div className="bg-gradient-to-r from-stone-900 via-amber-950/20 to-stone-900 border border-yellow-500/40 rounded-2xl p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <DollarSign size={15} /> Comparativo com a Média de Mercado do RubinOT
-                    </h3>
-                    <span className="text-xs font-bold text-amber-300">
-                      {(modalFipe.discountPct || 0) > 0 ? `${modalFipe.discountPct}% Abaixo da FIPE` : 'Preço de Mercado'}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="bg-black/60 p-3 rounded-xl border border-stone-800">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Preço de Venda / Lance</span>
-                      <div className="text-xl font-black text-white font-mono mt-0.5">{bid.toLocaleString()} TC</div>
-                    </div>
-
-                    <div className="bg-black/60 p-3 rounded-xl border border-stone-800">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Avaliação FIPE Justa</span>
-                      <div className="text-xl font-black text-yellow-400 font-mono mt-0.5">~{modalFipe.avgFipe.toLocaleString()} TC</div>
-                    </div>
-
-                    <div className="bg-black/60 p-3 rounded-xl border border-stone-800">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Lucro Líquido Revenda</span>
-                      <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">+{modalFipe.estimatedProfitTc.toLocaleString()} TC</div>
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-gray-400">
-                    *Média calibrada diretamente contra o histórico dos 1.000 leilões mais recentes arrematados no RubinOT, considerando classe, level, bônus de charms (+{(selectedAuctionModal.charm_points || 0) * 0.3 | 0} TC) e itens tierizados.
-                  </p>
-                </div>
-              );
-            })()}
-
-            {/* BOTÕES DE AÇÃO DO MODAL */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => handleShareAuction(selectedAuctionModal)}
-                className="flex-1 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-700 font-bold text-xs text-gray-200 flex items-center justify-center gap-2 transition-colors"
-              >
-                {copiedLink ? <Check size={16} className="text-emerald-400" /> : <Share2 size={16} />}
-                {copiedLink ? 'Copiado para o Clipboard!' : 'Compartilhar no Discord/WhatsApp'}
-              </button>
-
-              <a
-                href={`https://rubinot.com.br/bazaar/${selectedAuctionModal.auction_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 font-black text-stone-950 text-xs flex items-center justify-center gap-2 transition-all shadow-lg"
-              >
-                <ExternalLink size={16} />
-                <span>Abrir Leilão Oficial no RubinOT ↗</span>
-              </a>
-            </div>
-
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* BANNER ADSENSE */}
       <div className="mt-4">
