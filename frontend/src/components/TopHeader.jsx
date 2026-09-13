@@ -119,7 +119,7 @@ export default function TopHeader({
             className="bg-transparent text-yellow-300 font-bold text-xs focus:outline-none cursor-pointer"
           >
             {WORLDS_LIST.map(w => (
-              <option key={w} value={w} className="bg-black text-gray-200">{w}</option>
+              <option key={w.id} value={w.id} className="bg-black text-gray-200">{w.name}</option>
             ))}
           </select>
         </div>

@@ -227,7 +227,7 @@ export default function StreamerCompanion({ onNavigate, onPlayerClick }) {
             className="bg-black/90 border border-tibia-border rounded-xl px-2.5 py-1 text-xs text-yellow-400 font-bold focus:outline-none focus:border-yellow-500"
           >
             {WORLDS_LIST.map(w => (
-              <option key={w} value={w}>Mundo: {w}</option>
+              <option key={w.id} value={w.id}>Mundo: {w.name}</option>
             ))}
           </select>
 
