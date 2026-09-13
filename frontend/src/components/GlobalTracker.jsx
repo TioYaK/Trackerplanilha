@@ -791,7 +791,7 @@ export default function GlobalTracker({ onPlayerClick }) {
                               <td className="py-3 px-4">
                                 <div className="flex items-center gap-2">
                                   <span 
-                                    onClick={() => onPlayerClick && onPlayerClick(p.character_name)}
+                                    onClick={() => onPlayerClick && onPlayerClick(p.character_name, p.world || (selectedWorld !== 'ALL' ? selectedWorld : null))}
                                     className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer"
                                   >
                                     {p.character_name}
@@ -844,7 +844,7 @@ export default function GlobalTracker({ onPlayerClick }) {
 
                               <td className="py-3 px-4 text-center">
                                 <button
-                                  onClick={() => onPlayerClick && onPlayerClick(p.character_name)}
+                                  onClick={() => onPlayerClick && onPlayerClick(p.character_name, p.world || (selectedWorld !== 'ALL' ? selectedWorld : null))}
                                   className="inline-flex items-center gap-1 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-xs px-2.5 py-1 rounded-lg transition-colors font-semibold"
                                 >
                                   Dossiê <ChevronRight size={12} />
@@ -1276,7 +1276,7 @@ export default function GlobalTracker({ onPlayerClick }) {
                 <div key={i} className="bg-black/50 p-3 rounded border border-gray-800">
                   <div className="flex justify-between items-center mb-1">
                     <span
-                      onClick={() => onPlayerClick && onPlayerClick(d.name)}
+                      onClick={() => onPlayerClick && onPlayerClick(d.name, selectedWorld !== 'ALL' ? selectedWorld : null)}
                       className="text-sm font-bold text-gray-300 cursor-pointer hover:text-red-400 hover:underline transition-colors"
                     >
                       {d.name}
@@ -1365,7 +1365,7 @@ export default function GlobalTracker({ onPlayerClick }) {
                 <div key={i} className="bg-black/40 p-4 rounded-lg border border-gray-800 flex flex-col justify-center items-center text-center">
                   <div className="w-10 h-10 bg-yellow-500/20 text-yellow-500 rounded-full flex items-center justify-center font-bold text-lg mb-2">#{i + 1}</div>
                   <span
-                    onClick={() => onPlayerClick && onPlayerClick(solo.name)}
+                    onClick={() => onPlayerClick && onPlayerClick(solo.name, selectedWorld !== 'ALL' ? selectedWorld : null)}
                     className="font-bold text-white block mb-1 truncate w-full cursor-pointer hover:text-tibia-primary hover:underline transition-colors"
                   >
                     {solo.name}

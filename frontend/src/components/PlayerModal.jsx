@@ -71,7 +71,7 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
       const lastActive = cState?.last_active || gMem?.last_xp_date || (deathsRes?.data?.[0]?.death_time);
 
       // 3. Determinação do Mundo
-      let detectedWorld = targetWorld || gPerk?.world;
+      let detectedWorld = targetWorld || (initialWorld && initialWorld !== 'ALL' ? initialWorld : null) || gPerk?.world;
       if (!detectedWorld && profile?.makers) {
         for (const [wName, cName] of Object.entries(profile.makers)) {
           if (cName && typeof cName === 'string' && cName.toLowerCase().includes(playerName.toLowerCase())) {
@@ -108,6 +108,8 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
         }
       }
 
+      const resolvedGuildName = profile?.makers?._guild || (gMem?.rank ? `${gMem.rank}` : (gMem ? 'Membro de Guilda' : null));
+
       setCharInfo({
         name: playerName,
         level,
@@ -115,7 +117,7 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
         xpTotal,
         isOnline,
         lastActive,
-        guildName: gMem ? 'Shellpatrocina / Battlestorm' : null,
+        guildName: resolvedGuildName,
         guildRank: gMem?.rank || null,
         isHunted: Boolean(hunted || deathsRes?.data?.[0]?.is_hunted)
       });

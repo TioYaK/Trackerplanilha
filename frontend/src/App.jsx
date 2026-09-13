@@ -30,7 +30,6 @@ const Contribute = lazy(() => import('./views/Contribute'));
 const AuthScreen = lazy(() => import('./views/AuthScreen'));
 const AdminPanel = lazy(() => import('./views/AdminPanel'));
 const AdminDashboard = lazy(() => import('./views/AdminDashboard'));
-const OnboardingScreen = lazy(() => import('./views/OnboardingScreen'));
 const WorkerDashboard = lazy(() => import('./views/WorkerDashboard'));
 const GuildPerks = lazy(() => import('./views/GuildPerks'));
 const GiveawayDraw = lazy(() => import('./views/GiveawayDraw'));
@@ -520,13 +519,12 @@ export default function App() {
       }
 
 
-      if (profile?.status !== 'active' && !isAdmin) {
+      if (profile?.status === 'banned' || profile?.status === 'suspended') {
         return (
-          <GuildGate 
-            featureName={featureTitles[currentView] || `Área Restrita da ${activeGuildName}`}
-            onLogin={() => navigateView('auth')}
-            onNavigate={navigateView}
-          />
+          <div className="p-8 max-w-xl mx-auto text-center my-12 bg-red-950/40 border border-red-500/50 rounded-2xl p-8 shadow-2xl">
+            <h3 className="text-2xl font-medieval text-red-400 mb-2">Conta Suspensa</h3>
+            <p className="text-gray-300 text-sm">Seu acesso a esta funcionalidade foi suspenso por um administrador.</p>
+          </div>
         );
       }
 

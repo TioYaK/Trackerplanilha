@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Landmark, Check, X, Search, ShieldAlert, Banknote, FileText, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Landmark, Check, X, Search, ShieldAlert, Banknote, FileText, Plus, ArrowUpRight, ArrowDownRight, Globe } from 'lucide-react';
 import { useAuth } from '../components/AuthContext';
+import { useWorld } from '../context/WorldContext';
 import { formatVocation } from '../lib/tibiaUtils';
 
 export default function GuildBank({ isAdmin }) {
   const { profile } = useAuth();
+  const { selectedWorld, setSelectedWorld, worlds } = useWorld();
   const [loading, setLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [payments, setPayments] = useState([]);
@@ -72,7 +74,20 @@ export default function GuildBank({ isAdmin }) {
         if (data.length < 1000) break;
         page++;
       }
-      return allRoster;
+
+      // Mapeia mundos através de guild_perk_members
+      const { data: perkMapData } = await supabase
+        .from('guild_perk_members')
+        .select('character_name, world');
+      const worldMap = new Map();
+      (perkMapData || []).forEach(p => {
+        if (p.character_name) worldMap.set(p.character_name.toLowerCase(), p.world);
+      });
+
+      return allRoster.map(m => ({
+        ...m,
+        world: worldMap.get((m.name || '').toLowerCase()) || 'Auroria'
+      }));
     };
 
     const fetchTxP = supabase
@@ -147,9 +162,13 @@ export default function GuildBank({ isAdmin }) {
     );
   }
 
-  const filteredRoster = roster.filter(m => (m.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()));
-  const totalCount = roster.length;
-  const paidCount = payments.length;
+  const filteredRoster = roster.filter(m => {
+    const matchSearch = (m.name || '').toLowerCase().includes((searchTerm || '').toLowerCase());
+    const matchWorld = selectedWorld === 'ALL' || (m.world || '').toLowerCase() === selectedWorld.toLowerCase();
+    return matchSearch && matchWorld;
+  });
+  const totalCount = filteredRoster.length;
+  const paidCount = payments.filter(p => filteredRoster.some(m => m.name?.toLowerCase() === p.character_name?.toLowerCase())).length;
   const tcTotal = paidCount * 250; // 250 TC por mensalidade
   
   const bankBalance = tcTotal + transactions.reduce((acc, curr) => {
@@ -159,13 +178,36 @@ export default function GuildBank({ isAdmin }) {
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full animate-fade-in relative">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-tibia-border pb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-tibia-border pb-4">
         <div>
           <h2 className="text-4xl font-medieval text-gradient-gold mb-2 flex items-center">
             <Landmark className="mr-3 text-yellow-500" size={36} />
             Tesouraria da Guilda
           </h2>
-          <p className="text-gray-400 font-sans">Administração de mensalidades e prestação de contas públicas.</p>
+          <p className="text-gray-400 font-sans">Administração de mensalidades e prestação de contas públicas para todos os servidores.</p>
+        </div>
+      </div>
+
+      {/* SELETOR UNIVERSAL DE MUNDOS */}
+      <div className="mb-6 p-4 rounded-xl bg-black/60 border border-yellow-500/20">
+        <div className="flex items-center gap-2 mb-2.5 text-xs text-yellow-400 font-bold uppercase tracking-wider">
+          <Globe size={14} /> Filtrar Tesouraria por Servidor:
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {worlds.map((w) => (
+            <button
+              key={w.id}
+              onClick={() => setSelectedWorld(w.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                selectedWorld.toLowerCase() === w.id.toLowerCase()
+                  ? 'bg-yellow-500 text-black shadow-md font-black'
+                  : 'bg-stone-900/80 hover:bg-stone-800 text-gray-300 border border-white/5'
+              }`}
+            >
+              <span>{w.icon}</span>
+              <span>{w.name}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -251,6 +293,7 @@ export default function GuildBank({ isAdmin }) {
                 <thead className="bg-black/60 text-gray-400 uppercase font-semibold sticky top-0 z-10">
                   <tr>
                     <th className="px-6 py-4">Membro</th>
+                    <th className="px-6 py-4">Mundo</th>
                     <th className="px-6 py-4">Vocação / Level</th>
                     <th className="px-6 py-4">Status de Pagamento</th>
                     <th className="px-6 py-4 text-right">Ação (Admin)</th>
@@ -258,12 +301,17 @@ export default function GuildBank({ isAdmin }) {
                 </thead>
                 <tbody className="divide-y divide-tibia-border/50">
                   {loading ? (
-                    <tr><td colSpan="4" className="text-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto"></div></td></tr>
+                    <tr><td colSpan="5" className="text-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto"></div></td></tr>
                   ) : filteredRoster.map(m => {
                     const isPaid = payments.some(p => p.character_name?.toLowerCase() === m.name?.toLowerCase());
                     return (
                       <tr key={m.name} className="hover:bg-white/5 transition-colors">
                         <td className="px-6 py-4 font-bold text-white">{m.name}</td>
+                        <td className="px-6 py-4">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-yellow-500/10 text-yellow-400 border border-yellow-500/30">
+                            {m.world || 'Auroria'}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-gray-400">{formatVocation(m.vocation)} <span className="text-xs bg-gray-800 px-1 rounded ml-1 border border-gray-700">Lvl {m.level}</span></td>
                         <td className="px-6 py-4">
                           {isPaid ? (
