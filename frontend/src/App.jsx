@@ -1,5 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import TopNav from './components/TopNav';
+import SidebarNav from './components/SidebarNav';
+import TopHeader from './components/TopHeader';
 import ErrorBoundary from './components/ErrorBoundary';
 import AdBanner from './components/AdBanner';
 import PremiumGate from './components/PremiumGate';
@@ -331,6 +333,21 @@ export default function App() {
   const [inspectedPlayerWorld, setInspectedPlayerWorld] = useState(null);
   const [previousView, setPreviousView] = useState('home');
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar_collapsed') === 'true';
+    }
+    return false;
+  });
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+
+  const handleToggleSidebarCollapsed = (collapsed) => {
+    setSidebarCollapsed(collapsed);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar_collapsed', String(collapsed));
+    }
+  };
 
   // Atalho Global de Busca Rápida: Ctrl + K ou Cmd + K
   useEffect(() => {
@@ -799,19 +816,39 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex flex-col">
-      <TopNav
+    <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex overflow-x-hidden">
+      {/* Menu Lateral Gamer (Sidebar Navigation) */}
+      <SidebarNav
         currentView={currentView}
         setCurrentView={navigateView}
         isAdmin={isAdmin}
         isPremium={isPremium}
-        hasActiveWorker={hasActiveWorker}
-        isGuildMember={isGuildMember}
         user={user}
         profile={profile}
-        visibleTabs={visibleTabs ?? DEFAULT_VISIBLE_TABS}
-        onOpenSearch={() => setSearchModalOpen(true)}
+        isCollapsed={sidebarCollapsed}
+        setIsCollapsed={handleToggleSidebarCollapsed}
+        mobileOpen={sidebarMobileOpen}
+        setMobileOpen={setSidebarMobileOpen}
+        onOpenProfile={() => setProfileModalOpen(true)}
       />
+
+      {/* Conteúdo Principal ao lado da Sidebar */}
+      <div className={`flex flex-col flex-1 min-w-0 min-h-screen transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-64 sm:lg:pl-72'}`}>
+        
+        {/* Barra Superior Minimalista */}
+        <TopHeader
+          currentView={currentView}
+          setCurrentView={navigateView}
+          onOpenSearch={() => setSearchModalOpen(true)}
+          onToggleMobile={() => setSidebarMobileOpen(prev => !prev)}
+          isCollapsed={sidebarCollapsed}
+          setIsCollapsed={handleToggleSidebarCollapsed}
+          user={user}
+          profile={profile}
+          isAdmin={isAdmin}
+          isPremium={isPremium}
+          onOpenProfile={() => setProfileModalOpen(true)}
+        />
       
       {/* Banner de Publicidade Oficial (nunca exibe em telas de login ou institucionais para cumprir regras do AdSense) */}
       {!['auth', 'privacy', 'terms', 'about'].includes(currentView) && (
@@ -829,6 +866,12 @@ export default function App() {
       </main>
 
       <Footer onNavigate={navigateView} />
+      </div>
+
+      {/* Modal de Perfil Global */}
+      {profileModalOpen && (
+        <ProfileModal onClose={() => setProfileModalOpen(false)} />
+      )}
 
       {inspectedPlayer && (
         <PlayerModal
