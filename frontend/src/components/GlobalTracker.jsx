@@ -1,10 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
-import { AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users, DollarSign, Clock, Network, FileText } from 'lucide-react';
+import { 
+  AlertCircle, Brain, Target, TrendingUp, TrendingDown, Users, DollarSign, Clock, 
+  Network, FileText, Search, Globe, Shield, Activity, ChevronRight, ChevronLeft, 
+  RefreshCw, Flame, User, Swords, Zap, ExternalLink 
+} from 'lucide-react';
 import { formatVocation } from '../lib/tibiaUtils';
 
 export default function GlobalTracker({ onPlayerClick }) {
+  // Aba Ativa: 'server' (Monitor Global de Todo o Servidor) | 'war_room' (Sala de Guerra da Guilda)
+  const [activeTab, setActiveTab] = useState('server');
+
+  // Estados do Monitor Global do Servidor
+  const [serverPlayers, setServerPlayers] = useState([]);
+  const [totalServerPlayers, setTotalServerPlayers] = useState(0);
+  const [playersLoading, setPlayersLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [vocFilter, setVocFilter] = useState('ALL');
+  const [affiliationFilter, setAffiliationFilter] = useState('ALL'); // 'ALL' | 'guild' | 'hunted'
+  const [sortField, setSortField] = useState('level'); // 'level' | 'xp_gained' | 'last_active'
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 40;
+
+  const [guildSet, setGuildSet] = useState(new Set());
+  const [huntedSet, setHuntedSet] = useState(new Set());
+
   const [census, setCensus] = useState({ total_members: 0, active_members: 0 });
   const [barData, setBarData] = useState([]);
   const [hunters, setHunters] = useState(0);
@@ -399,6 +420,126 @@ export default function GlobalTracker({ onPlayerClick }) {
     fetchCensus();
   }, []);
 
+  // Busca lista de afiliações para badges (Guilda Battle Storm & Hunteds)
+  const fetchAffiliations = async () => {
+    try {
+      const [{ data: gData }, { data: hData }] = await Promise.all([
+        supabase.from('guild_members').select('name'),
+        supabase.from('hunted_list').select('name')
+      ]);
+      if (gData) setGuildSet(new Set(gData.filter(g => g?.name).map(g => g.name.toLowerCase())));
+      if (hData) setHuntedSet(new Set(hData.filter(h => h?.name).map(h => h.name.toLowerCase())));
+    } catch (e) {
+      console.warn('Erro ao carregar afiliações:', e);
+    }
+  };
+
+  // Carrega jogadores rastreados de todo o servidor
+  const fetchServerPlayers = async () => {
+    setPlayersLoading(true);
+    try {
+      let query = supabase
+        .from('current_character_state')
+        .select('character_name, level, vocation, xp_total, last_active, session_start_xp', { count: 'exact' })
+        .not('level', 'is', null);
+
+      if (searchTerm.trim()) {
+        query = query.ilike('character_name', `%${searchTerm.trim()}%`);
+      }
+
+      if (vocFilter !== 'ALL') {
+        query = query.ilike('vocation', `%${vocFilter}%`);
+      }
+
+      if (sortField === 'level') {
+        query = query.order('level', { ascending: false });
+      } else if (sortField === 'last_active') {
+        query = query.order('last_active', { ascending: false, nullsFirst: false });
+      } else {
+        query = query.order('level', { ascending: false });
+      }
+
+      query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      const { data, count, error } = await query;
+
+      if (data && data.length > 0) {
+        const names = data.map(d => d.character_name);
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: histData } = await supabase
+          .from('historical_sessions')
+          .select('character_name, xp_gained')
+          .in('character_name', names)
+          .gte('session_end', twentyFourHoursAgo);
+
+        const histMap = new Map();
+        if (histData) {
+          histData.forEach(h => {
+            const current = histMap.get(h.character_name.toLowerCase()) || 0;
+            histMap.set(h.character_name.toLowerCase(), current + Number(h.xp_gained || 0));
+          });
+        }
+
+        const merged = data.map(p => {
+          const activeDelta = Math.max(0, Number(p.xp_total || 0) - Number(p.session_start_xp || p.xp_total || 0));
+          const pastDelta = histMap.get(p.character_name.toLowerCase()) || 0;
+          return {
+            ...p,
+            xp_gained_24h: pastDelta + activeDelta
+          };
+        });
+
+        if (sortField === 'xp_gained') {
+          merged.sort((a, b) => b.xp_gained_24h - a.xp_gained_24h);
+        }
+
+        setServerPlayers(merged);
+        setTotalServerPlayers(count || 0);
+      } else {
+        setServerPlayers([]);
+        setTotalServerPlayers(count || 0);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar server players:', err);
+    } finally {
+      setPlayersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAffiliations();
+  }, []);
+
+  useEffect(() => {
+    fetchServerPlayers();
+  }, [searchTerm, vocFilter, sortField, page]);
+
+  const formatCompactXp = (num) => {
+    if (!num) return '0';
+    const n = Number(num);
+    if (isNaN(n)) return '0';
+    if (n >= 1000000000) return `${(n / 1000000000).toFixed(2)}B`;
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(0)}k`;
+    return n.toLocaleString();
+  };
+
+  const formatTimeAgo = (isoStr) => {
+    if (!isoStr) return 'Desconhecido';
+    try {
+      const d = new Date(isoStr.endsWith('Z') ? isoStr : isoStr + 'Z');
+      const diffMs = Date.now() - d.getTime();
+      const mins = Math.floor(diffMs / 60000);
+      if (mins < 1) return 'Agora mesmo';
+      if (mins < 60) return `há ${mins}m`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `há ${hours}h`;
+      const days = Math.floor(hours / 24);
+      return `há ${days}d`;
+    } catch {
+      return 'Recentemente';
+    }
+  };
+
   const pieData = [
     { name: 'Ativos (7 dias)', value: parseInt(census.active_members) || 0, color: '#10B981' }, 
     { name: 'Inativos', value: (parseInt(census.total_members) || 0) - (parseInt(census.active_members) || 0), color: '#374151' } 
@@ -417,19 +558,316 @@ export default function GlobalTracker({ onPlayerClick }) {
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
-        <div>
-          <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Sala de Guerra (War Room)</h2>
-          <p className="text-gray-400 font-sans">Business Intelligence e comportamento estratégico da guilda Battle Storm (Shellpatrocina).</p>
+      {/* SELETOR DE ABAS PRINCIPAL */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8 pb-4 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveTab('server')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medieval text-sm transition-all shadow-md ${
+              activeTab === 'server'
+                ? 'bg-gradient-to-r from-yellow-600 to-amber-700 text-black font-bold shadow-yellow-500/20'
+                : 'bg-black/60 border border-white/10 text-gray-300 hover:text-white hover:border-yellow-500/40'
+            }`}
+          >
+            <Globe size={18} />
+            Monitor Global de Jogadores
+            {totalServerPlayers > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-xs font-sans ${
+                activeTab === 'server' ? 'bg-black/40 text-yellow-300' : 'bg-white/10 text-gray-400'
+              }`}>
+                {totalServerPlayers.toLocaleString()}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('war_room')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medieval text-sm transition-all shadow-md ${
+              activeTab === 'war_room'
+                ? 'bg-gradient-to-r from-yellow-600 to-amber-700 text-black font-bold shadow-yellow-500/20'
+                : 'bg-black/60 border border-white/10 text-gray-300 hover:text-white hover:border-yellow-500/40'
+            }`}
+          >
+            <Shield size={18} />
+            Sala de Guerra & BI (Battle Storm)
+          </button>
         </div>
-        <button 
-          onClick={generateDiscordReport}
-          className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2 px-4 rounded shadow-[0_0_15px_rgba(88,101,242,0.5)] flex items-center transition-all"
-        >
-          <FileText className="mr-2" size={20} />
-          Jornal Diário (Discord)
-        </button>
+
+        {activeTab === 'war_room' && (
+          <button 
+            onClick={generateDiscordReport}
+            className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2 px-4 rounded-xl shadow-[0_0_15px_rgba(88,101,242,0.4)] flex items-center gap-2 transition-all text-sm"
+          >
+            <FileText size={18} />
+            Jornal Diário (Discord)
+          </button>
+        )}
       </div>
+
+      {activeTab === 'server' ? (
+        <div className="space-y-6">
+          {/* HEADER DA ABA GLOBAL */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-tibia-border">
+            <div>
+              <h2 className="text-3xl sm:text-4xl font-medieval text-gradient-gold">Monitor Global do Servidor</h2>
+              <p className="text-gray-400 text-xs sm:text-sm font-sans mt-1">
+                Telemetria e atividade contínua de todos os personagens rastreados nos mundos de Rubinot.
+              </p>
+            </div>
+
+            {/* BADGES RÁPIDAS */}
+            <div className="flex flex-wrap gap-2 text-xs">
+              <div className="bg-black/60 border border-white/10 rounded-xl px-3 py-1.5 flex items-center gap-2">
+                <Users size={14} className="text-yellow-400" />
+                <span className="text-gray-400">Rastreados:</span>
+                <strong className="text-white">{totalServerPlayers.toLocaleString()}</strong>
+              </div>
+              <div className="bg-black/60 border border-white/10 rounded-xl px-3 py-1.5 flex items-center gap-2">
+                <Flame size={14} className="text-green-400" />
+                <span className="text-gray-400">Caçando Hoje:</span>
+                <strong className="text-green-400">
+                  {serverPlayers.filter(p => (p.xp_gained_24h || 0) > 0).length}+
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {/* BARRA DE FILTROS & BUSCA */}
+          <div className="bg-black/60 border border-tibia-border rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Input de Busca */}
+            <div className="relative w-full md:w-80">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(0);
+                }}
+                placeholder="Buscar personagem..."
+                className="w-full bg-black/80 border border-white/15 rounded-xl px-4 py-2.5 pl-10 text-sm text-white focus:outline-none focus:border-yellow-500 shadow-inner"
+              />
+              <Search className="absolute left-3 top-3 text-gray-400" size={16} />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-2.5 text-gray-500 hover:text-white text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Selects de Filtros */}
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              {/* Filtro de Vocação */}
+              <select
+                value={vocFilter}
+                onChange={(e) => {
+                  setVocFilter(e.target.value);
+                  setPage(0);
+                }}
+                className="bg-black/80 border border-white/15 text-xs text-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-yellow-500"
+              >
+                <option value="ALL">Todas as Vocações</option>
+                <option value="Knight">Knights (EK)</option>
+                <option value="Druid">Druids (ED)</option>
+                <option value="Sorcerer">Sorcerers (MS)</option>
+                <option value="Paladin">Paladins (RP)</option>
+                <option value="Monk">Monks</option>
+              </select>
+
+              {/* Filtro de Afiliação */}
+              <select
+                value={affiliationFilter}
+                onChange={(e) => setAffiliationFilter(e.target.value)}
+                className="bg-black/80 border border-white/15 text-xs text-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-yellow-500"
+              >
+                <option value="ALL">Todas as Afiliações</option>
+                <option value="guild">🛡️ Guilda Battle Storm</option>
+                <option value="hunted">💀 Rivais / Hunted</option>
+              </select>
+
+              {/* Ordenação */}
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+                className="bg-black/80 border border-white/15 text-xs text-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-yellow-500"
+              >
+                <option value="level">Ordenar por Nível</option>
+                <option value="xp_gained">Ordenar por XP Ganho (24h)</option>
+                <option value="last_active">Atividade Mais Recente</option>
+              </select>
+            </div>
+          </div>
+
+          {/* LISTA / TABELA DE JOGADORES */}
+          {playersLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-3">
+              <div className="w-10 h-10 border-2 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
+              <div className="text-yellow-500 font-medieval text-sm animate-pulse">
+                Carregando dados globais do servidor...
+              </div>
+            </div>
+          ) : (
+            (() => {
+              const displayed = serverPlayers.filter(p => {
+                const nameLower = (p.character_name || '').toLowerCase();
+                if (affiliationFilter === 'guild') return guildSet.has(nameLower);
+                if (affiliationFilter === 'hunted') return huntedSet.has(nameLower);
+                return true;
+              });
+
+              if (displayed.length === 0) {
+                return (
+                  <div className="text-center py-16 bg-black/40 border border-white/10 rounded-2xl">
+                    <p className="text-gray-400 font-sans text-sm">Nenhum personagem encontrado com os filtros atuais.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="bg-tibia-card border-2 border-tibia-border rounded-2xl shadow-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm text-gray-300">
+                      <thead className="bg-black/80 text-gray-400 text-xs uppercase tracking-wider font-sans border-b border-tibia-border">
+                        <tr>
+                          <th className="py-3.5 px-4">#</th>
+                          <th className="py-3.5 px-4">Personagem</th>
+                          <th className="py-3.5 px-4">Vocação</th>
+                          <th className="py-3.5 px-4">Nível</th>
+                          <th className="py-3.5 px-4">XP Total</th>
+                          <th className="py-3.5 px-4 text-right">Ganho 24h</th>
+                          <th className="py-3.5 px-4 text-right">Última Atividade</th>
+                          <th className="py-3.5 px-4 text-center">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 font-sans">
+                        {displayed.map((p, idx) => {
+                          const nameLower = (p.character_name || '').toLowerCase();
+                          const isGuild = guildSet.has(nameLower);
+                          const isHunted = huntedSet.has(nameLower);
+
+                          const voc = formatVocation(p.vocation);
+                          const vocColor = 
+                            voc.includes('Knight') ? 'text-blue-400' :
+                            voc.includes('Druid') ? 'text-green-400' :
+                            voc.includes('Sorcerer') ? 'text-red-400' :
+                            voc.includes('Paladin') ? 'text-yellow-400' :
+                            voc.includes('Monk') ? 'text-purple-400' : 'text-gray-400';
+
+                          return (
+                            <tr 
+                              key={idx}
+                              className="hover:bg-white/[0.03] transition-colors group"
+                            >
+                              <td className="py-3 px-4 text-xs text-gray-500 font-mono">
+                                {page * PAGE_SIZE + idx + 1}
+                              </td>
+
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <span 
+                                    onClick={() => onPlayerClick && onPlayerClick(p.character_name)}
+                                    className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer"
+                                  >
+                                    {p.character_name}
+                                  </span>
+
+                                  {isGuild && (
+                                    <span className="bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0">
+                                      🛡️ Battle Storm
+                                    </span>
+                                  )}
+                                  {isHunted && (
+                                    <span className="bg-red-500/20 border border-red-500/40 text-red-300 text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0">
+                                      💀 Rival
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              <td className={`py-3 px-4 text-xs font-semibold ${vocColor}`}>
+                                {voc}
+                              </td>
+
+                              <td className="py-3 px-4 font-mono font-bold text-white">
+                                {p.level}
+                              </td>
+
+                              <td className="py-3 px-4 font-mono text-xs text-gray-400">
+                                {formatCompactXp(p.xp_total)} XP
+                              </td>
+
+                              <td className="py-3 px-4 text-right font-mono text-xs">
+                                {p.xp_gained_24h > 0 ? (
+                                  <span className="text-green-400 font-bold bg-green-950/40 border border-green-500/30 px-2 py-0.5 rounded">
+                                    +{formatCompactXp(p.xp_gained_24h)}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-600">-</span>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-4 text-right text-xs text-gray-400 font-sans">
+                                {formatTimeAgo(p.last_active)}
+                              </td>
+
+                              <td className="py-3 px-4 text-center">
+                                <button
+                                  onClick={() => onPlayerClick && onPlayerClick(p.character_name)}
+                                  className="inline-flex items-center gap-1 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-xs px-2.5 py-1 rounded-lg transition-colors font-semibold"
+                                >
+                                  Dossiê <ChevronRight size={12} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* PAGINADOR */}
+                  <div className="flex items-center justify-between p-4 bg-black/60 border-t border-tibia-border text-xs text-gray-400">
+                    <div>
+                      Mostrando {page * PAGE_SIZE + 1} a {Math.min((page + 1) * PAGE_SIZE, totalServerPlayers)} de {totalServerPlayers.toLocaleString()} personagens
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPage(p => Math.max(0, p - 1))}
+                        disabled={page === 0}
+                        className="px-3 py-1.5 rounded-lg bg-black/60 border border-white/10 hover:border-yellow-500/40 disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1 text-white font-bold"
+                      >
+                        <ChevronLeft size={14} /> Anterior
+                      </button>
+
+                      <span className="px-3 py-1 font-bold text-yellow-400">
+                        Página {page + 1} de {Math.max(1, Math.ceil(totalServerPlayers / PAGE_SIZE))}
+                      </span>
+
+                      <button
+                        onClick={() => setPage(p => p + 1)}
+                        disabled={(page + 1) * PAGE_SIZE >= totalServerPlayers}
+                        className="px-3 py-1.5 rounded-lg bg-black/60 border border-white/10 hover:border-yellow-500/40 disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1 text-white font-bold"
+                      >
+                        Próxima <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          )}
+        </div>
+      ) : (
+        <div>
+          <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
+            <div>
+              <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Sala de Guerra (War Room)</h2>
+              <p className="text-gray-400 font-sans">Business Intelligence e comportamento estratégico da guilda Battle Storm (Shellpatrocina).</p>
+            </div>
+          </div>
 
       {loading ? (
         <div className="flex justify-center items-center py-20">
@@ -913,6 +1351,8 @@ export default function GlobalTracker({ onPlayerClick }) {
 
       </div>
     )}
+    </div>
+  )}
   </div>
 );
 }

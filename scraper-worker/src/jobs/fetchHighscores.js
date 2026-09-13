@@ -53,10 +53,11 @@ export const runFetchHighscores = async (vocationStr) => {
     }
 
     const memberNames = new Set(allGuildMembers.filter(m => m && m.name).map(m => m.name.toLowerCase()));
-    const relevantPlayers = players.filter(p => p && p.name && memberNames.has(p.name.toLowerCase()));
+    // RASTREAMENTO GLOBAL: Monitora todos os jogadores do servidor (não descarta mais não-membros)
+    const relevantPlayers = players.filter(p => p && p.name);
     
     if (relevantPlayers.length === 0) {
-      console.log(`[JOB] Nenhum membro relevante encontrado nos highscores.`);
+      console.log(`[JOB] Nenhum jogador encontrado nos highscores.`);
       return;
     }
 
@@ -94,7 +95,9 @@ export const runFetchHighscores = async (vocationStr) => {
           session_start_xp = existing.session_start_xp || existing.xp_total;
           session_start_time = existing.session_start_time || now;
           last_active = now; // Update last active
-          activeNames.push(player.name);
+          if (memberNames.has(player.name.toLowerCase())) {
+            activeNames.push(player.name);
+          }
         } else {
           // Não ganhou XP, manter os dados antigos (só atualizamos se mudou de level, etc)
           session_start_xp = existing.session_start_xp;

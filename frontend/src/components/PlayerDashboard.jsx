@@ -9,7 +9,7 @@ import { ptBR } from 'date-fns/locale';
 
 import { parseUtcDate, toBrtDateStr, formatVocation } from '../lib/tibiaUtils';
 
-export default function PlayerDashboard({ playerName, isAdmin }) {
+export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer }) {
   const [telemetry, setTelemetry] = useState([]);
   const [strikes, setStrikes] = useState([]);
   const [stats, setStats] = useState({ ghostSlots: 0, totalHours: 0 });
@@ -26,6 +26,11 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
   const [showMakerModal, setShowMakerModal] = useState(false);
   const [makersData, setMakersData] = useState([]);
   const [makersLoading, setMakersLoading] = useState(false);
+  
+  // Busca e Seleção Rápida de Personagens
+  const [quickSearch, setQuickSearch] = useState('');
+  const [quickResults, setQuickResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const fetchData = async () => {
     if (!playerName) return;
@@ -437,10 +442,125 @@ export default function PlayerDashboard({ playerName, isAdmin }) {
     }
   };
 
-  if (!playerName) return <div className="text-gray-400">Selecione um jogador no Roster da Guilda.</div>;
+  const handleSearchSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!quickSearch.trim()) return;
+    setIsSearching(true);
+    try {
+      const { data } = await supabase
+        .from('current_character_state')
+        .select('character_name, level, vocation')
+        .ilike('character_name', `%${quickSearch.trim()}%`)
+        .limit(8);
+      setQuickResults(data || []);
+      if (data && data.length === 1 && onSelectPlayer) {
+        onSelectPlayer(data[0].character_name);
+        setQuickResults([]);
+        setQuickSearch('');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  if (!playerName) {
+    return (
+      <div className="max-w-3xl mx-auto py-12 px-4 animate-fade-in text-center">
+        <div className="bg-black/80 border-2 border-yellow-500/40 rounded-2xl p-8 shadow-2xl backdrop-blur-md">
+          <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center text-yellow-400 mx-auto mb-4">
+            <Search size={32} />
+          </div>
+          <h2 className="text-3xl font-medieval text-gradient-gold mb-2">Investigação Global de Jogador</h2>
+          <p className="text-gray-300 text-sm font-sans mb-6 max-w-lg mx-auto">
+            Pesquise qualquer personagem rastreado no Rubinot para visualizar em tempo real a curva de XP, sessões de caça, históricos de morte e horários de atividade.
+          </p>
+
+          <form onSubmit={handleSearchSubmit} className="relative max-w-md mx-auto mb-6">
+            <input 
+              type="text"
+              value={quickSearch}
+              onChange={(e) => {
+                setQuickSearch(e.target.value);
+                if (!e.target.value) setQuickResults([]);
+              }}
+              placeholder="Digite o nome do personagem..."
+              className="w-full bg-black/90 border border-yellow-500/40 rounded-xl px-4 py-3 pl-11 text-white text-sm focus:outline-none focus:border-yellow-400 shadow-inner"
+            />
+            <Search className="absolute left-3.5 top-3.5 text-gray-400" size={18} />
+            <button 
+              type="submit"
+              disabled={isSearching || !quickSearch.trim()}
+              className="absolute right-2 top-2 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 text-yellow-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-40"
+            >
+              {isSearching ? 'Buscando...' : 'Buscar'}
+            </button>
+          </form>
+
+          {quickResults.length > 0 && (
+            <div className="max-w-md mx-auto bg-black/95 border border-yellow-500/30 rounded-xl divide-y divide-white/5 text-left overflow-hidden shadow-2xl">
+              {quickResults.map((r, i) => (
+                <div 
+                  key={i}
+                  onClick={() => {
+                    if (onSelectPlayer) onSelectPlayer(r.character_name);
+                    setQuickResults([]);
+                    setQuickSearch('');
+                  }}
+                  className="p-3 hover:bg-yellow-950/30 cursor-pointer flex items-center justify-between transition-colors"
+                >
+                  <span className="font-bold text-white text-sm">{r.character_name}</span>
+                  <span className="text-xs text-gray-400">{r.vocation} • Lvl {r.level}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Barra de Pesquisa Rápida Superior */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-black/60 border border-tibia-border rounded-xl p-3 px-4 shadow-lg">
+        <div className="text-xs text-gray-400">
+          Investigando personagem: <strong className="text-white">{playerName}</strong>
+        </div>
+
+        <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-80">
+          <input 
+            type="text"
+            value={quickSearch}
+            onChange={(e) => {
+              setQuickSearch(e.target.value);
+              if (!e.target.value) setQuickResults([]);
+            }}
+            placeholder="Trocar de jogador..."
+            className="w-full bg-black/80 border border-white/15 rounded-lg px-3 py-1.5 pl-8 text-xs text-white focus:outline-none focus:border-yellow-500"
+          />
+          <Search className="absolute left-2.5 top-2 text-gray-400" size={14} />
+          {quickResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-black/95 border border-yellow-500/40 rounded-lg shadow-2xl divide-y divide-white/5 max-h-60 overflow-y-auto">
+              {quickResults.map((r, i) => (
+                <div 
+                  key={i}
+                  onClick={() => {
+                    if (onSelectPlayer) onSelectPlayer(r.character_name);
+                    setQuickResults([]);
+                    setQuickSearch('');
+                  }}
+                  className="p-2 hover:bg-yellow-950/40 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                >
+                  <span className="font-bold text-white">{r.character_name}</span>
+                  <span className="text-gray-400">{r.vocation} • Lvl {r.level}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </form>
+      </div>
       
       {/* Player Header */}
       <div className="bg-tibia-card border border-tibia-border rounded-lg p-6 shadow-xl flex flex-col md:flex-row justify-between items-center animate-fade-in relative overflow-hidden">

@@ -183,7 +183,7 @@ export default function App() {
         <div className="p-8 max-w-7xl mx-auto w-full">
           <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Investigação de Membro</h2>
           <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência, histórico criminal e telemetria do jogador.</p>
-          <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} />
+          <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} onSelectPlayer={setSelectedPlayer} />
         </div>
       );
     }
