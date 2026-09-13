@@ -52,6 +52,11 @@ export default function Footer({ onNavigate }) {
                 </button>
               </li>
               <li>
+                <button onClick={() => onNavigate && onNavigate('versus')} className="hover:text-yellow-400 transition-colors cursor-pointer text-left">
+                  ⚔️ Comparador Versus (Duelos)
+                </button>
+              </li>
+              <li>
                 <button onClick={() => onNavigate && onNavigate('guides')} className="hover:text-yellow-400 transition-colors cursor-pointer text-left">
                   📜 Guias & Estratégias (Artigos)
                 </button>

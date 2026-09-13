@@ -9,6 +9,7 @@ import { GUIDES_INDEX } from '../data/guidesIndex';
 
 const APP_ROUTES = [
   { id: 'bazaar', label: 'Bazaar Sniper (Leilões)', desc: 'Radar de arbitragem e leilões de personagens', icon: Gem, category: 'Módulo' },
+  { id: 'versus', label: 'Comparador Versus ⚔️', desc: 'Simulador de duelo e histórico head-to-head entre 2 guerreiros', icon: Swords, category: 'PvP' },
   { id: 'attendance', label: 'Killboard de Guerra & Frags', desc: 'Feed de abates em tempo real e Most Wanted', icon: Swords, category: 'Módulo' },
   { id: 'tracker', label: 'Monitor Global de Players', desc: 'Censo e lista de jogadores ativos', icon: Search, category: 'Módulo' },
   { id: 'analytics', label: 'Rankings Globais de XP', desc: 'Top rushers e recordes do servidor', icon: TrendingUp, category: 'Módulo' },

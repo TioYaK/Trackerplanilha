@@ -53,9 +53,10 @@ export default function TopNav({
     live: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
     home: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
     bazaar: { label: 'Bazaar Sniper (Leilões)', icon: <Gem size={16} className="text-yellow-400" /> },
+    versus: { label: 'Comparador Versus ⚔️', icon: <Swords size={16} className="text-red-400" /> },
     guides: { label: 'Guias & Estratégias 📜', icon: <BookOpen size={16} className="text-yellow-400" /> },
     sorteio: { label: 'Sorteios da Comunidade 🎁', icon: <Gift size={16} className="text-yellow-400" /> },
-    attendance: { label: 'Mural de Mortes & Frags', icon: <CalendarDays size={16} /> },
+    attendance: { label: 'Killboard de Guerra & Frags', icon: <CalendarDays size={16} /> },
     tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
     analytics: { label: 'Rankings Globais', icon: <TrendingDown size={16} /> },
     developers: { label: 'API para Devs ⚡', icon: <Code2 size={16} className="text-yellow-400" /> },
@@ -85,7 +86,7 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'bazaar', 'guides', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute']
+      items: ['live', 'bazaar', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
       title: profile?.guild_name ? `Guilda ${profile.guild_name}` : 'Espaço da Guilda',

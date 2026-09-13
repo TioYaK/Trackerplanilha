@@ -8,7 +8,7 @@ import { WORLDS_LIST } from '../context/WorldContext';
 import { formatVocation, parseUtcDate } from '../lib/tibiaUtils';
 import { soundFX } from '../lib/soundEffects';
 
-export default function PlayerModal({ playerName, initialWorld, onClose, onOpenFull }) {
+export default function PlayerModal({ playerName, initialWorld, onClose, onOpenFull, onVersus }) {
   const [loading, setLoading] = useState(true);
   const [charInfo, setCharInfo] = useState(null);
   const [selectedWorld, setSelectedWorld] = useState(initialWorld || 'ALL');
@@ -444,6 +444,18 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
           </a>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                onClose();
+                onVersus?.(playerName);
+              }}
+              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-red-950/60 hover:bg-red-900/80 border border-red-500/40 text-red-300 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              title="Comparar este jogador no Versus"
+            >
+              <Swords size={14} />
+              Versus ⚔️
+            </button>
+
             <button
               onClick={onClose}
               className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-black/80 hover:bg-white/5 border border-white/10 text-stone-400 hover:text-white text-xs font-bold transition-all cursor-pointer"

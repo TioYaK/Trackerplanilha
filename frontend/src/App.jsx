@@ -39,6 +39,7 @@ const PrivacyPolicy = lazy(() => import('./views/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./views/TermsOfService'));
 const AboutUs = lazy(() => import('./views/AboutUs'));
 const GuidesHub = lazy(() => import('./views/GuidesHub'));
+const CharacterVersus = lazy(() => import('./views/CharacterVersus'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import GlobalSearchModal from './components/GlobalSearchModal';
@@ -56,7 +57,7 @@ function ModuleFallback() {
 
 // Tabs padrão visíveis quando não há configuração no banco
 const DEFAULT_VISIBLE_TABS = [
-  'live', 'bazaar', 'guides', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute',
+  'live', 'bazaar', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute',
   'planilha', 'planilha_live', 'roster', 'invite',
   'radar', 'extreme'
 ];
@@ -65,6 +66,9 @@ const ROUTE_TO_VIEW = {
   '/': 'home',
   '/home': 'home',
   '/live': 'home',
+  '/versus': 'versus',
+  '/vs': 'versus',
+  '/comparador': 'versus',
   '/guias': 'guides',
   '/guides': 'guides',
   '/artigos': 'guides',
@@ -79,6 +83,7 @@ const ROUTE_TO_VIEW = {
   '/attendance': 'attendance',
   '/mortes': 'attendance',
   '/frags': 'attendance',
+  '/killboard': 'attendance',
   '/tracker': 'tracker',
   '/global': 'tracker',
   '/analytics': 'analytics',
@@ -164,11 +169,13 @@ const VIEW_TO_ROUTE = {
   terms: '/terms',
   about: '/about',
   guides: '/guias',
+  versus: '/versus',
 };
 
 const VIEW_TITLES = {
   home: 'Rubinot Tracker | Portal Central',
   live: 'Rubinot Tracker | Portal Central',
+  versus: 'Rubinot Tracker | Comparador de Personagens Versus ⚔️',
   guides: 'Rubinot Tracker | Guias, Estratégias & Artigos 📜',
   developers: 'Rubinot Tracker | API para Desenvolvedores ⚡',
   sorteio: 'Rubinot Tracker | Sorteios da Comunidade 🎁',
@@ -451,6 +458,14 @@ export default function App() {
     if (currentView === 'guides') {
       return <GuidesHub onNavigate={navigateView} />;
     }
+    if (currentView === 'versus') {
+      return (
+        <CharacterVersus 
+          onPlayerClick={handlePlayerClick} 
+          onNavigate={navigateView} 
+        />
+      );
+    }
     if (currentView === 'sorteio' || currentView === 'giveaway') {
       return (
         <GiveawayDraw 
@@ -637,6 +652,14 @@ export default function App() {
           initialWorld={inspectedPlayerWorld}
           onClose={() => setInspectedPlayer(null)}
           onOpenFull={handleOpenFullInvestigation}
+          onVersus={(pName) => {
+            if (typeof window !== 'undefined') {
+              const url = new URL(window.location.href);
+              url.searchParams.set('p1', pName);
+              window.history.replaceState({}, '', url.toString());
+            }
+            navigateView('versus');
+          }}
         />
       )}
 
