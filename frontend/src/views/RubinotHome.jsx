@@ -540,13 +540,16 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
               </div>
               <div>
                 <h3 className="text-lg font-medieval font-bold text-white">Mural de Mortes Recentes</h3>
-                <p className="text-[11px] text-gray-400 font-sans">Baixas PvP e PvE registradas no servidor</p>
+                <p className="text-[11px] text-gray-400 font-sans">
+                  {isGlobal ? 'Baixas PvP e PvE nos 16 servidores oficiais do Rubinot' : `Baixas PvP e PvE no servidor ${selectedWorld}`}
+                </p>
               </div>
             </div>
             
             <button
-              onClick={() => onNavigate('attendance')}
-              className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 font-bold"
+              onClick={() => onNavigate('tracker')}
+              className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 font-bold cursor-pointer"
+              title="Abrir monitor completo de mortes e frags"
             >
               Ver todas <ChevronRight size={14} />
             </button>
@@ -558,29 +561,54 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                 Nenhuma morte recente registrada no momento.
               </div>
             ) : (
-              recentDeaths.slice(0, 7).map((d, idx) => (
-                <div 
-                  key={idx}
-                  onClick={() => onPlayerClick && onPlayerClick(d.character_name)}
-                  className="flex items-center justify-between p-3 rounded-xl bg-black/60 border border-white/5 hover:border-red-500/40 hover:bg-red-950/20 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-red-400 font-bold text-xs">💀</span>
-                    <div>
-                      <div className="text-sm font-bold text-white group-hover:text-red-400 transition-colors">
-                        {d.character_name} <span className="text-xs font-normal text-gray-400">(Lvl {d.level || '?'})</span>
-                      </div>
-                      <div className="text-[11px] text-gray-400">
-                        Morto por: <span className="text-gray-300">{d.killed_by || 'Monstros'}</span>
+              recentDeaths.slice(0, 7).map((d, idx) => {
+                const isKnownMonster = [
+                  'werelion', 'werelioness', 'juggernaut', 'flimsy lost soul', 'young goanna', 
+                  'adult goanna', 'grim reaper', 'mean lost soul', 'skeleton', 'dragon', 'demon', 
+                  'hydra', 'behemoth', 'plaguesmith', 'defiler', 'hellhound', 'undead dragon', 'monstros'
+                ].some(m => (d.killed_by || '').toLowerCase().includes(m));
+                const isPvP = Boolean(d.is_pvp) || (!isKnownMonster && d.killed_by && d.killed_by.length > 2);
+
+                return (
+                  <div 
+                    key={idx}
+                    onClick={() => onPlayerClick && onPlayerClick(d.character_name)}
+                    className="flex items-center justify-between p-3 rounded-xl bg-black/60 border border-white/5 hover:border-red-500/40 hover:bg-red-950/20 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-red-400 font-bold text-xs">💀</span>
+                      <div>
+                        <div className="text-sm font-bold text-white group-hover:text-red-400 transition-colors flex items-center gap-2">
+                          <span>{d.character_name}</span>
+                          <span className="text-xs font-normal text-gray-400">(Lvl {d.level || '?'})</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                            isPvP ? 'bg-red-950/70 text-red-300 border border-red-500/40' : 'bg-blue-950/50 text-blue-300 border border-blue-500/30'
+                          }`}>
+                            {isPvP ? 'PvP Frag' : 'PvE'}
+                          </span>
+                          {d.is_guild_member && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+                              Guilda
+                            </span>
+                          )}
+                          {d.is_hunted && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-red-600 text-white">
+                              HUNTED
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-gray-400">
+                          Morto por: <span className="text-gray-300 font-medium">{d.killed_by || 'Monstros'}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="text-right text-[11px] text-gray-500 font-sans">
-                    {safeFormatTime(d.death_time)}
+                    <div className="text-right text-[11px] text-gray-500 font-sans">
+                      {safeFormatTime(d.death_time)}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -594,13 +622,15 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
               </div>
               <div>
                 <h3 className="text-lg font-medieval font-bold text-white">Top Rushers (24h)</h3>
-                <p className="text-[11px] text-gray-400 font-sans">Os maiores ganhos de experiência do dia</p>
+                <p className="text-[11px] text-gray-400 font-sans">
+                  {isGlobal ? 'Os maiores ganhos de experiência nos 16 servidores' : `Os maiores rushers de experiência em ${selectedWorld}`}
+                </p>
               </div>
             </div>
 
             <button
               onClick={() => onNavigate('analytics')}
-              className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 font-bold"
+              className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 font-bold cursor-pointer"
             >
               Rankings <ChevronRight size={14} />
             </button>
