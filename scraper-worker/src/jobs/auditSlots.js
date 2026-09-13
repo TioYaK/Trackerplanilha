@@ -180,30 +180,9 @@ export const runAuditSlots = async () => {
 
             console.log(`[AUDIT] ❌ Falta: "${party.party_name}" — Acumulado: ${missCount}/3`);
 
-            // ─── STRIKE AUTOMÁTICO (3ª falta) ────────────────────────────
+            // ─── STRIKE AUTOMÁTICO DESATIVADO ────────────────────────────
             if (missCount >= 3) {
-              const strikeReason = `Abandono de Slot (${missCount} faltas injustificadas): ${party.party_name}`;
-              console.log(`[AUDIT] 🚨 Aplicando Strikes automáticos — "${party.party_name}" (${missCount} faltas)`);
-
-              const expiresAt = new Date();
-              expiresAt.setDate(expiresAt.getDate() + 3);
-
-              const newStrikes = validMembers.map((member) => ({
-                character_name: member,
-                reason: strikeReason,
-                admin_name: 'Robô Xerife',
-                duration_days: 3,
-                expires_at: expiresAt.toISOString(),
-              }));
-
-              if (newStrikes.length > 0) {
-                const { error: strikeError } = await supabase.from('player_strikes').insert(newStrikes);
-                if (strikeError) {
-                  console.error('[AUDIT] Erro ao aplicar strikes:', strikeError.message);
-                } else {
-                  console.log(`[AUDIT] ⚖️  ${newStrikes.length} strikes aplicados — party: "${party.party_name}"`);
-                }
-              }
+              console.log(`[AUDIT] ⚠️ Slot abandonado — "${party.party_name}" (${missCount} faltas)`);
             }
             // ─────────────────────────────────────────────────────────────
           }

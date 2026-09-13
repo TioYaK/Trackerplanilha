@@ -112,31 +112,16 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
 
   const generateHR = async () => {
     setLoading(true);
-    let strikesData = [];
-    let page = 0;
-    while(true) {
-      const { data } = await supabase
-          .from('player_strikes')
-          .select('*')
-          .gte('expires_at', new Date().toISOString())
-          .range(page*1000, (page+1)*1000-1);
-      if (!data || data.length === 0) break;
-      strikesData.push(...data);
-      if (data.length < 1000) break;
-      page++;
-    }
-    
     const scoredMembers = members.map(m => {
-       const mNameLower = (m.name || '').toLowerCase();
-       const pStrikes = strikesData ? strikesData.filter(s => (s.character_name || '').toLowerCase() === mNameLower).length : 0;
-       const xpScore = Math.min(50, (m.xp_gained_24h || 0) / 10000000); // 1 pt per 10M, cap 50
-       let score = 50 + xpScore - (pStrikes * 30);
+       const xpScore = Math.min(50, (m.xp_gained_24h || 0) / 10000000); // 1 pt por 10M, cap 50
+       const onlineBonus = m.is_online ? 20 : 0;
+       let score = 30 + xpScore + onlineBonus;
        if (score > 100) score = 100;
        if (score < 0) score = 0;
-       return { ...m, score, strikes: pStrikes };
+       return { ...m, score };
     });
 
-    const toPromote = [...scoredMembers].filter(m => m.score >= 80).sort((a,b) => b.score - a.score).slice(0, 10);
+    const toPromote = [...scoredMembers].filter(m => m.score >= 70).sort((a,b) => b.score - a.score).slice(0, 10);
     const toKick = [...scoredMembers].filter(m => m.score <= 30).sort((a,b) => a.score - b.score).slice(0, 10);
     
     setHrData({ toPromote, toKick });
@@ -323,7 +308,7 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
                   <div key={m.name} className="flex justify-between items-center bg-white/5 p-2 rounded border-l-2 border-red-500">
                     <div>
                       <span className="font-bold text-white text-sm">{m.name}</span>
-                      <p className="text-[10px] text-red-400">{m.strikes} Punições</p>
+                      <p className="text-[10px] text-gray-400">Lvl {m.level} • {formatVocation(m.vocation)}</p>
                     </div>
                     <span className="text-red-500 font-mono font-bold">{Math.round(m.score)} pts</span>
                   </div>

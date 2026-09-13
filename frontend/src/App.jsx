@@ -434,7 +434,7 @@ export default function App() {
     }
     if (currentView === 'attendance') return <WarAttendance onPlayerClick={handlePlayerClick} />;
     if (currentView === 'tracker') return <GlobalTracker onPlayerClick={handlePlayerClick} />;
-    if (currentView === 'analytics') return <Rankings isAdmin={isAdmin} />;
+    if (currentView === 'analytics') return <Rankings isAdmin={isAdmin} onPlayerClick={handlePlayerClick} />;
     if (currentView === 'developers' || currentView === 'api') {
       return (
         <DeveloperHub 
@@ -528,24 +528,6 @@ export default function App() {
         );
       }
 
-      if (profile?.status === 'pending') {
-        return (
-          <div className="min-h-[50vh] flex items-center justify-center p-4">
-            <div className="bg-black/80 border-2 border-yellow-500/40 rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
-              <h2 className="text-3xl font-medieval text-yellow-500 mb-3">Conta em Análise</h2>
-              <p className="text-gray-300 font-sans text-sm mb-6">
-                Sua conta (Main: <strong>{profile.main_character}</strong>) foi registrada com sucesso, mas o acesso aos respawns da guilda precisa de ativação de um Administrador.
-              </p>
-              <button
-                onClick={() => navigateView('home')}
-                className="bg-yellow-600/30 hover:bg-yellow-600/50 border border-yellow-500 text-yellow-300 px-4 py-2 rounded text-xs font-bold transition-colors"
-              >
-                Navegar no Portal Público
-              </button>
-            </div>
-          </div>
-        );
-      }
 
       if (profile?.status !== 'active' && !isAdmin) {
         return (

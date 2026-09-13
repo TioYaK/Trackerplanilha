@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
 } from 'recharts';
-import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X, Globe, Trophy, ExternalLink, ArrowLeft, ChevronDown, Flame, Shield, Sparkles } from 'lucide-react';
+import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X, Globe, Trophy, ExternalLink, ArrowLeft, ChevronDown, Flame, Shield, Sparkles, Skull } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -12,11 +12,8 @@ import { WORLDS_LIST } from '../context/WorldContext';
 
 export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, onBack, initialWorld }) {
   const [telemetry, setTelemetry] = useState([]);
-  const [strikes, setStrikes] = useState([]);
   const [stats, setStats] = useState({ ghostSlots: 0, totalHours: 0 });
   const [loading, setLoading] = useState(true);
-  const [showStrikeModal, setShowStrikeModal] = useState(false);
-  const [strikeForm, setStrikeForm] = useState({ reason: '', days: 3 });
   const [frequentSquad, setFrequentSquad] = useState([]);
   const [prediction, setPrediction] = useState(null);
   const [heatmap, setHeatmap] = useState([]);
@@ -90,13 +87,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       .gte('death_time', fourteenDaysAgo)
       .order('death_time', { ascending: false });
 
-    const fetchStrikesP = supabase
-      .from('player_strikes')
-      .select('*')
-      .ilike('character_name', playerName)
-      .gte('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false });
-
     const fetchGPerkP = supabase
       .from('guild_perk_members')
       .select('world, notes')
@@ -132,7 +122,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       loginRes,
       sessionsRes,
       deathsRes,
-      strikesRes,
       gPerkRes,
       rushRes,
       squadData
@@ -143,7 +132,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       fetchLoginP,
       fetchSessionsP,
       fetchDeathsP,
-      fetchStrikesP,
       fetchGPerkP,
       fetchRushP,
       fetchSquadP()
@@ -396,9 +384,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       setTelemetry([]);
     }
 
-    // Strikes
-    setStrikes(strikesRes?.data || []);
-
     // Panelinhas (Frequent Squad)
     if (squadData && squadData.length > 0) {
       const mates = {};
@@ -487,27 +472,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       console.error(e);
     }
     setMakersLoading(false);
-  };
-
-  const handleApplyStrike = async (e) => {
-    e.preventDefault();
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + parseInt(strikeForm.days, 10));
-
-    const { error } = await supabase.from('player_strikes').insert([{
-      character_name: playerName,
-      reason: strikeForm.reason,
-      duration_days: parseInt(strikeForm.days, 10),
-      expires_at: expiresAt.toISOString()
-    }]);
-
-    if (!error) {
-      setShowStrikeModal(false);
-      setStrikeForm({ reason: '', days: 3 });
-      fetchData();
-    } else {
-      alert("Erro ao aplicar strike: " + error.message);
-    }
   };
 
   const handleSearchSubmit = async (e) => {
@@ -747,16 +711,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
             <Search className="mr-2" size={18} />
             Descobrir Makers
           </button>
-          
-          {isAdmin && (
-            <button 
-              onClick={() => setShowStrikeModal(true)}
-              className="w-full md:w-auto py-3 px-5 bg-red-600 hover:bg-red-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
-            >
-              <AlertOctagon className="mr-2" size={18} />
-              Aplicar Strike
-            </button>
-          )}
         </div>
       </div>
 
@@ -807,13 +761,13 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
 
       {/* Cards de Topo */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Strikes Card */}
-        <div className="bg-tibia-card p-4 rounded-lg border border-red-900/50 flex items-center justify-between">
+        {/* Baixas Recentes Card */}
+        <div className="bg-tibia-card p-4 rounded-lg border border-red-900/30 flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-400">Strikes Ativos</p>
-            <p className="text-3xl font-bold text-red-500">{strikes.length}</p>
+            <p className="text-sm text-gray-400">Baixas Recentes (14d)</p>
+            <p className="text-3xl font-bold text-red-400">{deaths.length} <span className="text-xs text-gray-400 font-normal">mortes</span></p>
           </div>
-          <Gavel className="text-red-500 opacity-50" size={32} />
+          <Skull className="text-red-400 opacity-60" size={32} />
         </div>
 
         {/* Panelinhas Card */}
@@ -960,38 +914,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         </div>
       )}
 
-      {/* Tabela de Strikes */}
-      {strikes.length > 0 && (
-        <div className="bg-red-950/20 border border-red-900/50 rounded-lg p-6">
-          <h3 className="text-xl font-bold text-red-400 mb-4 flex items-center">
-            <Gavel className="mr-2" /> Histórico Criminal (Strikes Ativos)
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-gray-300">
-              <thead className="text-gray-400 border-b border-red-900/50">
-                <tr>
-                  <th className="pb-2">Data</th>
-                  <th className="pb-2">Motivo</th>
-                  <th className="pb-2">Duração</th>
-                  <th className="pb-2 text-right">Expira em</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-red-900/30">
-                {strikes.map(s => (
-                  <tr key={s.id}>
-                    <td className="py-3">{format(new Date(s.created_at), 'dd/MM/yyyy HH:mm')}</td>
-                    <td className="py-3 text-white">{s.reason}</td>
-                    <td className="py-3">{s.duration_days} dias</td>
-                    <td className="py-3 text-right text-red-300">
-                      {formatDistanceToNow(new Date(s.expires_at), { addSuffix: true, locale: ptBR })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* Gráfico de XP */}
       <div className="bg-tibia-card p-6 rounded-lg border border-tibia-border">
@@ -1021,60 +943,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
           </div>
         )}
       </div>
-
-      {/* Modal de Strike */}
-      {showStrikeModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-tibia-card border border-red-900 rounded-lg p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-2xl font-bold text-red-500 mb-4 flex items-center">
-              <Gavel className="mr-2" /> Aplicar Strike
-            </h3>
-            <p className="text-gray-300 mb-6">Jogador alvo: <strong className="text-white">{playerName}</strong></p>
-            
-            <form onSubmit={handleApplyStrike}>
-              <div className="mb-4">
-                <label className="block text-gray-400 text-sm mb-1">Motivo (Visível para o infrator)</label>
-                <input 
-                  type="text" 
-                  required
-                  className="w-full bg-tibia-bg border border-gray-600 rounded p-2 text-white" 
-                  placeholder="Ex: Faltou no respawn e não avisou"
-                  value={strikeForm.reason}
-                  onChange={e => setStrikeForm({...strikeForm, reason: e.target.value})}
-                />
-              </div>
-              <div className="mb-6">
-                <label className="block text-gray-400 text-sm mb-1">Duração da Punição</label>
-                <select 
-                  className="w-full bg-tibia-bg border border-gray-600 rounded p-2 text-white"
-                  value={strikeForm.days}
-                  onChange={e => setStrikeForm({...strikeForm, days: e.target.value})}
-                >
-                  <option value={3}>3 Dias (Aviso Leve)</option>
-                  <option value={7}>7 Dias (Suspensão)</option>
-                  <option value={15}>15 Dias (Grave)</option>
-                  <option value={30}>30 Dias (Severo)</option>
-                </select>
-              </div>
-              <div className="flex justify-end gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setShowStrikeModal(false)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded shadow-tibia-glow transition"
-                >
-                  Confirmar Strike
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* MODAL DETETIVE DE MAKERS */}
       {showMakerModal && (

@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
     if (authError) throw authError;
     if (!authData.user) throw new Error('Erro ao criar usuário');
 
-    // 2. Criar o Profile Pendente com Metadados de Mundo e Guilda
+    // 2. Criar o Perfil com Acesso Imediato e Metadados de Mundo e Guilda
     const { error: profileError } = await supabase.from('profiles').insert([
       {
         id: authData.user.id,
@@ -81,8 +81,9 @@ export const AuthProvider = ({ children }) => {
         name: name,
         main_character: mainCharacter,
         ts3_nickname: ts3Nickname,
-        status: 'pending', // Alfândega!
+        status: 'active', // Acesso Imediato Liberado!
         role: 'user',
+        onboarding_completed: true,
         makers: {
           _world: world || 'Auroria',
           _guild: guildName || ''

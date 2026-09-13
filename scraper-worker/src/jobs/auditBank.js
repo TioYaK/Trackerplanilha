@@ -31,21 +31,7 @@ export const runAuditBank = async () => {
         if (bankErr) throw bankErr;
 
         if (pendentes && pendentes.length > 0) {
-            // 2. Insere strikes de 30 dias para cada caloteiro
-            const strikesToInsert = pendentes.map(p => {
-                const expires = new Date(brazilTime);
-                expires.setDate(expires.getDate() + 30); // Strike dura 30 dias ou até pagar
-                
-                return {
-                    character_name: p.name,
-                    reason: 'Inadimplência - Guild Bank (Automático)',
-                    duration_days: 30,
-                    expires_at: expires.toISOString()
-                };
-            });
-
-            await supabase.from('player_strikes').insert(strikesToInsert);
-            console.log(`[JOB] ❌ ${strikesToInsert.length} strikes aplicados por inadimplência.`);
+            console.log(`[JOB] ℹ️ ${pendentes.length} membros pendentes no Guild Bank.`);
         }
 
         // 3. Marca que a auditoria do mês já foi feita
