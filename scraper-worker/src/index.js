@@ -628,6 +628,29 @@ app.post('/admin/force-ts3', async (req, res) => {
   }
 });
 
+app.get('/api/character/:name', async (req, res) => {
+  try {
+    const rawName = decodeURIComponent(req.params.name || '').trim();
+    console.log(`[API_ADMIN] Consulta de personagem solicitada: "${rawName}"`);
+    const { scrapePlayer } = await import('./lib/rubinotScraper.js');
+    const result = await scrapePlayer(rawName);
+    if (!result) return res.status(404).json({ error: 'Personagem não encontrado no Rubinot' });
+
+    if (result.level && !isNaN(Number(result.level))) {
+      await supabase.from('current_character_state').upsert({
+        character_name: result.name,
+        level: Number(result.level),
+        vocation: result.vocation
+      }, { onConflict: 'character_name' });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('[API_ADMIN] Erro ao buscar personagem:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(3001, () => {
   console.log('[API_ADMIN] Servidor local na porta 3001 (comandos admin).');
 });

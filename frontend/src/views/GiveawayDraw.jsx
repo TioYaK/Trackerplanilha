@@ -6,7 +6,7 @@ import {
   Gift, Trophy, Sparkles, Users, Crown, Shield, 
   CheckCircle2, AlertCircle, Clock, Shuffle, 
   Plus, Trash2, ArrowRight, RotateCcw, Volume2, 
-  VolumeX, Calendar, Star, HelpCircle, UserPlus, Flame, Lock
+  VolumeX, Calendar, Star, HelpCircle, UserPlus, Flame, Lock, Edit3
 } from 'lucide-react';
 
 const RUBINOT_WORLDS = [
@@ -227,22 +227,81 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
       }
     }
 
-    // Buscar dados do personagem no banco (nível e vocação)
+    // Buscar dados do personagem no banco com cascata inteligente (Guilda -> Estado -> Sessões -> Mortes -> Worker)
     let charLevel = 1;
     let charVoc = 'Desconhecido';
+    let resolvedWorld = chosenWorld;
 
     try {
-      const { data: charData } = await supabase
-        .from('current_character_state')
+      // 1. Tenta guild_members primeiro (dados mais atualizados de membros da guilda)
+      const { data: gMember } = await supabase
+        .from('guild_members')
         .select('level, vocation')
-        .ilike('character_name', rawName)
+        .ilike('name', rawName)
         .maybeSingle();
 
-      if (charData) {
-        charLevel = charData.level || 1;
-        charVoc = charData.vocation || 'Aventureiro';
+      if (gMember && gMember.level && Number(gMember.level) > 0) {
+        charLevel = Number(gMember.level);
+        charVoc = gMember.vocation || 'Aventureiro';
+      } else {
+        // 2. Tenta current_character_state
+        const { data: charData } = await supabase
+          .from('current_character_state')
+          .select('level, vocation')
+          .ilike('character_name', rawName)
+          .maybeSingle();
+
+        if (charData && charData.level && Number(charData.level) > 0) {
+          charLevel = Number(charData.level);
+          charVoc = charData.vocation || 'Aventureiro';
+        } else {
+          // 3. Tenta histórico de sessões
+          const { data: sessData } = await supabase
+            .from('historical_sessions')
+            .select('end_level, start_level')
+            .ilike('character_name', rawName)
+            .order('session_end', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (sessData && (sessData.end_level || sessData.start_level)) {
+            charLevel = Number(sessData.end_level || sessData.start_level);
+          } else {
+            // 4. Tenta mortes recentes
+            const { data: deathData } = await supabase
+              .from('recent_deaths')
+              .select('level')
+              .ilike('character_name', rawName)
+              .order('death_time', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (deathData && deathData.level && Number(deathData.level) > 0) {
+              charLevel = Number(deathData.level);
+            }
+          }
+        }
       }
-    } catch (e) {}
+
+      // 5. Se ainda for <= 1, tenta consultar a API local do worker se disponível
+      if ((!charLevel || charLevel <= 1) && typeof window !== 'undefined') {
+        try {
+          const wRes = await fetch(`http://localhost:3001/api/character/${encodeURIComponent(rawName)}`, {
+            signal: AbortSignal.timeout(5000)
+          });
+          if (wRes.ok) {
+            const wData = await wRes.json();
+            if (wData && wData.level && !isNaN(Number(wData.level))) {
+              charLevel = Number(wData.level);
+              charVoc = wData.vocation || charVoc;
+              if (wData.world) resolvedWorld = wData.world;
+            }
+          }
+        } catch (we) {}
+      }
+    } catch (e) {
+      console.warn('Erro ao resolver dados do participante:', e);
+    }
 
     // Validação de nível mínimo
     if (giveaway.min_level > 0 && charLevel < giveaway.min_level) {
@@ -256,7 +315,7 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
     const newParticipant = {
       id: `p-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       name: rawName,
-      world: chosenWorld,
+      world: resolvedWorld,
       level: charLevel,
       vocation: charVoc,
       entered_at: new Date().toISOString()
@@ -454,6 +513,32 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
   const handleRemoveParticipant = async (pId) => {
     const updatedList = giveaway.participants.filter(p => p.id !== pId);
     await persistStore({ ...giveaway, participants: updatedList });
+  };
+
+  // Editar nível do participante pelo Admin
+  const handleEditParticipantLevel = async (pId) => {
+    const p = giveaway.participants.find(item => item.id === pId);
+    if (!p) return;
+    const newLvlStr = window.prompt(`Definir nível correto para "${p.name}":`, String(p.level || 1));
+    if (newLvlStr === null) return;
+    const newLvl = parseInt(newLvlStr, 10);
+    if (isNaN(newLvl) || newLvl < 1) {
+      alert('Nível inválido informado.');
+      return;
+    }
+    const updatedList = giveaway.participants.map(item => {
+      if (item.id === pId) {
+        return { ...item, level: newLvl };
+      }
+      return item;
+    });
+    await persistStore({ ...giveaway, participants: updatedList });
+    try {
+      await supabase.from('current_character_state').upsert({
+        character_name: p.name,
+        level: newLvl
+      }, { onConflict: 'character_name' });
+    } catch {}
   };
 
   // Limpar todos os participantes
@@ -837,13 +922,22 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
                       </div>
 
                       {isAdmin && (
-                        <button
-                          onClick={() => handleRemoveParticipant(p.id)}
-                          className="text-gray-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Remover participante"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEditParticipantLevel(p.id)}
+                            className="text-gray-400 hover:text-yellow-400 p-1 transition-colors"
+                            title="Editar Nível do Participante"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveParticipant(p.id)}
+                            className="text-gray-500 hover:text-red-400 p-1 transition-colors"
+                            title="Remover participante"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
