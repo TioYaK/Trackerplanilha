@@ -5,7 +5,7 @@ import { useWorld } from '../context/WorldContext';
 import { 
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
-  Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
+  Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, TrendingUp, User, Activity, CalendarDays, Target,
   ShieldAlert, Search, Bell, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2, BookOpen,
   Compass, Coins, Hammer, Skull
 } from 'lucide-react';
@@ -58,6 +58,8 @@ export default function TopNav({
     boss_tracker: { label: 'Rastreador de Bosses 20h 🗺️', icon: <Skull size={16} className="text-purple-400" /> },
     wheel_planner: { label: 'Roda do Destino (Builds) ☸️', icon: <Compass size={16} className="text-sky-400" /> },
     hunt_finder: { label: 'Hunt Finder 2.0 & Rotas 🗺️', icon: <Compass size={16} className="text-yellow-400" /> },
+    rotten_blood: { label: 'Rotten Blood & Soul War Hub 🩸', icon: <Skull size={16} className="text-red-400" /> },
+    bazaar_fipe: { label: 'FIPE Histórica Gráfica 📈', icon: <TrendingUp size={16} className="text-emerald-400" /> },
     exercise_calc: { label: 'Calculadora de Treino 🧮', icon: <Calculator size={16} className="text-yellow-400" /> },
     loot_splitter: { label: 'Divisão de Loot da Party 💰', icon: <Coins size={16} className="text-yellow-400" /> },
     bazaar: { label: 'Bazaar Sniper (Leilões)', icon: <Gem size={16} className="text-yellow-400" /> },
@@ -94,7 +96,7 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'war_feed', 'investigation', 'daily_spin', 'forge_calc', 'boss_tracker', 'wheel_planner', 'hunt_finder', 'exercise_calc', 'loot_splitter', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
+      items: ['live', 'war_feed', 'investigation', 'daily_spin', 'forge_calc', 'boss_tracker', 'wheel_planner', 'hunt_finder', 'rotten_blood', 'exercise_calc', 'loot_splitter', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
       title: 'Comunidade & Guildas',
@@ -105,7 +107,7 @@ export default function TopNav({
       title: 'Mega Premium 💎',
       icon: <Gem size={18} className="text-yellow-400" />,
       badge: isPremium ? 'VIP' : 'PRO',
-      items: ['bazaar', 'bazaar_flip', 'discord_webhooks', 'radar', 'extreme']
+      items: ['bazaar', 'bazaar_flip', 'bazaar_fipe', 'discord_webhooks', 'radar', 'extreme']
     }
   ];
 

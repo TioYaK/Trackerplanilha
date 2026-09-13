@@ -53,6 +53,8 @@ const PlayerInvestigation = lazy(() => import('./views/PlayerInvestigation'));
 const LiveWarFeed = lazy(() => import('./views/LiveWarFeed'));
 const DiscordWebhooks = lazy(() => import('./views/DiscordWebhooks'));
 const BazaarFlipCalculator = lazy(() => import('./views/BazaarFlipCalculator'));
+const RottenBloodHub = lazy(() => import('./views/RottenBloodHub'));
+const BazaarMarketIndex = lazy(() => import('./views/BazaarMarketIndex'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import GlobalSearchModal from './components/GlobalSearchModal';
@@ -134,6 +136,15 @@ const ROUTE_TO_VIEW = {
   '/flip-calc': 'bazaar_flip',
   '/bazaar-flip': 'bazaar_flip',
   '/flip': 'bazaar_flip',
+  '/rotten-blood': 'rotten_blood',
+  '/rotten': 'rotten_blood',
+  '/soulwar-hub': 'rotten_blood',
+  '/endgame-hub': 'rotten_blood',
+  '/headshot': 'rotten_blood',
+  '/mercado-fipe': 'bazaar_fipe',
+  '/fipe': 'bazaar_fipe',
+  '/fipe-grafica': 'bazaar_fipe',
+  '/bazaar-analytics': 'bazaar_fipe',
   '/loot': 'loot_splitter',
   '/loot-split': 'loot_splitter',
   '/divisao': 'loot_splitter',
@@ -597,6 +608,22 @@ export default function App() {
     if (currentView === 'bazaar_flip' || currentView === 'flip_calc') {
       return (
         <BazaarFlipCalculator 
+          onNavigate={navigateView} 
+          onPlayerClick={handlePlayerClick} 
+        />
+      );
+    }
+    if (currentView === 'rotten_blood' || currentView === 'soulwar_hub' || currentView === 'endgame_hub') {
+      return (
+        <RottenBloodHub 
+          onNavigate={navigateView} 
+          onPlayerClick={handlePlayerClick} 
+        />
+      );
+    }
+    if (currentView === 'bazaar_fipe' || currentView === 'fipe_grafica') {
+      return (
+        <BazaarMarketIndex 
           onNavigate={navigateView} 
           onPlayerClick={handlePlayerClick} 
         />
