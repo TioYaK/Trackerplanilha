@@ -62,15 +62,9 @@ export default function TopNav({
     developers: { label: 'API para Devs ⚡', icon: <Code2 size={16} className="text-yellow-400" /> },
     contribute: { label: 'Baixar Worker (VIP Grátis)', icon: <Cpu size={16} className="text-green-400" /> },
 
-    // 🛡️ Espaço da Guilda (Qualquer Guilda)
-    planilha: { label: 'Controle de Hunts & Caves', icon: <FileSpreadsheet size={16} /> },
-    planilha_live: { label: 'Monitor de Caves (Ao Vivo)', icon: <Activity size={16} /> },
-    respawns: { label: 'Respawns & Regras', icon: <ShieldAlert size={16} /> },
-    roster: { label: 'Exército da Guilda', icon: <Users size={16} /> },
-    bank: { label: 'Tesouraria da Guilda', icon: <Landmark size={16} /> },
-    market: { label: 'Mercado Interno (Trocas)', icon: <Store size={16} /> },
-    guild_perks: { label: 'Perks da Guilda', icon: <Award size={16} /> },
-    invite: { label: 'Convites In-Game (Membros)', icon: <UserPlus size={16} /> },
+    // 🛡️ Comunidade & Guildas
+    roster: { label: 'Censo & Exército de Jogadores', icon: <Users size={16} /> },
+    invite: { label: 'Solicitar Convite In-Game', icon: <UserPlus size={16} /> },
 
     // 💎 Mega Premium
     radar: { label: 'Radar de Inimigos 👑', icon: <ShieldAlert size={16} className="text-yellow-400" /> },
@@ -89,10 +83,9 @@ export default function TopNav({
       items: ['live', 'bazaar', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
-      title: profile?.guild_name ? `Guilda ${profile.guild_name}` : 'Espaço da Guilda',
-      icon: <Shield size={18} />,
-      badge: !isGuildMember ? '🔒' : null,
-      items: ['planilha', 'planilha_live', 'roster', 'invite']
+      title: 'Comunidade & Guildas',
+      icon: <Users size={18} />,
+      items: ['roster', 'invite']
     },
     {
       title: 'Mega Premium 💎',

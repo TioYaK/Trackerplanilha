@@ -58,7 +58,7 @@ function ModuleFallback() {
 // Tabs padrão visíveis quando não há configuração no banco
 const DEFAULT_VISIBLE_TABS = [
   'live', 'bazaar', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute',
-  'planilha', 'planilha_live', 'roster', 'invite',
+  'roster', 'invite',
   'radar', 'extreme'
 ];
 
@@ -97,22 +97,22 @@ const ROUTE_TO_VIEW = {
   '/spy': 'radar',
   '/extreme': 'extreme',
   '/bi': 'extreme',
-  '/planilha': 'planilha',
-  '/caves': 'planilha',
-  '/hunts': 'planilha',
-  '/planilha-live': 'planilha_live',
-  '/respawns': 'respawns',
-  '/regras': 'respawns',
+  '/planilha': 'home',
+  '/caves': 'home',
+  '/hunts': 'home',
+  '/planilha-live': 'home',
+  '/respawns': 'home',
+  '/regras': 'home',
   '/roster': 'roster',
   '/membros': 'roster',
-  '/bank': 'bank',
-  '/banco': 'bank',
-  '/market': 'market',
-  '/mercado': 'market',
-  '/perks': 'guild_perks',
-  '/guild-perks': 'guild_perks',
-  '/guild_perks': 'guild_perks',
-  '/pearks': 'guild_perks',
+  '/bank': 'home',
+  '/banco': 'home',
+  '/market': 'home',
+  '/mercado': 'home',
+  '/perks': 'home',
+  '/guild-perks': 'home',
+  '/guild_perks': 'home',
+  '/pearks': 'home',
   '/invite': 'invite',
   '/invites': 'invite',
   '/convite': 'invite',
@@ -494,7 +494,14 @@ export default function App() {
       return <InviteRequest defaultCharacter={profile?.main_character || ''} isPublic={!user} />;
     }
     if (currentView === 'guild_perks' || currentView === 'pearks') {
-      return <GuildPerks isAdmin={isAdmin} isPublic={!user || !isGuildMember} />;
+      return (
+        <RubinotHome 
+          onNavigate={navigateView} 
+          onPlayerClick={handlePlayerClick} 
+          isPremium={isPremium} 
+          user={user} 
+        />
+      );
     }
     if (currentView === 'players') {
       return (
@@ -546,17 +553,13 @@ export default function App() {
       );
     }
 
-    // 4. Abas de Gestão da Guilda 🛡️ (Gated para membros de guilda ativa)
-    const guildViews = ['planilha', 'planilha_live', 'respawns', 'roster', 'bank', 'market', 'party'];
+    // 4. Abas de Gestão da Comunidade & Guilda 🛡️
+    const guildViews = ['roster', 'party'];
     if (guildViews.includes(currentView)) {
       const activeGuildName = profile?.makers?._guild || profile?.guild_name || 'Guilda';
       const featureTitles = {
-        planilha: 'Controle de Hunts & Caves',
-        planilha_live: 'Monitor de Caves (Ao Vivo)',
-        respawns: 'Respawns & Regras',
-        roster: `Exército da ${activeGuildName}`,
-        bank: `Tesouraria da ${activeGuildName}`,
-        market: 'Mercado Interno'
+        roster: `Censo & Exército de Jogadores (${activeGuildName})`,
+        party: 'Painel Tático de Party'
       };
 
       if (!user) {
@@ -569,7 +572,6 @@ export default function App() {
         );
       }
 
-
       if (profile?.status === 'banned' || profile?.status === 'suspended') {
         return (
           <div className="p-8 max-w-xl mx-auto text-center my-12 bg-red-950/40 border border-red-500/50 rounded-2xl p-8 shadow-2xl">
@@ -580,12 +582,7 @@ export default function App() {
       }
 
       switch (currentView) {
-        case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
-        case 'planilha_live': return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
-        case 'respawns': return <RespawnTracker isAdmin={isAdmin} />;
         case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
-        case 'bank': return <GuildBank isAdmin={isAdmin} />;
-        case 'market': return <GuildMarket isAdmin={isAdmin} />;
         case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
       }
     }

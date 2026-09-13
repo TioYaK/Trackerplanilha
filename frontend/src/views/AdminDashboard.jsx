@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatDistanceToNow, format, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Activity, Server, Cpu, Clock, AlertTriangle, CheckCircle, BarChart2, RefreshCw } from 'lucide-react';
+import { Activity, Server, Cpu, Clock, AlertTriangle, CheckCircle, BarChart2, RefreshCw, Users } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import AccessTelemetryDashboard from '../components/AccessTelemetryDashboard';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('guild'); // 'guild' or 'workers'
+  const [activeTab, setActiveTab] = useState('telemetry'); // 'telemetry', 'guild', 'workers'
   const [loading, setLoading] = useState(true);
   
   // Data States
@@ -138,22 +139,36 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex space-x-4 mb-6">
+      <div className="flex flex-wrap gap-3 mb-6">
+        <button 
+          onClick={() => setActiveTab('telemetry')}
+          className={`px-4 py-2.5 rounded font-bold transition-all flex items-center gap-2 ${activeTab === 'telemetry' ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-white border border-yellow-400 shadow-lg shadow-yellow-500/20 scale-[1.02]' : 'bg-black/40 text-gray-400 hover:bg-black/60 hover:text-gray-200 border border-tibia-border'}`}
+        >
+          <BarChart2 size={18} className="text-yellow-400" />
+          <span>📊 Acessos & Membros (Web Analytics)</span>
+        </button>
         <button 
           onClick={() => setActiveTab('guild')}
-          className={`px-4 py-2 rounded font-bold transition-colors ${activeTab === 'guild' ? 'bg-tibia-primary text-white border border-tibia-highlight' : 'bg-black/30 text-gray-400 hover:bg-black/50 border border-tibia-border'}`}
+          className={`px-4 py-2.5 rounded font-bold transition-all flex items-center gap-2 ${activeTab === 'guild' ? 'bg-tibia-primary text-white border border-tibia-highlight shadow-lg scale-[1.02]' : 'bg-black/40 text-gray-400 hover:bg-black/60 hover:text-gray-200 border border-tibia-border'}`}
         >
-          📈 Atividade da Guilda
+          <Activity size={18} />
+          <span>📈 Atividade do Servidor (7 Dias)</span>
         </button>
         <button 
           onClick={() => setActiveTab('workers')}
-          className={`px-4 py-2 rounded font-bold transition-colors ${activeTab === 'workers' ? 'bg-tibia-primary text-white border border-tibia-highlight' : 'bg-black/30 text-gray-400 hover:bg-black/50 border border-tibia-border'}`}
+          className={`px-4 py-2.5 rounded font-bold transition-all flex items-center gap-2 ${activeTab === 'workers' ? 'bg-tibia-primary text-white border border-tibia-highlight shadow-lg scale-[1.02]' : 'bg-black/40 text-gray-400 hover:bg-black/60 hover:text-gray-200 border border-tibia-border'}`}
         >
-          💻 Frota de Processamento
+          <Server size={18} />
+          <span>💻 Frota de Processamento (Workers)</span>
         </button>
       </div>
 
-      {loading && workers.length === 0 ? (
+      {/* TAB: TELEMETRY */}
+      {activeTab === 'telemetry' && (
+        <AccessTelemetryDashboard />
+      )}
+
+      {activeTab !== 'telemetry' && (loading && workers.length === 0 ? (
         <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tibia-primary"></div></div>
       ) : (
         <>
@@ -397,7 +412,8 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
-        </>
+          </>
+        )
       )}
     </div>
   );
