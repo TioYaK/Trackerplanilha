@@ -3,7 +3,7 @@ import { fetchRubinotApi } from '../lib/rubinotScraper.js';
 
 export const runFetchTransfers = async () => {
     try {
-        console.log('[JOB] Fetching Transfers (Auroria)');
+        console.log('[JOB] Fetching Transfers (Todos os Mundos Rubinot)');
         const recordsToUpsert = [];
 
         const parseDate = (raw) => {
@@ -16,39 +16,46 @@ export const runFetchTransfers = async () => {
             return !isNaN(parsed.getTime()) ? parsed : new Date();
         };
 
-        // Transfers Chegando em Auroria (toWorld = 11)
-        const arriving = await fetchRubinotApi('/api/transfers?toWorld=11&page=1');
-        if (arriving && arriving.transfers && Array.isArray(arriving.transfers)) {
-            for (const t of arriving.transfers) {
-                const charName = t.player_name || t.playerName;
-                if (!charName) continue;
-                
-                const tDate = parseDate(t.transferred_at || t.transferredAt);
-                recordsToUpsert.push({
-                    character_name: charName,
-                    transfer_type: 'IN', // Chegou
-                    transfer_date: tDate.toISOString(),
-                    level: t.player_level || t.playerLevel || 0,
-                    other_world: t.from_world || t.fromWorld || 'Desconhecido'
-                });
-            }
-        }
+        const WORLD_IDS = ['11', '15', '30', '21', '16'];
+        for (const wId of WORLD_IDS) {
+            try {
+                // Transfers Chegando (toWorld)
+                const arriving = await fetchRubinotApi(`/api/transfers?toWorld=${wId}&page=1`);
+                if (arriving && arriving.transfers && Array.isArray(arriving.transfers)) {
+                    for (const t of arriving.transfers) {
+                        const charName = t.player_name || t.playerName;
+                        if (!charName) continue;
+                        
+                        const tDate = parseDate(t.transferred_at || t.transferredAt);
+                        recordsToUpsert.push({
+                            character_name: charName,
+                            transfer_type: 'IN', // Chegou
+                            transfer_date: tDate.toISOString(),
+                            level: t.player_level || t.playerLevel || 0,
+                            other_world: t.from_world || t.fromWorld || 'Desconhecido'
+                        });
+                    }
+                }
 
-        // Transfers Saindo de Auroria (fromWorld = 11)
-        const leaving = await fetchRubinotApi('/api/transfers?fromWorld=11&page=1');
-        if (leaving && leaving.transfers && Array.isArray(leaving.transfers)) {
-            for (const t of leaving.transfers) {
-                const charName = t.player_name || t.playerName;
-                if (!charName) continue;
-                
-                const tDate = parseDate(t.transferred_at || t.transferredAt);
-                recordsToUpsert.push({
-                    character_name: charName,
-                    transfer_type: 'OUT', // Saiu
-                    transfer_date: tDate.toISOString(),
-                    level: t.player_level || t.playerLevel || 0,
-                    other_world: t.to_world || t.toWorld || 'Desconhecido'
-                });
+                // Transfers Saindo (fromWorld)
+                const leaving = await fetchRubinotApi(`/api/transfers?fromWorld=${wId}&page=1`);
+                if (leaving && leaving.transfers && Array.isArray(leaving.transfers)) {
+                    for (const t of leaving.transfers) {
+                        const charName = t.player_name || t.playerName;
+                        if (!charName) continue;
+                        
+                        const tDate = parseDate(t.transferred_at || t.transferredAt);
+                        recordsToUpsert.push({
+                            character_name: charName,
+                            transfer_type: 'OUT', // Saiu
+                            transfer_date: tDate.toISOString(),
+                            level: t.player_level || t.playerLevel || 0,
+                            other_world: t.to_world || t.toWorld || 'Desconhecido'
+                        });
+                    }
+                }
+            } catch (wErr) {
+                console.warn(`[JOB] Erro ao buscar transfers do worldId ${wId}:`, wErr.message);
             }
         }
 

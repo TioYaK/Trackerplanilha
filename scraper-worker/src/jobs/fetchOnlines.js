@@ -88,7 +88,7 @@ export const runFetchOnlines = async () => {
             const axios = (await import('axios')).default;
             const targetDetails = newlyOnlineHunteds.map(h => `• **${h.name}** \`[${h.reason || 'Hunted'}]\``).join('\n');
             await axios.post(webhookConfig.discord_url, {
-              username: 'Radar Tático (BattleStorm)',
+              username: 'Radar Tático (Rubinot Tracker)',
               avatar_url: 'https://rubinot.com.br/favicon.ico',
               embeds: [{
                 title: '🚨 [RADAR TÁTICO] ALVO INIMIGO DETECTADO ONLINE!',

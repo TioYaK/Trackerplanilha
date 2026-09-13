@@ -757,7 +757,7 @@ const processC2Command = async (cmd) => {
 
     if (cmd.command === 'POPUP_MESSAGE') {
        notifier.notify({
-         title: 'Mensagem do Admin (BattleStorm)',
+         title: 'Mensagem do Administrador (Rubinot Tracker)',
          message: cmd.payload?.message || 'Sem mensagem',
          icon: path.join(WORKER_ROOT, 'icon.png'),
          sound: true
@@ -906,10 +906,10 @@ supabase
      
      // 1. Notificação Nativa (Desktop do Worker)
      notifier.notify({
-       title: `BattleStorm - ${alarm.type}`,
+       title: `Rubinot Tracker - ${alarm.type}`,
        message: alarm.message,
        icon: path.join(WORKER_ROOT, 'icon.png'),
-       appID: 'BattleStorm',
+       appID: 'RubinotTracker',
        sound: true, 
        wait: false
      });
@@ -938,7 +938,7 @@ supabase
        if (!config || !config.vapid_public_key || !config.vapid_private_key) return;
 
        webpush.setVapidDetails(
-         'mailto:admin@battlestorm.com',
+         'mailto:admin@rubinot.com',
          config.vapid_public_key,
          config.vapid_private_key
        );
@@ -950,7 +950,7 @@ supabase
        console.log(`[WEB PUSH] Disparando para ${subs.length} navegadores...`);
        
        const pushPayload = JSON.stringify({
-         title: `BattleStorm - ${alarm.type}`,
+         title: `Rubinot Tracker - ${alarm.type}`,
          body: alarm.message,
          icon: '/pwa-192x192.png',
          badge: '/pwa-192x192.png',

@@ -1,6 +1,6 @@
 self.addEventListener('push', function(event) {
   let payload = {
-    title: 'BattleStorm Alarme',
+    title: 'Rubinot Tracker Alarme',
     body: 'Novo aviso!',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',

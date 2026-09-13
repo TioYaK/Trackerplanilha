@@ -4,17 +4,17 @@ import { fetchRubinotApi, scrapeDeaths, parseRubinotDate } from '../lib/rubinotS
 
 export const runFetchDeaths = async () => {
     try {
-        console.log('[JOB] Fetching Deaths (Auroria)');
+        console.log('[JOB] Fetching Deaths (Todos os Mundos Rubinot)');
         
         let deathsArray = null;
         try {
-            deathsArray = await scrapeDeaths('Auroria');
+            deathsArray = await scrapeDeaths(null);
         } catch (e) {
             console.warn('[JOB] scrapeDeaths falhou, tentando API:', e.message);
         }
 
         if (!deathsArray || deathsArray.length === 0) {
-            const res = await fetchRubinotApi('/api/deaths?world=11');
+            const res = await fetchRubinotApi('/api/deaths');
             deathsArray = res ? (res.deaths || res.data || res) : null;
         }
 

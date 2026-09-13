@@ -1,5 +1,5 @@
 -- ========================================================================================
--- OTIMIZAÇÃO DE ÍNDICES PARA ALTA PERFORMANCE (BATTLESTORM TRACKER)
+-- OTIMIZAÇÃO DE ÍNDICES PARA ALTA PERFORMANCE (RUBINOT TRACKER)
 -- Execute este script no SQL Editor do Supabase para acelerar consultas e views em até 10x.
 -- ========================================================================================
 

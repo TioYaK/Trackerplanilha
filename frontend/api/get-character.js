@@ -112,7 +112,8 @@ export default async function handler(req, res) {
           await supabase.from('current_character_state').upsert({
             character_name: c.name || rawName,
             level: lvl,
-            vocation: voc
+            vocation: voc,
+            world: w
           }, { onConflict: 'character_name' });
 
           return res.json({

@@ -79,10 +79,10 @@ export default function Contribute() {
       <div className="text-center mb-10">
         <h2 className="text-5xl font-medieval text-gradient-gold mb-4 flex items-center justify-center gap-3">
           <Heart className="text-red-500" size={40} />
-          Colabore com a Nossa Guilda
+          Rede de Telemetria Distribuída
         </h2>
         <p className="text-gray-400 font-sans text-lg max-w-3xl mx-auto leading-relaxed">
-          Nossa inteligência artificial varre e monitora milhares de personagens para nos dar a melhor vantagem nas wars e na economia. Para que o nosso painel seja ultrarrápido e descentralizado, nós construímos uma <strong>Rede Compartilhada de Telemetria</strong>. O seu computador pode ser um nó nessa rede que mantém a guilda sempre no topo!
+          Nossa inteligência artificial varre e monitora milhares de personagens nos 6 servidores do Rubinot. Para que o nosso painel seja ultrarrápido e descentralizado, nós construímos uma <strong>Rede Compartilhada de Telemetria</strong>. Conecte um nó worker para apoiar a infraestrutura e desbloquear acesso VIP imediato!
         </p>
 
         {localWorker && (
@@ -170,10 +170,10 @@ export default function Contribute() {
           <div>
             <h3 className="text-2xl font-medieval text-gradient-gold flex items-center gap-2">
               <Award className="text-yellow-400" size={26} />
-              Mural de Contribuidores da Guilda
+              Mural de Contribuidores & Nós de Telemetria
             </h3>
             <p className="text-sm text-gray-400">
-              Membros que conectaram seus computadores para manter a inteligência e o radar 24/7 ativos.
+              Apoiadores e membros da comunidade que conectaram seus computadores para manter a telemetria e o radar dos 6 mundos ativos 24/7.
             </p>
           </div>
           <div className="text-xs text-gray-500 font-mono bg-black/40 px-3 py-1.5 rounded border border-gray-800 self-start sm:self-auto">

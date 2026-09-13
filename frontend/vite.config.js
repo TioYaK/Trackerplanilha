@@ -13,9 +13,9 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/ads\.txt/, /^\/Instalar_Worker/, /^\/api\/(v1|worker|check-maker|get-character|manage-user|reset-password|worker-config)/]
       },
       manifest: {
-        name: 'BattleStorm Tracker',
-        short_name: 'Tracker',
-        description: 'Painel de Gerenciamento da Guilda Shellpatrocina',
+        name: 'Rubinot Tracker',
+        short_name: 'RubinotTracker',
+        description: 'Plataforma Global de Inteligência e Gestão de Guildas do Rubinot',
         theme_color: '#0a0a0c',
         background_color: '#0a0a0c',
         display: 'standalone',

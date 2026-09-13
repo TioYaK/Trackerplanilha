@@ -30,7 +30,7 @@ export default async function handler(req, res) {
         name: p.name,
         level: p.level,
         vocation: p.vocation,
-        guild: 'Battle Storm'
+        guild: 'Guilda Registrada'
       })));
     }
 
@@ -54,10 +54,16 @@ export default async function handler(req, res) {
     // Se tier for Pro ou Enterprise, inclui também os que tiveram atividade nas últimas 3 horas
     if (keyData.tier === 'PRO' || keyData.tier === 'ENTERPRISE') {
       const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
-      const { data: recentActive } = await supabase
+      let charStateQuery = supabase
         .from('current_character_state')
-        .select('character_name, level, vocation, last_active')
-        .gte('last_active', threeHoursAgo)
+        .select('character_name, level, vocation, last_active, world')
+        .gte('last_active', threeHoursAgo);
+
+      if (targetWorld !== 'ALL') {
+        charStateQuery = charStateQuery.ilike('world', `%${targetWorld}%`);
+      }
+
+      const { data: recentActive } = await charStateQuery
         .order('last_active', { ascending: false })
         .limit(100);
 
@@ -69,6 +75,7 @@ export default async function handler(req, res) {
               name: a.character_name,
               level: a.level,
               vocation: a.vocation,
+              world: a.world || targetWorld,
               last_active: a.last_active
             });
           }
