@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Shield, Mail, Lock, User, Crosshair, Headphones, LogIn, UserPlus } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 
-export default function AuthScreen() {
+export default function AuthScreen({ onBack }) {
   const { login, register } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState('');
@@ -29,21 +29,25 @@ export default function AuthScreen() {
         await login(email, password);
       } else {
         const cleanMain = mainCharacter.trim();
-        // Validação da Guilda antes de registrar!
-        const { data: roster, error: rosterErr } = await supabase
-          .from('view_guild_roster')
-          .select('name')
-          .ilike('name', cleanMain) // case insensitive
-          .limit(1);
-          
-        if (rosterErr) throw rosterErr;
         
-        if (!roster || roster.length === 0) {
-          throw new Error('Personagem não encontrado na guilda. Verifique o nick ou procure um Admin.');
-        }
+        // Verifica se pertence à guilda oficial
+        let isOfficialGuild = false;
+        try {
+          const { data: roster } = await supabase
+            .from('view_guild_roster')
+            .select('name')
+            .ilike('name', cleanMain)
+            .limit(1);
+          if (roster && roster.length > 0) isOfficialGuild = true;
+        } catch (e) {}
 
         await register({ email, password, name, mainCharacter: cleanMain, ts3Nickname });
-        setSuccessMsg('Cadastro realizado com sucesso! Sua conta está PENDENTE e aguardando aprovação de um Administrador.');
+        
+        if (isOfficialGuild) {
+          setSuccessMsg('Cadastro realizado com sucesso! Como membro da guilda oficial, sua conta aguarda ativação de um Administrador.');
+        } else {
+          setSuccessMsg('Cadastro realizado com sucesso! Sua conta do Rubinot Hub foi criada. Faça login para continuar.');
+        }
         setIsLogin(true); // Volta pro login
       }
     } catch (err) {
@@ -64,9 +68,9 @@ export default function AuthScreen() {
         <div className="text-center mb-8 relative z-10">
           <Shield className="w-16 h-16 text-tibia-highlight mx-auto mb-4" />
           <h2 className="text-3xl font-medieval text-white drop-shadow-md">
-            BattleStorm <span className="text-tibia-highlight">Tracker</span>
+            Rubinot <span className="text-tibia-highlight">Tracker</span>
           </h2>
-          <p className="text-gray-400 font-sans mt-2">Área Restrita aos Membros da Guilda</p>
+          <p className="text-gray-400 font-sans mt-2">Portal de Telemetria, Inteligência & Guildas</p>
         </div>
 
         {error && (
@@ -182,6 +186,17 @@ export default function AuthScreen() {
             {isLogin ? "Membro novo? Registre-se aqui" : "Já tem conta? Faça login"}
           </button>
         </div>
+
+        {onBack && (
+          <div className="mt-4 pt-4 border-t border-white/10 text-center relative z-10">
+            <button
+              onClick={onBack}
+              className="text-xs text-yellow-500/80 hover:text-yellow-400 font-sans transition-colors inline-flex items-center gap-1.5"
+            >
+              ← Voltar ao Portal Público
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Banner de Anúncio / Patrocinador na Tela de Login */}

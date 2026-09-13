@@ -2,6 +2,8 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import TopNav from './components/TopNav';
 import ErrorBoundary from './components/ErrorBoundary';
 import AdBanner from './components/AdBanner';
+import PremiumGate from './components/PremiumGate';
+import GuildGate from './components/GuildGate';
 import { useAuth } from './components/AuthContext';
 import { LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
@@ -53,7 +55,38 @@ export default function App() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedParty, setSelectedParty] = useState(null);
   const [visibleTabs, setVisibleTabs] = useState(null);
-  const isAdmin = profile?.role === 'admin';
+  const [hasActiveWorker, setHasActiveWorker] = useState(false);
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'pifot16@gmail.com';
+  const isGuildMember = profile?.status === 'active';
+
+  // Concede Premium automático para quem tem um worker ativo rodando na rede
+  useEffect(() => {
+    if (!profile?.main_character && !profile?.name) return;
+    const checkWorker = async () => {
+      try {
+        const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        const { data } = await supabase
+          .from('worker_heartbeats')
+          .select('metadata')
+          .gte('last_ping', fifteenMinsAgo);
+        if (data) {
+          const charName = (profile.main_character || '').toLowerCase();
+          const pName = (profile.name || '').toLowerCase();
+          const match = data.some(w => {
+            const owner = (w.metadata?.owner || '').toLowerCase();
+            return (owner && (owner === charName || owner === pName));
+          });
+          setHasActiveWorker(match);
+        }
+      } catch (e) {}
+    };
+    checkWorker();
+    const interval = setInterval(checkWorker, 60000);
+    return () => clearInterval(interval);
+  }, [profile]);
+
+  const isPremium = isAdmin || profile?.role === 'premium' || profile?.is_premium === true || hasActiveWorker;
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -68,50 +101,18 @@ export default function App() {
         setVisibleTabs(DEFAULT_VISIBLE_TABS);
       }
     };
+    fetchSettings();
+  }, []);
 
-    if (user && profile?.status === 'active') {
-      fetchSettings();
-    }
-  }, [user, profile]);
-
-  if (loading || (user && !profile)) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex items-center justify-center p-4">
-        <div className="text-yellow-500 font-medieval text-2xl animate-pulse">Carregando...</div>
+        <div className="text-yellow-500 font-medieval text-2xl animate-pulse">Carregando Rubinot Hub...</div>
       </div>
     );
   }
 
-  if (!user) {
-    return (
-      <ErrorBoundary>
-        <Suspense fallback={<ModuleFallback />}>
-          <AuthScreen />
-        </Suspense>
-      </ErrorBoundary>
-    );
-  }
-
-  if (profile?.status === 'pending') {
-    return (
-      <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex items-center justify-center p-4">
-        <div className="bg-black/80 border-2 border-tibia-border rounded-lg shadow-tibia-glow max-w-md w-full p-8 text-center">
-          <h2 className="text-3xl font-medieval text-yellow-500 mb-4">Conta em Análise</h2>
-          <p className="text-gray-300 font-sans mb-6">
-            Sua conta (Main: {profile.main_character}) foi registrada com sucesso, mas você precisa aguardar um Administrador aprovar o seu acesso.
-          </p>
-          <button
-            onClick={logout}
-            className="bg-red-900/50 hover:bg-red-900 border border-red-500 text-white px-4 py-2 rounded flex items-center justify-center gap-2 w-full transition-colors"
-          >
-            <LogOut size={18} /> Sair
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (profile?.status === 'rejected') {
+  if (user && profile?.status === 'rejected') {
     return (
       <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex items-center justify-center p-4">
         <div className="bg-black/80 border-2 border-red-900 rounded-lg shadow-tibia-glow max-w-md w-full p-8 text-center">
@@ -130,16 +131,7 @@ export default function App() {
     );
   }
 
-  if (profile?.status !== 'active') {
-    // Fail-safe block to ensure ONLY 'active' statuses get past this point
-    return (
-      <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex items-center justify-center p-4">
-        <div className="text-yellow-500 font-medieval text-2xl animate-pulse">Aguardando validação do perfil...</div>
-      </div>
-    );
-  }
-
-  if (!profile.onboarding_completed) {
+  if (user && profile && !profile.onboarding_completed && profile.status === 'active') {
     return (
       <ErrorBoundary>
         <Suspense fallback={<ModuleFallback />}>
@@ -160,59 +152,153 @@ export default function App() {
   };
 
   const renderView = () => {
-    switch (currentView) {
-      case 'live':    return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
-      case 'roster':  return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
-      case 'attendance': return <WarAttendance onPlayerClick={handlePlayerClick} />;
-      case 'respawns': return <RespawnTracker isAdmin={isAdmin} />;
-      case 'invite': return <InviteRequest />;
-      case 'bazaar': return <BazaarSniper />;
-      case 'radar':   return <RadarHunters isAdmin={isAdmin} />;
-      case 'tracker': return <GlobalTracker onPlayerClick={handlePlayerClick} />;
-      case 'extreme': return <ExtremeAnalytics />;
-      case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
-      case 'bank':    return <GuildBank isAdmin={isAdmin} />;
-      case 'market':  return <GuildMarket isAdmin={isAdmin} />;
-      case 'party':   return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
-      case 'contribute': return <Contribute />;
-      case 'guild_perks': 
-      case 'pearks':   return <GuildPerks isAdmin={isAdmin} />;
-      case 'admin':   return isAdmin ? <AdminPanel /> : null;
-      case 'workers': return isAdmin ? <WorkerDashboard /> : null;
-      case 'admin_dashboard': return <AdminDashboard />;
-      case 'analytics': return <Rankings isAdmin={isAdmin} />;
-      case 'players':
+    // 1. Tela de Login / Cadastro
+    if (currentView === 'auth') {
+      return <AuthScreen onBack={() => setCurrentView('live')} />;
+    }
+
+    // 2. Abas Públicas (Acesso Aberto para todo o Rubinot)
+    if (currentView === 'live') return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
+    if (currentView === 'attendance') return <WarAttendance onPlayerClick={handlePlayerClick} />;
+    if (currentView === 'tracker') return <GlobalTracker onPlayerClick={handlePlayerClick} />;
+    if (currentView === 'analytics') return <Rankings isAdmin={isAdmin} />;
+    if (currentView === 'contribute') return <Contribute />;
+    if (currentView === 'players') {
+      return (
+        <div className="p-8 max-w-7xl mx-auto w-full">
+          <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Investigação de Membro</h2>
+          <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência, histórico criminal e telemetria do jogador.</p>
+          <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} />
+        </div>
+      );
+    }
+
+    // 3. Abas Mega Premium 💎 (Gated para não-premium)
+    if (currentView === 'bazaar') {
+      if (isPremium) return <BazaarSniper />;
+      return (
+        <PremiumGate 
+          featureName="Bazaar Sniper Mega Premium 💎"
+          featureDescription="O sistema definitivo de arbitragem e monitoramento de leilões do Rubinot. Detecte chares raros e oportunidades lucrativas até 60% abaixo do preço de mercado antes de todo mundo."
+          onNavigate={setCurrentView}
+          onLogin={() => setCurrentView('auth')}
+        />
+      );
+    }
+
+    if (currentView === 'radar') {
+      if (isPremium) return <RadarHunters isAdmin={isAdmin} />;
+      return (
+        <PremiumGate 
+          featureName="Radar de Inimigos (Warmode Spy) 👑"
+          featureDescription="Monitore movimentações de guildas rivais em tempo real, detecção de logins de makers, alertas de invasão de respawn e relatórios de frag táticos."
+          onNavigate={setCurrentView}
+          onLogin={() => setCurrentView('auth')}
+        />
+      );
+    }
+
+    if (currentView === 'extreme') {
+      if (isPremium) return <ExtremeAnalytics />;
+      return (
+        <PremiumGate 
+          featureName="Extreme BI & Inteligência Avançada 👑"
+          featureDescription="Business Intelligence profundo do servidor com gráficos de telemetria, curva de XP acumulada e dossiê investigativo."
+          onNavigate={setCurrentView}
+          onLogin={() => setCurrentView('auth')}
+        />
+      );
+    }
+
+    // 4. Abas de Gestão da Guilda 🛡️ (Gated para não membros)
+    const guildViews = ['planilha', 'respawns', 'roster', 'bank', 'market', 'party', 'guild_perks', 'pearks', 'invite'];
+    if (guildViews.includes(currentView)) {
+      if (!user) {
         return (
-          <div className="p-8 max-w-7xl mx-auto w-full">
-            <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Investigação de Membro</h2>
-            <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência, histórico criminal e aplique punições ao jogador.</p>
-            <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} />
+          <GuildGate 
+            featureName={currentView === 'planilha' ? 'Controle de Hunts & Caves' : 'Área Restrita da Guilda'}
+            onLogin={() => setCurrentView('auth')}
+            onNavigate={setCurrentView}
+          />
+        );
+      }
+
+      if (profile?.status === 'pending') {
+        return (
+          <div className="min-h-[50vh] flex items-center justify-center p-4">
+            <div className="bg-black/80 border-2 border-yellow-500/40 rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
+              <h2 className="text-3xl font-medieval text-yellow-500 mb-3">Conta em Análise</h2>
+              <p className="text-gray-300 font-sans text-sm mb-6">
+                Sua conta (Main: <strong>{profile.main_character}</strong>) foi registrada com sucesso, mas o acesso aos respawns da guilda precisa de ativação de um Administrador.
+              </p>
+              <button
+                onClick={() => setCurrentView('live')}
+                className="bg-yellow-600/30 hover:bg-yellow-600/50 border border-yellow-500 text-yellow-300 px-4 py-2 rounded text-xs font-bold transition-colors"
+              >
+                Navegar no Portal Público
+              </button>
+            </div>
           </div>
         );
-      default: return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
+      }
+
+      if (profile?.status !== 'active' && !isAdmin) {
+        return (
+          <GuildGate 
+            featureName="Área Restrita da Guilda"
+            onLogin={() => setCurrentView('auth')}
+            onNavigate={setCurrentView}
+          />
+        );
+      }
+
+      switch (currentView) {
+        case 'planilha': return <PlanilhaManager isAdmin={isAdmin} />;
+        case 'respawns': return <RespawnTracker isAdmin={isAdmin} />;
+        case 'roster': return <GuildRoster onPlayerClick={handlePlayerClick} isAdmin={isAdmin} />;
+        case 'bank': return <GuildBank isAdmin={isAdmin} />;
+        case 'market': return <GuildMarket isAdmin={isAdmin} />;
+        case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
+        case 'guild_perks':
+        case 'pearks': return <GuildPerks isAdmin={isAdmin} />;
+        case 'invite': return <InviteRequest />;
+      }
     }
+
+    // 5. Abas Administrativas ⚙️
+    if (['admin', 'workers', 'admin_dashboard'].includes(currentView)) {
+      if (!isAdmin) {
+        return <GuildGate featureName="Painel Administrativo" onLogin={() => setCurrentView('auth')} onNavigate={setCurrentView} />;
+      }
+      if (currentView === 'admin') return <AdminPanel />;
+      if (currentView === 'workers') return <WorkerDashboard />;
+      if (currentView === 'admin_dashboard') return <AdminDashboard />;
+    }
+
+    return <LiveDashboard onPlayerClick={handlePlayerClick} onPartyClick={handlePartyClick} isAdmin={isAdmin} />;
   };
 
-  // FIX: antes `isAdmin === false` impedia que admins vissem o loading.
-  // Agora: mostra loading apenas se visibleTabs ainda não carregou e NÃO é admin.
-  // Admins veem tudo de qualquer jeito, então podem renderizar sem esperar.
-  if (visibleTabs === null && !isAdmin) return null;
-
   return (
-    <div className="min-h-screen bg-tibia-bg bg-tibia-pattern">
+    <div className="min-h-screen bg-tibia-bg bg-tibia-pattern flex flex-col">
       <TopNav
         currentView={currentView}
         setCurrentView={setCurrentView}
         isAdmin={isAdmin}
+        isPremium={isPremium}
+        isGuildMember={isGuildMember}
+        user={user}
+        profile={profile}
         visibleTabs={visibleTabs ?? DEFAULT_VISIBLE_TABS}
       />
       
-      {/* Banner de Publicidade / Patrocinador Oficial */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-2">
-        <AdBanner />
-      </div>
+      {/* Banner de Publicidade (Oculto para assinantes Premium!) */}
+      {!isPremium && currentView !== 'auth' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-2">
+          <AdBanner />
+        </div>
+      )}
 
-      <main className="w-full">
+      <main className="w-full flex-1">
         <ErrorBoundary>
           <Suspense fallback={<ModuleFallback />}>
             {renderView()}

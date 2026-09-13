@@ -5,18 +5,26 @@ import {
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
   Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
-  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award
+  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
 import PushNotificationBell from './PushNotificationBell';
 
-export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTabs }) {
-  const { logout, profile } = useAuth();
+export default function TopNav({ 
+  currentView, 
+  setCurrentView, 
+  isAdmin, 
+  isPremium, 
+  isGuildMember, 
+  user, 
+  profile, 
+  visibleTabs 
+}) {
+  const { logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [workerCount, setWorkerCount] = useState(0);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [workerModalOpen, setWorkerModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -35,53 +43,54 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
     return () => clearInterval(interval);
   }, [isAdmin]);
 
-  // Mapeamento original de views e ícones para facilitar o uso no menu
+  // Mapeamento de views e ícones nos 4 níveis
   const viewsData = {
-    live: { label: 'Visão Geral (Ao Vivo)', icon: <Activity size={16} /> },
-    roster: { label: 'Membros da Guilda', icon: <Users size={16} /> },
-    guild_perks: { label: 'Perks da Guilda', icon: <Award size={16} /> },
-    radar: { label: 'Radar de Inimigos (Hunted)', icon: <ShieldAlert size={16} /> },
+    // 🌐 Rubinot Público
+    live: { label: 'Visão Geral & Onlines', icon: <Activity size={16} /> },
+    attendance: { label: 'Mural de Mortes & Frags', icon: <CalendarDays size={16} /> },
     tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
-    planilha: { label: 'Controle de Hunts & PTs', icon: <FileSpreadsheet size={16} /> },
-    respawns: { label: 'Respawns & Caves', icon: <ShieldAlert size={16} /> },
-    invite: { label: 'Solicitar Convite', icon: <UserPlus size={16} /> },
+    analytics: { label: 'Rankings Globais', icon: <TrendingDown size={16} /> },
+    contribute: { label: 'Baixar Worker (VIP Grátis)', icon: <Cpu size={16} className="text-green-400" /> },
+
+    // 🛡️ Espaço da Guilda
+    planilha: { label: 'Controle de Hunts & Caves', icon: <FileSpreadsheet size={16} /> },
+    respawns: { label: 'Respawns & Regras', icon: <ShieldAlert size={16} /> },
+    roster: { label: 'Exército da Guilda', icon: <Users size={16} /> },
     bank: { label: 'Tesouraria da Guilda', icon: <Landmark size={16} /> },
     market: { label: 'Mercado Interno (Trocas)', icon: <Store size={16} /> },
-    extreme: { label: 'Análise de Jogadores', icon: <Crosshair size={16} /> },
-    analytics: { label: 'Rankings & Tribunal', icon: <TrendingDown size={16} /> },
-    attendance: { label: 'Atividade Diária', icon: <CalendarDays size={16} /> },
-    bazaar: { label: 'Char Bazaar Sniper', icon: <Target size={16} /> },
-    contribute: { label: 'Ajude a Guilda', icon: <Swords size={16} /> },
+    guild_perks: { label: 'Perks da Guilda', icon: <Award size={16} /> },
+    invite: { label: 'Solicitar Convite', icon: <UserPlus size={16} /> },
+
+    // 💎 Mega Premium
+    bazaar: { label: 'Bazaar Sniper 💎', icon: <Gem size={16} className="text-yellow-400" /> },
+    radar: { label: 'Radar de Inimigos 👑', icon: <ShieldAlert size={16} className="text-yellow-400" /> },
+    extreme: { label: 'Extreme BI 👑', icon: <Crosshair size={16} className="text-yellow-400" /> },
+
+    // ⚙️ Administração
     admin: { label: 'Painel Admin', icon: <Lock size={16} /> },
     workers: { label: 'Comando & Controle (C2)', icon: <Server size={16} /> },
   };
 
-  // Agrupamento para os Dropdowns
+  // Agrupamento para os Dropdowns em 4 Níveis Estratégicos
   let menuGroups = [
     {
-      title: 'Operações e Radar',
-      icon: <Activity size={18} />,
-      items: ['live', 'radar', 'bazaar', 'extreme', 'respawns']
+      title: 'Rubinot Público',
+      icon: <Globe size={18} />,
+      items: ['live', 'attendance', 'tracker', 'analytics', 'contribute']
     },
     {
-      title: 'Gestão da Guilda',
-      icon: <Users size={18} />,
-      items: ['roster', 'guild_perks', 'invite', 'attendance', 'analytics', 'tracker', 'contribute']
+      title: 'Espaço da Guilda',
+      icon: <Shield size={18} />,
+      badge: !isGuildMember ? '🔒' : null,
+      items: ['planilha', 'respawns', 'roster', 'bank', 'market', 'guild_perks', 'invite']
     },
     {
-      title: 'Economia e Hunts',
-      icon: <Landmark size={18} />,
-      items: ['bank', 'market', 'planilha']
+      title: 'Mega Premium 💎',
+      icon: <Gem size={18} className="text-yellow-400" />,
+      badge: isPremium ? 'VIP' : 'PRO',
+      items: ['bazaar', 'radar', 'extreme']
     }
   ];
-
-  // Filtra as abas baseado no visibleTabs (Admin vê tudo)
-  if (!isAdmin && visibleTabs) {
-    menuGroups = menuGroups.map(group => ({
-      ...group,
-      items: group.items.filter(item => visibleTabs.includes(item))
-    })).filter(group => group.items.length > 0);
-  }
 
   // Se for admin, adicionamos o Painel Admin ao final
   if (isAdmin) {
@@ -103,11 +112,14 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
       <div className="max-w-[1400px] mx-auto px-4 flex justify-between items-center h-16">
         
         {/* Logo Section */}
-        <div className="flex items-center space-x-3 shrink-0">
-          <img src="/logo.jpg" alt="BattleStorm Logo" className="w-10 h-10 rounded-full border-2 border-tibia-highlight shadow-tibia-glow" />
+        <div 
+          onClick={() => setCurrentView('live')}
+          className="flex items-center space-x-3 shrink-0 cursor-pointer select-none"
+        >
+          <img src="/logo.jpg" alt="Rubinot Logo" className="w-10 h-10 rounded-full border-2 border-tibia-highlight shadow-tibia-glow" />
           <div className="hidden sm:block">
             <h1 className="text-xl lg:text-2xl font-medieval text-tibia-highlight tracking-wider shadow-black drop-shadow-md">
-              BattleStorm <span className="text-white">Tracker</span>
+              Rubinot <span className="text-white">Tracker</span>
             </h1>
           </div>
         </div>
@@ -124,6 +136,13 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
               }`}>
                 {group.icon}
                 <span className="text-md tracking-wide">{group.title}</span>
+                {group.badge && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    group.badge === 'VIP' ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/40' : 'bg-black/50 text-gray-400'
+                  }`}>
+                    {group.badge}
+                  </span>
+                )}
                 <ChevronDown size={14} className="group-hover:rotate-180 transition-transform duration-300" />
               </button>
 
@@ -152,13 +171,11 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
           ))}
         </nav>
 
-        {/* Worker Modal */}
-        {/* Removed Modal */}
-
         {/* Right Icons */}
         <div className="flex items-center space-x-3">
           <PushNotificationBell />
           <InstallPWA />
+          
           {isAdmin && (
             <button onClick={() => setCurrentView('admin_dashboard')} className="flex items-center px-3 py-1.5 rounded border bg-green-900/20 hover:bg-green-900/40 text-green-400 border-green-900/50 cursor-pointer transition-colors" title="Ver Central de Inteligência">
               <Server size={16} className="mr-0 sm:mr-2" />
@@ -173,34 +190,54 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
             </div>
           )}
 
-          <button 
-            onClick={() => setProfileModalOpen(true)}
-            className="flex items-center px-3 py-1.5 rounded transition-colors border bg-blue-900/30 text-blue-400 border-blue-800 hover:text-white hover:bg-blue-900/50"
-            title="Meu Perfil"
-          >
-            {profile?.avatar_url ? (
-              <img 
-                src={profile.avatar_url} 
-                alt="Avatar" 
-                className="w-5 h-5 rounded-full object-cover border border-tibia-highlight mr-0 sm:mr-2 shrink-0 bg-black/60" 
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-            ) : (
-              <User size={16} className="mr-0 sm:mr-2" />
-            )}
-            <span className="text-xs font-bold uppercase hidden sm:inline">
-              {profile?.main_character ? profile.main_character.split(' ')[0] : 'Perfil'}
-            </span>
-          </button>
+          {user ? (
+            <>
+              {isPremium && !isAdmin && (
+                <div className="hidden sm:flex items-center px-2 py-1 rounded border border-yellow-500/50 bg-yellow-500/20 text-yellow-400 text-xs font-bold gap-1 shadow-sm">
+                  <Gem size={13} className="text-yellow-400" />
+                  <span>VIP</span>
+                </div>
+              )}
 
-          <button 
-            onClick={logout}
-            className="flex items-center px-3 py-1.5 rounded transition-colors border bg-black/30 text-gray-500 border-gray-800 hover:text-white hover:bg-black/50"
-            title="Sair do Sistema"
-          >
-            <LogOut size={16} className="mr-0 sm:mr-2" />
-            <span className="text-xs font-bold uppercase hidden sm:inline">Sair</span>
-          </button>
+              <button 
+                onClick={() => setProfileModalOpen(true)}
+                className="flex items-center px-3 py-1.5 rounded transition-colors border bg-blue-900/30 text-blue-400 border-blue-800 hover:text-white hover:bg-blue-900/50"
+                title="Meu Perfil"
+              >
+                {profile?.avatar_url ? (
+                  <img 
+                    src={profile.avatar_url} 
+                    alt="Avatar" 
+                    className="w-5 h-5 rounded-full object-cover border border-tibia-highlight mr-0 sm:mr-2 shrink-0 bg-black/60" 
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                ) : (
+                  <User size={16} className="mr-0 sm:mr-2" />
+                )}
+                <span className="text-xs font-bold uppercase hidden sm:inline">
+                  {profile?.main_character ? profile.main_character.split(' ')[0] : 'Perfil'}
+                </span>
+              </button>
+
+              <button 
+                onClick={logout}
+                className="flex items-center px-3 py-1.5 rounded transition-colors border bg-black/30 text-gray-500 border-gray-800 hover:text-white hover:bg-black/50"
+                title="Sair do Sistema"
+              >
+                <LogOut size={16} className="mr-0 sm:mr-2" />
+                <span className="text-xs font-bold uppercase hidden sm:inline">Sair</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setCurrentView('auth')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-yellow-600 to-amber-700 hover:from-yellow-500 hover:to-amber-600 text-black font-bold text-xs shadow-md transition-all hover:scale-105 active:scale-95"
+            >
+              <LogIn size={15} />
+              <span className="hidden sm:inline">Entrar / Cadastrar</span>
+              <span className="sm:hidden">Entrar</span>
+            </button>
+          )}
 
           {/* Botão Menu Mobile */}
           <button 
@@ -228,6 +265,19 @@ export default function TopNav({ currentView, setCurrentView, isAdmin, visibleTa
       {mobileMenuOpen && (
         <div className="lg:hidden absolute top-16 left-0 w-full bg-black/95 border-b-2 border-tibia-border max-h-[80vh] overflow-y-auto z-50">
           <div className="p-4 space-y-6">
+            {!user && (
+              <div className="pb-3 border-b border-tibia-border/50">
+                <button
+                  onClick={() => {
+                    setCurrentView('auth');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-yellow-600 to-amber-700 text-black font-bold font-medieval text-base shadow-lg"
+                >
+                  <LogIn size={18} /> Entrar / Criar Conta
+                </button>
+              </div>
+            )}
             {menuGroups.map((group, index) => (
               <div key={index}>
                 <h3 className="flex items-center space-x-2 font-medieval text-tibia-highlight text-lg mb-2 pb-2 border-b border-tibia-border/50">
