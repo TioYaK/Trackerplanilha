@@ -3,18 +3,26 @@ import { fetchRubinotApi } from '../lib/rubinotScraper.js';
 import 'dotenv/config';
 
 export const runFetchGuild = async () => {
-  const guildName = process.env.GUILD_NAME || 'shellpatrocina';
-  console.log(`[JOB] Buscando dados da guilda: ${guildName}`);
+  const targetGuilds = ['shellpatrocina', 'battlestorm-belaria', 'battlestorm-bellum', 'battlestorm-retro', 'battlestorm-vesperia', 'battlestorm-malveria'];
+  if (process.env.GUILD_NAME && !targetGuilds.includes(process.env.GUILD_NAME.toLowerCase())) {
+    targetGuilds.push(process.env.GUILD_NAME.toLowerCase());
+  }
 
   try {
-    const res = await fetchRubinotApi(`/api/guilds/${guildName}`);
-    
-    if (!res || !res.guild || !res.guild.members || res.guild.members.length === 0) {
-      console.log(`[JOB] Nenhum membro encontrado ou guilda vazia.`);
-      return;
+    const { data: gData } = await supabase.from('guild_invites_queue').select('guild_name');
+    if (gData) {
+      gData.forEach(g => {
+        if (g.guild_name) {
+          const slug = g.guild_name.toLowerCase().trim().replace(/\s+/g, '-');
+          if (!targetGuilds.includes(slug)) targetGuilds.push(slug);
+        }
+      });
     }
-    
-    const members = res.guild.members;
+  } catch (e) {}
+
+  console.log(`[JOB] Buscando dados de ${targetGuilds.length} guildas nos servidores do Rubinot...`);
+
+  try {
 
     const VOCATION_MAP = {
       '0': 'Nenhuma',
@@ -35,18 +43,27 @@ export const runFetchGuild = async () => {
       return VOCATION_MAP[str] || voc;
     };
 
-    // Remove duplicatas pelo nome
+    // Remove duplicatas e agrega membros de todas as guildas
     const uniqueMembersMap = new Map();
-    members.forEach(m => {
-      if (!m || !m.name) return;
-      uniqueMembersMap.set(m.name, {
-        name: m.name,
-        vocation: formatVocation(m.vocation),
-        level: m.level,
-        rank: m.rank || null,          // FIX: campo rank agora é incluído no upsert
-        is_online: m.isOnline || false,
-      });
-    });
+    for (const gSlug of targetGuilds) {
+      try {
+        const res = await fetchRubinotApi(`/api/guilds/${gSlug}`);
+        if (res && res.guild && Array.isArray(res.guild.members)) {
+          res.guild.members.forEach(m => {
+            if (!m || !m.name) return;
+            uniqueMembersMap.set(m.name, {
+              name: m.name,
+              vocation: formatVocation(m.vocation),
+              level: m.level,
+              rank: m.rank || null,
+              is_online: m.isOnline || false,
+            });
+          });
+        }
+      } catch (gErr) {
+        console.warn(`[JOB] Falha ao coletar membros da guilda ${gSlug}:`, gErr.message);
+      }
+    }
 
     // Adiciona membros de parties_planilhadas e hunted_list para garantir que NUNCA sejam purgados
     const { data: activeParties } = await supabase.from('parties_planilhadas').select('members, leader_name');

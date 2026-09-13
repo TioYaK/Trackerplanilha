@@ -4,31 +4,34 @@ import { scrapeHighscores } from '../lib/rubinotScraper.js';
 import 'dotenv/config';
 
 const RUBINOT_WORLDS = ['Auroria', 'Belaria', 'Bellum', 'Tenebrium', 'Vesperia', 'Malveria'];
-let secondaryWorldIndex = 1; // Começa em Belaria
+let currentWorldIndex = 0;
 
 export const runFetchHighscores = async (vocationStr) => {
   try {
     const voc = vocationStr === 'ALL' ? null : 
                 vocationStr.charAt(0).toUpperCase() + vocationStr.slice(1).toLowerCase();
                 
-    const secondaryWorld = RUBINOT_WORLDS[secondaryWorldIndex];
-    secondaryWorldIndex = (secondaryWorldIndex + 1) % RUBINOT_WORLDS.length;
-    if (secondaryWorldIndex === 0) secondaryWorldIndex = 1; // Pula Auroria na rotação secundária pois já é o primário
+    // Roda em pares de mundos para cobrir os 6 mundos do Rubinot com igual prioridade
+    const world1 = RUBINOT_WORLDS[currentWorldIndex];
+    const world2 = RUBINOT_WORLDS[(currentWorldIndex + 1) % RUBINOT_WORLDS.length];
+    currentWorldIndex = (currentWorldIndex + 2) % RUBINOT_WORLDS.length;
 
-    console.log(`[JOB] Fetching Highscores -> Auroria (Principal) + ${secondaryWorld} (Rotação) | Vocação: ${voc || 'Geral'}`);
+    console.log(`[JOB] Fetching Highscores -> ${world1} + ${world2} (Rotação Equilibrada) | Vocação: ${voc || 'Geral'}`);
     
-    // 1. Auroria (Mundo Principal) - Top 15 páginas
-    const auroriaPlayers = await scrapeHighscores('Auroria', null, 15, voc) || []; 
-    
-    // 2. Mundo Secundário da Rodada - Top 5 páginas
-    let secondaryPlayers = [];
+    let playersW1 = [];
+    let playersW2 = [];
     try {
-      secondaryPlayers = await scrapeHighscores(secondaryWorld, null, 5, voc) || [];
-    } catch (sErr) {
-      console.warn(`[JOB] Falha ao raspar highscore de ${secondaryWorld}:`, sErr.message);
+      playersW1 = await scrapeHighscores(world1, null, 10, voc) || [];
+    } catch (e1) {
+      console.warn(`[JOB] Falha ao raspar highscore de ${world1}:`, e1.message);
+    }
+    try {
+      playersW2 = await scrapeHighscores(world2, null, 10, voc) || [];
+    } catch (e2) {
+      console.warn(`[JOB] Falha ao raspar highscore de ${world2}:`, e2.message);
     }
 
-    const players = [...auroriaPlayers, ...secondaryPlayers];
+    const players = [...playersW1, ...playersW2];
     
     if (!players || players.length === 0) {
       console.log(`[JOB] Nenhum highscore encontrado.`);
