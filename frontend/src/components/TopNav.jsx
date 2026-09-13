@@ -5,7 +5,7 @@ import {
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
   Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
-  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift
+  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
@@ -53,6 +53,7 @@ export default function TopNav({
     attendance: { label: 'Mural de Mortes & Frags', icon: <CalendarDays size={16} /> },
     tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
     analytics: { label: 'Rankings Globais', icon: <TrendingDown size={16} /> },
+    developers: { label: 'API para Devs ⚡', icon: <Code2 size={16} className="text-yellow-400" /> },
     contribute: { label: 'Baixar Worker (VIP Grátis)', icon: <Cpu size={16} className="text-green-400" /> },
 
     // 🛡️ Guilda Shell Patrocina
@@ -80,7 +81,7 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'sorteio', 'attendance', 'tracker', 'analytics', 'contribute']
+      items: ['live', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
       title: 'Guilda Battle Storm',

@@ -595,6 +595,37 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
 
       </div>
 
+      {/* 5. BANNER PARA DESENVOLVEDORES / ALUGUEL DE API ⚡ */}
+      <div className="relative overflow-hidden rounded-2xl border-2 border-yellow-500/40 bg-gradient-to-r from-yellow-950/60 via-black to-yellow-950/40 p-6 sm:p-8 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-yellow-500/20 border border-yellow-500/40 flex items-center justify-center text-yellow-400 text-3xl shrink-0 shadow-lg">
+            ⚡
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="rounded bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-yellow-400 border border-yellow-500/30">
+                Developer Hub
+              </span>
+              <span className="text-xs text-gray-400">REST API • JSON • Webhooks</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-medieval text-white font-bold">
+              Crie Bots de Discord e Ferramentas com Nossos Dados
+            </h3>
+            <p className="text-xs text-gray-300 font-sans mt-1 max-w-xl">
+              Alugue acesso à API oficial de telemetria do Rubinot. Telemetria dos 6 mundos, radar de mortes e status de personagens em tempo real.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => onNavigate('developers')}
+          className="shrink-0 flex items-center gap-2 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 px-6 py-3 text-xs font-bold text-black shadow-xl transition-all hover:scale-105 active:scale-95"
+        >
+          <span>Conhecer API & Planos</span>
+          <ArrowRight size={15} />
+        </button>
+      </div>
+
       {/* MODAL: CALCULADORA DE LOOT SPLIT */}
       {lootModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">

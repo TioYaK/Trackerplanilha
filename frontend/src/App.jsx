@@ -34,6 +34,7 @@ const OnboardingScreen = lazy(() => import('./views/OnboardingScreen'));
 const WorkerDashboard = lazy(() => import('./views/WorkerDashboard'));
 const GuildPerks = lazy(() => import('./views/GuildPerks'));
 const GiveawayDraw = lazy(() => import('./views/GiveawayDraw'));
+const DeveloperHub = lazy(() => import('./views/DeveloperHub'));
 
 function ModuleFallback() {
   return (
@@ -249,6 +250,16 @@ export default function App() {
     if (currentView === 'attendance') return <WarAttendance onPlayerClick={handlePlayerClick} />;
     if (currentView === 'tracker') return <GlobalTracker onPlayerClick={handlePlayerClick} />;
     if (currentView === 'analytics') return <Rankings isAdmin={isAdmin} />;
+    if (currentView === 'developers' || currentView === 'api') {
+      return (
+        <DeveloperHub 
+          user={user} 
+          profile={profile} 
+          isAdmin={isAdmin} 
+          onNavigate={navigateView} 
+        />
+      );
+    }
     if (currentView === 'contribute') return <Contribute />;
     if (currentView === 'players') {
       return (
