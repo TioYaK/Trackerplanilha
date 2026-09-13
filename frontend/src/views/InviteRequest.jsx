@@ -143,13 +143,13 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
             </div>
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-xs font-bold text-yellow-300 uppercase tracking-wider mb-1.5">
-                <UserPlus size={13} /> Recrutamento Oficial & Exclusivo
+                <Shield size={13} /> Sistema de Membros Recrutados
               </div>
               <h1 className="text-2xl sm:text-4xl font-medieval text-gradient-gold drop-shadow-md">
-                Recrutamento • Shell Patrocina & Aliadas
+                Convites In-Game • Shell Patrocina
               </h1>
               <p className="text-gray-300 font-sans text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-                Este sistema de convite automatizado é <strong>único e exclusivo</strong> para novos guerreiros e alts ingressarem na guilda <strong>Shell Patrocina</strong> (Auroria / Rubinot) e nas guildas parceiras nos demais servidores da rede.
+                Este sistema automatizado de convite in-game é <strong>exclusivo para membros já recrutados</strong> da guilda <strong>Shell Patrocina</strong> (Auroria / Rubinot) e de suas guildas parceiras nos demais servidores da rede.
               </p>
             </div>
           </div>
@@ -188,10 +188,10 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
           <div className="bg-tibia-card border-2 border-tibia-border rounded-xl p-6 shadow-xl relative">
             <h2 className="text-xl font-medieval font-bold mb-2 text-tibia-highlight flex items-center gap-2">
               <UserPlus size={20} className="text-yellow-400" />
-              Solicitar Convite In-Game
+              Convidar Personagem / Alt
             </h2>
             <p className="text-xs text-gray-400 mb-6 font-sans">
-              O bot executará o convite no painel da guilda no site oficial do servidor em poucos instantes.
+              Envie o convite in-game automático para o seu personagem principal ou maker. O robô executará o convite no painel da guilda no site oficial em instantes.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -231,7 +231,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
               <div className="bg-yellow-950/20 border border-yellow-500/30 rounded-lg p-3 text-[11px] text-gray-300 flex items-start gap-2">
                 <Info size={16} className="text-yellow-400 shrink-0 mt-0.5" />
                 <span>
-                  O personagem não pode estar em outra guilda. Após solicitar, confira os convites pendentes no site do jogo para aceitar.
+                  <strong>Atenção:</strong> Uso exclusivo para membros já recrutados pela liderança da Shell Patrocina. O personagem não pode pertencer a outra guilda.
                 </span>
               </div>
 

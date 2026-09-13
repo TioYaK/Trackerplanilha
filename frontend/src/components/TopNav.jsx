@@ -59,7 +59,7 @@ export default function TopNav({
     bank: { label: 'Tesouraria da Guilda', icon: <Landmark size={16} /> },
     market: { label: 'Mercado Interno (Trocas)', icon: <Store size={16} /> },
     guild_perks: { label: 'Perks da Guilda', icon: <Award size={16} /> },
-    invite: { label: 'Recrutamento Shell Patrocina', icon: <UserPlus size={16} className="text-yellow-400" /> },
+    invite: { label: 'Convites In-Game (Membros)', icon: <UserPlus size={16} /> },
 
     // 💎 Mega Premium
     bazaar: { label: 'Bazaar Sniper 💎', icon: <Gem size={16} className="text-yellow-400" /> },

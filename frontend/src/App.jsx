@@ -50,8 +50,11 @@ const DEFAULT_VISIBLE_TABS = [
 ];
 
 export default function App() {
-  const { user, profile, loading, logout } = useAuth();
-  const [currentView, setCurrentView] = useState('live');
+  const [currentView, setCurrentView] = useState(() => {
+    const path = window.location.pathname.toLowerCase();
+    if (path === '/invite' || path === '/invites') return 'invite';
+    return 'live';
+  });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedParty, setSelectedParty] = useState(null);
   const [visibleTabs, setVisibleTabs] = useState(null);
@@ -210,23 +213,23 @@ export default function App() {
       );
     }
 
-    // 3.1 Recrutamento Oficial & Convite Shell Patrocina (Acesso livre para quem quer ingressar ou alts)
-    if (currentView === 'invite') {
-      return (
-        <InviteRequest 
-          isPublic={!isAdmin} 
-          defaultCharacter={profile?.main_character || ''} 
-        />
-      );
-    }
-
-    // 4. Abas de Gestão da Guilda 🛡️ (Gated para membros Shell Patrocina)
-    const guildViews = ['planilha', 'respawns', 'roster', 'bank', 'market', 'party', 'guild_perks', 'pearks'];
+    // 4. Abas de Gestão da Guilda 🛡️ (Gated estritamente para membros Shell Patrocina)
+    const guildViews = ['planilha', 'respawns', 'roster', 'bank', 'market', 'party', 'guild_perks', 'pearks', 'invite'];
     if (guildViews.includes(currentView)) {
+      const featureTitles = {
+        planilha: 'Controle de Hunts & Caves',
+        invite: 'Convites In-Game da Guilda',
+        respawns: 'Respawns & Regras',
+        roster: 'Exército da Guilda',
+        bank: 'Tesouraria da Guilda',
+        market: 'Mercado Interno',
+        guild_perks: 'Perks da Guilda'
+      };
+
       if (!user) {
         return (
           <GuildGate 
-            featureName={currentView === 'planilha' ? 'Controle de Hunts & Caves' : 'Área Restrita da Guilda'}
+            featureName={featureTitles[currentView] || 'Área Restrita da Guilda Shell Patrocina'}
             onLogin={() => setCurrentView('auth')}
             onNavigate={setCurrentView}
           />
@@ -255,7 +258,7 @@ export default function App() {
       if (profile?.status !== 'active' && !isAdmin) {
         return (
           <GuildGate 
-            featureName="Área Restrita da Guilda"
+            featureName={featureTitles[currentView] || 'Área Restrita da Guilda Shell Patrocina'}
             onLogin={() => setCurrentView('auth')}
             onNavigate={setCurrentView}
           />
@@ -271,6 +274,7 @@ export default function App() {
         case 'party': return <PartyDashboard party={selectedParty} onPlayerClick={handlePlayerClick} />;
         case 'guild_perks':
         case 'pearks': return <GuildPerks isAdmin={isAdmin} />;
+        case 'invite': return <InviteRequest defaultCharacter={profile?.main_character || ''} isPublic={false} />;
       }
     }
 
