@@ -397,19 +397,22 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           </button>
         </div>
 
-        {/* CARD 3: ESPAÇO DA GUILDA SHELL PATROCINA (RESTRITO) */}
+        {/* CARD 3: ESPAÇO DA GUILDA BATTLE STORM (RESTRITO) */}
         <div className="relative overflow-hidden rounded-2xl border border-yellow-500/30 bg-gradient-to-b from-yellow-950/20 via-black/90 to-black p-6 shadow-2xl flex flex-col justify-between group hover:border-yellow-500/60 transition-all">
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <span className="rounded-full bg-yellow-500/20 border border-yellow-500/40 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-yellow-400 flex items-center gap-1.5">
                 <Shield size={13} /> Área da Guilda
               </span>
-              <span className="text-[10px] text-gray-400 uppercase font-bold">Membros</span>
+              <span className="text-[10px] text-yellow-500/80 uppercase font-bold tracking-wider">Membros</span>
             </div>
 
-            <h3 className="text-2xl font-medieval text-white mb-2 group-hover:text-yellow-400 transition-colors">
-              Guilda Shell Patrocina
+            <h3 className="text-2xl font-medieval text-white mb-1 group-hover:text-yellow-400 transition-colors">
+              Guilda Battle Storm
             </h3>
+            <div className="text-[11px] text-yellow-400/80 font-sans mb-3 flex items-center gap-1">
+              <span>🛡️ Divisão Auroria: Shell Patrocina</span>
+            </div>
             
             <p className="text-xs text-gray-300 font-sans leading-relaxed mb-6">
               Espaço reservado aos membros recrutados: agendamento de caves, banco da guilda, perks de war e emissão de convites in-game.
@@ -420,7 +423,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
             onClick={() => onNavigate('planilha')}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-black/70 hover:bg-yellow-950/40 border border-yellow-500/40 py-3 text-sm font-bold text-yellow-400 shadow-lg transition-all active:scale-95"
           >
-            <Shield size={16} /> Acessar Espaço da Guilda
+            <Shield size={16} /> Acessar Battle Storm
             <ArrowRight size={16} />
           </button>
         </div>

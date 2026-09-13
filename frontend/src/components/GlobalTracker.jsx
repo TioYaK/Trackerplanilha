@@ -420,7 +420,7 @@ export default function GlobalTracker({ onPlayerClick }) {
       <div className="flex justify-between items-center mb-8 border-b border-tibia-border pb-4">
         <div>
           <h2 className="text-5xl font-medieval text-gradient-gold mb-2">Sala de Guerra (War Room)</h2>
-          <p className="text-gray-400 font-sans">Business Intelligence e comportamento estratégico da guilda Shellpatrocina.</p>
+          <p className="text-gray-400 font-sans">Business Intelligence e comportamento estratégico da guilda Battle Storm (Shellpatrocina).</p>
         </div>
         <button 
           onClick={generateDiscordReport}

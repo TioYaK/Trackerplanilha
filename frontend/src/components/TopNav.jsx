@@ -81,7 +81,7 @@ export default function TopNav({
       items: ['live', 'attendance', 'tracker', 'analytics', 'contribute']
     },
     {
-      title: 'Guilda Shell Patrocina',
+      title: 'Guilda Battle Storm',
       icon: <Shield size={18} />,
       badge: !isGuildMember ? '🔒' : null,
       items: ['planilha', 'planilha_live', 'respawns', 'roster', 'bank', 'market', 'guild_perks', 'invite']

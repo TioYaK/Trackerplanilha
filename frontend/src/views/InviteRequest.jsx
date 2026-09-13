@@ -146,10 +146,10 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                 <Shield size={13} /> Sistema de Membros Recrutados
               </div>
               <h1 className="text-2xl sm:text-4xl font-medieval text-gradient-gold drop-shadow-md">
-                Convites In-Game • Shell Patrocina
+                Convites In-Game • Battle Storm
               </h1>
               <p className="text-gray-300 font-sans text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-                Este sistema automatizado de convite in-game é <strong>exclusivo para membros já recrutados</strong> da guilda <strong>Shell Patrocina</strong> (Auroria / Rubinot) e de suas guildas parceiras nos demais servidores da rede.
+                Este sistema automatizado de convite in-game é <strong>exclusivo para membros já recrutados</strong> da guilda <strong>Battle Storm</strong> (registrada como <strong>Shellpatrocina</strong> no Auroria) e de suas guildas nos demais servidores da rede Rubinot.
               </p>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
               <div className="bg-yellow-950/20 border border-yellow-500/30 rounded-lg p-3 text-[11px] text-gray-300 flex items-start gap-2">
                 <Info size={16} className="text-yellow-400 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Atenção:</strong> Uso exclusivo para membros já recrutados pela liderança da Shell Patrocina. O personagem não pode pertencer a outra guilda.
+                  <strong>Atenção:</strong> Uso exclusivo para membros já recrutados pela liderança da <strong>Battle Storm</strong> (Shell Patrocina). O personagem não pode pertencer a outra guilda.
                 </span>
               </div>
 

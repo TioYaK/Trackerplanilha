@@ -242,7 +242,7 @@ export default function App() {
       if (!user) {
         return (
           <GuildGate 
-            featureName={featureTitles[currentView] || 'Área Restrita da Guilda Shell Patrocina'}
+            featureName={featureTitles[currentView] || 'Área Restrita da Guilda Battle Storm'}
             onLogin={() => setCurrentView('auth')}
             onNavigate={setCurrentView}
           />
@@ -271,7 +271,7 @@ export default function App() {
       if (profile?.status !== 'active' && !isAdmin) {
         return (
           <GuildGate 
-            featureName={featureTitles[currentView] || 'Área Restrita da Guilda Shell Patrocina'}
+            featureName={featureTitles[currentView] || 'Área Restrita da Guilda Battle Storm'}
             onLogin={() => setCurrentView('auth')}
             onNavigate={setCurrentView}
           />
