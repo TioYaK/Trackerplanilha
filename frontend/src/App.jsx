@@ -40,6 +40,9 @@ const TermsOfService = lazy(() => import('./views/TermsOfService'));
 const AboutUs = lazy(() => import('./views/AboutUs'));
 const GuidesHub = lazy(() => import('./views/GuidesHub'));
 const CharacterVersus = lazy(() => import('./views/CharacterVersus'));
+const LootSplitter = lazy(() => import('./views/LootSplitter'));
+const ExerciseCalculator = lazy(() => import('./views/ExerciseCalculator'));
+const HuntFinder = lazy(() => import('./views/HuntFinder'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import GlobalSearchModal from './components/GlobalSearchModal';
@@ -88,6 +91,17 @@ const ROUTE_TO_VIEW = {
   '/global': 'tracker',
   '/analytics': 'analytics',
   '/rankings': 'analytics',
+  '/fame': 'fame',
+  '/salao-da-fama': 'fame',
+  '/loot': 'loot_splitter',
+  '/loot-split': 'loot_splitter',
+  '/divisao': 'loot_splitter',
+  '/exercise': 'exercise_calc',
+  '/treino': 'exercise_calc',
+  '/training': 'exercise_calc',
+  '/hunt-finder': 'hunt_finder',
+  '/hunts': 'hunt_finder',
+  '/caves': 'hunt_finder',
   '/contribute': 'contribute',
   '/worker': 'contribute',
   '/workers-vip': 'contribute',
@@ -98,8 +112,6 @@ const ROUTE_TO_VIEW = {
   '/extreme': 'extreme',
   '/bi': 'extreme',
   '/planilha': 'home',
-  '/caves': 'home',
-  '/hunts': 'home',
   '/planilha-live': 'home',
   '/respawns': 'home',
   '/regras': 'home',
@@ -146,6 +158,10 @@ const VIEW_TO_ROUTE = {
   attendance: '/attendance',
   tracker: '/tracker',
   analytics: '/analytics',
+  fame: '/fame',
+  loot_splitter: '/loot',
+  exercise_calc: '/treino',
+  hunt_finder: '/hunt-finder',
   contribute: '/contribute',
   bazaar: '/bazaar',
   radar: '/radar',
@@ -175,6 +191,10 @@ const VIEW_TO_ROUTE = {
 const VIEW_TITLES = {
   home: 'Rubinot Tracker | Portal Central',
   live: 'Rubinot Tracker | Portal Central',
+  loot_splitter: 'Rubinot Tracker | Divisão de Loot da Party 💰',
+  exercise_calc: 'Rubinot Tracker | Calculadora de Treino & Weapons 🧮',
+  hunt_finder: 'Rubinot Tracker | Hunt Finder 2.0 & Rotas 🗺️',
+  fame: 'Rubinot Tracker | Salão da Fama Rubinot 👑',
   versus: 'Rubinot Tracker | Comparador de Personagens Versus ⚔️',
   guides: 'Rubinot Tracker | Guias, Estratégias & Artigos 📜',
   developers: 'Rubinot Tracker | API para Desenvolvedores ⚡',
@@ -466,6 +486,18 @@ export default function App() {
         />
       );
     }
+    if (currentView === 'loot_splitter') {
+      return <LootSplitter onNavigate={navigateView} />;
+    }
+    if (currentView === 'exercise_calc') {
+      return <ExerciseCalculator onNavigate={navigateView} />;
+    }
+    if (currentView === 'hunt_finder') {
+      return <HuntFinder onNavigate={navigateView} />;
+    }
+    if (currentView === 'fame') {
+      return <Rankings initialTab="fame" isAdmin={isAdmin} onPlayerClick={handlePlayerClick} />;
+    }
     if (currentView === 'sorteio' || currentView === 'giveaway') {
       return (
         <GiveawayDraw 
@@ -520,11 +552,21 @@ export default function App() {
     }
 
     if (currentView === 'bazaar') {
+      if (isPremium) {
+        return (
+          <BazaarSniper 
+            isPremium={isPremium} 
+            onPlayerClick={handlePlayerClick} 
+            onNavigate={navigateView} 
+          />
+        );
+      }
       return (
-        <BazaarSniper 
-          isPremium={isPremium} 
-          onPlayerClick={handlePlayerClick} 
-          onNavigate={navigateView} 
+        <PremiumGate 
+          featureName="Bazaar Sniper Pro & Arbitragem 💎"
+          featureDescription="Monitore leilões com lances abaixo do valor de mercado, simulador FIPE de personagens, radar de hunted em leilão e alertas sonoros em tempo real nos 16 mundos de Rubinot."
+          onNavigate={navigateView}
+          onLogin={() => navigateView('auth')}
         />
       );
     }

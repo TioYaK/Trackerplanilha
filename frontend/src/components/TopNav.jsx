@@ -6,7 +6,8 @@ import {
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
   Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
-  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2, BookOpen
+  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2, BookOpen,
+  Compass, Coins
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
@@ -52,6 +53,9 @@ export default function TopNav({
     // 🌐 Rubinot Público
     live: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
     home: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
+    hunt_finder: { label: 'Hunt Finder 2.0 & Rotas 🗺️', icon: <Compass size={16} className="text-yellow-400" /> },
+    exercise_calc: { label: 'Calculadora de Treino 🧮', icon: <Calculator size={16} className="text-yellow-400" /> },
+    loot_splitter: { label: 'Divisão de Loot da Party 💰', icon: <Coins size={16} className="text-yellow-400" /> },
     bazaar: { label: 'Bazaar Sniper (Leilões)', icon: <Gem size={16} className="text-yellow-400" /> },
     versus: { label: 'Comparador Versus ⚔️', icon: <Swords size={16} className="text-red-400" /> },
     guides: { label: 'Guias & Estratégias 📜', icon: <BookOpen size={16} className="text-yellow-400" /> },
@@ -80,7 +84,7 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'bazaar', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
+      items: ['live', 'hunt_finder', 'exercise_calc', 'loot_splitter', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
       title: 'Comunidade & Guildas',
@@ -91,7 +95,7 @@ export default function TopNav({
       title: 'Mega Premium 💎',
       icon: <Gem size={18} className="text-yellow-400" />,
       badge: isPremium ? 'VIP' : 'PRO',
-      items: ['radar', 'extreme']
+      items: ['bazaar', 'radar', 'extreme']
     }
   ];
 

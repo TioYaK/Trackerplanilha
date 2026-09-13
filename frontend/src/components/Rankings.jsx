@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { formatVocation } from '../lib/tibiaUtils';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 
-export default function Rankings({ isAdmin, onPlayerClick }) {
+export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
   const { activeWorld, setActiveWorld, worlds } = useWorld();
   const [selectedWorld, setSelectedWorld] = useState(activeWorld || 'ALL');
 
@@ -12,9 +12,12 @@ export default function Rankings({ isAdmin, onPlayerClick }) {
   const [topLevels, setTopLevels] = useState([]);
   const [topParty, setTopParty] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('rushers'); // rushers, highscores, party
+  const [activeTab, setActiveTab] = useState(initialTab || 'rushers'); // rushers, highscores, party
   const [vocationFilter, setVocationFilter] = useState('ALL'); // ALL, EK, RP, MS, ED
   const [searchTerm, setSearchTerm] = useState('');
+  const [padeiros, setPadeiros] = useState([]);
+  const [topFraggers, setTopFraggers] = useState([]);
+  const [imortais, setImortais] = useState([]);
 
   // Sincroniza se o activeWorld mudar externamente
   useEffect(() => {
@@ -67,6 +70,55 @@ export default function Rankings({ isAdmin, onPlayerClick }) {
         });
       }
       setTopParty(bestParty);
+
+      // Busca mortes para o Salão da Fama (Padeiros, Top Fraggers e Imortais)
+      const { data: deathsData } = await supabase
+        .from('recent_deaths')
+        .select('character_name, killed_by, level, world, death_time')
+        .order('death_time', { ascending: false })
+        .limit(250);
+
+      if (deathsData && deathsData.length > 0) {
+        // Padeiros (mais mortes)
+        const deathCounts = {};
+        const pvpKillerCounts = {};
+        const deadSet = new Set();
+
+        deathsData.forEach(d => {
+          if (d.character_name) {
+            deadSet.add(d.character_name.toLowerCase());
+            deathCounts[d.character_name] = (deathCounts[d.character_name] || 0) + 1;
+          }
+          if (d.killed_by) {
+            const kb = d.killed_by.trim();
+            const lower = kb.toLowerCase();
+            const isMonster = lower.startsWith('a ') || lower.startsWith('an ') || lower.includes('dragon') || lower.includes('demon') || lower.includes('skeleton');
+            if (!isMonster && kb.length > 2) {
+              pvpKillerCounts[kb] = (pvpKillerCounts[kb] || 0) + 1;
+            }
+          }
+        });
+
+        const sortedPadeiros = Object.entries(deathCounts)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10);
+        setPadeiros(sortedPadeiros);
+
+        const sortedFraggers = Object.entries(pvpKillerCounts)
+          .map(([name, kills]) => ({ name, kills }))
+          .sort((a, b) => b.kills - a.kills)
+          .slice(0, 10);
+        setTopFraggers(sortedFraggers);
+
+        // Imortais: rushers com mais de 0 XP que NÃO morreram
+        if (rushersData) {
+          const aliveRushers = rushersData
+            .filter(r => r.name && !deadSet.has(r.name.toLowerCase()) && r.exp_gained > 0)
+            .slice(0, 10);
+          setImortais(aliveRushers);
+        }
+      }
 
       // 4. Cruzamento de Mundos e Dados de Personagens
       const allNames = new Set();
@@ -299,6 +351,18 @@ export default function Rankings({ isAdmin, onPlayerClick }) {
         </button>
 
         <button
+          onClick={() => setActiveTab('fame')}
+          className={`flex items-center gap-2 px-5 py-3 font-bold text-sm transition-all border-b-2 whitespace-nowrap ${
+            activeTab === 'fame'
+              ? 'border-yellow-400 text-yellow-300 bg-yellow-500/10'
+              : 'border-transparent text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <Sparkles size={18} className="text-yellow-400" />
+          👑 Salão da Fama
+        </button>
+
+        <button
           onClick={() => setActiveTab('party')}
           className={`flex items-center gap-2 px-5 py-3 font-bold text-sm transition-all border-b-2 whitespace-nowrap ${
             activeTab === 'party'
@@ -510,6 +574,123 @@ export default function Rankings({ isAdmin, onPlayerClick }) {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Conteúdo da Aba: Salão da Fama Rubinot 👑 */}
+      {activeTab === 'fame' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* 1. O IMORTAL */}
+            <div className="bg-black/70 border-2 border-green-500/40 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3 border-b border-green-500/30 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Shield className="text-green-400" size={20} />
+                    <h3 className="font-medieval text-green-400 text-base font-bold">🛡️ Os Imortais</h3>
+                  </div>
+                  <span className="text-[10px] bg-green-500/20 text-green-300 px-2 py-0.5 rounded font-bold uppercase">Zero Mortes</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+                  Guerreiros com maior ganho de experiência nas últimas 24h sem sofrer nenhuma baixa.
+                </p>
+
+                <div className="space-y-2">
+                  {imortais.length === 0 ? (
+                    <div className="text-xs text-gray-500 italic text-center py-6">Carregando guerreiros imortais...</div>
+                  ) : (
+                    imortais.slice(0, 5).map((p, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => onPlayerClick && onPlayerClick(p.name)}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-black/60 border border-green-500/20 hover:border-green-400 cursor-pointer transition-all"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400 font-bold font-mono text-xs">#{idx + 1}</span>
+                          <span className="text-xs font-bold text-white hover:text-green-300">{p.name}</span>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-green-400">+{((p.exp_gained || 0) / 1000000).toFixed(1)}M XP</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. O PADEIRO DA SEMANA */}
+            <div className="bg-black/70 border-2 border-red-500/40 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3 border-b border-red-500/30 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Flame className="text-red-400" size={20} />
+                    <h3 className="font-medieval text-red-400 text-base font-bold">🥖 O Padeiro do Mês</h3>
+                  </div>
+                  <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded font-bold uppercase">Mais Deitaram</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+                  Os clientes fiéis do templo: quem mais distribuiu bênçãos e perdeu XP no servidor recentemente.
+                </p>
+
+                <div className="space-y-2">
+                  {padeiros.length === 0 ? (
+                    <div className="text-xs text-gray-500 italic text-center py-6">Carregando estatísticas do templo...</div>
+                  ) : (
+                    padeiros.slice(0, 5).map((p, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => onPlayerClick && onPlayerClick(p.name)}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-black/60 border border-red-500/20 hover:border-red-400 cursor-pointer transition-all"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-red-400 font-bold font-mono text-xs">#{idx + 1}</span>
+                          <span className="text-xs font-bold text-white hover:text-red-300">{p.name}</span>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-red-400">{p.count}x mortes</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 3. TOP FRAGGERS PVP */}
+            <div className="bg-black/70 border-2 border-yellow-500/40 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3 border-b border-yellow-500/30 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="text-yellow-400" size={20} />
+                    <h3 className="font-medieval text-yellow-400 text-base font-bold">⚔️ Executores PvP</h3>
+                  </div>
+                  <span className="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded font-bold uppercase">Top Fraggers</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+                  Os maiores assassinos e finalizadores em confrontos de Warmode e batalhas abertas.
+                </p>
+
+                <div className="space-y-2">
+                  {topFraggers.length === 0 ? (
+                    <div className="text-xs text-gray-500 italic text-center py-6">Carregando maiores matadores...</div>
+                  ) : (
+                    topFraggers.slice(0, 5).map((p, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => onPlayerClick && onPlayerClick(p.name)}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-black/60 border border-yellow-500/20 hover:border-yellow-400 cursor-pointer transition-all"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-yellow-400 font-bold font-mono text-xs">#{idx + 1}</span>
+                          <span className="text-xs font-bold text-white hover:text-yellow-300">{p.name}</span>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-yellow-400">{p.kills} frags</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

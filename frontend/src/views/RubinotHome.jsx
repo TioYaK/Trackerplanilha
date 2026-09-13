@@ -6,9 +6,10 @@ import {
   Globe, Activity, Skull, Trophy, Gem, Cpu, Calculator, 
   Search, Shield, ArrowRight, RefreshCw, Users, Server, 
   ExternalLink, CheckCircle2, ChevronRight, Zap, Sparkles, Copy, Check, Gift,
-  BookOpen, HelpCircle
+  BookOpen, HelpCircle, Compass, Coins, Swords, Target
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
+import LiveWarFeed from '../components/LiveWarFeed';
 
 // Censo Oficial dos 16 Mundos do Rubinot (Base Oficial em Tempo Real)
 const WORLD_CENSUS = {
@@ -426,6 +427,9 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
       {/* BANNER OFICIAL DE PUBLICIDADE & PATROCÍNIOS */}
       <AdBanner />
 
+      {/* ⚔️ LIVE WAR FEED: MURAL DE FRAGS EM TEMPO REAL & FEED DE TRETA */}
+      <LiveWarFeed onPlayerClick={onPlayerClick} onNavigate={onNavigate} />
+
       {/* 3. VITRINE DE SUPER RECURSOS (OS 3 PILARES DE CONVERSÃO & UTILIDADE) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
@@ -438,7 +442,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
               <span className="rounded-full bg-yellow-500/20 border border-yellow-500/40 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-yellow-300 flex items-center gap-1.5">
                 <Gem size={13} className="text-yellow-400" /> Mega Premium 💎
               </span>
-              <span className="text-[10px] text-gray-400 uppercase font-bold">Flagship</span>
+              <span className="text-[10px] text-gray-400 uppercase font-bold">VIP Only</span>
             </div>
 
             <h3 className="text-2xl font-medieval text-gradient-gold mb-2 group-hover:text-yellow-300 transition-colors">
@@ -472,58 +476,65 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           <div>
             <div className="flex items-center justify-between mb-4">
               <span className="rounded-full bg-cyan-500/20 border border-cyan-500/40 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-                <Calculator size={13} /> Ferramenta Comunitária
+                <Coins size={13} /> Ferramenta Comunitária
               </span>
               <span className="text-[10px] text-green-400 uppercase font-bold">100% Grátis</span>
             </div>
 
             <h3 className="text-2xl font-medieval text-cyan-400 mb-2 group-hover:text-cyan-300 transition-colors">
-              Loot Split Calculator
+              Divisão de Loot de Hunt
             </h3>
             
             <p className="text-xs text-gray-300 font-sans leading-relaxed mb-6">
-              Terminou a hunt da party? Cole o Party Hunt Session do client e divida automaticamente lucro, supplies e transferências em 1 segundo.
+              Terminou a hunt da party? Cole o Party Hunt Session do client e divida automaticamente lucro, supplies e comandos bancários em 1 segundo.
             </p>
           </div>
 
           <button
-            onClick={() => setLootModalOpen(true)}
+            onClick={() => onNavigate('loot_splitter')}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-cyan-900/50 hover:bg-cyan-800 border border-cyan-500/50 py-3 text-sm font-bold text-cyan-200 shadow-lg transition-all active:scale-95"
           >
-            <Calculator size={16} /> Abrir Calculadora de Loot
+            <Coins size={16} /> Abrir Calculadora de Loot
             <ArrowRight size={16} />
           </button>
         </div>
 
-        {/* CARD 3: ESPAÇO DE GESTÃO DA GUILDA (MULTI-GUILDA) */}
+        {/* CARD 3: HUNT FINDER 2.0 & CALCULADORA DE TREINO */}
         <div className="relative overflow-hidden rounded-2xl border border-yellow-500/30 bg-gradient-to-b from-yellow-950/20 via-black/90 to-black p-6 shadow-2xl flex flex-col justify-between group hover:border-yellow-500/60 transition-all">
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="rounded-full bg-yellow-500/20 border border-yellow-500/40 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-yellow-400 flex items-center gap-1.5">
-                <Shield size={13} /> Área da Guilda
+                <Compass size={13} /> Guias & Simuladores
               </span>
-              <span className="text-[10px] text-yellow-500/80 uppercase font-bold tracking-wider">Multi-Guilda</span>
+              <span className="text-[10px] text-yellow-500/80 uppercase font-bold tracking-wider">Novo Arsenal</span>
             </div>
 
             <h3 className="text-2xl font-medieval text-white mb-1 group-hover:text-yellow-400 transition-colors">
-              Espaço & Gestão de Guilda
+              Hunt Finder & Treino
             </h3>
             <div className="text-[11px] text-yellow-400/80 font-sans mb-3 flex items-center gap-1">
-              <span>🛡️ Suporte para todas as guildas em todos os mundos</span>
+              <span>🎯 Respawns mais lucrativos e cálculo de Exercise Weapons</span>
             </div>
             
             <p className="text-xs text-gray-300 font-sans leading-relaxed mb-6">
-              Espaço reservado aos membros e lideranças: agendamento de caves, controle de hunts, banco da guilda, perks de war e emissão de convites in-game.
+              Filtre as melhores hunts para seu level e vocação (Cobras, Issavi, Nagas) e calcule exatamente quantas armas de treino precisa para seu skill meta!
             </p>
           </div>
 
-          <button
-            onClick={() => onNavigate('planilha')}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-black/70 hover:bg-yellow-950/40 border border-yellow-500/40 py-3 text-sm font-bold text-yellow-400 shadow-lg transition-all active:scale-95"
-          >
-            <Shield size={16} /> Acessar Gestão de Guilda
-            <ArrowRight size={16} />
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => onNavigate('hunt_finder')}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-black/80 hover:bg-yellow-950/50 border border-yellow-500/40 py-2.5 text-xs font-bold text-yellow-400 shadow-lg transition-all active:scale-95"
+            >
+              <Compass size={14} /> Hunt Finder
+            </button>
+            <button
+              onClick={() => onNavigate('exercise_calc')}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 text-black py-2.5 text-xs font-bold shadow-lg transition-all active:scale-95"
+            >
+              <Calculator size={14} /> Calc Treino
+            </button>
+          </div>
         </div>
 
       </div>
