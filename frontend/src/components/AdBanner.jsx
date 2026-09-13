@@ -24,11 +24,12 @@ export default function AdBanner({
   const [adBlocked, setAdBlocked] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  // Considera AdSense ativo no bloco quando houver um slot numérico válido criado no AdSense
-  const hasValidSlot = slot && slot !== '1234567890' && /^\d+$/.test(slot);
+  // Considera AdSense configurado quando houver client válido do Google (ca-pub-...)
+  const isAdSenseConfigured = client && client.startsWith('ca-pub-') && !client.includes('XXXX');
+  const hasSpecificSlot = slot && slot !== '1234567890' && /^\d+$/.test(slot);
 
   useEffect(() => {
-    if (!hasValidSlot || dismissed) return;
+    if (!isAdSenseConfigured || dismissed) return;
 
     // Inicializa o anúncio no slot com segurança para SPAs
     const timer = setTimeout(() => {
@@ -41,35 +42,35 @@ export default function AdBanner({
         // Ignora erro de slot duplicado ou bloqueado no React
         setAdBlocked(true);
       }
-    }, 300);
+    }, 400);
 
     return () => clearTimeout(timer);
-  }, [slot, hasValidSlot, dismissed]);
+  }, [slot, isAdSenseConfigured, dismissed]);
 
   if (dismissed) return null;
 
-  // Se o AdSense estiver configurado com credenciais válidas e não bloqueado, renderiza o slot do Google
-  if (hasValidSlot && !adBlocked) {
+  // Se o AdSense estiver configurado com credenciais válidas e não bloqueado, renderiza o slot oficial do Google
+  if (isAdSenseConfigured && !adBlocked) {
     return (
-      <div className={`relative my-4 overflow-hidden rounded-lg border border-yellow-500/20 bg-black/60 p-2 text-center shadow-lg ${className}`}>
+      <div className={`relative my-4 overflow-hidden rounded-xl border border-yellow-500/25 bg-black/70 p-3 text-center shadow-2xl backdrop-blur-sm ${className}`}>
         {allowDismiss && (
           <button
             onClick={() => setDismissed(true)}
-            className="absolute right-2 top-2 z-10 rounded p-1 text-gray-400 hover:bg-white/10 hover:text-white"
+            className="absolute right-2 top-2 z-10 rounded p-1 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
             title="Ocultar anúncio"
           >
             <X size={14} />
           </button>
         )}
-        <div className="mb-1 text-[10px] uppercase tracking-wider text-gray-500 font-sans">
-          Publicidade / Google AdSense
+        <div className="mb-1 text-[9px] uppercase tracking-widest text-yellow-500/60 font-mono flex items-center justify-center gap-1">
+          <Sparkles size={10} className="text-yellow-500/60" /> Publicidade Oficial • Google AdSense
         </div>
         <div ref={adRef} className="flex items-center justify-center min-h-[90px]">
           <ins
             className="adsbygoogle"
             style={{ display: 'block', minHeight: '90px', width: '100%' }}
             data-ad-client={client}
-            data-ad-slot={slot}
+            {...(hasSpecificSlot ? { 'data-ad-slot': slot } : {})}
             data-ad-format={format}
             data-full-width-responsive={responsive ? 'true' : 'false'}
           />

@@ -6,8 +6,9 @@ import {
   Gift, Trophy, Sparkles, Users, Crown, Shield, 
   CheckCircle2, AlertCircle, Clock, Shuffle, 
   Plus, Trash2, ArrowRight, RotateCcw, Volume2, 
-  VolumeX, Calendar, Star, HelpCircle, UserPlus, Flame, Lock, Edit3
+  VolumeX, Calendar, Star, HelpCircle, UserPlus, Flame, Lock, Edit3, RefreshCw
 } from 'lucide-react';
+import AdBanner from '../components/AdBanner';
 
 const RUBINOT_WORLDS = [
   'Todos os Mundos',
@@ -56,6 +57,8 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
   const [charInput, setCharInput] = useState('');
   const [worldInput, setWorldInput] = useState('Auroria');
   const [regStatus, setRegStatus] = useState({ type: '', message: '' });
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [syncingLevels, setSyncingLevels] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
 
   // Estados da Roleta / Sorteio ao vivo
@@ -201,6 +204,9 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
       return;
     }
 
+    setIsRegistering(true);
+    setRegStatus({ type: 'info', message: `🔍 Verificando "${rawName}" no Rubinot em tempo real...` });
+
     // Verificar se já está inscrito
     const already = giveaway.participants.some(
       p => p.name.toLowerCase() === rawName.toLowerCase()
@@ -283,11 +289,28 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
         }
       }
 
-      // 5. Se ainda for <= 1, tenta consultar a API local do worker se disponível
+      // 5. Se ainda for <= 1, tenta chamar a API Serverless /api/get-character
+      if ((!charLevel || charLevel <= 1) && typeof window !== 'undefined') {
+        try {
+          const apiRes = await fetch(`/api/get-character?name=${encodeURIComponent(rawName)}`, {
+            signal: AbortSignal.timeout(4000)
+          });
+          if (apiRes.ok) {
+            const aData = await apiRes.json();
+            if (aData && aData.level && Number(aData.level) > 0) {
+              charLevel = Number(aData.level);
+              charVoc = aData.vocation || charVoc;
+              if (aData.world) resolvedWorld = aData.world;
+            }
+          }
+        } catch (ae) {}
+      }
+
+      // 6. Se ainda for <= 1, tenta consultar a API do worker local caso ativo
       if ((!charLevel || charLevel <= 1) && typeof window !== 'undefined') {
         try {
           const wRes = await fetch(`http://localhost:3001/api/character/${encodeURIComponent(rawName)}`, {
-            signal: AbortSignal.timeout(5000)
+            signal: AbortSignal.timeout(6000)
           });
           if (wRes.ok) {
             const wData = await wRes.json();
@@ -305,9 +328,17 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
 
     // Validação de nível mínimo
     if (giveaway.min_level > 0 && charLevel < giveaway.min_level) {
+      setIsRegistering(false);
+      if (charLevel <= 1) {
+        setRegStatus({
+          type: 'error',
+          message: `⚠️ Não foi possível confirmar o nível de "${rawName}" no Rubinot no momento (Requisito: Lvl ${giveaway.min_level}). Verifique o nome exato ou peça ao admin para validar sua inscrição.`
+        });
+        return;
+      }
       setRegStatus({
         type: 'error',
-        message: `Nível insuficiente. O requisito mínimo desta rodada é nível ${giveaway.min_level} (Seu nível: ${charLevel}).`
+        message: `Nível insuficiente. O requisito mínimo desta rodada é nível ${giveaway.min_level} (Nível detectado: ${charLevel}).`
       });
       return;
     }
@@ -328,9 +359,10 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
 
     await persistStore(updatedGiveaway);
     setCharInput('');
+    setIsRegistering(false);
     setRegStatus({ 
       type: 'success', 
-      message: `🎉 Inscrição confirmada com sucesso para ${rawName}! Boa sorte!` 
+      message: `🎉 Inscrição confirmada com sucesso para ${rawName} (Lvl ${charLevel} • ${charVoc})! Boa sorte!` 
     });
 
     if (soundEnabled) soundFX.playRouletteTick(800);
@@ -539,6 +571,81 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
         level: newLvl
       }, { onConflict: 'character_name' });
     } catch {}
+  };
+
+  // Sincronizar níveis reais de todos os participantes via Worker / Banco
+  const handleSyncAllParticipantsLevels = async () => {
+    if (syncingLevels || !giveaway.participants || giveaway.participants.length === 0) return;
+    setSyncingLevels(true);
+
+    try {
+      const updated = [...giveaway.participants];
+      let updatedCount = 0;
+
+      for (let i = 0; i < updated.length; i++) {
+        const p = updated[i];
+        const rawName = p.name;
+        let freshLevel = p.level;
+        let freshVoc = p.vocation;
+        let freshWorld = p.world;
+
+        // 1. Tenta guild_members
+        const { data: gMember } = await supabase
+          .from('guild_members')
+          .select('level, vocation')
+          .ilike('name', rawName)
+          .maybeSingle();
+
+        if (gMember && gMember.level && Number(gMember.level) > 1) {
+          freshLevel = Number(gMember.level);
+          freshVoc = gMember.vocation || freshVoc;
+        } else {
+          // 2. Tenta current_character_state
+          const { data: cData } = await supabase
+            .from('current_character_state')
+            .select('level, vocation')
+            .ilike('character_name', rawName)
+            .maybeSingle();
+
+          if (cData && cData.level && Number(cData.level) > 1) {
+            freshLevel = Number(cData.level);
+            freshVoc = cData.vocation || freshVoc;
+          } else {
+            // 3. Tenta worker local na porta 3001
+            try {
+              const wRes = await fetch(`http://localhost:3001/api/character/${encodeURIComponent(rawName)}`, {
+                signal: AbortSignal.timeout(6000)
+              });
+              if (wRes.ok) {
+                const wData = await wRes.json();
+                if (wData && wData.level && !isNaN(Number(wData.level)) && Number(wData.level) > 1) {
+                  freshLevel = Number(wData.level);
+                  freshVoc = wData.vocation || freshVoc;
+                  if (wData.world) freshWorld = wData.world;
+                }
+              }
+            } catch {}
+          }
+        }
+
+        if (freshLevel !== p.level || freshVoc !== p.vocation || freshWorld !== p.world) {
+          updated[i] = {
+            ...p,
+            level: freshLevel,
+            vocation: freshVoc,
+            world: freshWorld
+          };
+          updatedCount++;
+        }
+      }
+
+      await persistStore({ ...giveaway, participants: updated });
+      alert(`✅ Sincronização concluída! ${updatedCount} participante(s) atualizados com níveis reais do Rubinot.`);
+    } catch (err) {
+      alert(`Erro na sincronização: ${err.message}`);
+    } finally {
+      setSyncingLevels(false);
+    }
   };
 
   // Limpar todos os participantes
@@ -883,13 +990,25 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
                   />
 
                   {isAdmin && (
-                    <button
-                      onClick={handleExecuteDraw}
-                      disabled={isSpinning || giveaway.participants.length === 0}
-                      className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 px-4 py-2 text-xs font-bold text-black shadow-lg transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      <Shuffle size={14} /> Realizar Sorteio Agora
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSyncAllParticipantsLevels}
+                        disabled={syncingLevels || giveaway.participants.length === 0}
+                        className="flex items-center gap-1.5 rounded-xl border border-blue-500/40 bg-blue-950/40 hover:bg-blue-900/50 px-3.5 py-2 text-xs font-bold text-blue-300 transition-all active:scale-95 disabled:opacity-50"
+                        title="Consulta o Rubinot e sincroniza os níveis e vocações de todos os participantes inscritos"
+                      >
+                        <RefreshCw size={13} className={syncingLevels ? 'animate-spin text-blue-400' : ''} />
+                        <span>{syncingLevels ? 'Sincronizando...' : 'Atualizar Níveis'}</span>
+                      </button>
+
+                      <button
+                        onClick={handleExecuteDraw}
+                        disabled={isSpinning || giveaway.participants.length === 0}
+                        className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 px-4 py-2 text-xs font-bold text-black shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                      >
+                        <Shuffle size={14} /> Realizar Sorteio Agora
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1018,7 +1137,7 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
           <div className="space-y-6">
             
             {/* Ações Globais do Admin */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <button
                 onClick={handleExecuteDraw}
                 disabled={isSpinning || giveaway.participants.length === 0}
@@ -1026,6 +1145,16 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
               >
                 <Shuffle size={18} />
                 <span>Realizar Sorteio Agora</span>
+              </button>
+
+              <button
+                onClick={handleSyncAllParticipantsLevels}
+                disabled={syncingLevels || giveaway.participants.length === 0}
+                className="flex items-center justify-center gap-2 rounded-xl bg-blue-950/60 border border-blue-500/50 hover:bg-blue-900/60 p-4 text-sm font-bold text-blue-300 shadow-xl transition-all active:scale-95 disabled:opacity-50"
+                title="Consulta dados frescos no Rubinot e sincroniza todos os inscritos"
+              >
+                <RefreshCw size={18} className={syncingLevels ? 'animate-spin text-blue-400' : ''} />
+                <span>{syncingLevels ? 'Sincronizando...' : 'Atualizar Níveis Rubinot'}</span>
               </button>
 
               <button
@@ -1037,7 +1166,7 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
                 }`}
               >
                 <Clock size={18} />
-                <span>{giveaway.status === 'OPEN' ? 'Pausar / Fechar Inscrições' : 'Reabrir Inscrições'}</span>
+                <span>{giveaway.status === 'OPEN' ? 'Pausar Inscrições' : 'Reabrir Inscrições'}</span>
               </button>
 
               <button
@@ -1045,7 +1174,7 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
                 className="flex items-center justify-center gap-2 rounded-xl bg-purple-950/60 border border-purple-500/50 hover:bg-purple-900/60 p-4 text-sm font-bold text-purple-300 shadow-xl transition-all"
               >
                 <CheckCircle2 size={18} />
-                <span>Arquivar Rodada & Iniciar Nova</span>
+                <span>Arquivar & Nova Rodada</span>
               </button>
             </div>
 
@@ -1214,6 +1343,9 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
 
           </div>
         )}
+
+        {/* Banner de Publicidade / Patrocínio Oficial */}
+        <AdBanner />
 
       </div>
     </div>

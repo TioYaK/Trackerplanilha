@@ -6,6 +6,7 @@ import {
   Search, Shield, ArrowRight, RefreshCw, Users, Server, 
   ExternalLink, CheckCircle2, ChevronRight, Zap, Sparkles, Copy, Check, Gift
 } from 'lucide-react';
+import AdBanner from '../components/AdBanner';
 
 const RUBINOT_WORLDS = [
   { id: 'ALL', name: 'Todos os Mundos', icon: '🌐' },
@@ -366,6 +367,9 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           <ArrowRight size={15} />
         </button>
       </div>
+
+      {/* BANNER OFICIAL DE PUBLICIDADE & PATROCÍNIOS */}
+      <AdBanner />
 
       {/* 3. VITRINE DE SUPER RECURSOS (OS 3 PILARES DE CONVERSÃO & UTILIDADE) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

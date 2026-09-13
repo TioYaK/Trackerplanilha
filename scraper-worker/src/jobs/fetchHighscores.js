@@ -2,15 +2,32 @@ import { supabase } from '../db.js';
 import { scrapeHighscores } from '../lib/rubinotScraper.js';
 import 'dotenv/config';
 
+const RUBINOT_WORLDS = ['Auroria', 'Belaria', 'Bellum', 'Tenebrium', 'Vesperia', 'Malveria'];
+let secondaryWorldIndex = 1; // Começa em Belaria
+
 export const runFetchHighscores = async (vocationStr) => {
   try {
     const voc = vocationStr === 'ALL' ? null : 
                 vocationStr.charAt(0).toUpperCase() + vocationStr.slice(1).toLowerCase();
                 
-    console.log(`[JOB] Fetching Highscores (Auroria) -> Vocação: ${voc || 'Geral'}`);
+    const secondaryWorld = RUBINOT_WORLDS[secondaryWorldIndex];
+    secondaryWorldIndex = (secondaryWorldIndex + 1) % RUBINOT_WORLDS.length;
+    if (secondaryWorldIndex === 0) secondaryWorldIndex = 1; // Pula Auroria na rotação secundária pois já é o primário
+
+    console.log(`[JOB] Fetching Highscores -> Auroria (Principal) + ${secondaryWorld} (Rotação) | Vocação: ${voc || 'Geral'}`);
     
-    // Varre as 20 páginas (Top 1000) da vocação específica.
-    const players = await scrapeHighscores('Auroria', null, 20, voc); 
+    // 1. Auroria (Mundo Principal) - Top 15 páginas
+    const auroriaPlayers = await scrapeHighscores('Auroria', null, 15, voc) || []; 
+    
+    // 2. Mundo Secundário da Rodada - Top 5 páginas
+    let secondaryPlayers = [];
+    try {
+      secondaryPlayers = await scrapeHighscores(secondaryWorld, null, 5, voc) || [];
+    } catch (sErr) {
+      console.warn(`[JOB] Falha ao raspar highscore de ${secondaryWorld}:`, sErr.message);
+    }
+
+    const players = [...auroriaPlayers, ...secondaryPlayers];
     
     if (!players || players.length === 0) {
       console.log(`[JOB] Nenhum highscore encontrado.`);

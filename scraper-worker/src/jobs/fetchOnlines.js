@@ -1,20 +1,36 @@
 import { scrapeOnlines } from '../lib/rubinotScraper.js';
 import { supabase } from '../db.js';
 
+const RUBINOT_WORLDS = ['Auroria', 'Belaria', 'Bellum', 'Tenebrium', 'Vesperia', 'Malveria'];
+
 export const runFetchOnlines = async () => {
-  console.log(`[JOB] Fetching online players...`);
+  console.log(`[JOB] Fetching online players across all Rubinot worlds...`);
 
   try {
-    const onlinePlayers = await scrapeOnlines('Auroria');
+    const allWorldOnlines = {};
+    const onlinePlayers = [];
+
+    // Coleta onlines de todos os 6 mundos do Rubinot
+    for (const world of RUBINOT_WORLDS) {
+      try {
+        const worldPlayers = await scrapeOnlines(world);
+        allWorldOnlines[world] = worldPlayers || [];
+        if (Array.isArray(worldPlayers)) {
+          onlinePlayers.push(...worldPlayers);
+        }
+      } catch (wErr) {
+        console.warn(`[JOB] Falha ao buscar onlines de ${world}:`, wErr.message);
+      }
+    }
     
     if (onlinePlayers.length === 0) {
-      console.log('[JOB] Nenhum jogador online ou erro ao buscar.');
+      console.log('[JOB] Nenhum jogador online ou erro ao buscar nos mundos.');
       return;
     }
 
-    console.log(`[JOB] Iniciando processamento de ${onlinePlayers.length} jogadores online.`);
+    console.log(`[JOB] Total de ${onlinePlayers.length} jogadores online coletados nos 6 mundos.`);
 
-    // Registra o historico para o Heatmap de atividade
+    // Registra o total consolidado para o Heatmap e métricas do portal
     await supabase.from('online_history').insert({
       online_count: onlinePlayers.length
     });
@@ -74,11 +90,11 @@ export const runFetchOnlines = async () => {
                 description: `O radar de satélite detectou a conexão imediata de alvos na lista negra:\n\n${targetDetails}\n\n*Preparem as traps e posicionem os scouts!*`,
                 color: 15158332, // Vermelho de Alerta
                 fields: [
-                  { name: 'Mundo', value: 'Auroria', inline: true },
+                  { name: 'Mundos', value: 'Rubinot (6 Mundos)', inline: true },
                   { name: 'Total Online', value: `${onlinePlayers.length} players`, inline: true },
                   { name: 'Horário', value: new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: true }
                 ],
-                footer: { text: 'Auroria Telemetry Radar • Sistema de Defesa Automatizado' },
+                footer: { text: 'Rubinot Telemetry Radar • Sistema de Defesa Automatizado' },
                 timestamp: new Date().toISOString()
               }]
             }).catch(e => console.warn('[JOB] Erro ao enviar webhook do radar tático:', e.message));

@@ -16,6 +16,7 @@ export default function TopNav({
   setCurrentView, 
   isAdmin, 
   isPremium, 
+  hasActiveWorker,
   isGuildMember, 
   user, 
   profile, 
@@ -195,12 +196,21 @@ export default function TopNav({
 
           {user ? (
             <>
-              {isPremium && !isAdmin && (
+              {hasActiveWorker ? (
+                <div 
+                  className="flex items-center px-2.5 py-1 rounded border border-green-500/50 bg-green-950/60 text-green-400 text-xs font-bold gap-1.5 shadow-md cursor-help"
+                  title="Acesso VIP Ativo: Worker conectado e enviando telemetria em tempo real!"
+                >
+                  <Cpu size={13} className="text-green-400 animate-pulse" />
+                  <span className="hidden sm:inline">VIP Worker</span>
+                  <span className="sm:hidden">VIP</span>
+                </div>
+              ) : (isPremium && !isAdmin && (
                 <div className="hidden sm:flex items-center px-2 py-1 rounded border border-yellow-500/50 bg-yellow-500/20 text-yellow-400 text-xs font-bold gap-1 shadow-sm">
                   <Gem size={13} className="text-yellow-400" />
                   <span>VIP</span>
                 </div>
-              )}
+              ))}
 
               <button 
                 onClick={() => setProfileModalOpen(true)}

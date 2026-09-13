@@ -7,6 +7,7 @@ import { ptBR } from 'date-fns/locale';
 export default function Contribute() {
   const [copied, setCopied] = useState(false);
   const [workersList, setWorkersList] = useState([]);
+  const [localWorker, setLocalWorker] = useState(null);
   const [networkStats, setNetworkStats] = useState({
     activeWorkers: 0,
     totalTasks: 0,
@@ -16,9 +17,29 @@ export default function Contribute() {
 
   useEffect(() => {
     fetchNetworkStats();
-    const interval = setInterval(fetchNetworkStats, 15000);
+    checkLocalWorker();
+    const interval = setInterval(() => {
+      fetchNetworkStats();
+      checkLocalWorker();
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  const checkLocalWorker = async () => {
+    try {
+      const res = await fetch('http://localhost:3001/api/health', { signal: AbortSignal.timeout(1500) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.status === 'online') {
+          setLocalWorker(data);
+          return;
+        }
+      }
+      setLocalWorker(null);
+    } catch {
+      setLocalWorker(null);
+    }
+  };
 
   const fetchNetworkStats = async () => {
     try {
@@ -63,6 +84,32 @@ export default function Contribute() {
         <p className="text-gray-400 font-sans text-lg max-w-3xl mx-auto leading-relaxed">
           Nossa inteligência artificial varre e monitora milhares de personagens para nos dar a melhor vantagem nas wars e na economia. Para que o nosso painel seja ultrarrápido e descentralizado, nós construímos uma <strong>Rede Compartilhada de Telemetria</strong>. O seu computador pode ser um nó nessa rede que mantém a guilda sempre no topo!
         </p>
+
+        {localWorker && (
+          <div className="mt-6 max-w-2xl mx-auto rounded-xl border border-green-500/50 bg-green-950/40 p-4 shadow-xl backdrop-blur-sm flex items-center justify-between gap-4 text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-green-500/20 border border-green-500/40 flex items-center justify-center text-green-400 shrink-0">
+                <Cpu size={22} className="animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-green-300 uppercase tracking-wider">Worker Ativo Detectado!</span>
+                  <span className="rounded bg-green-500/20 border border-green-500/40 px-2 py-0.5 text-[10px] font-extrabold text-green-400 uppercase">
+                    VIP Liberado ⚡
+                  </span>
+                </div>
+                <p className="text-xs text-gray-300 font-sans mt-0.5">
+                  ID: <span className="font-mono text-yellow-300 font-bold">{localWorker.worker_id}</span> • Operador: <strong className="text-white">{localWorker.owner}</strong> • Versão {localWorker.version}
+                </p>
+              </div>
+            </div>
+            <div className="hidden sm:block text-right">
+              <span className="inline-flex items-center gap-1 text-xs text-green-400 font-bold">
+                <CheckCircle2 size={15} /> Sincronizado
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* PODER DA REDE NEURAL EM TEMPO REAL (PILAR IV) */}

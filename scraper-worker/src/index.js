@@ -628,6 +628,19 @@ app.post('/admin/force-ts3', async (req, res) => {
   }
 });
 
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'online',
+    worker_id: WORKER_ID,
+    owner: process.env.WORKER_OWNER || 'Anônimo',
+    location: WORKER_LOCATION,
+    uptime_seconds: Math.floor((Date.now() - WORKER_STARTED) / 1000),
+    tasks_completed: totalTasksCompleted,
+    is_paused: isWorkerPaused,
+    version: WORKER_VERSION
+  });
+});
+
 app.get('/api/character/:name', async (req, res) => {
   try {
     const rawName = decodeURIComponent(req.params.name || '').trim();
