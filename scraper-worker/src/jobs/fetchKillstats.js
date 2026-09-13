@@ -3,10 +3,15 @@ import { fetchRubinotApi } from '../lib/rubinotScraper.js';
 
 export const runFetchKillstats = async () => {
     try {
-        console.log('[JOB] Fetching Killstats (Auroria)');
+        console.log('[JOB] Fetching Killstats (Todos os Mundos Rubinot)');
         
-        // Auroria is world=11
-        const killstats = await fetchRubinotApi('/api/killstats?world=11');
+        let killstats = await fetchRubinotApi('/api/killstats?world=all');
+        if (!killstats || !killstats.entries || !Array.isArray(killstats.entries)) {
+            killstats = await fetchRubinotApi('/api/killstats');
+        }
+        if (!killstats || !killstats.entries || !Array.isArray(killstats.entries)) {
+            killstats = await fetchRubinotApi('/api/killstats?world=11');
+        }
         if (!killstats || !killstats.entries || !Array.isArray(killstats.entries)) {
             console.log('[JOB] Killstats retornou vazio ou erro.');
             return;

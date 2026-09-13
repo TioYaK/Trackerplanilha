@@ -16,8 +16,33 @@ export const runFetchTransfers = async () => {
             return !isNaN(parsed.getTime()) ? parsed : new Date();
         };
 
-        const WORLD_IDS = ['11', '15', '30', '21', '16'];
-        for (const wId of WORLD_IDS) {
+        // 1. Tenta buscar transfers de Todos os Mundos (Global) de uma só vez
+        try {
+            const globalArriving = await fetchRubinotApi(`/api/transfers?toWorld=all&page=1`);
+            const globalLeaving = await fetchRubinotApi(`/api/transfers?fromWorld=all&page=1`);
+            const combined = [
+                ...(globalArriving?.transfers || []),
+                ...(globalLeaving?.transfers || [])
+            ];
+            for (const t of combined) {
+                const charName = t.player_name || t.playerName;
+                if (!charName) continue;
+                const tDate = parseDate(t.transferred_at || t.transferredAt);
+                recordsToUpsert.push({
+                    character_name: charName,
+                    transfer_type: t.to_world || t.toWorld ? 'IN' : 'OUT',
+                    transfer_date: tDate.toISOString(),
+                    level: t.player_level || t.playerLevel || 0,
+                    other_world: t.from_world || t.fromWorld || t.to_world || t.toWorld || 'Desconhecido'
+                });
+            }
+        } catch (gErr) {
+            console.warn('[JOB] Busca global de transfers falhou, iterando por mundos:', gErr.message);
+        }
+
+        // 2. Todos os 16 IDs de mundos do Rubinot (Auroria, Belaria, Bellum, Drakaria, Eldrian, Elysian, Infernum I/II/III, Lunarian, Malveria, Mystian, Obsidian, Solarian, Tenebrium, Vesperia)
+        const ALL_RUBINOT_WORLD_IDS = ['11', '15', '30', '33', '31', '1', '35', '9', '34', '18', '32', '12', '21', '16'];
+        for (const wId of ALL_RUBINOT_WORLD_IDS) {
             try {
                 // Transfers Chegando (toWorld)
                 const arriving = await fetchRubinotApi(`/api/transfers?toWorld=${wId}&page=1`);

@@ -18,6 +18,15 @@ export const runFetchGuild = async () => {
         }
       });
     }
+    const { data: perkData } = await supabase.from('guild_perk_settings').select('guild_name');
+    if (perkData) {
+      perkData.forEach(p => {
+        if (p.guild_name) {
+          const slug = p.guild_name.toLowerCase().trim().replace(/\s+/g, '-');
+          if (!targetGuilds.includes(slug)) targetGuilds.push(slug);
+        }
+      });
+    }
   } catch (e) {}
 
   console.log(`[JOB] Buscando dados de ${targetGuilds.length} guildas nos servidores do Rubinot...`);

@@ -32,8 +32,20 @@ const WORLD_IDS = {
   auroria: '11',
   belaria: '15',
   bellum: '30',
+  drakaria: '33',
+  eldrian: '31',
+  elysian: '1',
+  'infernum i': '35',
+  'infernum ii': '35',
+  'infernum iii': '35',
+  infernum: '35',
+  lunarian: '9',
+  malveria: '34',
+  mystian: '18',
+  obsidian: '32',
+  solarian: '12',
   tenebrium: '21',
-  vesperia: '16',
+  vesperia: '16'
 };
 
 const DEFAULT_ACCOUNTS = {
