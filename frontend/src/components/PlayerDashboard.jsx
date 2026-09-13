@@ -180,10 +180,16 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer })
       currentXP = Number(boundsData[boundsData.length - 1].end_xp_total || 0);
     }
 
-    // Histórico de Mortes e Mudança de Level
+    // Histórico de Mortes e Mudança de Level (com desduplicação defensiva)
     const deathsData = deathsRes?.data || [];
     let lvlHist = [];
+    const seenDeaths = new Set();
     deathsData.forEach(d => {
+      const timeKey = d.death_time ? d.death_time.slice(0, 16) : '';
+      const dupeKey = `${(d.killed_by || '').toLowerCase()}_${timeKey}`;
+      if (seenDeaths.has(dupeKey)) return;
+      seenDeaths.add(dupeKey);
+
       const fromLvl = Number(d.level) || 0;
       const toLvl = Math.max(1, fromLvl - 1);
       lvlHist.push({

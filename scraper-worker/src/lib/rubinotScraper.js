@@ -1001,6 +1001,76 @@ async function scrapePlayer(playerName) {
     }
 }
 
+// ─── parseRubinotDate ─────────────────────────────────────────────────────────
+function parseRubinotDate(str) {
+    if (!str || typeof str !== 'string') return null;
+    str = str.trim();
+
+    const monthMap = {
+        jan: 0, jane: 0, january: 0, janeiro: 0,
+        feb: 1, fev: 1, february: 1, fevereiro: 1,
+        mar: 2, march: 2, marco: 2, março: 2,
+        apr: 3, abr: 3, april: 3, abril: 3,
+        may: 4, mai: 4, maio: 4,
+        jun: 5, june: 5, junho: 5,
+        jul: 6, july: 6, julho: 6,
+        aug: 7, ago: 7, august: 7, agosto: 7,
+        sep: 8, sept: 8, set: 8, september: 8, setembro: 8,
+        oct: 9, out: 9, october: 9, outubro: 9,
+        nov: 10, november: 10, novembro: 10,
+        dec: 11, dez: 11, december: 11, dezembro: 11
+    };
+
+    // Formato Rubinot: "13 Sept 2026, 01:05:39" ou "13 Set 2026, 01:05:39"
+    const dmyMatch = str.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([a-zA-ZçÇ]+)\s+(\d{4}),?\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/i);
+    if (dmyMatch) {
+        const day = parseInt(dmyMatch[1], 10);
+        const monStr = dmyMatch[2].toLowerCase();
+        const year = parseInt(dmyMatch[3], 10);
+        const hour = parseInt(dmyMatch[4], 10);
+        const min = parseInt(dmyMatch[5], 10);
+        const sec = dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0;
+
+        const month = monthMap[monStr] ?? (monthMap[monStr.slice(0, 3)] ?? -1);
+        if (month !== -1) {
+            // O servidor do Rubinot exibe horário de Brasília (UTC-3). Convertemos para UTC somando 3 horas:
+            return new Date(Date.UTC(year, month, day, hour + 3, min, sec));
+        }
+    }
+
+    // Formato com barras: "13/09/2026 01:05:39"
+    const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+    if (slashMatch) {
+        const day = parseInt(slashMatch[1], 10);
+        const month = parseInt(slashMatch[2], 10) - 1;
+        const year = parseInt(slashMatch[3], 10);
+        const hour = parseInt(slashMatch[4], 10);
+        const min = parseInt(slashMatch[5], 10);
+        const sec = slashMatch[6] ? parseInt(slashMatch[6], 10) : 0;
+        return new Date(Date.UTC(year, month, day, hour + 3, min, sec));
+    }
+
+    // Formato apenas horário: "01:05:39" ou "01:05"
+    const timeMatch = str.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+    if (timeMatch) {
+        const hour = parseInt(timeMatch[1], 10);
+        const min = parseInt(timeMatch[2], 10);
+        const sec = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+        const now = new Date();
+        let d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hour + 3, min, sec));
+        if (d.getTime() > now.getTime() + 10 * 60 * 1000) {
+            d = new Date(d.getTime() - 24 * 60 * 60 * 1000);
+        }
+        return d;
+    }
+
+    // Fallback nativo
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) return parsed;
+
+    return null;
+}
+
 // ─── scrapeDeaths ─────────────────────────────────────────────────────────────
 async function scrapeDeaths(world) {
     const key    = `deaths_${(world || 'all').toLowerCase().replace(/\s+/g, '_')}`;
@@ -1035,8 +1105,10 @@ async function scrapeDeaths(world) {
                     if (!world || worldCol.toLowerCase() === world.toLowerCase()) {
                         const m = infoText.match(/^(.*?)\s+morreu no level\s+(\d+)\s+por\s+(.*?)\.?$/i);
                         if (m) {
+                            const parsedDate = parseRubinotDate(timeStr);
                             allDeaths.push({
                                 timeStr,
+                                death_time: parsedDate ? parsedDate.toISOString() : null,
                                 world: worldCol,
                                 name:     m[1].trim(),
                                 level:    parseInt(m[2], 10),
@@ -1187,5 +1259,6 @@ export {
     recycleBrowserPages,
     scrapeOnlines,
     fetchRubinotApi,
-    isInMaintenance
+    isInMaintenance,
+    parseRubinotDate
 };

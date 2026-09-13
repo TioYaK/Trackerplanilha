@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { parseUtcDate } from '../lib/tibiaUtils';
+import { parseUtcDate, toBrtTimeStr } from '../lib/tibiaUtils';
 import { 
   Globe, Activity, Skull, Trophy, Gem, Cpu, Calculator, 
   Search, Shield, ArrowRight, RefreshCw, Users, Server, 
@@ -71,7 +71,17 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         workersQuery
       ]);
 
-      if (deathsRes.data) setRecentDeaths(deathsRes.data);
+      if (deathsRes.data) {
+        const seen = new Set();
+        const dedupedDeaths = deathsRes.data.filter(d => {
+          const timeKey = d.death_time ? d.death_time.slice(0, 16) : '';
+          const key = `${(d.character_name || '').toLowerCase()}__${timeKey}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setRecentDeaths(dedupedDeaths);
+      }
       if (rushersRes.data) setTopRushers(rushersRes.data);
       if (onlineRes.data) setOnlineCount(onlineRes.data.online_count || 0);
       if (workersRes && workersRes.count !== null && workersRes.count !== undefined) {
@@ -87,9 +97,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
   const safeFormatTime = (isoString) => {
     if (!isoString) return '';
     try {
-      const d = parseUtcDate(isoString);
-      if (!d || isNaN(d.getTime())) return '';
-      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      return toBrtTimeStr(isoString);
     } catch (e) {
       return '';
     }

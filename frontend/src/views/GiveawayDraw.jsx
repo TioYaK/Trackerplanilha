@@ -176,8 +176,6 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
       });
       if (giveaway.winners && giveaway.winners.length > 0) {
         setSelectedWinner(giveaway.winners[0]);
-      } else {
-        setSelectedWinner(null);
       }
     }
   }, [giveaway]);
@@ -294,19 +292,19 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
     setIsSpinning(true);
     setSelectedWinner(null);
 
-    // Atualiza status para DRAWING
+    // Atualiza status para DRAWING (não bloqueante para animação iniciar imediatamente)
     const drawingGiveaway = { ...giveaway, status: 'DRAWING' };
-    await persistStore(drawingGiveaway);
+    persistStore(drawingGiveaway).catch(console.error);
 
-    // Efeito de roleta rápida desacelerando
+    // Efeito de roleta rápida desacelerando com duração perfeita (~5s)
     const participants = [...giveaway.participants];
     // Escolhe o vencedor aleatoriamente com alta entropia
     const winnerIndex = Math.floor(Math.random() * participants.length);
     const officialWinner = participants[winnerIndex];
 
-    let currentInterval = 50; // ms
+    let currentInterval = 60; // ms
     let iterations = 0;
-    const maxIterations = 40; // Total de ciclos
+    const maxIterations = 24; // Duração total perfeita ~5.2s
 
     const spinStep = () => {
       iterations++;
@@ -314,12 +312,12 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
       setCurrentDisplayedCandidate(randomCandidate);
 
       if (soundEnabled) {
-        soundFX.playRouletteTick(500 + (iterations * 15));
+        soundFX.playRouletteTick(450 + (iterations * 20));
       }
 
       if (iterations < maxIterations) {
-        // Desaceleração exponencial progressiva
-        currentInterval += Math.floor(iterations * 6);
+        // Desaceleração suave e emocionante
+        currentInterval += 14;
         setTimeout(spinStep, currentInterval);
       } else {
         // Chegou ao vencedor final!
