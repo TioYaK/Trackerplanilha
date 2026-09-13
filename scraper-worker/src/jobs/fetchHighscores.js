@@ -1,4 +1,5 @@
 import { supabase } from '../db.js';
+import { apiClient } from '../apiClient.js';
 import { scrapeHighscores } from '../lib/rubinotScraper.js';
 import 'dotenv/config';
 
@@ -148,11 +149,19 @@ export const runFetchHighscores = async (vocationStr) => {
     let upsertedCount = 0;
     for (let i = 0; i < statesToUpsert.length; i += chunkSize) {
       const chunk = statesToUpsert.slice(i, i + chunkSize);
-      const { error } = await supabase.from('current_character_state').upsert(chunk, { onConflict: 'character_name' });
-      if (error) {
-        console.error(`[JOB] Erro ao atualizar current_character_state:`, error.message);
-      } else {
-        upsertedCount += chunk.length;
+      
+      // 1. Tenta envio via ApiClient seguro (Gateway Vercel)
+      const apiRes = await apiClient.reportHighscores(chunk);
+      if (apiRes?.ok) {
+        upsertedCount += (apiRes.processed || chunk.length);
+      } else if (supabase) {
+        // 2. Fallback direto
+        const { error } = await supabase.from('current_character_state').upsert(chunk, { onConflict: 'character_name' });
+        if (error) {
+          console.error(`[JOB] Erro ao atualizar current_character_state (fallback):`, error.message);
+        } else {
+          upsertedCount += chunk.length;
+        }
       }
     }
     

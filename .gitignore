@@ -1,17 +1,47 @@
+# Dependencias
 node_modules/
-.env
 dist/
 .DS_Store
+Thumbs.db
 
-# Arquivos temporários e de debug
+# Variaveis de ambiente e segredos (NUNCA versionar)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+google-credentials.json
+
+# Perfis de Navegador e Automacao Puppeteer (Cookies, Sessions, Storage)
+scraper-worker/puppeteer_*
+puppeteer_*
+worker_profiles/
+*profile*/
+*.db
+*.db-journal
+*.db-wal
+
+# Arquivos temporarios, scratch e testes pontuais
+scratch/
 temp.jsx
 temp_debug.jsx
 patch_dashboard.js
 output_tracker.txt
+fix_*.js
+old_*.jsx
+old_*.js
 *.tmp
 *.bak
+*.csv
+cache_*.json
 
-# Arquivos de teste do scraper (grandes e desnecessários no repositório)
+# Logs
+*.log
+logs/
+scraper-worker/debug_screenshots/
+
+# Arquivos de teste do scraper
 scraper-worker/test*.html
 scraper-worker/test*.cjs
 scraper-worker/test*.js
@@ -21,19 +51,14 @@ scraper-worker/ts3_dump.txt
 scraper-worker/online.html
 scraper-worker/*.html
 
-# Build artifacts do worker
+# Build artifacts e binarios
 scraper-worker/dist/
 scraper-worker/pkg_build/
+scraper-worker/upx*
 *.exe
-# Excecao: o instalador publicado na Vercel deve ser versionado
-!frontend/public/*.exe
+*.zip
+!frontend/public/worker.zip
 
 # Worker runtime
 scraper-worker/worker_id.txt
 
-# Logs
-*.log
-logs/
-worker_profiles/  
-scraper-worker/google-credentials.json  
-scraper-worker/debug_screenshots/

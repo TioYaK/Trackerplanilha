@@ -8,6 +8,7 @@ dotenv.config({ path: path.join(WORKER_ROOT, '.env') });
 import express from 'express';
 import cors from 'cors';
 import { supabase } from './db.js';
+import { apiClient } from './apiClient.js';
 import { exec } from 'child_process';
 import os from 'os';
 import fs from 'fs';
@@ -498,14 +499,21 @@ const sendHeartbeat = async () => {
       terminal_logs_updated_at: currentTerminalLogsUpdatedAt,
     };
 
-    await supabase.from('worker_heartbeats').upsert({
-      worker_id: WORKER_ID,
-      last_ping: new Date().toISOString(),
-      started_at: WORKER_STARTED,
-      version: WORKER_VERSION,
-      location: WORKER_LOCATION,
-      metadata,
-    });
+    // 1. Tenta envio via ApiClient seguro (Gateway Vercel)
+    const hbRes = await apiClient.sendHeartbeat(metadata);
+    if (hbRes?.is_paused !== undefined) {
+      isWorkerPaused = Boolean(hbRes.is_paused);
+    } else if (supabase) {
+      // 2. Fallback direto se supabase estiver disponível
+      await supabase.from('worker_heartbeats').upsert({
+        worker_id: WORKER_ID,
+        last_ping: new Date().toISOString(),
+        started_at: WORKER_STARTED,
+        version: WORKER_VERSION,
+        location: WORKER_LOCATION,
+        metadata,
+      });
+    }
 
     const statsToFlush = { ...sessionStats };
     sessionStats = {};

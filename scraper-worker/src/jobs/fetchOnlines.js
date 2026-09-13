@@ -1,5 +1,6 @@
 import { scrapeOnlines } from '../lib/rubinotScraper.js';
 import { supabase } from '../db.js';
+import { apiClient } from '../apiClient.js';
 
 const RUBINOT_WORLDS = ['Auroria', 'Belaria', 'Bellum', 'Tenebrium', 'Vesperia', 'Malveria'];
 
@@ -30,10 +31,14 @@ export const runFetchOnlines = async () => {
 
     console.log(`[JOB] Total de ${onlinePlayers.length} jogadores online coletados nos 6 mundos.`);
 
-    // Registra o total consolidado para o Heatmap e métricas do portal
-    await supabase.from('online_history').insert({
-      online_count: onlinePlayers.length
-    });
+    // Registra o total consolidado via ApiClient seguro (ou fallback direto)
+    const apiRes = await apiClient.reportOnlines(onlinePlayers.length, onlinePlayers);
+    if (!apiRes?.ok && supabase) {
+      await supabase.from('online_history').insert({
+        online_count: onlinePlayers.length
+      });
+    }
+
 
     // ─── DETECÇÃO DE MAKERS (LOGIN / LOGOUT) ───
     const fs = await import('fs');

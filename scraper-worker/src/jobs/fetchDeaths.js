@@ -1,4 +1,5 @@
 import { supabase } from '../db.js';
+import { apiClient } from '../apiClient.js';
 import { fetchRubinotApi, scrapeDeaths, parseRubinotDate } from '../lib/rubinotScraper.js';
 
 export const runFetchDeaths = async () => {
@@ -22,12 +23,18 @@ export const runFetchDeaths = async () => {
             return;
         }
 
-        // Buscar membros da guilda e hunteds para cruzar dados
-        const { data: guildData } = await supabase.from('guild_members').select('name');
-        const { data: huntedData } = await supabase.from('hunted_list').select('name');
-        
-        const guildSet = new Set((guildData || []).filter(m => m && m.name).map(m => m.name.toLowerCase()));
-        const huntedSet = new Set((huntedData || []).filter(h => h && h.name).map(h => h.name.toLowerCase()));
+        // Buscar membros da guilda e hunteds para cruzar dados (se disponível)
+        let guildSet = new Set();
+        let huntedSet = new Set();
+        try {
+            if (supabase) {
+                const { data: guildData } = await supabase.from('guild_members').select('name');
+                const { data: huntedData } = await supabase.from('hunted_list').select('name');
+                if (guildData) guildSet = new Set(guildData.filter(m => m && m.name).map(m => m.name.toLowerCase()));
+                if (huntedData) huntedSet = new Set(huntedData.filter(h => h && h.name).map(h => h.name.toLowerCase()));
+            }
+        } catch (e) {}
+
 
         const records = [];
         for (const death of deathsArray.slice(0, 50)) { // últimas 50
@@ -83,13 +90,20 @@ export const runFetchDeaths = async () => {
         const uniqueRecords = Array.from(uniqueRecordsMap.values());
 
         if (uniqueRecords.length > 0) {
-            const { error } = await supabase
-                .from('recent_deaths')
-                .upsert(uniqueRecords, { onConflict: 'character_name,death_time', ignoreDuplicates: true });
-            if (error) {
-                console.warn('[JOB] Erro ao salvar lote de mortes:', error.message);
-            } else {
-                console.log(`[JOB] Deaths finalizado. Lote de ${uniqueRecords.length} mortes verificado/processado com sucesso.`);
+            // 1. Tenta envio prioritário via ApiClient seguro (Gateway Vercel)
+            const apiRes = await apiClient.reportDeaths(uniqueRecords);
+            if (apiRes?.ok) {
+                console.log(`[JOB] Deaths finalizado via ApiClient. Lote de ${uniqueRecords.length} mortes verificado/processado com sucesso.`);
+            } else if (supabase) {
+                // 2. Fallback direto se supabase estiver disponível
+                const { error } = await supabase
+                    .from('recent_deaths')
+                    .upsert(uniqueRecords, { onConflict: 'character_name,death_time', ignoreDuplicates: true });
+                if (error) {
+                    console.warn('[JOB] Erro ao salvar lote de mortes (fallback):', error.message);
+                } else {
+                    console.log(`[JOB] Deaths finalizado via fallback direto.`);
+                }
             }
         }
     } catch (e) {

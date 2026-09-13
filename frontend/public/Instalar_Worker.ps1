@@ -29,8 +29,8 @@ try {
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
     $configUrl = "https://trackerplanilha.vercel.app/api/worker-config"
     $config = Invoke-RestMethod -Uri $configUrl -Method GET -TimeoutSec 15
-    $SUPABASE_URL = $config.url
-    $SUPABASE_KEY = $config.key
+    $API_BASE_URL = if ($config.apiUrl) { $config.apiUrl } else { "https://trackerplanilha.vercel.app" }
+    $WORKER_TOKEN = if ($config.workerToken) { $config.workerToken } else { $config.key }
     $GUILD_NAME   = $config.guild
 } catch {
     Write-Host "ERRO: Nao foi possivel obter as credenciais do servidor." -ForegroundColor Red
@@ -79,19 +79,32 @@ $WorkerPath = Join-Path $WorkDir "scraper-worker"
 Write-Host ""
 Write-Host "[2/4] Baixando a ultima versao do robo..." -ForegroundColor Yellow
 
-if (Test-Path (Join-Path $WorkDir ".git")) {
-    Write-Host "  -> Atualizando instalacao existente..." -ForegroundColor Gray
-    git -C $WorkDir fetch --all --quiet *> $null
-    git -C $WorkDir reset --hard origin/main --quiet *> $null
-} else {
-    if (Test-Path $WorkDir) { Remove-Item $WorkDir -Recurse -Force -ErrorAction SilentlyContinue }
-    New-Item -ItemType Directory -Path $WorkDir -Force | Out-Null
-    git clone --quiet https://github.com/TioYaK/Trackerplanilha.git $WorkDir *> $null
+New-Item -ItemType Directory -Path $WorkerPath -Force | Out-Null
+
+$zipUrl = "https://trackerplanilha.vercel.app/worker.zip"
+$tempZip = Join-Path $env:TEMP "worker.zip"
+
+$downloadOk = $false
+try {
+    Write-Host "  -> Baixando pacote seguro do worker ($zipUrl)..." -ForegroundColor Gray
+    Invoke-WebRequest -Uri $zipUrl -OutFile $tempZip -TimeoutSec 30
+    Write-Host "  -> Extraindo arquivos..." -ForegroundColor Gray
+    Expand-Archive -Path $tempZip -DestinationPath $WorkerPath -Force
+    Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
+    $downloadOk = $true
+    Write-Host "  -> Arquivos atualizados com sucesso!" -ForegroundColor Green
+} catch {
+    Write-Host "  -> Aviso: Download do pacote zip falhou ($($_.Exception.Message))." -ForegroundColor Yellow
+    if (Test-Path (Join-Path $WorkDir ".git")) {
+        Write-Host "  -> Atualizando via repositorio existente..." -ForegroundColor Gray
+        git -C $WorkDir fetch --all --quiet *> $null
+        git -C $WorkDir reset --hard origin/main --quiet *> $null
+    } else {
+        Write-Host "  -> Tentando clone de contingencia..." -ForegroundColor Gray
+        git clone --quiet https://github.com/TioYaK/Trackerplanilha.git $WorkDir *> $null
+    }
 }
 
-# Garante que a pasta existe mesmo se o git clone falhar por algum motivo
-New-Item -ItemType Directory -Path $WorkerPath -Force | Out-Null
-Write-Host "  -> Arquivos atualizados com sucesso!" -ForegroundColor Green
 
 # ---- [3/4] Credenciais ----
 Write-Host ""
@@ -100,13 +113,13 @@ $ownerName = Read-Host "Digite seu nome (Discord ou Personagem) para credito no 
 if ([string]::IsNullOrWhiteSpace($ownerName)) { $ownerName = "Anonimo" }
 
 $envLines = @(
-    "SUPABASE_URL=$SUPABASE_URL",
-    "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_KEY",
+    "API_BASE_URL=$API_BASE_URL",
+    "WORKER_TOKEN=$WORKER_TOKEN",
     "GUILD_NAME=$GUILD_NAME",
     "WORKER_OWNER=$ownerName"
 )
 $envLines | Set-Content -Path (Join-Path $WorkerPath ".env") -Encoding UTF8
-Write-Host "  -> Credenciais salvas." -ForegroundColor Green
+Write-Host "  -> Credenciais seguras salvas (Zero-Trust)." -ForegroundColor Green
 
 if (Test-Path $WorkerPath) {
     Write-Host "  -> Instalando modulos do Node.js (aguarde alguns instantes)..." -ForegroundColor Gray

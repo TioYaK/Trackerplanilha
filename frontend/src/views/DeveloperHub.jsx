@@ -837,10 +837,10 @@ print(data)`;
 
                   <div>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-bold font-medieval text-yellow-400">50 TC</span>
+                      <span className="text-4xl font-bold font-medieval text-yellow-400">R$ 50,00</span>
                       <span className="text-xs text-gray-400">/ mês</span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Ou R$ 15,00 via Pix. Ativação no mesmo dia.</p>
+                    <p className="text-xs text-gray-400 mt-1">Ativação rápida via Pix. Ideal para bots e ferramentas.</p>
                   </div>
 
                   <div className="space-y-2.5 pt-4 border-t border-yellow-500/20 text-xs text-gray-200">
@@ -890,10 +890,10 @@ print(data)`;
 
                   <div>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-bold font-medieval text-purple-300">150 TC</span>
+                      <span className="text-4xl font-bold font-medieval text-purple-300">R$ 200,00</span>
                       <span className="text-xs text-gray-400">/ mês</span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Ou R$ 35,00 via Pix. Potência militar de espionagem.</p>
+                    <p className="text-xs text-gray-400 mt-1">Potência militar de espionagem e dados em tempo real.</p>
                   </div>
 
                   <div className="space-y-2.5 pt-4 border-t border-tibia-border text-xs text-gray-300">
@@ -1040,50 +1040,45 @@ print(data)`;
                 <h3 className="text-xl font-medieval font-bold text-white">
                   Alugar Plano {selectedPlanToRent === 'ENTERPRISE' ? 'Guild Enterprise' : 'Dev Pro'}
                 </h3>
-                <p className="text-xs text-gray-400 font-sans">
-                  {selectedPlanToRent === 'ENTERPRISE' ? '150 Tibia Coins ou R$ 35,00 / mês' : '50 Tibia Coins ou R$ 15,00 / mês'}
+                <p className="text-xs text-yellow-400 font-bold font-sans">
+                  {selectedPlanToRent === 'ENTERPRISE' ? 'R$ 200,00 / mês' : 'R$ 50,00 / mês'}
                 </p>
               </div>
             </div>
 
             <div className="space-y-4 text-xs font-sans text-gray-300">
-              {/* Opção 1: Tibia Coins in-game */}
-              <div className="p-4 rounded-2xl bg-yellow-950/30 border border-yellow-500/30 space-y-2">
-                <div className="flex items-center justify-between font-bold text-yellow-400 uppercase text-[11px]">
-                  <span>Opção 1: Tibia Coins In-Game (Mais Rápido)</span>
-                  <span className="text-white font-medieval">{selectedPlanToRent === 'ENTERPRISE' ? '150 TC' : '50 TC'}</span>
-                </div>
-                <p className="text-gray-300 leading-relaxed">
-                  Transfira as Tibia Coins para o personagem <strong className="text-white">Kit Apanha</strong> ou <strong className="text-white">Pacozk</strong> (Auroria) e informe seu email na mensagem de transferência: <code className="text-yellow-400 font-mono">{userEmail || 'seu-email@aqui.com'}</code>.
-                </p>
-              </div>
-
-              {/* Opção 2: Pix */}
-              <div className="p-4 rounded-2xl bg-black/60 border border-white/10 space-y-2">
+              {/* Pagamento via Pix */}
+              <div className="p-4 rounded-2xl bg-gradient-to-b from-yellow-950/40 to-black border border-yellow-500/40 space-y-3">
                 <div className="flex items-center justify-between font-bold text-white uppercase text-[11px]">
-                  <span>Opção 2: Pagamento via Pix</span>
-                  <span className="text-green-400 font-bold">{selectedPlanToRent === 'ENTERPRISE' ? 'R$ 35,00' : 'R$ 15,00'}</span>
+                  <span className="text-yellow-400">Pagamento via Pix</span>
+                  <span className="text-green-400 text-base font-extrabold">{selectedPlanToRent === 'ENTERPRISE' ? 'R$ 200,00' : 'R$ 50,00'}</span>
                 </div>
-                <p className="text-gray-400">
-                  Chave Pix (Email): <strong className="text-yellow-300 font-mono select-all">pifot16@gmail.com</strong>
+                <div className="bg-black/60 p-3 rounded-xl border border-white/10 space-y-1.5">
+                  <div className="text-[11px] text-gray-400">Chave Pix (E-mail):</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <strong className="text-yellow-300 font-mono text-xs select-all">pifot16@gmail.com</strong>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText('pifot16@gmail.com');
+                        setPixCopied(true);
+                        setTimeout(() => setPixCopied(false), 2000);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-500 hover:bg-yellow-400 text-black text-[11px] font-bold transition-all shadow"
+                    >
+                      {pixCopied ? <Check size={12} className="text-black" /> : <Copy size={12} />}
+                      <span>{pixCopied ? 'Copiado!' : 'Copiar Chave'}</span>
+                    </button>
+                  </div>
+                </div>
+                <p className="text-gray-300 text-[11px] leading-relaxed">
+                  Informe o seu e-mail cadastrado (<code className="text-yellow-400 font-mono">{userEmail || 'seu-email@aqui.com'}</code>) na descrição do Pix para identificação automática.
                 </p>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText('pifot16@gmail.com');
-                    setPixCopied(true);
-                    setTimeout(() => setPixCopied(false), 2000);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition-all"
-                >
-                  {pixCopied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                  <span>{pixCopied ? 'Chave Copiada!' : 'Copiar Chave Pix'}</span>
-                </button>
               </div>
 
-              <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-500/30 text-[11px] text-blue-300 flex items-start gap-2">
-                <HelpCircle size={15} className="shrink-0 mt-0.5 text-blue-400" />
+              <div className="p-3.5 rounded-xl bg-blue-950/30 border border-blue-500/30 text-[11px] text-blue-200 flex items-start gap-2.5">
+                <HelpCircle size={16} className="shrink-0 mt-0.5 text-blue-400" />
                 <span>
-                  Após o envio, envie o comprovante ou informe o admin no Discord da guilda. Sua chave será promovida imediatamente para o plano alugado!
+                  Após o pagamento, envie o comprovante no Discord da guilda ou contate o administrador. Sua chave será promovida imediatamente para o plano contratado!
                 </span>
               </div>
             </div>
