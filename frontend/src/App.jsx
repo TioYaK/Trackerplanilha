@@ -45,6 +45,10 @@ const ExerciseCalculator = lazy(() => import('./views/ExerciseCalculator'));
 const HuntFinder = lazy(() => import('./views/HuntFinder'));
 const GuildVersus = lazy(() => import('./views/GuildVersus'));
 const PartyFinder = lazy(() => import('./views/PartyFinder'));
+const ForgeCalculator = lazy(() => import('./views/ForgeCalculator'));
+const BossTracker = lazy(() => import('./views/BossTracker'));
+const DailyRoulette = lazy(() => import('./views/DailyRoulette'));
+const WheelOfDestiny = lazy(() => import('./views/WheelOfDestiny'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import GlobalSearchModal from './components/GlobalSearchModal';
@@ -98,6 +102,16 @@ const ROUTE_TO_VIEW = {
   '/guild-war': 'guild_war',
   '/war-comparator': 'guild_war',
   '/comparador-guildas': 'guild_war',
+  '/forja': 'forge_calc',
+  '/forge': 'forge_calc',
+  '/bosses': 'boss_tracker',
+  '/boss': 'boss_tracker',
+  '/rotations': 'boss_tracker',
+  '/roleta': 'daily_spin',
+  '/roulette': 'daily_spin',
+  '/spin': 'daily_spin',
+  '/wheel': 'wheel_planner',
+  '/roda': 'wheel_planner',
   '/party-finder': 'party_finder',
   '/party-search': 'party_finder',
   '/vagas': 'party_finder',
@@ -196,6 +210,10 @@ const VIEW_TO_ROUTE = {
   about: '/about',
   guides: '/guias',
   versus: '/versus',
+  forge_calc: '/forja',
+  boss_tracker: '/bosses',
+  daily_spin: '/roleta',
+  wheel_planner: '/wheel',
 };
 
 const VIEW_TITLES = {
@@ -207,6 +225,10 @@ const VIEW_TITLES = {
   exercise_calc: 'Rubinot Tracker | Calculadora de Treino & Weapons 🧮',
   hunt_finder: 'Rubinot Tracker | Hunt Finder 2.0 & Rotas 🗺️',
   fame: 'Rubinot Tracker | Salão da Fama Rubinot 👑',
+  forge_calc: 'Rubinot Tracker | Forja de Exaltação 2.0 🔨',
+  boss_tracker: 'Rubinot Tracker | Rastreador de Bosses 20h 🗺️',
+  daily_spin: 'Rubinot Tracker | Roleta da Fortuna Diária 🎰',
+  wheel_planner: 'Rubinot Tracker | Roda do Destino (Wheel of Destiny) ☸️',
   versus: 'Rubinot Tracker | Comparador de Personagens Versus ⚔️',
   guides: 'Rubinot Tracker | Guias, Estratégias & Artigos 📜',
   developers: 'Rubinot Tracker | API para Desenvolvedores ⚡',
@@ -512,6 +534,18 @@ export default function App() {
     }
     if (currentView === 'guild_war') {
       return <GuildVersus onPlayerClick={handlePlayerClick} onNavigate={navigateView} />;
+    }
+    if (currentView === 'forge_calc') {
+      return <ForgeCalculator onNavigate={navigateView} />;
+    }
+    if (currentView === 'boss_tracker') {
+      return <BossTracker onNavigate={navigateView} />;
+    }
+    if (currentView === 'daily_spin') {
+      return <DailyRoulette onNavigate={navigateView} />;
+    }
+    if (currentView === 'wheel_planner') {
+      return <WheelOfDestiny onNavigate={navigateView} />;
     }
     if (currentView === 'party_finder') {
       return <PartyFinder onPlayerClick={handlePlayerClick} onNavigate={navigateView} user={user} profile={profile} />;

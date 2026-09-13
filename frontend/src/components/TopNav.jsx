@@ -7,7 +7,7 @@ import {
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
   Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
   ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2, BookOpen,
-  Compass, Coins
+  Compass, Coins, Hammer, Skull
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
@@ -53,6 +53,10 @@ export default function TopNav({
     // 🌐 Rubinot Público
     live: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
     home: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
+    daily_spin: { label: 'Roleta da Fortuna 🎰', icon: <Gift size={16} className="text-yellow-400" /> },
+    forge_calc: { label: 'Forja de Exaltação 2.0 🔨', icon: <Hammer size={16} className="text-amber-400" /> },
+    boss_tracker: { label: 'Rastreador de Bosses 20h 🗺️', icon: <Skull size={16} className="text-purple-400" /> },
+    wheel_planner: { label: 'Roda do Destino (Builds) ☸️', icon: <Compass size={16} className="text-sky-400" /> },
     hunt_finder: { label: 'Hunt Finder 2.0 & Rotas 🗺️', icon: <Compass size={16} className="text-yellow-400" /> },
     exercise_calc: { label: 'Calculadora de Treino 🧮', icon: <Calculator size={16} className="text-yellow-400" /> },
     loot_splitter: { label: 'Divisão de Loot da Party 💰', icon: <Coins size={16} className="text-yellow-400" /> },
@@ -86,7 +90,7 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'hunt_finder', 'exercise_calc', 'loot_splitter', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
+      items: ['live', 'daily_spin', 'forge_calc', 'boss_tracker', 'wheel_planner', 'hunt_finder', 'exercise_calc', 'loot_splitter', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
       title: 'Comunidade & Guildas',
