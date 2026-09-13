@@ -204,32 +204,47 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'Campo characters deve ser um array.' });
         }
 
-        const validChars = [];
+        const validStates = [];
+        const validWorldRanks = [];
+
         for (const c of characters.slice(0, 150)) { // 150 por chunk
           const name = String(c.character_name || '').trim();
           const level = parseInt(c.level, 10);
-          const exp = parseInt(c.experience, 10);
+          const exp = parseInt(c.experience || c.xp_total, 10);
 
           if (!name || isNaN(level) || level < 1 || level > 3500) continue;
 
-          validChars.push({
+          validStates.push({
             character_name: name,
             level: level,
             vocation: String(c.vocation || 'Unknown').slice(0, 30),
-            experience: isNaN(exp) ? 0 : exp,
-            world: c.world ? String(c.world).slice(0, 30) : null,
-            rank: parseInt(c.rank, 10) || null,
-            updated_at: new Date().toISOString()
+            xp_total: isNaN(exp) ? null : exp,
+            last_active: new Date().toISOString()
           });
+
+          if (c.world) {
+            const cleanRank = parseInt(String(c.rank || '').replace(/\D/g, ''), 10) || null;
+            validWorldRanks.push({
+              character_name: name,
+              world: String(c.world).slice(0, 30),
+              notes: cleanRank ? `rank:${cleanRank}` : null
+            });
+          }
         }
 
-        if (validChars.length > 0) {
+        if (validStates.length > 0) {
           await supabase
             .from('current_character_state')
-            .upsert(validChars, { onConflict: 'character_name' });
+            .upsert(validStates, { onConflict: 'character_name' });
         }
 
-        return res.status(200).json({ ok: true, processed: validChars.length });
+        if (validWorldRanks.length > 0) {
+          await supabase
+            .from('guild_perk_members')
+            .upsert(validWorldRanks, { onConflict: 'character_name' });
+        }
+
+        return res.status(200).json({ ok: true, processed: validStates.length });
       }
 
       // -------------------------------------------------------------

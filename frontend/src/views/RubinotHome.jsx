@@ -572,7 +572,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                 return (
                   <div 
                     key={idx}
-                    onClick={() => onPlayerClick && onPlayerClick(d.character_name)}
+                    onClick={() => onPlayerClick && onPlayerClick(d.character_name, selectedWorld !== 'ALL' ? selectedWorld : null)}
                     className="flex items-center justify-between p-3 rounded-xl bg-black/60 border border-white/5 hover:border-red-500/40 hover:bg-red-950/20 transition-all cursor-pointer group"
                   >
                     <div className="flex items-center gap-3">
@@ -645,7 +645,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
               topRushers.slice(0, 7).map((r, idx) => (
                 <div 
                   key={idx}
-                  onClick={() => onPlayerClick && onPlayerClick(r.character_name || r.name)}
+                  onClick={() => onPlayerClick && onPlayerClick(r.character_name || r.name, selectedWorld !== 'ALL' ? selectedWorld : null)}
                   className="flex items-center justify-between p-3 rounded-xl bg-black/60 border border-white/5 hover:border-yellow-500/40 hover:bg-yellow-950/20 transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-3">

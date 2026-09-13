@@ -179,11 +179,22 @@ export const runFetchHighscores = async (vocationStr) => {
         upsertedCount += (apiRes.processed || chunk.length);
       } else if (supabase) {
         // 2. Fallback direto
-        const { error } = await supabase.from('current_character_state').upsert(chunk, { onConflict: 'character_name' });
+        const cleanChunk = chunk.map(({ world, ...rest }) => rest);
+        const { error } = await supabase.from('current_character_state').upsert(cleanChunk, { onConflict: 'character_name' });
         if (error) {
           console.error(`[JOB] Erro ao atualizar current_character_state (fallback):`, error.message);
         } else {
-          upsertedCount += chunk.length;
+          upsertedCount += cleanChunk.length;
+        }
+
+        // Sincroniza mundo e rank em guild_perk_members
+        const perkChunk = chunk.filter(c => c.world).map(c => ({
+          character_name: c.character_name,
+          world: c.world,
+          notes: c.rank ? `rank:${c.rank}` : null
+        }));
+        if (perkChunk.length > 0) {
+          await supabase.from('guild_perk_members').upsert(perkChunk, { onConflict: 'character_name' });
         }
       }
     }

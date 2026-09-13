@@ -39,6 +39,7 @@ const PrivacyPolicy = lazy(() => import('./views/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./views/TermsOfService'));
 const AboutUs = lazy(() => import('./views/AboutUs'));
 import Footer from './components/Footer';
+import PlayerModal from './components/PlayerModal';
 
 function ModuleFallback() {
   return (
@@ -220,8 +221,14 @@ export default function App() {
   const [selectedParty, setSelectedParty] = useState(null);
   const [visibleTabs, setVisibleTabs] = useState(null);
   const [hasActiveWorker, setHasActiveWorker] = useState(false);
+  const [inspectedPlayer, setInspectedPlayer] = useState(null);
+  const [inspectedPlayerWorld, setInspectedPlayerWorld] = useState(null);
+  const [previousView, setPreviousView] = useState('home');
 
   const navigateView = (view, extra = {}) => {
+    if (currentView !== 'players' && view !== currentView) {
+      setPreviousView(currentView);
+    }
     setCurrentView(view);
     if (typeof window !== 'undefined') {
       let targetPath = VIEW_TO_ROUTE[view] || '/';
@@ -381,7 +388,14 @@ export default function App() {
     );
   }
 
-  const handlePlayerClick = (playerName) => {
+  const handlePlayerClick = (playerName, world = null) => {
+    if (!playerName) return;
+    setInspectedPlayer(playerName);
+    setInspectedPlayerWorld(world);
+  };
+
+  const handleOpenFullInvestigation = (playerName) => {
+    setInspectedPlayer(null);
     setSelectedPlayer(playerName);
     navigateView('players', { player: playerName });
   };
@@ -443,7 +457,13 @@ export default function App() {
         <div className="p-8 max-w-7xl mx-auto w-full">
           <h2 className="text-4xl font-medieval text-tibia-highlight mb-2 drop-shadow-md">Investigação de Membro</h2>
           <p className="text-gray-400 mb-8 font-sans">Verifique a eficiência, histórico criminal e telemetria do jogador.</p>
-          <PlayerDashboard playerName={selectedPlayer} isAdmin={isAdmin} onSelectPlayer={handlePlayerClick} />
+          <PlayerDashboard 
+            playerName={selectedPlayer} 
+            isAdmin={isAdmin} 
+            onSelectPlayer={handlePlayerClick}
+            onBack={() => navigateView(previousView || 'home')}
+            initialWorld={inspectedPlayerWorld}
+          />
         </div>
       );
     }
@@ -602,6 +622,15 @@ export default function App() {
       </main>
 
       <Footer onNavigate={navigateView} />
+
+      {inspectedPlayer && (
+        <PlayerModal
+          playerName={inspectedPlayer}
+          initialWorld={inspectedPlayerWorld}
+          onClose={() => setInspectedPlayer(null)}
+          onOpenFull={handleOpenFullInvestigation}
+        />
+      )}
     </div>
   );
 }

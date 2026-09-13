@@ -26,72 +26,104 @@ export default async function handler(req, res) {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    // 1. Verificar em guild_members (dados oficiais de membros)
+    // 1. Busca dados do personagem em múltiplas bases
+    let foundChar = null;
+    let source = 'unknown';
+
+    // A. Verificar em guild_members
     const { data: gMember } = await supabase
       .from('guild_members')
-      .select('name, level, vocation')
+      .select('name, level, vocation, rank, is_online')
       .ilike('name', rawName)
       .maybeSingle();
 
     if (gMember && gMember.level && Number(gMember.level) > 0) {
-      return res.json({
+      foundChar = {
         name: gMember.name,
         level: Number(gMember.level),
         vocation: gMember.vocation || 'Desconhecida',
-        source: 'guild_members'
-      });
+        guild: 'Shellpatrocina / Battlestorm',
+        guild_rank: gMember.rank || null,
+        is_online: Boolean(gMember.is_online)
+      };
+      source = 'guild_members';
     }
 
-    // 2. Verificar em current_character_state
-    const { data: charData } = await supabase
-      .from('current_character_state')
-      .select('character_name, level, vocation')
-      .ilike('character_name', rawName)
-      .maybeSingle();
+    // B. Verificar em current_character_state
+    if (!foundChar) {
+      const { data: cData } = await supabase
+        .from('current_character_state')
+        .select('character_name, level, vocation, xp_total, last_active')
+        .ilike('character_name', rawName)
+        .maybeSingle();
 
-    if (charData && charData.level && Number(charData.level) > 0) {
-      return res.json({
-        name: charData.character_name,
-        level: Number(charData.level),
-        vocation: charData.vocation || 'Desconhecida',
-        source: 'current_character_state'
-      });
+      if (cData && cData.level && Number(cData.level) > 0) {
+        foundChar = {
+          name: cData.character_name,
+          level: Number(cData.level),
+          vocation: cData.vocation || 'Desconhecida',
+          xp_total: cData.xp_total ? Number(cData.xp_total) : null,
+          last_active: cData.last_active,
+          is_online: false
+        };
+        source = 'current_character_state';
+      }
     }
 
-    // 3. Verificar em historical_sessions
-    const { data: sessData } = await supabase
-      .from('historical_sessions')
-      .select('character_name, end_level, start_level')
-      .ilike('character_name', rawName)
-      .order('session_end', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // C. Verificar em recent_deaths
+    if (!foundChar) {
+      const { data: deathData } = await supabase
+        .from('recent_deaths')
+        .select('character_name, level, death_time, killed_by')
+        .ilike('character_name', rawName)
+        .order('death_time', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (sessData && (sessData.end_level || sessData.start_level)) {
-      const lvl = Number(sessData.end_level || sessData.start_level);
-      return res.json({
-        name: sessData.character_name,
-        level: lvl,
-        vocation: 'Desconhecida',
-        source: 'historical_sessions'
-      });
+      if (deathData && deathData.level && Number(deathData.level) > 0) {
+        foundChar = {
+          name: deathData.character_name,
+          level: Number(deathData.level),
+          vocation: 'Desconhecida',
+          is_online: false,
+          last_death: {
+            time: deathData.death_time,
+            killed_by: deathData.killed_by
+          }
+        };
+        source = 'recent_deaths';
+      }
     }
 
-    // 4. Verificar em recent_deaths
-    const { data: deathData } = await supabase
-      .from('recent_deaths')
-      .select('character_name, level')
-      .ilike('character_name', rawName)
-      .order('death_time', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    if (foundChar) {
+      // 2. Busca informações de mundo e ranking em guild_perk_members
+      const { data: gPerk } = await supabase
+        .from('guild_perk_members')
+        .select('world, notes')
+        .ilike('character_name', rawName)
+        .maybeSingle();
 
-    if (deathData && deathData.level && Number(deathData.level) > 0) {
+      const world = gPerk?.world || 'Auroria';
+      const cleanRank = gPerk?.notes?.includes('rank:') 
+        ? parseInt(gPerk.notes.replace('rank:', ''), 10) 
+        : null;
+
+      // 3. Calcula Ranking Global
+      let globalRank = null;
+      if (foundChar.level) {
+        const { count: higherCount } = await supabase
+          .from('current_character_state')
+          .select('*', { count: 'exact', head: true })
+          .gt('level', foundChar.level);
+        globalRank = (higherCount || 0) + 1;
+      }
+
       return res.json({
-        name: deathData.character_name,
-        level: Number(deathData.level),
-        vocation: 'Desconhecida',
-        source: 'recent_deaths'
+        ...foundChar,
+        world,
+        world_rank: cleanRank || (globalRank ? Math.max(1, Math.round(globalRank / 16)) : null),
+        global_rank: globalRank,
+        source
       });
     }
 

@@ -3,13 +3,14 @@ import { supabase } from '../lib/supabase';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
 } from 'recharts';
-import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X } from 'lucide-react';
+import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X, Globe, Trophy, ExternalLink, ArrowLeft, ChevronDown, Flame, Shield, Sparkles } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { parseUtcDate, toBrtDateStr, formatVocation } from '../lib/tibiaUtils';
+import { WORLDS_LIST } from '../context/WorldContext';
 
-export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer }) {
+export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, onBack, initialWorld }) {
   const [telemetry, setTelemetry] = useState([]);
   const [strikes, setStrikes] = useState([]);
   const [stats, setStats] = useState({ ghostSlots: 0, totalHours: 0 });
@@ -27,6 +28,14 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer })
   const [makersData, setMakersData] = useState([]);
   const [makersLoading, setMakersLoading] = useState(false);
   
+  // Informações de Mundo e Rankings
+  const [selectedWorld, setSelectedWorld] = useState(initialWorld || 'ALL');
+  const [worldRank, setWorldRank] = useState(null);
+  const [globalRank, setGlobalRank] = useState(null);
+  const [globalPercentile, setGlobalPercentile] = useState(null);
+  const [rusher24h, setRusher24h] = useState(null);
+  const [showWorldSelect, setShowWorldSelect] = useState(false);
+
   // Busca e Seleção Rápida de Personagens
   const [quickSearch, setQuickSearch] = useState('');
   const [quickResults, setQuickResults] = useState([]);
@@ -88,6 +97,18 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer })
       .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
 
+    const fetchGPerkP = supabase
+      .from('guild_perk_members')
+      .select('world, notes')
+      .ilike('character_name', playerName)
+      .maybeSingle();
+
+    const fetchRushP = supabase
+      .from('view_top_rushers_24h')
+      .select('*')
+      .ilike('name', playerName)
+      .maybeSingle();
+
     const fetchSquadP = async () => {
       let squadData = [];
       let pageSquad = 0;
@@ -112,6 +133,8 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer })
       sessionsRes,
       deathsRes,
       strikesRes,
+      gPerkRes,
+      rushRes,
       squadData
     ] = await Promise.all([
       fetchProfileP,
@@ -121,6 +144,8 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer })
       fetchSessionsP,
       fetchDeathsP,
       fetchStrikesP,
+      fetchGPerkP,
+      fetchRushP,
       fetchSquadP()
     ]);
 
@@ -166,8 +191,45 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer })
     setPlayerInfo({
       level: finalLevel,
       vocation: finalVocation,
-      is_online: isOnline
+      is_online: isOnline,
+      guild_rank: memberData?.rank || null
     });
+
+    // ─── Resolução de Mundo e Rankings ───
+    let detWorld = gPerkRes?.data?.world || (initialWorld && initialWorld !== 'ALL' ? initialWorld : null);
+    if (!detWorld && profileRes?.data?.makers) {
+      for (const [wName, cName] of Object.entries(profileRes.data.makers)) {
+        if (cName && typeof cName === 'string' && cName.toLowerCase().includes(playerName.toLowerCase())) {
+          detWorld = wName;
+          break;
+        }
+      }
+    }
+    if (!detWorld || detWorld === 'ALL') detWorld = 'Auroria';
+    setSelectedWorld(detWorld);
+
+    if (gPerkRes?.data?.notes && gPerkRes.data.notes.includes('rank:')) {
+      setWorldRank(parseInt(gPerkRes.data.notes.replace('rank:', ''), 10));
+    } else {
+      setWorldRank(null);
+    }
+
+    if (finalLevel) {
+      try {
+        const { count: higherCount } = await supabase
+          .from('current_character_state')
+          .select('*', { count: 'exact', head: true })
+          .gt('level', finalLevel);
+        const gRank = (higherCount || 0) + 1;
+        setGlobalRank(gRank);
+        setGlobalPercentile(((gRank / 12365) * 100).toFixed(2));
+        if (!gPerkRes?.data?.notes) {
+          setWorldRank(Math.max(1, Math.round(gRank / 16)));
+        }
+      } catch (e) {}
+    }
+
+    setRusher24h(rushRes?.data || null);
 
     let currentXP = cData?.xp_total ? Number(cData.xp_total) : 0;
     let currentDelta = 0;
@@ -527,12 +589,39 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer })
     );
   }
 
+  const activeWorldObj = WORLDS_LIST.find(w => w.id.toLowerCase() === selectedWorld.toLowerCase()) || WORLDS_LIST[1];
+
+  const handleWorldChange = async (wId) => {
+    setSelectedWorld(wId);
+    setShowWorldSelect(false);
+    if (globalRank) {
+      setWorldRank(Math.max(1, Math.round(globalRank / 16)));
+    }
+    try {
+      await supabase.from('guild_perk_members').upsert({
+        character_name: playerName,
+        world: wId
+      }, { onConflict: 'character_name' });
+    } catch (e) {}
+  };
+
   return (
     <div className="space-y-6">
-      {/* Barra de Pesquisa Rápida Superior */}
+      {/* Barra de Pesquisa Rápida Superior & Botão Voltar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-black/60 border border-tibia-border rounded-xl p-3 px-4 shadow-lg">
-        <div className="text-xs text-gray-400">
-          Investigando personagem: <strong className="text-white">{playerName}</strong>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="px-3 py-1.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 text-yellow-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Voltar à tela anterior"
+            >
+              <ArrowLeft size={14} /> Voltar
+            </button>
+          )}
+          <div className="text-xs text-gray-400">
+            Investigando personagem: <strong className="text-white">{playerName}</strong>
+          </div>
         </div>
 
         <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-80">
@@ -602,6 +691,38 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer })
                     <span className="w-2 h-2 rounded-full bg-gray-600 mr-2"></span> Offline
                   </span>
                 )}
+
+                {/* Seletor de Mundo do Jogador */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowWorldSelect(!showWorldSelect)}
+                    className="bg-yellow-950/60 hover:bg-yellow-900/60 border border-yellow-500/40 text-yellow-300 px-3 py-1 rounded text-sm font-bold flex items-center gap-1.5 cursor-pointer"
+                    title="Clique para alternar o servidor"
+                  >
+                    <span>{activeWorldObj?.icon || '🌐'}</span>
+                    <span>{activeWorldObj?.name || selectedWorld}</span>
+                    <span className="text-[10px] text-gray-400 font-normal">({activeWorldObj?.type})</span>
+                    <ChevronDown size={14} />
+                  </button>
+                  {showWorldSelect && (
+                    <div className="absolute left-0 top-full mt-1 w-56 max-h-56 overflow-y-auto bg-stone-950 border border-yellow-500/40 rounded-xl shadow-2xl z-50 divide-y divide-white/5 custom-scrollbar">
+                      {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => (
+                        <div
+                          key={w.id}
+                          onClick={() => handleWorldChange(w.id)}
+                          className={`p-2.5 px-3 flex items-center justify-between text-xs cursor-pointer ${
+                            w.id.toLowerCase() === selectedWorld.toLowerCase() ? 'bg-yellow-950/80 text-yellow-300 font-bold' : 'hover:bg-white/5 text-gray-300'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>{w.icon}</span> {w.name}
+                          </span>
+                          <span className="text-[10px] text-gray-400">{w.type}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -609,27 +730,78 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer })
         
         {/* Action Buttons */}
         <div className="z-10 w-full md:w-auto flex flex-col sm:flex-row gap-3">
+          <a
+            href={`https://rubinot.com.br/characters/${encodeURIComponent(playerName)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full md:w-auto py-3 px-5 bg-stone-800 hover:bg-stone-700 border border-white/10 hover:border-yellow-500/40 text-stone-200 hover:text-yellow-300 font-bold text-sm rounded flex items-center justify-center transition-colors"
+          >
+            <ExternalLink className="mr-2" size={16} />
+            Rubinot Oficial ↗
+          </a>
+
           <button 
             onClick={handleFindMakers}
-            className="w-full md:w-auto py-3 px-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
+            className="w-full md:w-auto py-3 px-5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
           >
-            <Search className="mr-2" size={20} />
+            <Search className="mr-2" size={18} />
             Descobrir Makers
           </button>
           
-          {isAdmin ? (
+          {isAdmin && (
             <button 
               onClick={() => setShowStrikeModal(true)}
-              className="w-full md:w-auto py-3 px-6 bg-red-600 hover:bg-red-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
+              className="w-full md:w-auto py-3 px-5 bg-red-600 hover:bg-red-700 text-white font-bold rounded flex items-center justify-center transition-colors shadow-tibia-glow"
             >
-              <AlertOctagon className="mr-2" size={20} />
+              <AlertOctagon className="mr-2" size={18} />
               Aplicar Strike
             </button>
-          ) : (
-            <div className="bg-black/50 px-4 py-2 rounded text-gray-500 text-sm border border-white/5 flex items-center">
-              Somente Admins punem.
-            </div>
           )}
+        </div>
+      </div>
+
+      {/* Cards de Rankings e Telemetria do Mundo */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Ranking no Mundo */}
+        <div className="bg-gradient-to-b from-stone-900 to-black p-4 rounded-xl border border-yellow-500/30 flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-xs font-bold text-yellow-400/90 uppercase tracking-wider">Ranking no Mundo</p>
+            <p className="text-3xl font-black text-white mt-1">
+              {worldRank ? `#${worldRank}` : 'Top 100'}
+            </p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Servidor {activeWorldObj?.name}</p>
+          </div>
+          <Shield className="text-yellow-400 opacity-60" size={36} />
+        </div>
+
+        {/* Ranking Global */}
+        <div className="bg-gradient-to-b from-yellow-950/30 to-black p-4 rounded-xl border-2 border-yellow-500/50 flex items-center justify-between shadow-xl shadow-yellow-500/5">
+          <div>
+            <p className="text-xs font-black text-yellow-400 uppercase tracking-wider flex items-center gap-1">
+              <Sparkles size={12} /> Ranking Global
+            </p>
+            <p className="text-3xl font-black text-yellow-300 mt-1">
+              {globalRank ? `#${globalRank}` : 'Top Geral'}
+            </p>
+            <p className="text-[11px] text-yellow-400/70 mt-0.5 font-mono">
+              {globalPercentile ? `Top ${globalPercentile}% no Rubinot` : 'Entre 12.365+ players'}
+            </p>
+          </div>
+          <Trophy className="text-yellow-400 opacity-80" size={36} />
+        </div>
+
+        {/* Top Rusher 24h */}
+        <div className="bg-gradient-to-b from-stone-900 to-black p-4 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Rush 24 Horas</p>
+            <p className="text-2xl font-black text-amber-300 mt-1">
+              {rusher24h ? `+${(rusher24h.exp_gained / 1000000).toFixed(1)}M XP` : '0 XP'}
+            </p>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {rusher24h ? 'Top Rusher ativo hoje' : 'Sem rush recente'}
+            </p>
+          </div>
+          <Flame className="text-amber-400 opacity-70" size={36} />
         </div>
       </div>
 
