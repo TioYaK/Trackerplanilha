@@ -8,8 +8,9 @@ import { useAuth } from './components/AuthContext';
 import { LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
+import RubinotHome from './views/RubinotHome';
+
 // Lazy-loaded Views & Components
-const RubinotHome = lazy(() => import('./views/RubinotHome'));
 const LiveDashboard = lazy(() => import('./views/LiveDashboard'));
 const GlobalTracker = lazy(() => import('./components/GlobalTracker'));
 const PlanilhaManager = lazy(() => import('./views/PlanilhaManager'));
@@ -51,10 +52,11 @@ const DEFAULT_VISIBLE_TABS = [
 ];
 
 export default function App() {
+  const { user, profile, loading, logout } = useAuth();
   const [currentView, setCurrentView] = useState(() => {
     const path = window.location.pathname.toLowerCase();
     if (path === '/invite' || path === '/invites') return 'invite';
-    return 'live';
+    return 'home';
   });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedParty, setSelectedParty] = useState(null);

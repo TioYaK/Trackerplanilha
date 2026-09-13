@@ -61,7 +61,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
       const cutoffLimit = new Date(Date.now() - 15 * 60 * 1000).toISOString();
       let workersQuery = supabase
         .from('worker_heartbeats')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .gte('last_ping', cutoffLimit);
 
       const [deathsRes, rushersRes, onlineRes, workersRes] = await Promise.all([
@@ -74,11 +74,24 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
       if (deathsRes.data) setRecentDeaths(deathsRes.data);
       if (rushersRes.data) setTopRushers(rushersRes.data);
       if (onlineRes.data) setOnlineCount(onlineRes.data.online_count || 0);
-      if (workersRes.count !== null) setActiveWorkers(workersRes.count || 0);
+      if (workersRes && workersRes.count !== null && workersRes.count !== undefined) {
+        setActiveWorkers(workersRes.count);
+      }
     } catch (err) {
       console.error('Erro ao carregar dados do Rubinot Hub:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const safeFormatTime = (isoString) => {
+    if (!isoString) return '';
+    try {
+      const d = parseUtcDate(isoString);
+      if (!d || isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return '';
     }
   };
 
@@ -463,12 +476,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                   </div>
 
                   <div className="text-right text-[11px] text-gray-500 font-sans">
-                    {d.death_time ? (
-                      (() => {
-                        const date = parseUtcDate(d.death_time);
-                        return date ? date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-                      })()
-                    ) : ''}
+                    {safeFormatTime(d.death_time)}
                   </div>
                 </div>
               ))
@@ -523,7 +531,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                         {r.character_name || r.name}
                       </div>
                       <div className="text-[11px] text-gray-400">
-                        {r.vocation || 'Desconhecida'} • Level {r.level || '?'}
+                        {r.vocation ? `${r.vocation} • ` : ''}{r.level ? `Level ${r.level}` : 'Top Rusher 24h'}
                       </div>
                     </div>
                   </div>
