@@ -6,7 +6,7 @@ import {
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
   Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
-  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2, BookOpen,
+  ShieldAlert, Search, Bell, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2, BookOpen,
   Compass, Coins, Hammer, Skull
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
@@ -61,6 +61,8 @@ export default function TopNav({
     exercise_calc: { label: 'Calculadora de Treino 🧮', icon: <Calculator size={16} className="text-yellow-400" /> },
     loot_splitter: { label: 'Divisão de Loot da Party 💰', icon: <Coins size={16} className="text-yellow-400" /> },
     bazaar: { label: 'Bazaar Sniper (Leilões)', icon: <Gem size={16} className="text-yellow-400" /> },
+    bazaar_flip: { label: 'Calculadora de Revenda 💰', icon: <Calculator size={16} className="text-emerald-400" /> },
+    discord_webhooks: { label: 'Alertas Discord 📢', icon: <Bell size={16} className="text-indigo-400" /> },
     investigation: { label: 'Investigação Pro (Makers) 🕵️‍♂️', icon: <Search size={16} className="text-red-400" /> },
     war_feed: { label: 'Mural de Frags & Live War ⚔️', icon: <Swords size={16} className="text-red-400" /> },
     versus: { label: 'Comparador Versus ⚔️', icon: <Swords size={16} className="text-red-400" /> },
@@ -103,7 +105,7 @@ export default function TopNav({
       title: 'Mega Premium 💎',
       icon: <Gem size={18} className="text-yellow-400" />,
       badge: isPremium ? 'VIP' : 'PRO',
-      items: ['bazaar', 'radar', 'extreme']
+      items: ['bazaar', 'bazaar_flip', 'discord_webhooks', 'radar', 'extreme']
     }
   ];
 

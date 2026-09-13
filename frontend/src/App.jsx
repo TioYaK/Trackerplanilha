@@ -51,6 +51,8 @@ const DailyRoulette = lazy(() => import('./views/DailyRoulette'));
 const WheelOfDestiny = lazy(() => import('./views/WheelOfDestiny'));
 const PlayerInvestigation = lazy(() => import('./views/PlayerInvestigation'));
 const LiveWarFeed = lazy(() => import('./views/LiveWarFeed'));
+const DiscordWebhooks = lazy(() => import('./views/DiscordWebhooks'));
+const BazaarFlipCalculator = lazy(() => import('./views/BazaarFlipCalculator'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import GlobalSearchModal from './components/GlobalSearchModal';
@@ -126,6 +128,12 @@ const ROUTE_TO_VIEW = {
   '/treta': 'war_feed',
   '/feed-war': 'war_feed',
   '/frags-live': 'war_feed',
+  '/webhooks': 'discord_webhooks',
+  '/discord': 'discord_webhooks',
+  '/discord-webhooks': 'discord_webhooks',
+  '/flip-calc': 'bazaar_flip',
+  '/bazaar-flip': 'bazaar_flip',
+  '/flip': 'bazaar_flip',
   '/loot': 'loot_splitter',
   '/loot-split': 'loot_splitter',
   '/divisao': 'loot_splitter',
@@ -575,6 +583,22 @@ export default function App() {
         <LiveWarFeed 
           onPlayerClick={handlePlayerClick} 
           onNavigate={navigateView} 
+        />
+      );
+    }
+    if (currentView === 'discord_webhooks' || currentView === 'webhooks') {
+      return (
+        <DiscordWebhooks 
+          onNavigate={navigateView} 
+          onPlayerClick={handlePlayerClick} 
+        />
+      );
+    }
+    if (currentView === 'bazaar_flip' || currentView === 'flip_calc') {
+      return (
+        <BazaarFlipCalculator 
+          onNavigate={navigateView} 
+          onPlayerClick={handlePlayerClick} 
         />
       );
     }
