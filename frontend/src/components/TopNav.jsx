@@ -67,6 +67,7 @@ export default function TopNav({
     discord_webhooks: { label: 'Alertas Discord 📢', icon: <Bell size={16} className="text-indigo-400" /> },
     investigation: { label: 'Investigação Pro (Makers) 🕵️‍♂️', icon: <Search size={16} className="text-red-400" /> },
     war_feed: { label: 'Mural de Frags & Live War ⚔️', icon: <Swords size={16} className="text-red-400" /> },
+    companion: { label: 'Mini HUD Gamer (Monitor 2) 🖥️', icon: <Monitor size={16} className="text-cyan-400" /> },
     versus: { label: 'Comparador Versus ⚔️', icon: <Swords size={16} className="text-red-400" /> },
     guides: { label: 'Guias & Estratégias 📜', icon: <BookOpen size={16} className="text-yellow-400" /> },
     sorteio: { label: 'Sorteios da Comunidade 🎁', icon: <Gift size={16} className="text-yellow-400" /> },
@@ -96,7 +97,7 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'war_feed', 'investigation', 'daily_spin', 'forge_calc', 'boss_tracker', 'wheel_planner', 'hunt_finder', 'rotten_blood', 'exercise_calc', 'loot_splitter', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
+      items: ['live', 'war_feed', 'companion', 'investigation', 'daily_spin', 'forge_calc', 'boss_tracker', 'wheel_planner', 'hunt_finder', 'rotten_blood', 'exercise_calc', 'loot_splitter', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
       title: 'Comunidade & Guildas',
@@ -107,7 +108,7 @@ export default function TopNav({
       title: 'Mega Premium 💎',
       icon: <Gem size={18} className="text-yellow-400" />,
       badge: isPremium ? 'VIP' : 'PRO',
-      items: ['bazaar', 'bazaar_flip', 'bazaar_fipe', 'discord_webhooks', 'radar', 'extreme']
+      items: ['bazaar', 'bazaar_flip', 'bazaar_fipe', 'discord_webhooks', 'radar', 'extreme', 'companion']
     }
   ];
 

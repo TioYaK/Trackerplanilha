@@ -55,6 +55,7 @@ const DiscordWebhooks = lazy(() => import('./views/DiscordWebhooks'));
 const BazaarFlipCalculator = lazy(() => import('./views/BazaarFlipCalculator'));
 const RottenBloodHub = lazy(() => import('./views/RottenBloodHub'));
 const BazaarMarketIndex = lazy(() => import('./views/BazaarMarketIndex'));
+const StreamerCompanion = lazy(() => import('./views/StreamerCompanion'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import GlobalSearchModal from './components/GlobalSearchModal';
@@ -145,6 +146,11 @@ const ROUTE_TO_VIEW = {
   '/fipe': 'bazaar_fipe',
   '/fipe-grafica': 'bazaar_fipe',
   '/bazaar-analytics': 'bazaar_fipe',
+  '/companion': 'companion',
+  '/hud': 'companion',
+  '/mini-hud': 'companion',
+  '/streamer': 'companion',
+  '/gamer-hud': 'companion',
   '/loot': 'loot_splitter',
   '/loot-split': 'loot_splitter',
   '/divisao': 'loot_splitter',
@@ -624,6 +630,14 @@ export default function App() {
     if (currentView === 'bazaar_fipe' || currentView === 'fipe_grafica') {
       return (
         <BazaarMarketIndex 
+          onNavigate={navigateView} 
+          onPlayerClick={handlePlayerClick} 
+        />
+      );
+    }
+    if (currentView === 'companion' || currentView === 'hud' || currentView === 'mini_hud') {
+      return (
+        <StreamerCompanion 
           onNavigate={navigateView} 
           onPlayerClick={handlePlayerClick} 
         />
