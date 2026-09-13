@@ -38,6 +38,7 @@ const DeveloperHub = lazy(() => import('./views/DeveloperHub'));
 const PrivacyPolicy = lazy(() => import('./views/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./views/TermsOfService'));
 const AboutUs = lazy(() => import('./views/AboutUs'));
+const GuidesHub = lazy(() => import('./views/GuidesHub'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 
@@ -54,7 +55,7 @@ function ModuleFallback() {
 
 // Tabs padrão visíveis quando não há configuração no banco
 const DEFAULT_VISIBLE_TABS = [
-  'live', 'bazaar', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute',
+  'live', 'bazaar', 'guides', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute',
   'planilha', 'planilha_live', 'roster', 'invite',
   'radar', 'extreme'
 ];
@@ -63,6 +64,10 @@ const ROUTE_TO_VIEW = {
   '/': 'home',
   '/home': 'home',
   '/live': 'home',
+  '/guias': 'guides',
+  '/guides': 'guides',
+  '/artigos': 'guides',
+  '/conteudo': 'guides',
   '/api': 'developers',
   '/developers': 'developers',
   '/dev': 'developers',
@@ -157,11 +162,13 @@ const VIEW_TO_ROUTE = {
   privacy: '/privacy',
   terms: '/terms',
   about: '/about',
+  guides: '/guias',
 };
 
 const VIEW_TITLES = {
   home: 'Rubinot Tracker | Portal Central',
   live: 'Rubinot Tracker | Portal Central',
+  guides: 'Rubinot Tracker | Guias, Estratégias & Artigos 📜',
   developers: 'Rubinot Tracker | API para Desenvolvedores ⚡',
   sorteio: 'Rubinot Tracker | Sorteios da Comunidade 🎁',
   attendance: 'Rubinot Tracker | Mural de Mortes & Frags',
@@ -426,6 +433,9 @@ export default function App() {
           user={user} 
         />
       );
+    }
+    if (currentView === 'guides') {
+      return <GuidesHub onNavigate={navigateView} />;
     }
     if (currentView === 'sorteio' || currentView === 'giveaway') {
       return (

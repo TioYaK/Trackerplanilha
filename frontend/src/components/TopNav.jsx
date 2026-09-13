@@ -6,7 +6,7 @@ import {
   Crosshair, Users, Landmark, BrainCircuit, Shield, 
   Settings, LogOut, ChevronDown, Menu, X, Monitor, Database, Lock, Unlock, Server,
   Swords, LayoutDashboard, Calculator, ShoppingBag, TrendingDown, User, Activity, CalendarDays, Target,
-  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2
+  ShieldAlert, Search, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2, BookOpen
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
@@ -51,6 +51,8 @@ export default function TopNav({
     // 🌐 Rubinot Público
     live: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
     home: { label: 'Portal Central Rubinot', icon: <Globe size={16} /> },
+    bazaar: { label: 'Bazaar Sniper (Leilões)', icon: <Gem size={16} className="text-yellow-400" /> },
+    guides: { label: 'Guias & Estratégias 📜', icon: <BookOpen size={16} className="text-yellow-400" /> },
     sorteio: { label: 'Sorteios da Comunidade 🎁', icon: <Gift size={16} className="text-yellow-400" /> },
     attendance: { label: 'Mural de Mortes & Frags', icon: <CalendarDays size={16} /> },
     tracker: { label: 'Monitor Global de Players', icon: <Search size={16} /> },
@@ -69,7 +71,6 @@ export default function TopNav({
     invite: { label: 'Convites In-Game (Membros)', icon: <UserPlus size={16} /> },
 
     // 💎 Mega Premium
-    bazaar: { label: 'Bazaar Sniper 💎', icon: <Gem size={16} className="text-yellow-400" /> },
     radar: { label: 'Radar de Inimigos 👑', icon: <ShieldAlert size={16} className="text-yellow-400" /> },
     extreme: { label: 'Extreme BI 👑', icon: <Crosshair size={16} className="text-yellow-400" /> },
 
@@ -83,7 +84,7 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'bazaar', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute']
+      items: ['live', 'bazaar', 'guides', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
       title: profile?.guild_name ? `Guilda ${profile.guild_name}` : 'Espaço da Guilda',

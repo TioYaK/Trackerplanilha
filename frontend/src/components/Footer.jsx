@@ -52,6 +52,11 @@ export default function Footer({ onNavigate }) {
                 </button>
               </li>
               <li>
+                <button onClick={() => onNavigate && onNavigate('guides')} className="hover:text-yellow-400 transition-colors cursor-pointer text-left">
+                  📜 Guias & Estratégias (Artigos)
+                </button>
+              </li>
+              <li>
                 <button onClick={() => onNavigate && onNavigate('sorteio')} className="hover:text-yellow-400 transition-colors cursor-pointer text-left">
                   🎁 Sorteador de Prêmios & Roleta
                 </button>
@@ -97,6 +102,11 @@ export default function Footer({ onNavigate }) {
               <li>
                 <button onClick={() => onNavigate && onNavigate('about')} className="hover:text-yellow-400 transition-colors cursor-pointer text-left inline-flex items-center gap-1.5">
                   <Globe size={13} /> Sobre Nós
+                </button>
+              </li>
+              <li>
+                <button onClick={() => onNavigate && onNavigate('guides')} className="hover:text-yellow-400 transition-colors cursor-pointer text-left inline-flex items-center gap-1.5">
+                  <FileText size={13} /> Central Editorial & Artigos
                 </button>
               </li>
               <li>
