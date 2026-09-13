@@ -83,19 +83,19 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute']
+      items: ['live', 'bazaar', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
       title: profile?.guild_name ? `Guilda ${profile.guild_name}` : 'Espaço da Guilda',
       icon: <Shield size={18} />,
       badge: !isGuildMember ? '🔒' : null,
-      items: ['planilha', 'planilha_live', 'respawns', 'roster', 'bank', 'market', 'guild_perks', 'invite']
+      items: ['planilha', 'planilha_live', 'roster', 'invite']
     },
     {
       title: 'Mega Premium 💎',
       icon: <Gem size={18} className="text-yellow-400" />,
       badge: isPremium ? 'VIP' : 'PRO',
-      items: ['bazaar', 'radar', 'extreme']
+      items: ['radar', 'extreme']
     }
   ];
 

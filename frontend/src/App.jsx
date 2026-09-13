@@ -7,6 +7,7 @@ import GuildGate from './components/GuildGate';
 import { useAuth } from './components/AuthContext';
 import { LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
+import { trackPageView } from './lib/telemetry';
 
 import RubinotHome from './views/RubinotHome';
 
@@ -53,8 +54,9 @@ function ModuleFallback() {
 
 // Tabs padrão visíveis quando não há configuração no banco
 const DEFAULT_VISIBLE_TABS = [
-  'live', 'radar', 'roster', 'planilha', 'contribute',
-  'bank', 'market', 'loot', 'tracker', 'extreme', 'respawns', 'guild_perks'
+  'live', 'bazaar', 'sorteio', 'attendance', 'tracker', 'analytics', 'developers', 'contribute',
+  'planilha', 'planilha_live', 'roster', 'invite',
+  'radar', 'extreme'
 ];
 
 const ROUTE_TO_VIEW = {
@@ -334,6 +336,19 @@ export default function App() {
 
   const isPremium = isAdmin || profile?.role === 'premium' || profile?.is_premium === true || hasActiveWorker;
 
+  // Telemetria assíncrona de navegação & métricas por perfil de usuário
+  useEffect(() => {
+    trackPageView({
+      view: currentView,
+      path: typeof window !== 'undefined' ? window.location.pathname : '/',
+      world: profile?.makers?._world || 'Global',
+      user,
+      profile,
+      isPremium,
+      isAdmin
+    });
+  }, [currentView, user?.id, isPremium, isAdmin]);
+
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -458,15 +473,12 @@ export default function App() {
       );
     }
 
-    // 3. Abas Mega Premium 💎 (Gated para não-premium)
     if (currentView === 'bazaar') {
-      if (isPremium) return <BazaarSniper />;
       return (
-        <PremiumGate 
-          featureName="Bazaar Sniper Mega Premium 💎"
-          featureDescription="O sistema definitivo de arbitragem e monitoramento de leilões do Rubinot. Detecte chares raros e oportunidades lucrativas até 60% abaixo do preço de mercado antes de todo mundo."
-          onNavigate={navigateView}
-          onLogin={() => navigateView('auth')}
+        <BazaarSniper 
+          isPremium={isPremium} 
+          onPlayerClick={handlePlayerClick} 
+          onNavigate={navigateView} 
         />
       );
     }
