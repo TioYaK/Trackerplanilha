@@ -24,9 +24,6 @@ const VOCATION_TABS = [
   { id: 'none', label: 'Rook / Sem Voc', short: 'None', icon: '🛡️', color: 'text-gray-400' }
 ];
 
-// Palavras-chave dos itens meta/BiS no Tibia e RubinOT
-const BIS_KEYWORDS = ['soul', 'falcon', 'sanguine', 'naga', 'cobra', 'lion', 'alicorn', 'spiritthorn', 'arcanomancer', 'eldritch'];
-
 // Runas de Charm do Tibia e seus custos
 const CHARM_RUNES = [
   { id: 'wound', name: 'Wound', cost: 600, type: 'Dano Físico', icon: '🩸', desc: '5% de chance de causar 5% da vida do monstro como dano físico.' },
@@ -57,9 +54,11 @@ const RUBINOT_MARKET_STATS = {
     { voc: 'Exalted Monk (Monk)', avg: 505, median: 371, note: 'Boa opção de entrada para quem quer gastar menos' },
   ],
   itemMultipliers: {
+    sanguine: '+2.000 a +4.500 TC por item (Rotten Blood BiS Supremo)',
+    soulwar: '+600 a +1.800 TC por item (Soulstalkers, Soulshell, etc.)',
     tier1: '+150 a +350 TC no valor final',
     tier2: '+450 a +850 TC no valor final',
-    tier3: '+1.200 a +2.500 TC no valor final (Soulstalkers, Lion Bow, etc.)',
+    tier3: '+1.200 a +2.500 TC no valor final',
     charms1000: '+250 a +400 TC a cada 1.000 charm points'
   }
 };
@@ -85,7 +84,7 @@ function CharAvatar({ name, vocation, size = 'md' }) {
   );
 }
 
-// Cálculo exato de telemetria de HP, Mana, Cap e Speed por fórmula Tibia
+// Telemetria exata de HP, Mana, Cap e Speed por fórmula Tibia
 function calculateCharTelemetry(level, vocation) {
   const lvl = Math.max(1, Number(level) || 1);
   const voc = (vocation || '').toLowerCase();
@@ -126,12 +125,12 @@ function getCharacterQuestAccess(level) {
   const lvl = Number(level) || 1;
   return [
     {
-      name: 'Rotten Blood (Endgame BiS)',
+      name: 'Rotten Blood (Endgame BiS Sanguine)',
       reqLevel: 1000,
       status: lvl >= 1000 ? 'Habilitado para Bakragore' : 'Requer Level 1000+',
       unlocked: lvl >= 1000,
       reward: 'Equipamentos Sanguine BiS & Taints',
-      tier: 'Tier 5 Endgame'
+      tier: 'Tier 5 Supremo'
     },
     {
       name: 'Soul War & Goshnar Taints',
@@ -152,9 +151,9 @@ function getCharacterQuestAccess(level) {
     {
       name: 'The Secret Library & Grand Master Oberon',
       reqLevel: 500,
-      status: lvl >= 500 ? 'Liberado para Daily Oberon' : 'Requer Level 500+',
+      status: lvl >= 500 ? 'Liberado para Oberon Diário' : 'Requer Level 500+',
       unlocked: lvl >= 500,
-      reward: 'Falcon Items & Livros Elementais BiS',
+      reward: 'Falcon Items & Livros Elementais',
       tier: 'Tier 3'
     },
     {
@@ -176,7 +175,7 @@ function getCharacterQuestAccess(level) {
     {
       name: 'Forgotten Knowledge & Heart of Destruction',
       reqLevel: 300,
-      status: lvl >= 300 ? 'Acesso a Imbuements Poderosos' : 'Requer Level 300+',
+      status: lvl >= 300 ? 'Acesso a Imbuements Tier 3' : 'Requer Level 300+',
       unlocked: lvl >= 300,
       reward: 'Imbuements Poderosos Tier 3 (Crítico/Mana)',
       tier: 'Tier 2'
@@ -200,7 +199,7 @@ function getCharacterQuestAccess(level) {
   ];
 }
 
-// Avaliação FIPE individual calibrada com os dados reais de venda do RubinOT
+// Avaliação FIPE calibrada focando em Sanguine, Soulwar e Tiers
 function calculateCharFipe(char) {
   const lvl = Number(char.level) || 100;
   const ch = Number(char.charm_points) || 0;
@@ -219,20 +218,28 @@ function calculateCharFipe(char) {
   else if (voc.includes('monk')) vocMultiplier = 0.95;
 
   baseRate *= vocMultiplier;
-
   let baseTc = Math.round(lvl * baseRate);
   const charmsBonus = Math.round((ch / 1000) * 300);
 
+  // Bônus de Tiers e Bônus Real de Sanguine / Soulwar
   let tierBonus = 0;
+  let sanguineBonus = 0;
+  let soulwarBonus = 0;
+
   if (Array.isArray(char.items_data)) {
     char.items_data.forEach(it => {
+      const name = (it?.name || '').toLowerCase();
+      if (name.includes('sanguine')) sanguineBonus += 2500;
+      else if (name.includes('soul')) soulwarBonus += 800;
+
       if (it?.tier === 1) tierBonus += 250;
       else if (it?.tier === 2) tierBonus += 600;
       else if (it?.tier >= 3) tierBonus += 1500;
     });
   }
 
-  const avgFipe = Math.round(baseTc + charmsBonus + tierBonus);
+  const gearBonus = sanguineBonus + soulwarBonus + tierBonus;
+  const avgFipe = Math.round(baseTc + charmsBonus + gearBonus);
   const minFipe = Math.round(avgFipe * 0.85);
   const maxFipe = Math.round(avgFipe * 1.15);
 
@@ -240,7 +247,7 @@ function calculateCharFipe(char) {
   const discountPct = (avgFipe > 0 && currentBid > 0) ? Math.round(((avgFipe - currentBid) / avgFipe) * 100) : 0;
   const estimatedProfitTc = Math.max(0, Math.round(avgFipe * 0.88 - 50 - currentBid));
 
-  return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, tierBonus, baseTc, charmsBonus, vocMultiplier };
+  return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, tierBonus, sanguineBonus, soulwarBonus, baseTc, charmsBonus };
 }
 
 export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
@@ -262,13 +269,13 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   // Estados internos do Modal com Abas
   const [modalActiveTab, setModalActiveTab] = useState('overview'); // 'overview' | 'items' | 'skills' | 'charms' | 'quests' | 'fipe'
   const [modalItemSearch, setModalItemSearch] = useState('');
-  const [modalItemFilter, setModalItemFilter] = useState('all'); // 'all' | 'bis' | 'tiered'
+  const [modalItemFilter, setModalItemFilter] = useState('all'); // 'all' | 'sanguine' | 'soulwar' | 'tiered'
 
-  // Paginação inteligente
+  // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(24);
 
-  // 1. Filtros Básicos & Status
+  // Filtros Básicos & Status
   const [minLevel, setMinLevel] = useState('');
   const [maxLevel, setMaxLevel] = useState('');
   const [minBid, setMinBid] = useState('');
@@ -276,11 +283,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
   const [minCharms, setMinCharms] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // 2. Filtros de Equipamentos Valiosos & Tiers
-  const [itemSetFilter, setItemSetFilter] = useState('all');
-  const [itemTierFilter, setItemTierFilter] = useState('all');
+  // Filtros de Equipamentos Meta (Foco em Sanguine e Soulwar)
+  const [itemSetFilter, setItemSetFilter] = useState('all'); // 'all' | 'sanguine' | 'soulwar' | 'sanguine_or_soul'
+  const [itemTierFilter, setItemTierFilter] = useState('all'); // 'all' | 'tier1' | 'tier2' | 'tier3'
 
-  // 3. Filtros de Habilidades & Skills
+  // Filtros de Habilidades & Skills
   const [minMagLevel, setMinMagLevel] = useState('');
   const [minDist, setMinDist] = useState('');
   const [minMelee, setMinMelee] = useState('');
@@ -314,7 +321,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     });
   };
 
-  // Ticker de tempo regressivo otimizado
   useEffect(() => {
     const timer = setInterval(() => {
       setNowTimestamp(Date.now());
@@ -322,7 +328,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     return () => clearInterval(timer);
   }, []);
 
-  // Busca e Pré-processamento de dados
   const fetchAlerts = async () => {
     setLoading(true);
     try {
@@ -337,21 +342,17 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       const preprocessed = (data || []).map(a => {
         const fipe = calculateCharFipe(a);
         const items = Array.isArray(a.items_data) ? a.items_data : [];
-        let hasBis = false;
+        let hasSanguine = false;
+        let hasSoul = false;
         let highestTier = 0;
-        let bisTags = [];
 
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
           if (!item) continue;
           if (item.tier > highestTier) highestTier = item.tier;
           const nameLower = (item.name || '').toLowerCase();
-          for (let k = 0; k < BIS_KEYWORDS.length; k++) {
-            if (nameLower.includes(BIS_KEYWORDS[k])) {
-              hasBis = true;
-              if (!bisTags.includes(BIS_KEYWORDS[k])) bisTags.push(BIS_KEYWORDS[k]);
-            }
-          }
+          if (nameLower.includes('sanguine')) hasSanguine = true;
+          if (nameLower.includes('soul')) hasSoul = true;
         }
 
         const voc = (a.vocation || '').toLowerCase();
@@ -365,8 +366,9 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         return {
           ...a,
           _fipe: fipe,
-          _hasBis: hasBis,
-          _bisTags: bisTags,
+          _hasSanguine: hasSanguine,
+          _hasSoul: hasSoul,
+          _hasSanguineOrSoul: hasSanguine || hasSoul,
           _highestTier: highestTier,
           _maxMelee: maxMelee,
           _isTopSkill: isTopSkill,
@@ -393,7 +395,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     setAudioEnabled(next);
   };
 
-  // Contagem de leilões por vocação
   const vocationCounts = useMemo(() => {
     const counts = { ALL: alerts.length, knight: 0, paladin: 0, sorcerer: 0, druid: 0, monk: 0, none: 0 };
     alerts.forEach(a => {
@@ -408,7 +409,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     return counts;
   }, [alerts]);
 
-  // Formatação de tempo restante
   const getTimeRemaining = (auctionEnd, endTimeMs) => {
     const endMs = endTimeMs || (auctionEnd ? new Date(auctionEnd).getTime() : 0);
     if (!endMs) return { text: 'Expirado', isUrgent: false, isImminent: false, isEnded: true, totalSeconds: 0 };
@@ -437,7 +437,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     };
   };
 
-  // Contagem de filtros ativos
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (minLevel || maxLevel) count++;
@@ -478,7 +477,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     setCurrentPage(1);
   }, [searchQuery, selectedVoc, selectedWorld, activeChip, statusFilter, itemSetFilter, itemTierFilter, minLevel, maxLevel, minBid, maxBid, minCharms, minMagLevel, minDist, minMelee, minShielding, sortOption]);
 
-  // Filtragem e Ordenação com Pré-processados O(1)
   const filteredAndSortedAuctions = useMemo(() => {
     let result = alerts.filter(a => {
       const isEnded = (a._endTimeMs || 0) <= nowTimestamp;
@@ -513,13 +511,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       if (maxBid && (a.current_bid || 0) > Number(maxBid)) return false;
       if (minCharms && (a.charm_points || 0) < Number(minCharms)) return false;
 
+      // Filtro Estratégico de Itens: Sanguine ou Soulwar
       if (itemSetFilter !== 'all') {
-        if (!a._hasBis) return false;
-        if (itemSetFilter === 'soulwar' && !a._bisTags.includes('soul')) return false;
-        if (itemSetFilter === 'falcon' && !a._bisTags.includes('falcon')) return false;
-        if (itemSetFilter === 'sanguine' && !a._bisTags.includes('sanguine')) return false;
-        if (itemSetFilter === 'naga_cobra' && !a._bisTags.includes('naga') && !a._bisTags.includes('cobra')) return false;
-        if (itemSetFilter === 'lion_spirit' && !a._bisTags.includes('lion') && !a._bisTags.includes('spiritthorn') && !a._bisTags.includes('alicorn') && !a._bisTags.includes('eldritch')) return false;
+        if (itemSetFilter === 'sanguine' && !a._hasSanguine) return false;
+        if (itemSetFilter === 'soulwar' && !a._hasSoul) return false;
+        if (itemSetFilter === 'sanguine_or_soul' && !a._hasSanguineOrSoul) return false;
       }
 
       if (itemTierFilter !== 'all') {
@@ -546,10 +542,13 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
       if (minShielding && (a.skills_data?.shielding || 0) < Number(minShielding)) return false;
 
+      // Chips Rápidos
       if (activeChip === 'opportunity') {
         return (a._fipe?.discountPct || 0) >= 20 || a.is_sniping_opportunity;
       }
-      if (activeChip === 'bis_gear') return a._hasBis;
+      if (activeChip === 'sanguine') return a._hasSanguine;
+      if (activeChip === 'soulwar') return a._hasSoul;
+      if (activeChip === 'sanguine_or_soul') return a._hasSanguineOrSoul;
       if (activeChip === 'tier2_plus') return (a._highestTier || 0) >= 2;
       if (activeChip === 'high_skills') return a._isTopSkill;
       if (activeChip === 'ending_soon') {
@@ -614,7 +613,8 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     let opportunities = 0;
     let endingSoon = 0;
     let tieredCount = 0;
-    let bisCount = 0;
+    let sanguineCount = 0;
+    let soulCount = 0;
 
     for (let i = 0; i < alerts.length; i++) {
       const a = alerts[i];
@@ -628,10 +628,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       }
       if ((a._fipe?.discountPct || 0) >= 20 || a.is_sniping_opportunity) opportunities++;
       if (a._highestTier > 0) tieredCount++;
-      if (a._hasBis) bisCount++;
+      if (a._hasSanguine) sanguineCount++;
+      if (a._hasSoul) soulCount++;
     }
 
-    return { total, activeCount, endedCount, opportunities, endingSoon, tieredCount, bisCount, favoritesCount: favorites.length };
+    return { total, activeCount, endedCount, opportunities, endingSoon, tieredCount, sanguineCount, soulCount, favoritesCount: favorites.length };
   }, [alerts, favorites, nowTimestamp]);
 
   const handleShareAuction = (auction) => {
@@ -642,13 +643,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  // Itens filtrados dentro do modal
   const modalFilteredItems = useMemo(() => {
     if (!selectedAuctionModal || !Array.isArray(selectedAuctionModal.items_data)) return [];
     let items = selectedAuctionModal.items_data;
 
-    if (modalItemFilter === 'bis') {
-      items = items.filter(it => it?.name && BIS_KEYWORDS.some(k => it.name.toLowerCase().includes(k)));
+    if (modalItemFilter === 'sanguine') {
+      items = items.filter(it => (it?.name || '').toLowerCase().includes('sanguine'));
+    } else if (modalItemFilter === 'soulwar') {
+      items = items.filter(it => (it?.name || '').toLowerCase().includes('soul'));
     } else if (modalItemFilter === 'tiered') {
       items = items.filter(it => it && it.tier > 0);
     }
@@ -680,7 +682,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             </h1>
             
             <p className="text-gray-300 font-sans text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
-              Consulte leilões ativos e o histórico dos últimos 30 dias de vendas do RubinOT. Clique em qualquer personagem para inspecionar o dossiê completo por abas: telemetria, inventário, skills, charms, quests e FIPE!
+              Consulte leilões ativos e o histórico dos últimos 30 dias de vendas do RubinOT. Filtre os verdadeiros Grails do meta (<strong className="text-red-400">Sanguine</strong> e <strong className="text-purple-400">Soulwar</strong>) e inspecione tudo em abas detalhadas!
             </p>
           </div>
 
@@ -786,23 +788,30 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 </div>
               ))}
             </div>
+
+            <div className="p-3.5 bg-red-950/30 border border-red-500/30 rounded-xl flex items-start gap-3">
+              <Flame size={18} className="text-red-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-gray-300 leading-relaxed">
+                <strong className="text-red-300">O que realmente comanda o valor do char:</strong> Equipamentos <strong className="text-white">Sanguine</strong> (Rotten Blood) acrescentam em média <strong className="text-red-400">+2.500 a +4.500 TC</strong> por item ao preço arrematado. Itens <strong className="text-white">Soulwar</strong> acrescentam <strong className="text-purple-300">+800 a +1.800 TC</strong>.
+              </div>
+            </div>
           </div>
         )}
 
         {/* DRAWER AVANÇADO DE FILTROS PRO */}
         {showFiltersDrawer && (
           <div className="mt-6 pt-6 border-t border-yellow-500/20 space-y-5 animate-fade-in bg-stone-950/95 p-5 sm:p-6 rounded-2xl border border-yellow-500/40 shadow-2xl">
-            {/* SEÇÃO 1: FILTROS DE EQUIPAMENTOS VALIOSOS & TIERS */}
+            {/* SEÇÃO 1: FILTROS DE EQUIPAMENTOS SUPREMOS (SANGUINE & SOULWAR) */}
             <div>
               <div className="flex items-center gap-2 mb-3 pb-1 border-b border-stone-800 text-xs font-bold text-yellow-400 uppercase tracking-wider">
-                <Gem size={15} /> 1. Equipamentos Bons & Forja de Exaltação
+                <Gem size={15} /> 1. Equipamentos Nobres do Meta (Sanguine & Soulwar)
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-1.5">
                   <label className="text-xs font-bold text-white flex items-center justify-between">
-                    <span>Equipamentos / Sets Notáveis (BiS)</span>
-                    <span className="text-[10px] text-yellow-400 font-mono">269 chars com BiS</span>
+                    <span>Filtro de Grails BiS</span>
+                    <span className="text-[10px] text-red-400 font-mono font-bold">31 Sanguine • 85 Soul</span>
                   </label>
                   <select
                     value={itemSetFilter}
@@ -810,19 +819,16 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-xs text-yellow-300 font-bold focus:outline-none focus:border-yellow-500"
                   >
                     <option value="all">Qualquer Equipamento</option>
-                    <option value="bis">💎 Qualquer Item BiS / Meta (Soul, Falcon, Sanguine...)</option>
-                    <option value="soulwar">💀 Soulwar Gear (Soulshell, Soulstalkers, Soulmaimer...)</option>
-                    <option value="falcon">🦅 Falcon Gear (Falcon Bow, Coif, Battleaxe, Plate...)</option>
-                    <option value="sanguine">🩸 Sanguine Gear (Rotten Blood BiS Lendário)</option>
-                    <option value="naga_cobra">🐍 Naga & Cobra Gear (Crossbow, Rod, Wand, Axe...)</option>
-                    <option value="lion_spirit">🦁 Lion / Spiritthorn / Alicorn / Eldritch</option>
+                    <option value="sanguine">🩸 Apenas com Sanguine (Rotten Blood BiS Supremo - 31 chars)</option>
+                    <option value="soulwar">💀 Apenas com Soulwar (Soulstalkers, Shells, Maimer - 85 chars)</option>
+                    <option value="sanguine_or_soul">👑 Possui Sanguine OU Soulwar (91 chars)</option>
                   </select>
                 </div>
 
                 <div className="bg-stone-900/90 border border-stone-800 rounded-xl p-3 space-y-1.5">
                   <label className="text-xs font-bold text-white flex items-center justify-between">
                     <span>Nível de Tier da Forja</span>
-                    <span className="text-[10px] text-cyan-400 font-mono">172 chars com Tier</span>
+                    <span className="text-[10px] text-cyan-400 font-mono font-bold">172 chars com Tier</span>
                   </label>
                   <select
                     value={itemTierFilter}
@@ -1115,7 +1121,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
       </div>
 
-      {/* 3. STRIP DE MÉTRICAS & CHIPS RÁPIDOS */}
+      {/* 3. STRIP DE MÉTRICAS & CHIPS RÁPIDOS (FOCO EM SANGUINE E SOULWAR) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         <div 
           onClick={() => setActiveChip('all')}
@@ -1134,35 +1140,39 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
 
         <div 
-          onClick={() => setActiveChip('bis_gear')}
+          onClick={() => setActiveChip('sanguine')}
           className={`bg-black/80 border p-3.5 rounded-2xl cursor-pointer transition-all shadow-lg ${
-            activeChip === 'bis_gear' 
-              ? 'border-purple-500 bg-purple-950/20 shadow-purple-500/10' 
+            activeChip === 'sanguine' 
+              ? 'border-red-500 bg-red-950/30 shadow-red-500/20' 
+              : 'border-yellow-500/20 hover:border-red-500/50'
+          }`}
+        >
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-red-400 uppercase font-bold flex items-center gap-1">
+              🩸 Sanguine BiS
+            </span>
+            <Flame className="text-red-400" size={16} />
+          </div>
+          <p className="text-2xl sm:text-3xl font-medieval font-bold text-red-400 mt-1">{stats.sanguineCount}</p>
+          <p className="text-[11px] text-red-400/70 mt-0.5">Rotten Blood Supremo</p>
+        </div>
+
+        <div 
+          onClick={() => setActiveChip('soulwar')}
+          className={`bg-black/80 border p-3.5 rounded-2xl cursor-pointer transition-all shadow-lg ${
+            activeChip === 'soulwar' 
+              ? 'border-purple-500 bg-purple-950/30 shadow-purple-500/20' 
               : 'border-yellow-500/20 hover:border-purple-500/50'
           }`}
         >
           <div className="flex justify-between items-center">
-            <span className="text-xs text-purple-400 uppercase font-semibold">Com Itens BiS</span>
+            <span className="text-xs text-purple-400 uppercase font-bold flex items-center gap-1">
+              💀 Soulwar Gear
+            </span>
             <Gem className="text-purple-400" size={16} />
           </div>
-          <p className="text-2xl sm:text-3xl font-medieval font-bold text-purple-300 mt-1">{stats.bisCount}</p>
-          <p className="text-[11px] text-purple-400/70 mt-0.5">Soulwar, Falcon, Sanguine</p>
-        </div>
-
-        <div 
-          onClick={() => setActiveChip('tiered_items')}
-          className={`bg-black/80 border p-3.5 rounded-2xl cursor-pointer transition-all shadow-lg ${
-            activeChip === 'tiered_items' 
-              ? 'border-cyan-500 bg-cyan-950/20 shadow-cyan-500/10' 
-              : 'border-yellow-500/20 hover:border-cyan-500/50'
-          }`}
-        >
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-cyan-400 uppercase font-semibold">Com Itens Tier</span>
-            <Zap className="text-cyan-400" size={16} />
-          </div>
-          <p className="text-2xl sm:text-3xl font-medieval font-bold text-cyan-400 mt-1">{stats.tieredCount}</p>
-          <p className="text-[11px] text-cyan-500/70 mt-0.5">Tier 1 ao 3 inclusos</p>
+          <p className="text-2xl sm:text-3xl font-medieval font-bold text-purple-300 mt-1">{stats.soulCount}</p>
+          <p className="text-[11px] text-purple-400/70 mt-0.5">Stalkers, Shells & Maimer</p>
         </div>
 
         <div 
@@ -1190,7 +1200,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
             <Search className="absolute left-3.5 top-3 text-gray-500" size={16} />
             <input
               type="text"
-              placeholder="Buscar personagem ou item (ex: soulshell, falcon, sanguine, naga, lion)..."
+              placeholder="Buscar personagem ou item (ex: sanguine, soulstalkers, soulshell)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-stone-900 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500"
@@ -1228,12 +1238,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
         </div>
 
-        {/* Chips Rápidos de Atalhos */}
+        {/* Chips Rápidos com SANGUINE e SOULWAR destacados */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
           <div className="flex flex-wrap gap-1.5">
             {[
               { id: 'all', label: '🌟 Todos' },
-              { id: 'bis_gear', label: '💎 Com BiS (Soul/Falcon/Sanguine)' },
+              { id: 'sanguine', label: `🩸 Com Sanguine (${stats.sanguineCount})` },
+              { id: 'soulwar', label: `💀 Com Soulwar (${stats.soulCount})` },
+              { id: 'sanguine_or_soul', label: '👑 Sanguine ou Soul (91)' },
               { id: 'tier2_plus', label: '⚡ Tier 2+' },
               { id: 'high_skills', label: '🎯 Skills 120+ / ML Alto' },
               { id: 'opportunity', label: '🔥 Pechinchas FIPE' },
@@ -1279,7 +1291,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
           <Target className="mx-auto text-yellow-500/40" size={48} />
           <h3 className="text-xl font-medieval text-white">Nenhum leilão encontrado para os filtros atuais</h3>
           <p className="text-xs text-gray-400 max-w-md mx-auto">
-            Tente flexibilizar os filtros de skills, selecionar "Todas as Classes" ou marcar "Qualquer Equipamento" para expandir os resultados.
+            Tente selecionar "Todas as Classes" ou marcar "Qualquer Equipamento" para expandir os resultados.
           </p>
           <button
             onClick={resetAllFilters}
@@ -1303,7 +1315,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   <th className="p-3.5">Level</th>
                   <th className="p-3.5">Skills / ML</th>
                   <th className="p-3.5">Charms</th>
-                  <th className="p-3.5">Equipamentos / Tiers</th>
+                  <th className="p-3.5">Grails (Sanguine/Soul)</th>
                   <th className="p-3.5">Preço (TC)</th>
                   <th className="p-3.5">FIPE Real</th>
                   <th className="p-3.5">Status</th>
@@ -1338,7 +1350,8 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         <div className="font-bold text-white hover:text-yellow-400 flex items-center gap-1.5 flex-wrap">
                           <span>{auction.character_name}</span>
                           {auction.is_hunted && <span className="text-[10px] px-1 bg-red-600 text-white rounded font-bold">Hunted</span>}
-                          {auction._hasBis && <span className="text-[10px] px-1 bg-purple-950 text-purple-300 border border-purple-500/40 rounded font-bold">💎 BiS</span>}
+                          {auction._hasSanguine && <span className="text-[10px] px-1.5 py-0.5 bg-red-950 text-red-300 border border-red-500/50 rounded font-black">🩸 Sanguine</span>}
+                          {auction._hasSoul && <span className="text-[10px] px-1.5 py-0.5 bg-purple-950 text-purple-300 border border-purple-500/50 rounded font-black">💀 Soulwar</span>}
                           {auction._highestTier > 0 && <span className="text-[10px] px-1 bg-cyan-950 text-cyan-300 border border-cyan-500/30 rounded font-bold">⚡ T{auction._highestTier}</span>}
                         </div>
                       </td>
@@ -1350,11 +1363,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       </td>
                       <td className="p-3 text-purple-300 font-mono">{auction.charm_points || 0}</td>
                       <td className="p-3 text-gray-400">
-                        {Array.isArray(auction.items_data) && auction.items_data.length > 0 ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-cyan-400 font-mono font-bold">{auction.items_data.length} itens</span>
-                            {auction._hasBis && <span className="text-[10px] text-purple-400 font-bold">✦ BiS</span>}
-                          </div>
+                        {auction._hasSanguine && auction._hasSoul ? (
+                          <span className="text-red-400 font-bold font-mono">🩸 Sanguine + 💀 Soul</span>
+                        ) : auction._hasSanguine ? (
+                          <span className="text-red-400 font-bold font-mono">🩸 Sanguine BiS</span>
+                        ) : auction._hasSoul ? (
+                          <span className="text-purple-400 font-bold font-mono">💀 Soulwar BiS</span>
+                        ) : Array.isArray(auction.items_data) && auction.items_data.length > 0 ? (
+                          <span className="text-gray-400 font-mono">{auction.items_data.length} itens</span>
                         ) : (
                           <span className="text-gray-600">-</span>
                         )}
@@ -1420,6 +1436,10 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     ? 'opacity-75 border-stone-800/80 hover:border-stone-700'
                     : auction.is_hunted
                     ? 'border-red-500/60 shadow-red-500/10'
+                    : auction._hasSanguine
+                    ? 'border-red-500/80 shadow-red-900/30'
+                    : auction._hasSoul
+                    ? 'border-purple-500/80 shadow-purple-900/30'
                     : timeInfo.isImminent
                     ? 'border-amber-500 shadow-amber-500/20 animate-pulse'
                     : (fipe?.discountPct || 0) >= 20
@@ -1440,9 +1460,15 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         <Star size={16} fill={isFav ? "currentColor" : "none"} />
                       </button>
 
-                      {auction._hasBis && (
-                        <span className="bg-purple-950/90 border border-purple-500/50 text-purple-300 text-[10px] font-black uppercase px-2 py-0.5 rounded flex items-center gap-1 shadow">
-                          💎 BiS Gear
+                      {auction._hasSanguine && (
+                        <span className="bg-red-950/90 border border-red-500/80 text-red-300 text-[10px] font-black uppercase px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-md shadow-red-900/30 animate-pulse">
+                          🩸 Sanguine
+                        </span>
+                      )}
+
+                      {auction._hasSoul && (
+                        <span className="bg-purple-950/90 border border-purple-500/80 text-purple-300 text-[10px] font-black uppercase px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-md shadow-purple-900/30">
+                          💀 Soulwar
                         </span>
                       )}
 
@@ -1535,11 +1561,13 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     </div>
                   </div>
 
-                  {/* ITENS INCLUSOS */}
+                  {/* ITENS INCLUSOS: DESTAQUE PARA SANGUINE E SOULWAR */}
                   {Array.isArray(auction.items_data) && auction.items_data.length > 0 && (
                     <div className="flex items-center gap-1.5 mb-3 p-2 rounded-xl bg-black/40 border border-white/5 overflow-x-auto custom-scrollbar">
                       {auction.items_data.slice(0, 6).map((item, idx) => {
-                        const isBisItem = item?.name && BIS_KEYWORDS.some(k => item.name.toLowerCase().includes(k));
+                        const nameLower = (item?.name || '').toLowerCase();
+                        const isSanguine = nameLower.includes('sanguine');
+                        const isSoul = nameLower.includes('soul');
 
                         return (
                           <div key={idx} className="relative shrink-0 group/item">
@@ -1548,10 +1576,12 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                               alt={item?.name || 'Item'}
                               loading="lazy"
                               decoding="async"
-                              title={`${item?.name || ''} ${item?.tier > 0 ? `[Tier ${item.tier}]` : ''} ${isBisItem ? '(BiS / Meta)' : ''}`}
+                              title={`${item?.name || ''} ${item?.tier > 0 ? `[Tier ${item.tier}]` : ''} ${isSanguine ? '(SANGUINE BiS)' : isSoul ? '(SOULWAR BiS)' : ''}`}
                               className={`w-7 h-7 object-contain drop-shadow rounded p-0.5 border ${
-                                isBisItem 
-                                  ? 'bg-purple-950/60 border-purple-500/60' 
+                                isSanguine 
+                                  ? 'bg-red-950/80 border-red-500 shadow-sm shadow-red-500/50' 
+                                  : isSoul 
+                                  ? 'bg-purple-950/80 border-purple-500 shadow-sm shadow-purple-500/50'
                                   : 'bg-stone-900/60 border-stone-700/40'
                               }`}
                               onError={(e) => { e.target.style.display = 'none'; }}
@@ -1702,7 +1732,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         </div>
       )}
 
-      {/* 7. MODAL DE INSPEÇÃO ULTRA-COMPLETO COM MÚLTIPLAS ABAS (ESTILO BAZAAR OFICIAL) */}
+      {/* 7. MODAL DE INSPEÇÃO ULTRA-COMPLETO COM ABAS (FOCO REAL EM SANGUINE & SOULWAR) */}
       {selectedAuctionModal && (() => {
         const char = selectedAuctionModal;
         const fipe = char._fipe || calculateCharFipe(char);
@@ -1715,6 +1745,9 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
         const isRP = vocStr.includes('Paladin');
         const isEK = vocStr.includes('Knight');
         const charmPts = Number(char.charm_points) || 0;
+
+        const sanguineItemsCount = itemsList.filter(it => (it?.name || '').toLowerCase().includes('sanguine')).length;
+        const soulItemsCount = itemsList.filter(it => (it?.name || '').toLowerCase().includes('soul')).length;
 
         const MODAL_TABS = [
           { id: 'overview', label: 'Visão Geral', icon: <User size={14} /> },
@@ -1747,9 +1780,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                           Hunted
                         </span>
                       )}
-                      {char._hasBis && (
-                        <span className="text-xs px-2 py-0.5 bg-purple-950 text-purple-300 border border-purple-500/50 rounded font-black uppercase">
-                          💎 Com BiS
+                      {char._hasSanguine && (
+                        <span className="text-xs px-2.5 py-0.5 bg-red-950 text-red-300 border border-red-500/80 rounded-lg font-black uppercase animate-pulse">
+                          🩸 Sanguine BiS
+                        </span>
+                      )}
+                      {char._hasSoul && (
+                        <span className="text-xs px-2.5 py-0.5 bg-purple-950 text-purple-300 border border-purple-500/80 rounded-lg font-black uppercase">
+                          💀 Soulwar BiS
                         </span>
                       )}
                     </h2>
@@ -1797,7 +1835,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 {/* ABA 1: VISÃO GERAL & TELEMETRIA */}
                 {modalActiveTab === 'overview' && (
                   <div className="space-y-6 animate-fadeIn">
-                    {/* Status Vitais Calculados */}
                     <div>
                       <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                         <Gauge size={14} className="text-yellow-400" /> Atributos Vitais do Personagem (Base Tibia)
@@ -1837,7 +1874,6 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       </div>
                     </div>
 
-                    {/* Destaques Rápidos */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-4 space-y-2">
                         <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider block">🛡️ Proteções e Status</span>
@@ -1890,11 +1926,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   </div>
                 )}
 
-                {/* ABA 2: EQUIPAMENTOS & INVENTÁRIO COM BUSCA INTERNA */}
+                {/* ABA 2: EQUIPAMENTOS & INVENTÁRIO (SANGUINE E SOULWAR EM DESTAQUE ABSOLUTO) */}
                 {modalActiveTab === 'items' && (
                   <div className="space-y-4 animate-fadeIn">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-900/80 p-3 rounded-xl border border-stone-800">
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
                         <button
                           type="button"
                           onClick={() => setModalItemFilter('all')}
@@ -1902,13 +1938,26 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         >
                           Todos ({itemsList.length})
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setModalItemFilter('bis')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${modalItemFilter === 'bis' ? 'bg-purple-900 text-purple-200 border border-purple-500/50 font-black' : 'bg-stone-950 text-gray-400 hover:text-white'}`}
-                        >
-                          💎 Apenas BiS
-                        </button>
+                        {sanguineItemsCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setModalItemFilter('sanguine')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${modalItemFilter === 'sanguine' ? 'bg-red-600 text-white font-black shadow-md shadow-red-600/30' : 'bg-red-950/60 text-red-300 border border-red-500/40 hover:bg-red-900/60'}`}
+                          >
+                            <span>🩸 Sanguine</span>
+                            <span className="bg-red-900 text-white px-1 rounded-full text-[10px]">{sanguineItemsCount}</span>
+                          </button>
+                        )}
+                        {soulItemsCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setModalItemFilter('soulwar')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${modalItemFilter === 'soulwar' ? 'bg-purple-600 text-white font-black shadow-md shadow-purple-600/30' : 'bg-purple-950/60 text-purple-300 border border-purple-500/40 hover:bg-purple-900/60'}`}
+                          >
+                            <span>💀 Soulwar</span>
+                            <span className="bg-purple-900 text-white px-1 rounded-full text-[10px]">{soulItemsCount}</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => setModalItemFilter('tiered')}
@@ -1933,26 +1982,21 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                     {modalFilteredItems.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto custom-scrollbar p-1">
                         {modalFilteredItems.map((item, idx) => {
-                          const isSoul = item?.name && item.name.toLowerCase().includes('soul');
-                          const isFalcon = item?.name && item.name.toLowerCase().includes('falcon');
-                          const isSanguine = item?.name && item.name.toLowerCase().includes('sanguine');
-                          const isOtherBis = item?.name && BIS_KEYWORDS.some(k => item.name.toLowerCase().includes(k)) && !isSoul && !isFalcon && !isSanguine;
+                          const nameLower = (item?.name || '').toLowerCase();
+                          const isSanguine = nameLower.includes('sanguine');
+                          const isSoul = nameLower.includes('soul');
 
                           return (
                             <div 
                               key={idx} 
                               className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
                                 isSanguine
-                                  ? 'bg-red-950/40 border-red-500/60 shadow-md shadow-red-900/20'
+                                  ? 'bg-gradient-to-r from-red-950/60 via-stone-900 to-stone-950 border-2 border-red-500 shadow-md shadow-red-900/30 ring-1 ring-red-500/30'
                                   : isSoul
-                                  ? 'bg-purple-950/40 border-purple-500/60 shadow-md shadow-purple-900/20'
-                                  : isFalcon
-                                  ? 'bg-amber-950/40 border-amber-500/60 shadow-md shadow-amber-900/20'
-                                  : isOtherBis
-                                  ? 'bg-emerald-950/30 border-emerald-500/40'
+                                  ? 'bg-gradient-to-r from-purple-950/60 via-stone-900 to-stone-950 border-2 border-purple-500 shadow-md shadow-purple-900/30 ring-1 ring-purple-500/30'
                                   : item.tier > 0 
-                                  ? 'bg-cyan-950/30 border-cyan-500/40 shadow-sm' 
-                                  : 'bg-stone-900/70 border-stone-800'
+                                  ? 'bg-cyan-950/30 border border-cyan-500/40 shadow-sm' 
+                                  : 'bg-stone-900/70 border border-stone-800'
                               }`}
                             >
                               <div className="relative shrink-0">
@@ -1961,7 +2005,13 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                                   alt={item?.name || 'Item'}
                                   loading="lazy"
                                   decoding="async"
-                                  className="w-10 h-10 object-contain bg-stone-950 rounded-lg p-1 border border-stone-700/60"
+                                  className={`w-10 h-10 object-contain rounded-lg p-1 border ${
+                                    isSanguine 
+                                      ? 'bg-red-950 border-red-500' 
+                                      : isSoul 
+                                      ? 'bg-purple-950 border-purple-500' 
+                                      : 'bg-stone-950 border-stone-700/60'
+                                  }`}
                                   onError={(e) => { e.target.style.display = 'none'; }}
                                 />
                                 {item.tier > 0 && (
@@ -1972,16 +2022,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                               </div>
 
                               <div className="min-w-0 flex-1">
-                                <div className="text-xs font-bold text-white capitalize truncate" title={item?.name}>
+                                <div className={`text-xs font-bold capitalize truncate ${isSanguine ? 'text-red-300' : isSoul ? 'text-purple-300' : 'text-white'}`} title={item?.name}>
                                   {item?.name}
                                 </div>
                                 <div className="text-[10px] text-gray-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   {item.count > 1 && <span>Qtd: {item.count}</span>}
                                   {item.tier > 0 && <span className="text-cyan-400 font-bold">Tier {item.tier}</span>}
-                                  {isSanguine && <span className="text-red-400 font-black">🩸 Sanguine</span>}
-                                  {isSoul && <span className="text-purple-400 font-black">💀 Soulwar</span>}
-                                  {isFalcon && <span className="text-amber-400 font-black">🦅 Falcon</span>}
-                                  {isOtherBis && <span className="text-emerald-400 font-black">💎 BiS</span>}
+                                  {isSanguine && <span className="text-red-400 font-black flex items-center gap-0.5">🩸 SANGUINE BiS</span>}
+                                  {isSoul && <span className="text-purple-400 font-black flex items-center gap-0.5">💀 SOULWAR BiS</span>}
                                 </div>
                               </div>
                             </div>
@@ -2157,7 +2205,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   </div>
                 )}
 
-                {/* ABA 6: DOSSIÊ FIPE & ARBITRAGEM */}
+                {/* ABA 6: DOSSIÊ FIPE & ARBITRAGEM (FOCO EM SANGUINE E SOULWAR) */}
                 {modalActiveTab === 'fipe' && (
                   <div className="space-y-5 animate-fadeIn">
                     <div className="bg-gradient-to-r from-stone-900 via-amber-950/20 to-stone-900 border border-yellow-500/40 rounded-2xl p-5 space-y-4">
@@ -2188,7 +2236,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       </div>
 
                       {/* Discriminação de Composição */}
-                      <div className="p-3 bg-stone-950/80 rounded-xl border border-stone-800 space-y-1.5 text-xs text-gray-300 font-mono">
+                      <div className="p-3.5 bg-stone-950/80 rounded-xl border border-stone-800 space-y-2 text-xs text-gray-300 font-mono">
                         <div className="flex justify-between py-1 border-b border-stone-800/80">
                           <span>Base de Nível ({char.level} lvls x taxa {vocStr.split(' ')[0]}):</span>
                           <span className="text-white font-bold">~{fipe.baseTc} TC</span>
@@ -2197,12 +2245,24 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                           <span>Bônus de Charms ({charmPts} pts):</span>
                           <span className="text-purple-400 font-bold">+{fipe.charmsBonus} TC</span>
                         </div>
+                        {fipe.sanguineBonus > 0 && (
+                          <div className="flex justify-between py-1 border-b border-stone-800/80 text-red-400">
+                            <span>🩸 Bônus Equipamentos Sanguine (Rotten Blood):</span>
+                            <span className="font-bold">+{fipe.sanguineBonus} TC</span>
+                          </div>
+                        )}
+                        {fipe.soulwarBonus > 0 && (
+                          <div className="flex justify-between py-1 border-b border-stone-800/80 text-purple-300">
+                            <span>💀 Bônus Equipamentos Soulwar:</span>
+                            <span className="font-bold">+{fipe.soulwarBonus} TC</span>
+                          </div>
+                        )}
                         <div className="flex justify-between py-1 border-b border-stone-800/80">
-                          <span>Bônus de Itens Forjados com Tier:</span>
+                          <span>Bônus de Forja / Tiers:</span>
                           <span className="text-cyan-400 font-bold">+{fipe.tierBonus} TC</span>
                         </div>
-                        <div className="flex justify-between py-1 text-yellow-300 font-bold pt-1">
-                          <span>Valor FIPE Total Sugerido:</span>
+                        <div className="flex justify-between py-1 text-yellow-300 font-bold pt-1 text-sm">
+                          <span>Valor FIPE Total Calibrado:</span>
                           <span>{fipe.avgFipe} TC</span>
                         </div>
                       </div>
