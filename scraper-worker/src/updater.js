@@ -32,55 +32,8 @@ export const checkForUpdates = async () => {
             return false;
         }
 
-        // Se houver repositório Git (ambiente de desenvolvimento local), executa com prompts 100% silenciados
-        if (fs.existsSync(gitDir)) {
-            const silentGitEnv = {
-                ...process.env,
-                GIT_TERMINAL_PROMPT: '0',
-                GCM_INTERACTIVE: 'never',
-                GIT_ASKPASS: '',
-                SSH_ASKPASS: ''
-            };
-
-            return new Promise((resolve) => {
-                exec('git rev-parse HEAD', { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, (err1, currentHead) => {
-                    if (err1) return resolve(false);
-                    const oldHash = currentHead ? currentHead.trim() : '';
-                    exec('git fetch origin main', { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, (err2) => {
-                        if (err2) {
-                            // Se falhou por autenticação privada ou sem internet, silencia sem abrir janelas
-                            return resolve(false);
-                        }
-                        exec('git rev-parse origin/main', { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, (err3, remoteHead) => {
-                            if (err3) return resolve(false);
-                            const newHash = remoteHead ? remoteHead.trim() : '';
-                            if (oldHash && newHash && oldHash !== newHash) {
-                                console.log(`[UPDATER] 🚀 Nova versão detectada no GitHub (${oldHash.slice(0, 7)} -> ${newHash.slice(0, 7)})!`);
-                                console.log('[UPDATER] Atualizando código silenciosamente com git reset --hard...');
-                                exec('git reset --hard origin/main', { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, () => {
-                                    exec(`git diff --name-only ${oldHash} ${newHash}`, { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, (errDiff, diffFiles) => {
-                                        const needsNpmInstall = diffFiles && diffFiles.includes('package.json');
-                                        if (needsNpmInstall) {
-                                            console.log('[UPDATER] Alterações em dependências detectadas. Executando npm install...');
-                                            exec('npm install --no-audit --no-fund', { cwd: WORKER_ROOT, windowsHide: true }, () => {
-                                                console.log('[UPDATER] ✅ Atualização concluída. Reiniciando processo...');
-                                                process.exit(0);
-                                            });
-                                        } else {
-                                            console.log('[UPDATER] ✅ Código atualizado. Reiniciando processo...');
-                                            process.exit(0);
-                                        }
-                                    });
-                                });
-                                return;
-                            }
-                            resolve(false);
-                        });
-                    });
-                });
-            });
-        }
-
+        // Se for o repositório principal de desenvolvimento, NUNCA dê git reset --hard
+        // Isso previne que commits locais não-pushados sejam apagados
         return false;
     }
 
