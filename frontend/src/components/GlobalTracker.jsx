@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { 
@@ -20,6 +20,16 @@ export default function GlobalTracker({ onPlayerClick }) {
   const [totalServerPlayers, setTotalServerPlayers] = useState(0);
   const [playersLoading, setPlayersLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const activeRequestRef = useRef(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const [vocFilter, setVocFilter] = useState('ALL');
   const [affiliationFilter, setAffiliationFilter] = useState('ALL'); // 'ALL' | 'guild' | 'hunted'
   const [sortField, setSortField] = useState('level'); // 'level' | 'xp_gained' | 'last_active'
@@ -439,28 +449,49 @@ export default function GlobalTracker({ onPlayerClick }) {
 
   // Carrega jogadores rastreados de todo o servidor
   const fetchServerPlayers = async () => {
+    const requestId = ++activeRequestRef.current;
     setPlayersLoading(true);
     try {
+      const cleanSearch = (debouncedSearch || '').replace(/["'“”]/g, '').trim();
+
       let query = supabase
         .from('current_character_state')
         .select('character_name, level, vocation, xp_total, last_active, session_start_xp', { count: 'exact' })
         .not('level', 'is', null);
 
-      // Nota: o campo 'world' reside em guild_perk_members; se um mundo for selecionado, busca nomes desse servidor
+      // Tratamento refinado de Mundo e Busca:
       if (selectedWorld && selectedWorld !== 'ALL') {
-        const { data: worldMembers } = await supabase
-          .from('guild_perk_members')
-          .select('character_name')
-          .eq('world', selectedWorld)
-          .limit(1000);
-        if (worldMembers && worldMembers.length > 0) {
-          const memberNames = worldMembers.map(m => m.character_name);
-          query = query.in('character_name', memberNames.slice(0, 100));
-        }
-      }
+        if (cleanSearch) {
+          // Se está buscando por nome dentro de um mundo específico, checa se existe nele
+          const { data: worldMatches } = await supabase
+            .from('guild_perk_members')
+            .select('character_name')
+            .eq('world', selectedWorld)
+            .ilike('character_name', `%${cleanSearch}%`);
 
-      if (searchTerm.trim()) {
-        query = query.ilike('character_name', `%${searchTerm.trim()}%`);
+          if (worldMatches && worldMatches.length > 0) {
+            query = query.in('character_name', worldMatches.map(m => m.character_name));
+          } else {
+            // Fallback global inteligente: se não achar especificamente naquele mundo, busca em todo o RubinOT para não dar "0 resultados"
+            query = query.ilike('character_name', `%${cleanSearch}%`);
+          }
+        } else {
+          // Sem busca por nome: carrega membros cadastrados daquele mundo sem o corte restritivo de 100
+          const { data: worldMembers } = await supabase
+            .from('guild_perk_members')
+            .select('character_name')
+            .eq('world', selectedWorld)
+            .limit(1000);
+
+          if (worldMembers && worldMembers.length > 0) {
+            const memberNames = worldMembers.map(m => m.character_name);
+            query = query.in('character_name', memberNames);
+          }
+        }
+      } else {
+        if (cleanSearch) {
+          query = query.ilike('character_name', `%${cleanSearch}%`);
+        }
       }
 
       if (vocFilter !== 'ALL') {
@@ -478,14 +509,30 @@ export default function GlobalTracker({ onPlayerClick }) {
       query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
       const { data, count, error } = await query;
 
+      if (requestId !== activeRequestRef.current) return; // Descarta requisição obsoleta
+
       if (data && data.length > 0) {
         const names = data.map(d => d.character_name);
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const { data: histData } = await supabase
-          .from('historical_sessions')
-          .select('character_name, xp_gained')
-          .in('character_name', names)
-          .gte('session_end', twentyFourHoursAgo);
+
+        // Busca telemetria 24h e identificação de mundo em paralelo
+        const [{ data: histData }, { data: rushData }, { data: perkData }] = await Promise.all([
+          supabase
+            .from('historical_sessions')
+            .select('character_name, xp_gained')
+            .in('character_name', names)
+            .gte('session_end', twentyFourHoursAgo),
+          supabase
+            .from('view_top_rushers_24h')
+            .select('name, exp_gained')
+            .in('name', names),
+          supabase
+            .from('guild_perk_members')
+            .select('character_name, world')
+            .in('character_name', names)
+        ]);
+
+        if (requestId !== activeRequestRef.current) return;
 
         const histMap = new Map();
         if (histData) {
@@ -495,12 +542,33 @@ export default function GlobalTracker({ onPlayerClick }) {
           });
         }
 
+        const rushMap = new Map();
+        if (rushData) {
+          rushData.forEach(r => {
+            rushMap.set(r.name.toLowerCase(), Number(r.exp_gained || 0));
+          });
+        }
+
+        const worldMap = new Map();
+        if (perkData) {
+          perkData.forEach(pk => {
+            worldMap.set(pk.character_name.toLowerCase(), pk.world);
+          });
+        }
+
         const merged = data.map(p => {
+          const nameLower = p.character_name.toLowerCase();
           const activeDelta = Math.max(0, Number(p.xp_total || 0) - Number(p.session_start_xp || p.xp_total || 0));
-          const pastDelta = histMap.get(p.character_name.toLowerCase()) || 0;
+          const pastDelta = histMap.get(nameLower) || 0;
+          const rushDelta = rushMap.get(nameLower) || 0;
+          const xpGained24h = Math.max(rushDelta, pastDelta + activeDelta);
+
+          const characterWorld = worldMap.get(nameLower) || (selectedWorld !== 'ALL' ? selectedWorld : null);
+
           return {
             ...p,
-            xp_gained_24h: pastDelta + activeDelta
+            world: characterWorld,
+            xp_gained_24h: xpGained24h
           };
         });
 
@@ -517,7 +585,9 @@ export default function GlobalTracker({ onPlayerClick }) {
     } catch (err) {
       console.error('Erro ao buscar server players:', err);
     } finally {
-      setPlayersLoading(false);
+      if (requestId === activeRequestRef.current) {
+        setPlayersLoading(false);
+      }
     }
   };
 
@@ -527,7 +597,7 @@ export default function GlobalTracker({ onPlayerClick }) {
 
   useEffect(() => {
     fetchServerPlayers();
-  }, [searchTerm, vocFilter, sortField, page, selectedWorld]);
+  }, [debouncedSearch, vocFilter, sortField, page, selectedWorld]);
 
   const formatCompactXp = (num) => {
     if (!num) return '0';
@@ -665,7 +735,11 @@ export default function GlobalTracker({ onPlayerClick }) {
               <Search className="absolute left-3 top-3 text-gray-400" size={16} />
               {searchTerm && (
                 <button
-                  onClick={() => setSearchTerm('')}
+                  onClick={() => {
+                    setSearchTerm('');
+                    setDebouncedSearch('');
+                    setPage(0);
+                  }}
                   className="absolute right-3 top-2.5 text-gray-500 hover:text-white text-xs font-bold"
                 >
                   ✕

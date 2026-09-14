@@ -57,7 +57,8 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
 
   // Busca rápida de personagens no Supabase com debounce
   useEffect(() => {
-    if (!query || query.trim().length < 2) {
+    const cleanQ = (query || '').replace(/["'“”]/g, '').trim();
+    if (!cleanQ || cleanQ.length < 2) {
       setPlayerResults([]);
       return;
     }
@@ -65,32 +66,65 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const cleanQ = query.trim();
-        // Busca paralela em guild_members e recent_deaths
-        const [gmRes, deathRes] = await Promise.all([
-          supabase
-            .from('guild_members')
-            .select('name, level, vocation')
-            .ilike('name', `%${cleanQ}%`)
-            .limit(6),
-          supabase
+        // Busca direta em current_character_state (base com 42.000+ players rastreados)
+        const { data: charData } = await supabase
+          .from('current_character_state')
+          .select('character_name, level, vocation')
+          .ilike('character_name', `%${cleanQ}%`)
+          .order('level', { ascending: false })
+          .limit(8);
+
+        if (charData && charData.length > 0) {
+          const names = charData.map(c => c.character_name);
+
+          // Verifica se pertencem à guilda ou possuem mundo cadastrado no perk
+          const [{ data: gmData }, { data: perkData }] = await Promise.all([
+            supabase
+              .from('guild_members')
+              .select('name')
+              .in('name', names),
+            supabase
+              .from('guild_perk_members')
+              .select('character_name, world')
+              .in('character_name', names)
+          ]);
+
+          const guildSet = new Set((gmData || []).map(g => g.name?.toLowerCase()));
+          const worldMap = new Map((perkData || []).map(p => [p.character_name?.toLowerCase(), p.world]));
+
+          const results = charData.map(c => {
+            const isGuild = guildSet.has(c.character_name.toLowerCase());
+            const world = worldMap.get(c.character_name.toLowerCase()) || null;
+            return {
+              name: c.character_name,
+              level: c.level,
+              vocation: c.vocation,
+              world: world,
+              source: isGuild ? '🛡️ Guilda' : (world ? `🌐 ${world}` : 'RubinOT')
+            };
+          });
+
+          setPlayerResults(results);
+        } else {
+          // Fallback para recent_deaths caso seja um personagem muito novo
+          const { data: deathData } = await supabase
             .from('recent_deaths')
             .select('character_name, level')
             .ilike('character_name', `%${cleanQ}%`)
-            .limit(4)
-        ]);
+            .limit(4);
 
-        const map = new Map();
-        (gmRes.data || []).forEach(p => {
-          map.set(p.name.toLowerCase(), { name: p.name, level: p.level, vocation: p.vocation, source: 'Censo' });
-        });
-        (deathRes.data || []).forEach(d => {
-          if (!map.has(d.character_name.toLowerCase())) {
-            map.set(d.character_name.toLowerCase(), { name: d.character_name, level: d.level, vocation: null, source: 'Combate' });
+          if (deathData && deathData.length > 0) {
+            setPlayerResults(deathData.map(d => ({
+              name: d.character_name,
+              level: d.level,
+              vocation: null,
+              world: null,
+              source: 'Combate'
+            })));
+          } else {
+            setPlayerResults([]);
           }
-        });
-
-        setPlayerResults(Array.from(map.values()));
+        }
       } catch (e) {
         console.error('Erro na busca global:', e);
       } finally {
@@ -126,7 +160,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
   const handleSelect = (item) => {
     if (!item) return;
     if (item.type === 'player') {
-      onPlayerClick?.(item.data.name);
+      onPlayerClick?.(item.data.name, item.data.world);
       onClose();
     } else if (item.type === 'world') {
       setActiveWorld(item.data.id);
@@ -243,7 +277,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
                   <button
                     key={p.name}
                     onClick={() => {
-                      onPlayerClick?.(p.name);
+                      onPlayerClick?.(p.name, p.world);
                       onClose();
                     }}
                     className="w-full flex items-center justify-between p-2.5 rounded-xl bg-black/40 hover:bg-yellow-500/20 border border-white/5 hover:border-yellow-500/40 text-left transition-all cursor-pointer"
