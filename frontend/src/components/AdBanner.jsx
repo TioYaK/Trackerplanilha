@@ -113,13 +113,13 @@ export default function AdBanner({
         {adFilled ? 'Publicidade Oficial • Google AdSense' : customBadge}
       </div>
 
-      {/* CONTAINER DO GOOGLE ADSENSE (sempre montado no DOM para cálculo de dimensões) */}
+      {/* CONTAINER DO GOOGLE ADSENSE (visível para o crawler do Google poder medir o slot) */}
       {isAdSenseConfigured && (
-        <div className={adFilled ? 'block min-h-[90px] w-full overflow-hidden' : 'absolute inset-0 opacity-0 pointer-events-none'}>
+        <div className={`w-full overflow-hidden flex items-center justify-center ${adFilled ? 'min-h-[90px] py-1' : (adRef.current?.getAttribute('data-ad-status') === 'unfilled' ? 'hidden' : 'min-h-[1px]')}`}>
           <ins
             ref={adRef}
             className="adsbygoogle"
-            style={{ display: 'block', minHeight: '90px', width: '100%' }}
+            style={{ display: 'block', width: '100%', minHeight: adFilled ? '90px' : '1px' }}
             data-ad-client={client}
             {...(numericSlot ? { 'data-ad-slot': numericSlot } : {})}
             data-ad-format={format}
