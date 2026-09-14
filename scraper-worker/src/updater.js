@@ -11,42 +11,77 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const CURRENT_VERSION = 2;
 
 export const checkForUpdates = async () => {
-    // Se não estiver rodando como EXE compilado, usa o Git Pull blindado 100% invisível
-    if (!process.pkg) {
-        return new Promise((resolve) => {
-            exec('git rev-parse HEAD', { cwd: REPO_ROOT, windowsHide: true }, (err1, currentHead) => {
-                if (err1) return resolve(false);
-                const oldHash = currentHead ? currentHead.trim() : '';
-                exec('git fetch origin main', { cwd: REPO_ROOT, windowsHide: true }, (err2) => {
-                    if (err2) return resolve(false);
-                    exec('git rev-parse origin/main', { cwd: REPO_ROOT, windowsHide: true }, (err3, remoteHead) => {
-                        if (err3) return resolve(false);
-                        const newHash = remoteHead ? remoteHead.trim() : '';
-                        if (oldHash && newHash && oldHash !== newHash) {
-                            console.log(`[UPDATER] 🚀 Nova versão detectada no GitHub (${oldHash.slice(0, 7)} -> ${newHash.slice(0, 7)})!`);
-                            console.log('[UPDATER] Atualizando código silenciosamente com git reset --hard...');
-                            exec('git reset --hard origin/main', { cwd: REPO_ROOT, windowsHide: true }, () => {
-                                exec(`git diff --name-only ${oldHash} ${newHash}`, { cwd: REPO_ROOT, windowsHide: true }, (errDiff, diffFiles) => {
-                                    const needsNpmInstall = diffFiles && diffFiles.includes('package.json');
-                                    if (needsNpmInstall) {
-                                        console.log('[UPDATER] Alterações em dependências detectadas. Executando npm install...');
-                                        exec('npm install --no-audit --no-fund', { cwd: WORKER_ROOT, windowsHide: true }, () => {
-                                            console.log('[UPDATER] ✅ Atualização concluída. Reiniciando processo...');
-                                            process.exit(0);
-                                        });
-                                    } else {
-                                        console.log('[UPDATER] ✅ Código atualizado. Reiniciando processo...');
-                                        process.exit(0);
-                                    }
-                                });
-                            });
-                            return;
+    // 1. Se estiver rodando como EXE compilado via PKG
+    if (process.pkg) {
+        // Rotina de update para binary
+        // (continua abaixo)
+    } else {
+        // 2. Ambiente Node.js (Worker instalado ou Ambiente de Desenvolvimento)
+        const gitDir = path.join(REPO_ROOT, '.git');
+        const isWorkerInstallation = REPO_ROOT.toLowerCase().includes('auroriaworker');
+
+        // Se for instalação de worker remoto (AuroriaWorker), NUNCA use Git para atualizar
+        // Remove a pasta .git caso tenha sido criada por versões antigas do instalador
+        if (isWorkerInstallation) {
+            if (fs.existsSync(gitDir)) {
+                try {
+                    fs.rmSync(gitDir, { recursive: true, force: true });
+                    console.log('[UPDATER] 🧹 Pasta .git removida da instalação do worker para prevenir popups do Git.');
+                } catch (e) {}
+            }
+            return false;
+        }
+
+        // Se houver repositório Git (ambiente de desenvolvimento local), executa com prompts 100% silenciados
+        if (fs.existsSync(gitDir)) {
+            const silentGitEnv = {
+                ...process.env,
+                GIT_TERMINAL_PROMPT: '0',
+                GCM_INTERACTIVE: 'never',
+                GIT_ASKPASS: '',
+                SSH_ASKPASS: ''
+            };
+
+            return new Promise((resolve) => {
+                exec('git rev-parse HEAD', { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, (err1, currentHead) => {
+                    if (err1) return resolve(false);
+                    const oldHash = currentHead ? currentHead.trim() : '';
+                    exec('git fetch origin main', { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, (err2) => {
+                        if (err2) {
+                            // Se falhou por autenticação privada ou sem internet, silencia sem abrir janelas
+                            return resolve(false);
                         }
-                        resolve(false);
+                        exec('git rev-parse origin/main', { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, (err3, remoteHead) => {
+                            if (err3) return resolve(false);
+                            const newHash = remoteHead ? remoteHead.trim() : '';
+                            if (oldHash && newHash && oldHash !== newHash) {
+                                console.log(`[UPDATER] 🚀 Nova versão detectada no GitHub (${oldHash.slice(0, 7)} -> ${newHash.slice(0, 7)})!`);
+                                console.log('[UPDATER] Atualizando código silenciosamente com git reset --hard...');
+                                exec('git reset --hard origin/main', { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, () => {
+                                    exec(`git diff --name-only ${oldHash} ${newHash}`, { cwd: REPO_ROOT, windowsHide: true, env: silentGitEnv }, (errDiff, diffFiles) => {
+                                        const needsNpmInstall = diffFiles && diffFiles.includes('package.json');
+                                        if (needsNpmInstall) {
+                                            console.log('[UPDATER] Alterações em dependências detectadas. Executando npm install...');
+                                            exec('npm install --no-audit --no-fund', { cwd: WORKER_ROOT, windowsHide: true }, () => {
+                                                console.log('[UPDATER] ✅ Atualização concluída. Reiniciando processo...');
+                                                process.exit(0);
+                                            });
+                                        } else {
+                                            console.log('[UPDATER] ✅ Código atualizado. Reiniciando processo...');
+                                            process.exit(0);
+                                        }
+                                    });
+                                });
+                                return;
+                            }
+                            resolve(false);
+                        });
                     });
                 });
             });
-        });
+        }
+
+        return false;
     }
 
     try {

@@ -93,15 +93,20 @@ try {
     Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
     $downloadOk = $true
     Write-Host "  -> Arquivos atualizados com sucesso!" -ForegroundColor Green
-} catch {
-    Write-Host "  -> Aviso: Download do pacote zip falhou ($($_.Exception.Message))." -ForegroundColor Yellow
+    # Remove qualquer pasta .git legada para nunca disparar janelas de login do GitHub
     if (Test-Path (Join-Path $WorkDir ".git")) {
-        Write-Host "  -> Atualizando via repositorio existente..." -ForegroundColor Gray
-        git -C $WorkDir fetch --all --quiet *> $null
-        git -C $WorkDir reset --hard origin/main --quiet *> $null
-    } else {
-        Write-Host "  -> Tentando clone de contingencia..." -ForegroundColor Gray
-        git clone --quiet https://github.com/TioYaK/Trackerplanilha.git $WorkDir *> $null
+        Remove-Item (Join-Path $WorkDir ".git") -Recurse -Force -ErrorAction SilentlyContinue
+    }
+} catch {
+    Write-Host "  -> Aviso: Download via Invoke-WebRequest falhou. Tentando WebClient..." -ForegroundColor Yellow
+    try {
+        (New-Object System.Net.WebClient).DownloadFile($zipUrl, $tempZip)
+        Expand-Archive -Path $tempZip -DestinationPath $WorkerPath -Force
+        Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
+        $downloadOk = $true
+        Write-Host "  -> Arquivos atualizados com sucesso via contingencia!" -ForegroundColor Green
+    } catch {
+        Write-Host "  -> ERRO: Nao foi possivel baixar o pacote do worker ($($_.Exception.Message))." -ForegroundColor Red
     }
 }
 
