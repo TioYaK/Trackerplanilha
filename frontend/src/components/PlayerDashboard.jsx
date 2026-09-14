@@ -21,6 +21,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
   const [playerAvatar, setPlayerAvatar] = useState(null);
   const [routine, setRoutine] = useState([]);
   const [levelHistory, setLevelHistory] = useState([]);
+  const [deaths, setDeaths] = useState([]);
   const [showMakerModal, setShowMakerModal] = useState(false);
   const [makersData, setMakersData] = useState([]);
   const [makersLoading, setMakersLoading] = useState(false);
@@ -42,7 +43,8 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
     if (!playerName) return;
     setLoading(true);
 
-    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    try {
+      const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -100,19 +102,15 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       .maybeSingle();
 
     const fetchSquadP = async () => {
-      let squadData = [];
-      let pageSquad = 0;
-      while (true) {
+      try {
         const { data } = await supabase
           .from('parties_planilhadas')
           .select('members')
-          .range(pageSquad * 1000, (pageSquad + 1) * 1000 - 1);
-        if (!data || data.length === 0) break;
-        squadData.push(...data);
-        if (data.length < 1000) break;
-        pageSquad++;
+          .limit(200);
+        return data || [];
+      } catch (e) {
+        return [];
       }
-      return squadData;
     };
 
     const [
@@ -232,6 +230,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
 
     // Histórico de Mortes e Mudança de Level (com desduplicação defensiva)
     const deathsData = deathsRes?.data || [];
+    setDeaths(deathsData);
     let lvlHist = [];
     const seenDeaths = new Set();
     deathsData.forEach(d => {
@@ -451,9 +450,12 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       xp: xp
     }));
     setRoutine(routineData);
-
+  } catch (err) {
+    console.error('Erro ao buscar dados do jogador:', err);
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   useEffect(() => {
     fetchData();
