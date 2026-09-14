@@ -2,17 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, X, User, Globe, FileText, ArrowRight, 
   Sparkles, Gem, Swords, TrendingUp, Cpu, Gift, ExternalLink,
-  BookOpen, Compass, Calculator, Skull
+  BookOpen, Compass, Calculator, Skull, Shield
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 import { GUIDES_INDEX } from '../data/guidesIndex';
 
 const APP_ROUTES = [
+  { id: 'gear', label: 'Calculadora de Proteção de Set (Gear Builder) 🛡️', desc: 'Resistências compostas, simulação de dano e link compartilhável via URL', icon: Shield, category: 'Arsenal' },
+  { id: 'rotten_blood', label: 'Bakragore Combat Timer & Taints (Rotten Blood) ⏳', desc: 'Cronômetro tático com bips sonoros e troca de anéis / SSA', icon: Skull, category: 'Endgame' },
+  { id: 'home', label: 'Boss & Criatura Boostada do Dia 👹', desc: 'Rotação diária sincronizada com o Server Save e links para hunts', icon: Sparkles, category: 'Destaque' },
   { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas (105 Hunts) 🗺️', desc: 'Guia completo de respawns, vídeos do YouTube, charms e proteções', icon: Compass, category: 'Respawns' },
   { id: 'quest_checklists', label: 'Quests & Acessos (Checklists & Spoilers) 📜', desc: 'Passo a passo interativo de Soul War, Rotten Blood, Primal Ordeal e Acessos', icon: BookOpen, category: 'Endgame' },
   { id: 'hunter_toolbelt', label: 'Hunter Toolbelt & Calculadoras 🧰', desc: 'Party Share 3/2, alarme de stamina e comparador de imbuements', icon: Calculator, category: 'Utilitários' },
-  { id: 'rotten_blood', label: 'Rotten Blood & Timer Bakragore 🩸', desc: 'Calculadora de risco de morte e cooldown de 20h do Bakragore', icon: Skull, category: 'Endgame' },
   { id: 'bis_market', label: 'Market Board de Itens BiS 💎', desc: 'Preços médios de mercado, conversor GP ⇄ TC e simulador de arbitragem', icon: Gem, category: 'Economia' },
   { id: 'bazaar', label: 'Bazaar Sniper (Leilões)', desc: 'Radar de arbitragem e leilões de personagens', icon: Gem, category: 'Módulo' },
   { id: 'versus', label: 'Comparador Versus ⚔️', desc: 'Simulador de duelo e histórico head-to-head entre 2 guerreiros', icon: Swords, category: 'PvP' },
