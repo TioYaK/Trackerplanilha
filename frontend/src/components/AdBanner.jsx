@@ -43,18 +43,21 @@ export default function AdBanner({
     const checkFilledStatus = () => {
       if (!adRef.current) return false;
       const status = adRef.current.getAttribute('data-ad-status');
-      const hasIframe = adRef.current.querySelector('iframe');
-      if (status === 'filled' || hasIframe) {
+      if (status === 'unfilled') {
+        setAdFilled(false);
+        return false;
+      }
+      if (status === 'filled') {
         setAdFilled(true);
         return true;
       }
       return false;
     };
 
-    // Timeout seguro para acionar o push do AdSense
+    // Fila segura de push do AdSense (funciona mesmo antes do download completo do script)
     const timer = setTimeout(() => {
       try {
-        if (typeof window !== 'undefined' && window.adsbygoogle && adRef.current) {
+        if (typeof window !== 'undefined' && adRef.current) {
           const status = adRef.current.getAttribute('data-adsbygoogle-status');
           if (!status) {
             (window.adsbygoogle = window.adsbygoogle || []).push({});
@@ -121,9 +124,9 @@ export default function AdBanner({
           <ins
             ref={adRef}
             className="adsbygoogle"
-            style={{ display: 'block', width: '100%', minHeight: adFilled ? '90px' : '1px' }}
+            style={{ display: 'block', width: '100%', minHeight: adFilled ? '90px' : 'auto' }}
             data-ad-client={client}
-            {...(numericSlot ? { 'data-ad-slot': numericSlot } : {})}
+            data-ad-slot={numericSlot}
             data-ad-format={format}
             data-full-width-responsive={responsive ? 'true' : 'false'}
           />
