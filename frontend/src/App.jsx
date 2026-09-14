@@ -315,7 +315,14 @@ const VIEW_TITLES = {
 function parseCurrentLocation() {
   if (typeof window === 'undefined') return { view: 'home', player: null };
   const rawPath = window.location.pathname.toLowerCase();
-  const path = (rawPath.length > 1 && rawPath.endsWith('/')) ? rawPath.slice(0, -1) : rawPath;
+  let path = (rawPath.length > 1 && rawPath.endsWith('/')) ? rawPath.slice(0, -1) : rawPath;
+
+  // Suporte a hash routing caso o navegador use #/quests, #quests, #/toolbelt etc
+  const rawHash = (window.location.hash || '').toLowerCase();
+  const cleanHash = rawHash.replace(/^#\/?/, '/');
+  if (cleanHash && cleanHash !== '/' && (ROUTE_TO_VIEW[cleanHash] || cleanHash.startsWith('/quest') || cleanHash.startsWith('/acesso') || cleanHash.startsWith('/toolbelt'))) {
+    path = cleanHash;
+  }
 
   if (path.startsWith('/player/')) {
     const rawName = window.location.pathname.slice(8);
@@ -332,6 +339,32 @@ function parseCurrentLocation() {
   const queryPlayer = searchParams.get('player') || searchParams.get('name') || searchParams.get('char');
   if ((path === '/player' || path === '/players') && queryPlayer) {
     return { view: 'players', player: decodeURIComponent(queryPlayer).trim() };
+  }
+
+  // Suporte a rotas com prefixo tolerante para Quests e Toolbelt
+  if (path === '/quests' || path === '/quest' || path.startsWith('/quest') || path.startsWith('/acesso') || path.startsWith('/spoiler')) {
+    return { view: 'quest_checklists', player: null };
+  }
+  if (path === '/toolbelt' || path.startsWith('/toolbelt') || path.startsWith('/calc') || path === '/share' || path === '/stamina' || path === '/bless') {
+    return { view: 'hunter_toolbelt', player: null };
+  }
+  if (path.startsWith('/hunt') || path.startsWith('/cave')) {
+    return { view: 'hunt_finder', player: null };
+  }
+
+  // Suporte a query params e tabs como ?view=quests ou ?tab=toolbelt
+  const viewParam = searchParams.get('view') || searchParams.get('tab') || searchParams.get('page');
+  if (viewParam) {
+    const cleanViewParam = viewParam.toLowerCase().trim();
+    if (cleanViewParam === 'quests' || cleanViewParam === 'quest' || cleanViewParam === 'quest_checklists') {
+      return { view: 'quest_checklists', player: null };
+    }
+    if (cleanViewParam === 'toolbelt' || cleanViewParam === 'hunter_toolbelt') {
+      return { view: 'hunter_toolbelt', player: null };
+    }
+    if (ROUTE_TO_VIEW['/' + cleanViewParam]) {
+      return { view: ROUTE_TO_VIEW['/' + cleanViewParam], player: null };
+    }
   }
 
   const mappedView = ROUTE_TO_VIEW[path] || 'home';

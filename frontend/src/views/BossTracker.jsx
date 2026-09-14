@@ -330,6 +330,63 @@ export default function BossTracker() {
         </div>
       </div>
 
+      {/* Widget Especial: Boss & Criatura Boostada do Rubinot */}
+      <div className="bg-gradient-to-r from-stone-900 via-stone-950 to-stone-900 border border-yellow-500/30 rounded-2xl p-5 shadow-xl">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+              <Sparkles size={22} className="animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+                  RubinOT Sistema Boost Diário
+                </span>
+                <span className="text-xs text-gray-400 font-mono">Diferente do Tibia Global</span>
+              </div>
+              <h3 className="text-base font-bold text-white mt-1">
+                Bônus de Farm & Cooldowns Ativos Hoje
+              </h3>
+            </div>
+          </div>
+
+          {/* Cards de Boosted Boss e Boosted Criatura */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-auto">
+            {/* Boosted Boss */}
+            <div className="bg-black/60 border border-purple-500/40 rounded-xl p-3 flex items-center gap-3 min-w-[240px]">
+              <div className="w-10 h-10 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-lg">
+                👑
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-purple-300 font-bold uppercase">Boss Boostado</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">+Loot Roll</span>
+                </div>
+                <div className="text-sm font-bold text-white truncate">Grand Master Oberon</div>
+                <div className="text-[10px] text-gray-400">+50% XP e chance extra de BiS drop</div>
+              </div>
+            </div>
+
+            {/* Boosted Creature */}
+            <div className="bg-black/60 border border-emerald-500/40 rounded-xl p-3 flex items-center gap-3 min-w-[240px]">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+                🐉
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-emerald-300 font-bold uppercase">Criatura Boostada</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">+XP & Respawn</span>
+                </div>
+                <div className="text-sm font-bold text-white truncate">Vexclaw / Grimeleech</div>
+                <div className="text-[10px] text-gray-400">+50% XP, +100% Loot e respawn veloz</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       {/* Resumo da Rota & Categorias */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-4 flex items-center gap-3.5">

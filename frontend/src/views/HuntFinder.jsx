@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Compass, Search, MapPin, Coins, Zap, Shield, Flame, Skull, 
   ExternalLink, Filter, Star, Sparkles, CheckCircle2, Play, Video, 
@@ -38,6 +39,21 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
       console.warn('Deep link parse error:', e);
     }
   }, []);
+
+  // Bloqueia scroll do fundo e adiciona atalho ESC ao abrir modal
+  useEffect(() => {
+    if (!selectedHunt) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') handleCloseModal();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [selectedHunt]);
 
   // Ao abrir o modal, atualiza a query string de forma elegante
   const handleOpenHunt = (hunt) => {
@@ -482,10 +498,17 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
       {/* ========================================================================= */}
       {/* MODAL TÁTICO COMPLETO DA HUNT COM YOUTUBE E DETALHES META                   */}
       {/* ========================================================================= */}
-      {selectedHunt && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in">
-          
-          <div className="bg-gradient-to-b from-gray-950 via-black to-black border-2 border-yellow-500/60 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+      {selectedHunt && typeof document !== 'undefined' && createPortal(
+        <div 
+          className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleCloseModal();
+          }}
+        >
+          <div 
+            className="bg-gradient-to-b from-gray-950 via-black to-black border-2 border-yellow-500/60 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto animate-fade-in relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             
             {/* Header do Modal */}
             <div className="relative p-5 sm:p-6 border-b border-tibia-border bg-gradient-to-r from-yellow-950/40 via-black to-black flex items-start justify-between gap-4">
@@ -825,7 +848,8 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
 
           </div>
 
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Banner de Anúncios AdSense */}

@@ -2,9 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Calculator, Users, Clock, Shield, Coins, Sparkles, 
   CheckCircle2, Copy, Check, Bell, BellOff, ArrowRight,
-  TrendingUp, AlertTriangle, Info, Zap, Heart, Flame
+  TrendingUp, AlertTriangle, Info, Zap, Heart, Flame,
+  Skull, Package, Search, Filter, Plus, Minus, Trash2, MapPin, Target, ExternalLink
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
+import { MONSTERS_VULNERABILITY_DATABASE } from '../data/monstersVulnerability';
+import { LOOT_BUYERS_DATABASE } from '../data/lootBuyersDatabase';
 
 export default function HunterToolbelt() {
   const [activeTab, setActiveTab] = useState('share'); // 'share', 'stamina', 'bless', 'imbue'
@@ -164,6 +167,91 @@ export default function HunterToolbelt() {
     grimeleechWings: 4500  // 5x = 22.5k -> Total Mana ~202.5k
   });
 
+  // =========================================================================
+  // 5. DOSSIÊ DE CRIATURAS & BOSSES (FRAQUEZAS ELEMENTAIS)
+  // =========================================================================
+  const [monsterSearch, setMonsterSearch] = useState('');
+  const [monsterCategory, setMonsterCategory] = useState('ALL');
+  const [selectedMonster, setSelectedMonster] = useState(null);
+
+  const filteredMonsters = useMemo(() => {
+    return MONSTERS_VULNERABILITY_DATABASE.filter(m => {
+      if (monsterCategory !== 'ALL' && m.category !== monsterCategory) return false;
+      if (monsterSearch.trim()) {
+        const q = monsterSearch.toLowerCase().trim();
+        return m.name.toLowerCase().includes(q) || 
+               m.bestElement.toLowerCase().includes(q) || 
+               m.bestCharm.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [monsterCategory, monsterSearch]);
+
+  // =========================================================================
+  // 6. COMPRADORES DE LOOT (YASIR, DJINNS, RASHID)
+  // =========================================================================
+  const [lootSearch, setLootSearch] = useState('');
+  const [lootBuyerFilter, setLootBuyerFilter] = useState('ALL');
+  const [lootQuantities, setLootQuantities] = useState({});
+
+  const handleUpdateLootQty = (id, delta) => {
+    setLootQuantities(prev => {
+      const current = prev[id] || 0;
+      const next = Math.max(0, current + delta);
+      if (next === 0) {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      }
+      return { ...prev, [id]: next };
+    });
+  };
+
+  const handleSetLootQty = (id, val) => {
+    const num = Math.max(0, parseInt(val) || 0);
+    setLootQuantities(prev => {
+      if (num === 0) {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      }
+      return { ...prev, [id]: num };
+    });
+  };
+
+  const handleClearLootQuantities = () => {
+    setLootQuantities({});
+  };
+
+  const filteredLootItems = useMemo(() => {
+    return LOOT_BUYERS_DATABASE.filter(item => {
+      if (lootBuyerFilter !== 'ALL' && item.buyer !== lootBuyerFilter) return false;
+      if (lootSearch.trim()) {
+        const q = lootSearch.toLowerCase().trim();
+        return item.name.toLowerCase().includes(q) || item.buyer.toLowerCase().includes(q) || item.city.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [lootBuyerFilter, lootSearch]);
+
+  const lootTotals = useMemo(() => {
+    let grandTotal = 0;
+    const byBuyer = { 'Yasir': 0, 'Green Djinn': 0, 'Blue Djinn': 0, 'Rashid': 0 };
+
+    LOOT_BUYERS_DATABASE.forEach(item => {
+      const qty = lootQuantities[item.id] || 0;
+      if (qty > 0) {
+        const sub = qty * item.price;
+        grandTotal += sub;
+        if (byBuyer[item.buyer] !== undefined) {
+          byBuyer[item.buyer] += sub;
+        }
+      }
+    });
+
+    return { grandTotal, byBuyer };
+  }, [lootQuantities]);
+
   const imbueComparison = useMemo(() => {
     const tokenFee6 = goldTokenPrice * 6; // 6 tokens para Tier 3
     const successFee100 = 150000; // Taxa de 100%
@@ -274,6 +362,28 @@ export default function HunterToolbelt() {
             }`}
           >
             <Coins className="w-4 h-4" /> Imbuements (Token vs Itens)
+          </button>
+
+          <button
+            onClick={() => setActiveTab('dossier')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition border ${
+              activeTab === 'dossier'
+                ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/20'
+                : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Skull className="w-4 h-4 text-purple-400" /> Dossiê de Fraquezas (Monstros/Bosses)
+          </button>
+
+          <button
+            onClick={() => setActiveTab('yasir')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition border ${
+              activeTab === 'yasir'
+                ? 'bg-amber-600 border-amber-500 text-white shadow-lg shadow-amber-600/20'
+                : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Package className="w-4 h-4 text-amber-400" /> Compradores de Loot (Yasir / Djinns)
           </button>
         </div>
 
@@ -698,6 +808,365 @@ export default function HunterToolbelt() {
                   Economia de: <strong className="text-emerald-400 font-mono">{imbueComparison.crit.savings.toLocaleString()} GP</strong>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 5. ABA DOSSIÊ DE FRAQUEZAS ELEMENTAIS (ESTILO HAKAI MARKET)                */}
+        {/* ========================================================================= */}
+        {activeTab === 'dossier' && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Header com Filtro */}
+            <div className="bg-slate-900/90 border border-purple-500/30 rounded-2xl p-6 space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Skull className="w-6 h-6 text-purple-400" /> Matriz de Fraquezas & Resistências
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                    Consulte a sensibilidade elemental de cada criatura, melhor elemento de arma, proteção defensiva e charm recomendado.
+                  </p>
+                </div>
+                
+                <div className="relative w-full sm:w-72">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar monstro ou elemento..."
+                    value={monsterSearch}
+                    onChange={(e) => setMonsterSearch(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* Categorias */}
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
+                {['ALL', 'Boss Endgame', 'Soul War', 'Rotten Blood', 'Meta Farm', 'Endgame Clássico'].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setMonsterCategory(cat)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      monsterCategory === cat
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    {cat === 'ALL' ? 'Todas as Categorias' : cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Grid de Monstros */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filteredMonsters.map(m => {
+                const isSelected = selectedMonster?.id === m.id;
+                return (
+                  <div
+                    key={m.id}
+                    className="bg-slate-900/80 border border-slate-800 hover:border-purple-500/50 rounded-2xl p-5 space-y-4 transition shadow-lg"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                            {m.category}
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono">HP: {m.hp} • XP: {m.exp}</span>
+                        </div>
+                        <h3 className="text-lg font-bold text-white mt-1">{m.name}</h3>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Melhor Ataque</span>
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30">
+                          {m.bestElement} ({m.bestElementMultiplier})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Barra de Fraquezas Elementais */}
+                    <div className="space-y-2 bg-slate-950 p-3.5 rounded-xl border border-slate-800/80">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        Sensibilidade Elemental (% de Dano Recebido):
+                      </div>
+
+                      <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 text-center text-xs">
+                        {/* Físico */}
+                        <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block font-semibold">⚔️ Fís</span>
+                          <span className={`font-mono font-bold ${m.res.physical > 100 ? 'text-emerald-400' : m.res.physical === 0 ? 'text-rose-500' : 'text-slate-300'}`}>
+                            {m.res.physical}%
+                          </span>
+                        </div>
+
+                        {/* Fogo */}
+                        <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-red-400 block font-semibold">🔥 Fogo</span>
+                          <span className={`font-mono font-bold ${m.res.fire > 100 ? 'text-emerald-400' : m.res.fire === 0 ? 'text-rose-500' : m.res.fire < 80 ? 'text-rose-400' : 'text-slate-300'}`}>
+                            {m.res.fire}%
+                          </span>
+                        </div>
+
+                        {/* Gelo */}
+                        <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-sky-400 block font-semibold">❄️ Gelo</span>
+                          <span className={`font-mono font-bold ${m.res.ice > 100 ? 'text-emerald-400' : m.res.ice === 0 ? 'text-rose-500' : m.res.ice < 80 ? 'text-rose-400' : 'text-slate-300'}`}>
+                            {m.res.ice}%
+                          </span>
+                        </div>
+
+                        {/* Energia */}
+                        <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-purple-400 block font-semibold">⚡ Energ</span>
+                          <span className={`font-mono font-bold ${m.res.energy > 100 ? 'text-emerald-400' : m.res.energy === 0 ? 'text-rose-500' : m.res.energy < 80 ? 'text-rose-400' : 'text-slate-300'}`}>
+                            {m.res.energy}%
+                          </span>
+                        </div>
+
+                        {/* Terra */}
+                        <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-amber-500 block font-semibold">🌿 Terra</span>
+                          <span className={`font-mono font-bold ${m.res.earth > 100 ? 'text-emerald-400' : m.res.earth === 0 ? 'text-rose-500' : m.res.earth < 80 ? 'text-rose-400' : 'text-slate-300'}`}>
+                            {m.res.earth}%
+                          </span>
+                        </div>
+
+                        {/* Holy */}
+                        <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-yellow-300 block font-semibold">✨ Holy</span>
+                          <span className={`font-mono font-bold ${m.res.holy > 100 ? 'text-emerald-400' : m.res.holy === 0 ? 'text-rose-500' : m.res.holy < 80 ? 'text-rose-400' : 'text-slate-300'}`}>
+                            {m.res.holy}%
+                          </span>
+                        </div>
+
+                        {/* Morte */}
+                        <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 col-span-2 sm:col-span-1">
+                          <span className="text-[10px] text-gray-400 block font-semibold">💀 Morte</span>
+                          <span className={`font-mono font-bold ${m.res.death > 100 ? 'text-emerald-400' : m.res.death === 0 ? 'text-rose-500 line-through' : m.res.death < 80 ? 'text-rose-400' : 'text-slate-300'}`}>
+                            {m.res.death === 0 ? 'IMUNE' : `${m.res.death}%`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dicas Táticas */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                      <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                        <span className="text-slate-400 font-bold block text-[10px] uppercase">🛡️ Defesa Recomendada:</span>
+                        <span className="text-slate-200 font-medium">{m.bestDefense}</span>
+                      </div>
+                      <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                        <span className="text-slate-400 font-bold block text-[10px] uppercase">🎯 Melhor Charm:</span>
+                        <span className="text-yellow-300 font-bold">{m.bestCharm}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-400 italic bg-purple-950/20 border border-purple-500/20 p-2.5 rounded-xl">
+                      💡 {m.tip}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 6. ABA COMPRADORES DE LOOT (YASIR / DJINNS / RASHID)                        */}
+        {/* ========================================================================= */}
+        {activeTab === 'yasir' && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Header & Sumário Financeiro */}
+            <div className="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-6 space-y-5 shadow-xl">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Package className="w-6 h-6 text-amber-400" /> Liquidante de Loot & Compradores
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                    Calcule o lucro total da sua hunt separando exatamente o que vender no Yasir (Carlin/Ank/LB), Green Djinn, Blue Djinn e Rashid.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                  <button
+                    onClick={handleClearLootQuantities}
+                    className="px-3 py-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 rounded-xl text-rose-300 text-xs font-bold transition flex items-center gap-1.5"
+                  >
+                    <Trash2 size={14} /> Limpar
+                  </button>
+                  <button
+                    onClick={() => {
+                      const lines = ['📋 RESUMO DE VENDA DE LOOT:'];
+                      Object.entries(lootQuantities).forEach(([id, q]) => {
+                        const it = LOOT_BUYERS_DATABASE.find(x => x.id === id);
+                        if (it && q > 0) {
+                          lines.push(`• ${q}x ${it.name}: ${(q * it.price).toLocaleString()} GP (${it.buyer})`);
+                        }
+                      });
+                      lines.push(`\n💰 TOTAL GERAL: ${lootTotals.grandTotal.toLocaleString()} GP`);
+                      handleCopy(lines.join('\n'), 'loot-copy');
+                    }}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-amber-600/20"
+                  >
+                    {copiedId === 'loot-copy' ? <Check size={14} /> : <Copy size={14} />}
+                    {copiedId === 'loot-copy' ? 'Copiado!' : 'Copiar Romaneio'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Painel de Totais por NPC */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 border-t border-slate-800">
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center col-span-2 sm:col-span-1">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase block">Total Geral</span>
+                  <span className="text-base sm:text-lg font-mono font-bold text-emerald-400">
+                    {lootTotals.grandTotal.toLocaleString()} GP
+                  </span>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Yasir</span>
+                  <span className="text-sm font-mono font-bold text-amber-300">
+                    {lootTotals.byBuyer['Yasir'].toLocaleString()} GP
+                  </span>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Green Djinn</span>
+                  <span className="text-sm font-mono font-bold text-emerald-300">
+                    {lootTotals.byBuyer['Green Djinn'].toLocaleString()} GP
+                  </span>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Blue Djinn</span>
+                  <span className="text-sm font-mono font-bold text-sky-300">
+                    {lootTotals.byBuyer['Blue Djinn'].toLocaleString()} GP
+                  </span>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Rashid</span>
+                  <span className="text-sm font-mono font-bold text-purple-300">
+                    {lootTotals.byBuyer['Rashid'].toLocaleString()} GP
+                  </span>
+                </div>
+              </div>
+
+              {/* Filtros e Busca */}
+              <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {['ALL', 'Yasir', 'Green Djinn', 'Blue Djinn', 'Rashid'].map(b => (
+                    <button
+                      key={b}
+                      onClick={() => setLootBuyerFilter(b)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                        lootBuyerFilter === b
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
+                    >
+                      {b === 'ALL' ? 'Todos os NPCs' : b}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Filtrar item de loot..."
+                    value={lootSearch}
+                    onChange={(e) => setLootSearch(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 w-full sm:w-60"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Lista de Itens com Contadores Interativos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filteredLootItems.map(item => {
+                const qty = lootQuantities[item.id] || 0;
+                const totalItem = qty * item.price;
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-4 rounded-xl border transition flex flex-col justify-between gap-3 ${
+                      qty > 0 
+                        ? 'bg-amber-950/20 border-amber-500/40 shadow-md' 
+                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            item.buyer === 'Yasir' 
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                              : item.buyer === 'Green Djinn'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : item.buyer === 'Blue Djinn'
+                              ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                              : 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                          }`}>
+                            {item.buyer}
+                          </span>
+                          <span className="text-[10px] text-slate-400">{item.city}</span>
+                        </div>
+                        <h4 className="font-bold text-sm text-white mt-1">{item.name}</h4>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="font-mono text-xs font-bold text-amber-400">
+                          {item.price.toLocaleString()} GP
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">por unidade</span>
+                      </div>
+                    </div>
+
+                    {/* Controles de Quantidade */}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                      <div className="text-xs">
+                        {qty > 0 ? (
+                          <span className="font-mono font-bold text-emerald-400">
+                            Total: {totalItem.toLocaleString()} GP
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 text-[11px]">Nenhuma unidade</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                        <button
+                          onClick={() => handleUpdateLootQty(item.id, -1)}
+                          disabled={qty === 0}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <input
+                          type="number"
+                          min="0"
+                          value={qty === 0 ? '' : qty}
+                          placeholder="0"
+                          onChange={(e) => handleSetLootQty(item.id, e.target.value)}
+                          className="w-12 text-center bg-transparent text-xs font-mono font-bold text-white focus:outline-none"
+                        />
+                        <button
+                          onClick={() => handleUpdateLootQty(item.id, 1)}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

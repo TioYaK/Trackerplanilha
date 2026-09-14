@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, X, User, Globe, FileText, ArrowRight, 
-  Sparkles, Gem, Swords, TrendingUp, Cpu, Gift, ExternalLink 
+  Sparkles, Gem, Swords, TrendingUp, Cpu, Gift, ExternalLink,
+  BookOpen, Compass, Calculator, Skull
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 import { GUIDES_INDEX } from '../data/guidesIndex';
 
 const APP_ROUTES = [
+  { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas (105 Hunts) 🗺️', desc: 'Guia completo de respawns, vídeos do YouTube, charms e proteções', icon: Compass, category: 'Respawns' },
+  { id: 'quest_checklists', label: 'Quests & Acessos (Checklists & Spoilers) 📜', desc: 'Passo a passo interativo de Soul War, Rotten Blood, Primal Ordeal e Acessos', icon: BookOpen, category: 'Endgame' },
+  { id: 'hunter_toolbelt', label: 'Hunter Toolbelt & Calculadoras 🧰', desc: 'Party Share 3/2, alarme de stamina e comparador de imbuements', icon: Calculator, category: 'Utilitários' },
+  { id: 'rotten_blood', label: 'Rotten Blood & Timer Bakragore 🩸', desc: 'Calculadora de risco de morte e cooldown de 20h do Bakragore', icon: Skull, category: 'Endgame' },
   { id: 'bazaar', label: 'Bazaar Sniper (Leilões)', desc: 'Radar de arbitragem e leilões de personagens', icon: Gem, category: 'Módulo' },
   { id: 'versus', label: 'Comparador Versus ⚔️', desc: 'Simulador de duelo e histórico head-to-head entre 2 guerreiros', icon: Swords, category: 'PvP' },
   { id: 'attendance', label: 'Killboard de Guerra & Frags', desc: 'Feed de abates em tempo real e Most Wanted', icon: Swords, category: 'Módulo' },

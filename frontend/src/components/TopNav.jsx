@@ -58,6 +58,8 @@ export default function TopNav({
     boss_tracker: { label: 'Rastreador de Bosses 20h 🗺️', icon: <Skull size={16} className="text-purple-400" /> },
     wheel_planner: { label: 'Roda do Destino (Builds) ☸️', icon: <Compass size={16} className="text-sky-400" /> },
     hunt_finder: { label: 'Hunt Finder 2.0 & Rotas 🗺️', icon: <Compass size={16} className="text-yellow-400" /> },
+    quest_checklists: { label: 'Quests & Acessos (Checklists) 📜', icon: <BookOpen size={16} className="text-indigo-400" /> },
+    hunter_toolbelt: { label: 'Hunter Toolbelt (Stamina & Share) 🧰', icon: <Calculator size={16} className="text-emerald-400" /> },
     rotten_blood: { label: 'Rotten Blood & Soul War Hub 🩸', icon: <Skull size={16} className="text-red-400" /> },
     bazaar_fipe: { label: 'FIPE Histórica Gráfica 📈', icon: <TrendingUp size={16} className="text-emerald-400" /> },
     exercise_calc: { label: 'Calculadora de Treino 🧮', icon: <Calculator size={16} className="text-yellow-400" /> },
@@ -97,7 +99,7 @@ export default function TopNav({
     {
       title: 'Rubinot Público',
       icon: <Globe size={18} />,
-      items: ['live', 'war_feed', 'companion', 'investigation', 'daily_spin', 'forge_calc', 'boss_tracker', 'wheel_planner', 'hunt_finder', 'rotten_blood', 'exercise_calc', 'loot_splitter', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
+      items: ['live', 'war_feed', 'companion', 'investigation', 'daily_spin', 'forge_calc', 'boss_tracker', 'wheel_planner', 'hunt_finder', 'quest_checklists', 'hunter_toolbelt', 'rotten_blood', 'exercise_calc', 'loot_splitter', 'versus', 'attendance', 'guides', 'sorteio', 'tracker', 'analytics', 'developers', 'contribute']
     },
     {
       title: 'Comunidade & Guildas',
