@@ -36,7 +36,7 @@ const VIEW_TITLES = {
   sorteio: { title: 'Sorteios da Comunidade', icon: Gift, color: 'text-yellow-400' },
   guides: { title: 'Guias & Estratégias', icon: BookOpen, color: 'text-yellow-400' },
   radar: { title: 'Radar de Inimigos 👑', icon: Shield, color: 'text-yellow-400' },
-  extreme: { title: 'Extreme BI 👑', icon: Crosshair, color: 'text-yellow-400' },
+  extreme: { title: 'Radar de Transfers & Mortes 👑', icon: Crosshair, color: 'text-yellow-400' },
   tracker: { title: 'Monitor Global de Players', icon: Search, color: 'text-gray-300' },
   analytics: { title: 'Rankings Globais', icon: TrendingDown, color: 'text-gray-300' }
 };

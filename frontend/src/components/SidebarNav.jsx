@@ -70,7 +70,7 @@ export const NAVIGATION_GROUPS = [
     items: [
       { id: 'discord_webhooks', label: 'Webhooks Discord', icon: Bell },
       { id: 'radar', label: 'Radar de Inimigos 👑', icon: ShieldAlert, badge: 'VIP', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
-      { id: 'extreme', label: 'Extreme BI 👑', icon: Crosshair, badge: 'VIP', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' }
+      { id: 'extreme', label: 'Radar de Transfers & Mortes 👑', icon: Crosshair, badge: 'VIP', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' }
     ]
   },
   {
