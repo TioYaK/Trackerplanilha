@@ -8,9 +8,16 @@ import {
 import AdBanner from '../components/AdBanner';
 import { MONSTERS_VULNERABILITY_DATABASE } from '../data/monstersVulnerability';
 import { LOOT_BUYERS_DATABASE } from '../data/lootBuyersDatabase';
+import GearSetCalculator from '../components/GearSetCalculator';
 
 export default function HunterToolbelt() {
-  const [activeTab, setActiveTab] = useState('share'); // 'share', 'stamina', 'bless', 'imbue'
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('tab') === 'gear' || p.get('h') || p.get('set')) return 'gear';
+    } catch (e) {}
+    return 'gear';
+  });
   const [copiedId, setCopiedId] = useState(null);
 
   const handleCopy = (text, id) => {
@@ -426,6 +433,17 @@ export default function HunterToolbelt() {
         {/* Navegação por Abas */}
         <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
           <button
+            onClick={() => setActiveTab('gear')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition border ${
+              activeTab === 'gear'
+                ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-600/20'
+                : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Shield className="w-4 h-4 text-emerald-400" /> 🛡️ Set & Resistências (Link)
+          </button>
+
+          <button
             onClick={() => setActiveTab('share')}
             className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition border ${
               activeTab === 'share'
@@ -491,6 +509,11 @@ export default function HunterToolbelt() {
             <Package className="w-4 h-4 text-amber-400" /> Compradores de Loot (Yasir / Djinns)
           </button>
         </div>
+
+        {/* 0. ABA SET & RESISTÊNCIAS COMPOSTAS (GEAR BUILDER COM LINK COMPARTILHÁVEL) */}
+        {activeTab === 'gear' && (
+          <GearSetCalculator />
+        )}
 
         {/* 1. ABA EXP SHARE */}
         {activeTab === 'share' && (

@@ -173,6 +173,10 @@ const ROUTE_TO_VIEW = {
   '/sniper': 'bazaar',
   '/radar': 'radar',
   '/spy': 'radar',
+  '/gear': 'hunter_toolbelt',
+  '/set': 'hunter_toolbelt',
+  '/protecao': 'hunter_toolbelt',
+  '/resistencias': 'hunter_toolbelt',
   '/extreme': 'extreme',
   '/bi': 'extreme',
   '/planilha': 'home',
@@ -641,7 +645,7 @@ export default function App() {
     if (currentView === 'quest_checklists' || currentView === 'quests' || currentView === 'acessos') {
       return <QuestChecklists onNavigate={navigateView} />;
     }
-    if (currentView === 'hunter_toolbelt' || currentView === 'toolbelt' || currentView === 'calculadoras' || currentView === 'share' || currentView === 'stamina' || currentView === 'bless') {
+    if (currentView === 'hunter_toolbelt' || currentView === 'toolbelt' || currentView === 'gear' || currentView === 'set' || currentView === 'protecao' || currentView === 'calculadoras' || currentView === 'share' || currentView === 'stamina' || currentView === 'bless') {
       return <HunterToolbelt />;
     }
     if (currentView === 'bis_market' || currentView === 'bis' || currentView === 'market_board' || currentView === 'itens') {
