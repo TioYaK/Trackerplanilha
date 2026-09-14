@@ -36,8 +36,9 @@ export const NAVIGATION_GROUPS = [
     borderColor: 'border-rose-500/30',
     bgGradient: 'from-rose-950/30 to-transparent',
     items: [
-      { id: 'rotten_blood', label: 'Rotten Blood & Soul War Hub', icon: Skull, badge: 'ENDGAME', badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
-      { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas', icon: Compass, badge: 'NOVO', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
+      { id: 'rotten_blood', label: 'Rotten Blood & Timer Bakragore', icon: Skull, badge: 'ENDGAME', badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
+      { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas (105)', icon: Compass, badge: '105 HUNTS', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
+      { id: 'quest_checklists', label: 'Quests & Acessos (Checklists)', icon: BookOpen, badge: 'SPOILERS', badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' },
       { id: 'boss_tracker', label: 'Rastreador de Bosses 20h', icon: Skull },
       { id: 'wheel_planner', label: 'Roda do Destino (Builds)', icon: Compass },
       { id: 'forge_calc', label: 'Forja de Exaltação 2.0', icon: Hammer }
@@ -55,6 +56,7 @@ export const NAVIGATION_GROUPS = [
       { id: 'bazaar', label: 'Bazaar Sniper (Leilões)', icon: Gem, badge: 'VIP', badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
       { id: 'bazaar_flip', label: 'Calculadora de Revenda (Flip)', icon: Calculator },
       { id: 'bazaar_fipe', label: 'FIPE Histórica Gráfica', icon: TrendingUp, badge: '17k', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+      { id: 'hunter_toolbelt', label: 'Hunter Toolbelt (Stamina/Share)', icon: Calculator, badge: 'ÚTIL', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
       { id: 'loot_splitter', label: 'Divisão de Loot da Party', icon: Coins },
       { id: 'exercise_calc', label: 'Calculadora de Treino', icon: Calculator }
     ]

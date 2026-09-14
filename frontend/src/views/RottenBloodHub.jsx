@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Skull, Shield, Zap, Flame, Compass, AlertTriangle, Heart, 
   Sparkles, CheckCircle2, ChevronRight, Activity, Swords, Info,
-  TrendingDown, ShieldAlert, Award, Copy, Check, ExternalLink, Sliders
+  TrendingDown, ShieldAlert, Award, Copy, Check, ExternalLink, Sliders,
+  Clock, Bell, BellOff, RotateCcw, Play
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 
@@ -111,7 +112,56 @@ const BIS_WEAPONS = [
 ];
 
 export default function RottenBloodHub({ onNavigate, onPlayerClick }) {
-  const [activeTab, setActiveTab] = useState('calculator'); // 'calculator', 'taint', 'bis'
+  const [activeTab, setActiveTab] = useState('calculator'); // 'calculator', 'taint', 'bis', 'timer'
+
+  // Timer do Bakragore & Taints
+  const [lastKillTime, setLastKillTime] = useState(() => {
+    try {
+      const saved = localStorage.getItem('rubinot_bakragore_kill_time');
+      return saved ? parseInt(saved, 10) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const [alarmActive, setAlarmActive] = useState(false);
+  const [partyTaints, setPartyTaints] = useState({
+    ek: 2,
+    ed: 2,
+    ms: 2,
+    rp1: 1,
+    rp2: 1
+  });
+
+  const cooldownDurationMs = 20 * 60 * 60 * 1000; // 20 horas
+  const readyAtMs = lastKillTime ? lastKillTime + cooldownDurationMs : null;
+  const msRemaining = readyAtMs ? Math.max(0, readyAtMs - currentTime) : 0;
+  const isBakragoreReady = !lastKillTime || msRemaining === 0;
+
+  const hoursRemaining = Math.floor(msRemaining / (1000 * 60 * 60));
+  const minsRemaining = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
+  const secsRemaining = Math.floor((msRemaining % (1000 * 60)) / 1000);
+
+  const handleStartBakragoreCooldown = () => {
+    const now = Date.now();
+    setLastKillTime(now);
+    try {
+      localStorage.setItem('rubinot_bakragore_kill_time', now.toString());
+    } catch (e) {}
+  };
+
+  const handleResetBakragoreTimer = () => {
+    setLastKillTime(null);
+    try {
+      localStorage.removeItem('rubinot_bakragore_kill_time');
+    } catch (e) {}
+  };
 
   // Parâmetros da Calculadora de Sobrevivência
   const [vocation, setVocation] = useState('Knight');
@@ -291,6 +341,18 @@ export default function RottenBloodHub({ onNavigate, onPlayerClick }) {
         >
           <Swords size={16} className={activeTab === 'bis' ? 'text-red-400' : ''} />
           Armas BiS Sanguine & Preços
+        </button>
+
+        <button
+          onClick={() => setActiveTab('timer')}
+          className={`px-5 py-3 text-xs sm:text-sm font-bold rounded-t-2xl transition-all flex items-center gap-2 border-t border-x ${
+            activeTab === 'timer'
+              ? 'bg-red-950/40 text-red-300 border-red-500/50'
+              : 'bg-transparent text-gray-400 border-transparent hover:text-gray-200'
+          }`}
+        >
+          <Clock size={16} className={activeTab === 'timer' ? 'text-red-400' : ''} />
+          Timer Bakragore & Taints
         </button>
       </div>
 
@@ -703,6 +765,170 @@ export default function RottenBloodHub({ onNavigate, onPlayerClick }) {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* CONTEÚDO 4: TIMER DO BAKRAGORE & TAINT TRACKER */}
+      {activeTab === 'timer' && (
+        <div className="space-y-6 animate-fade-in">
+          
+          {/* Card Principal: Cronômetro do Boss */}
+          <div className="bg-black/80 border border-red-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+            <div className="absolute -right-16 -bottom-16 w-80 h-80 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
+              {/* Esquerda: Status e Relógio Gigante */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 border ${
+                    isBakragoreReady 
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse'
+                      : 'bg-red-500/20 text-red-300 border-red-500/40'
+                  }`}>
+                    {isBakragoreReady ? <CheckCircle2 size={14} /> : <Clock size={14} />}
+                    {isBakragoreReady ? 'BAKRAGORE LIVRE / PRONTO PARA MATAR' : 'COOLDOWN DE 20H ATIVO'}
+                  </span>
+                  <span className="text-xs text-gray-400 font-mono">
+                    Cooldown Oficial: 20 horas por personagem
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-4xl sm:text-6xl font-black font-mono tracking-tight text-white flex items-center gap-2">
+                    {isBakragoreReady ? (
+                      <span className="text-emerald-400">00:00:00</span>
+                    ) : (
+                      <span className="text-red-400">
+                        {String(hoursRemaining).padStart(2, '0')}:
+                        {String(minsRemaining).padStart(2, '0')}:
+                        {String(secsRemaining).padStart(2, '0')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    {isBakragoreReady 
+                      ? 'Você não possui penalidade ativa. Pode entrar na sala do boss a qualquer momento.'
+                      : `Liberado em: ${new Date(readyAtMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}`
+                    }
+                  </p>
+                </div>
+
+                {/* Barra de Progresso do Cooldown */}
+                {!isBakragoreReady && (
+                  <div className="w-full bg-black/60 border border-tibia-border h-3 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-red-600 to-amber-500 h-full transition-all duration-1000 rounded-full"
+                      style={{ width: `${Math.max(2, Math.min(100, 100 - (msRemaining / cooldownDurationMs * 100)))}%` }}
+                    />
+                  </div>
+                )}
+
+                {/* Botões de Ação */}
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button
+                    onClick={handleStartBakragoreCooldown}
+                    className="px-5 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center gap-2 transition shadow-lg shadow-red-600/30"
+                  >
+                    <Play size={16} /> Matei o Bakragore Agora! (Iniciar 20h)
+                  </button>
+
+                  <button
+                    onClick={handleResetBakragoreTimer}
+                    className="px-4 py-3 bg-white/5 hover:bg-white/10 text-gray-300 font-semibold rounded-xl text-xs flex items-center gap-1.5 transition border border-tibia-border"
+                  >
+                    <RotateCcw size={14} /> Resetar / Está Livre
+                  </button>
+                </div>
+              </div>
+
+              {/* Direita: Dicas Rápidas de Alavanca */}
+              <div className="lg:col-span-5 bg-black/60 border border-tibia-border/80 rounded-2xl p-5 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-yellow-400 flex items-center gap-1.5">
+                  <Flame size={14} className="text-red-400" /> Requisitos da Alavanca do Boss:
+                </h4>
+                <ul className="text-xs text-gray-300 space-y-2 list-disc list-inside">
+                  <li>Time formado por <strong>5 jogadores</strong> (EK, ED, MS e 2 RPs).</li>
+                  <li>Todos devem ter derrotado os 4 bosses dos quadrantes (Murk, Chagorz, Ichgahal e Vemiath).</li>
+                  <li>Nenhum membro pode estar com o cooldown de 20h ativo.</li>
+                  <li>O nível de Taint de cada um determina a chance de drop de <em>Bag You Desire</em>.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Simulador de Taints da Party (Quem aguenta o Bakragore?) */}
+          <div className="bg-black/70 border border-tibia-border rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-tibia-border pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Activity size={20} className="text-red-400" /> Calculador de Taint da Party (5 Jogadores)
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Defina o nível de Taint de cada membro da sua equipe para calcular a corrupção total da sala e risco de wipe.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-300 uppercase">Taints Acumulados:</span>
+                <span className="px-3 py-1 bg-red-950/60 border border-red-500/50 rounded-xl font-mono font-bold text-red-300 text-lg">
+                  {partyTaints.ek + partyTaints.ed + partyTaints.ms + partyTaints.rp1 + partyTaints.rp2} / 25
+                </span>
+              </div>
+            </div>
+
+            {/* Controles por Vocação da Party */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { key: 'ek', role: 'Elite Knight (Blocker)', color: 'text-yellow-400' },
+                { key: 'ed', role: 'Elder Druid (Healer)', color: 'text-blue-400' },
+                { key: 'ms', role: 'Master Sorcerer (DPS)', color: 'text-purple-400' },
+                { key: 'rp1', role: 'Royal Paladin 1 (DPS)', color: 'text-emerald-400' },
+                { key: 'rp2', role: 'Royal Paladin 2 (DPS)', color: 'text-teal-400' },
+              ].map(member => (
+                <div key={member.key} className="bg-black/80 border border-tibia-border rounded-2xl p-4 space-y-3">
+                  <div className="font-bold text-xs text-gray-200">
+                    {member.role}
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">
+                      Nível de Taint:
+                    </label>
+                    <select
+                      value={partyTaints[member.key]}
+                      onChange={(e) => setPartyTaints({ ...partyTaints, [member.key]: parseInt(e.target.value) })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-yellow-400 focus:outline-none"
+                    >
+                      <option value={0}>Taint 0 (Sem Taint)</option>
+                      <option value={1}>Taint 1 (+6% Dano / -8% Heal)</option>
+                      <option value={2}>Taint 2 (+14% Dano / -18% Heal)</option>
+                      <option value={3}>Taint 3 (+22% Dano / -28% Heal)</option>
+                      <option value={4}>Taint 4 (+32% Dano / -40% Heal)</option>
+                      <option value={5}>Taint 5 (+45% Dano / -55% Heal)</option>
+                    </select>
+                  </div>
+                  <div className="text-[11px] text-gray-400">
+                    Dano sofrido: <strong className="text-red-400">+{TAINT_LEVELS[partyTaints[member.key]].damageTakenIncrease}%</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Veredito do Bakragore */}
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                <span className="text-gray-300">
+                  {partyTaints.ek + partyTaints.ed + partyTaints.ms + partyTaints.rp1 + partyTaints.rp2 >= 15 ? (
+                    <strong className="text-red-400">Risco Extremo de Wipe!</strong>
+                  ) : (
+                    <strong className="text-emerald-400">Composição Estável para a Arena!</strong>
+                  )}{' '}
+                  Mantenha Stone Skin Amulets na hotkey para troca rápida no momento do combo triplo de Miasma.
+                </span>
+              </div>
+            </div>
+          </div>
+
         </div>
       )}
 

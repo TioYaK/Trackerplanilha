@@ -58,6 +58,8 @@ const BazaarFlipCalculator = lazy(() => import('./views/BazaarFlipCalculator'));
 const RottenBloodHub = lazy(() => import('./views/RottenBloodHub'));
 const BazaarMarketIndex = lazy(() => import('./views/BazaarMarketIndex'));
 const StreamerCompanion = lazy(() => import('./views/StreamerCompanion'));
+const QuestChecklists = lazy(() => import('./views/QuestChecklists'));
+const HunterToolbelt = lazy(() => import('./views/HunterToolbelt'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import ProfileModal from './components/ProfileModal';
@@ -207,6 +209,15 @@ const ROUTE_TO_VIEW = {
   '/termos': 'terms',
   '/about': 'about',
   '/sobre': 'about',
+  '/quests': 'quest_checklists',
+  '/quest-checklists': 'quest_checklists',
+  '/acessos': 'quest_checklists',
+  '/toolbelt': 'hunter_toolbelt',
+  '/calculadoras': 'hunter_toolbelt',
+  '/utilitarios': 'hunter_toolbelt',
+  '/share': 'hunter_toolbelt',
+  '/stamina': 'hunter_toolbelt',
+  '/bless': 'hunter_toolbelt',
 };
 
 const VIEW_TO_ROUTE = {
@@ -225,6 +236,8 @@ const VIEW_TO_ROUTE = {
   loot_splitter: '/loot',
   exercise_calc: '/treino',
   hunt_finder: '/hunt-finder',
+  quest_checklists: '/quests',
+  hunter_toolbelt: '/toolbelt',
   contribute: '/contribute',
   bazaar: '/bazaar',
   radar: '/radar',
@@ -258,6 +271,8 @@ const VIEW_TO_ROUTE = {
 const VIEW_TITLES = {
   home: 'Rubinot Tracker | Portal Central',
   live: 'Rubinot Tracker | Portal Central',
+  quest_checklists: 'Rubinot Tracker | Spoilers & Checklists de Quests 📜',
+  hunter_toolbelt: 'Rubinot Tracker | Hunter\'s Toolbelt & Calculadoras 🧰',
   guild_war: 'Rubinot Tracker | Comparador de Guildas & War Heatmap 🎯',
   party_finder: 'Rubinot Tracker | Party Finder & Buscador de Time 🏆',
   loot_splitter: 'Rubinot Tracker | Divisão de Loot da Party 💰',
@@ -582,6 +597,12 @@ export default function App() {
     }
     if (currentView === 'hunt_finder') {
       return <HuntFinder onNavigate={navigateView} />;
+    }
+    if (currentView === 'quest_checklists' || currentView === 'quests' || currentView === 'acessos') {
+      return <QuestChecklists onNavigate={navigateView} />;
+    }
+    if (currentView === 'hunter_toolbelt' || currentView === 'toolbelt' || currentView === 'calculadoras' || currentView === 'share' || currentView === 'stamina' || currentView === 'bless') {
+      return <HunterToolbelt />;
     }
     if (currentView === 'fame') {
       return <Rankings initialTab="fame" isAdmin={isAdmin} onPlayerClick={handlePlayerClick} />;
