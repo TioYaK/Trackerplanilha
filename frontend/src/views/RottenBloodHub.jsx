@@ -6,6 +6,7 @@ import {
   Clock, Bell, BellOff, RotateCcw, Play
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
+import BakragoreCombatTimer from '../components/BakragoreCombatTimer';
 
 // Cenários de Combos Letais (Combos que causam Headshot instantâneo)
 const COMBAT_SCENARIOS = [
@@ -112,7 +113,7 @@ const BIS_WEAPONS = [
 ];
 
 export default function RottenBloodHub({ onNavigate, onPlayerClick }) {
-  const [activeTab, setActiveTab] = useState('calculator'); // 'calculator', 'taint', 'bis', 'timer'
+  const [activeTab, setActiveTab] = useState('combat'); // 'combat', 'calculator', 'taint', 'bis', 'timer'
 
   // Timer do Bakragore & Taints
   const [lastKillTime, setLastKillTime] = useState(() => {
@@ -308,6 +309,18 @@ export default function RottenBloodHub({ onNavigate, onPlayerClick }) {
       {/* Navegação de Abas do Hub */}
       <div className="flex border-b border-tibia-border gap-2 overflow-x-auto">
         <button
+          onClick={() => setActiveTab('combat')}
+          className={`px-5 py-3 text-xs sm:text-sm font-bold rounded-t-2xl transition-all flex items-center gap-2 border-t border-x ${
+            activeTab === 'combat'
+              ? 'bg-red-950/40 text-red-300 border-red-500/50 shadow-inner'
+              : 'bg-transparent text-gray-400 border-transparent hover:text-gray-200'
+          }`}
+        >
+          <Clock size={16} className={activeTab === 'combat' ? 'text-red-400 animate-pulse' : ''} />
+          ⏳ Combat Timer & Bips Sonoros
+        </button>
+
+        <button
           onClick={() => setActiveTab('calculator')}
           className={`px-5 py-3 text-xs sm:text-sm font-bold rounded-t-2xl transition-all flex items-center gap-2 border-t border-x ${
             activeTab === 'calculator'
@@ -352,9 +365,14 @@ export default function RottenBloodHub({ onNavigate, onPlayerClick }) {
           }`}
         >
           <Clock size={16} className={activeTab === 'timer' ? 'text-red-400' : ''} />
-          Timer Bakragore & Taints
+          Cooldown 20h do Boss
         </button>
       </div>
+
+      {/* CONTEÚDO 0: COMBAT TIMER & BIPS SONOROS */}
+      {activeTab === 'combat' && (
+        <BakragoreCombatTimer />
+      )}
 
       {/* CONTEÚDO 1: CALCULADORA ANTI-HEADSHOT */}
       {activeTab === 'calculator' && (
