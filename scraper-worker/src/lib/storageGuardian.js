@@ -82,7 +82,7 @@ export function getDebugScreenshotPath(name) {
 }
 
 /**
- * Limpa perfis e pastas temporárias órfãs do Puppeteer e Chrome no Temp do sistema operacional.
+ * Limpa perfis e arquivos temporários órfãos do Puppeteer, Chrome e Edge no Temp do sistema operacional.
  */
 export function cleanStalePuppeteerProfiles(maxAgeMinutes = 10) {
   try {
@@ -93,32 +93,51 @@ export function cleanStalePuppeteerProfiles(maxAgeMinutes = 10) {
     const now = Date.now();
     const maxAgeMs = maxAgeMinutes * 60 * 1000;
 
-    let removed = 0;
+    let removedDirs = 0;
+    let removedFiles = 0;
+
+    const dirPrefixes = [
+      'headlessedge',
+      'puppeteer_dev_',
+      'puppeteer-bazaar-',
+      'puppeteer-',
+      'scoped_dir',
+      'importer_',
+      '.org.chromium.',
+      '.com.google.chrome.'
+    ];
+
     for (const entry of entries) {
-      if (
-        entry.startsWith('puppeteer_dev_') ||
-        entry.startsWith('Importer_') ||
-        entry.startsWith('.org.chromium.Chromium.') ||
-        entry.startsWith('.com.google.Chrome.') ||
-        entry.startsWith('scoped_dir')
-      ) {
+      const lower = entry.toLowerCase();
+      const isDirMatch = dirPrefixes.some(p => lower.startsWith(p));
+      const isFileMatch = lower.startsWith('~dfcache_') || 
+                          (lower.startsWith('wct') && lower.endsWith('.tmp')) ||
+                          lower.startsWith('.org.chromium.');
+
+      if (isDirMatch || isFileMatch) {
         const fullPath = path.join(tempDir, entry);
         try {
           const stat = fs.statSync(fullPath);
-          if (stat.isDirectory() && (now - stat.mtimeMs > maxAgeMs)) {
+          const isStale = (now - stat.mtimeMs > maxAgeMs);
+
+          if (stat.isDirectory() && isStale) {
             fs.rmSync(fullPath, { recursive: true, force: true, maxRetries: 0 });
-            removed++;
+            removedDirs++;
+          } else if (stat.isFile() && isStale) {
+            fs.unlinkSync(fullPath);
+            removedFiles++;
           }
         } catch {
-          // Arquivo bloqueado por processo ativo, ignora
+          // Arquivo bloqueado por processo ativo em execução, ignora com segurança
         }
       }
     }
 
-    if (removed > 0) {
-      console.log(`[STORAGE] 🧹 Limpeza de Temp: ${removed} pastas temporárias órfãs removidas.`);
+    const total = removedDirs + removedFiles;
+    if (total > 0) {
+      console.log(`[STORAGE] 🧹 Limpeza de Temp: ${removedDirs} pastas e ${removedFiles} arquivos órfãos removidos.`);
     }
-    return removed;
+    return total;
   } catch (err) {
     console.warn('[STORAGE] Aviso ao limpar Temp:', err.message);
     return 0;
@@ -126,23 +145,31 @@ export function cleanStalePuppeteerProfiles(maxAgeMinutes = 10) {
 }
 
 /**
- * Limpa caches não essenciais das pastas de perfil do worker (worker_profiles).
+ * Limpa caches e telemetria não essenciais das pastas de perfil do worker (worker_profiles).
  * Preserva estritamente: Cookies, Local Storage, Preferences, Login Data.
  */
 export function cleanWorkerProfileCaches() {
   try {
-    let baseDir = path.join(process.cwd(), 'worker_profiles');
-    if (!fs.existsSync(baseDir)) {
-      try {
-        const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-        const candidate = path.resolve(moduleDir, '../../worker_profiles');
-        if (fs.existsSync(candidate)) baseDir = candidate;
-      } catch {}
-    }
-    if (!fs.existsSync(baseDir)) return 0;
+    const candidateDirs = [];
 
-    const profileDirs = fs.readdirSync(baseDir);
-    const cacheNames = [
+    const cwdDir = path.join(process.cwd(), 'worker_profiles');
+    if (fs.existsSync(cwdDir)) candidateDirs.push(cwdDir);
+
+    try {
+      const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+      const workerProfiles = path.resolve(moduleDir, '../../worker_profiles');
+      if (fs.existsSync(workerProfiles) && !candidateDirs.includes(workerProfiles)) {
+        candidateDirs.push(workerProfiles);
+      }
+      const rootProfiles = path.resolve(moduleDir, '../../../worker_profiles');
+      if (fs.existsSync(rootProfiles) && !candidateDirs.includes(rootProfiles)) {
+        candidateDirs.push(rootProfiles);
+      }
+    } catch {}
+
+    if (candidateDirs.length === 0) return 0;
+
+    const bloatDirNames = [
       'Cache',
       'Code Cache',
       'GPUCache',
@@ -152,14 +179,20 @@ export function cleanWorkerProfileCaches() {
       'Shared Dictionary',
       'component_crx_cache',
       'ProvenanceData',
+      'ProvenanceDataTensors',
       'Edge Entity Extraction',
       'EdgeLanguageDetectionModel',
       'Edge Wallet',
       'Edge Shopping',
       'Edge Web Discover',
       'Edge Collections',
+      'Edge Sidebar',
+      'Edge Signal Triggers',
+      'EdgeCoupons',
+      'EdgeHub',
       'Speech Recognition',
       'GrShaderCache',
+      'ShaderCache',
       'BrowserMetrics',
       'OptimizationHints',
       'SafetyTips',
@@ -170,50 +203,140 @@ export function cleanWorkerProfileCaches() {
       'OnDeviceHeadSuggestModel',
       'SmartScreen',
       'Recovery',
-      'AutofillStates'
+      'Autofill',
+      'AutofillStates',
+      'hyphen-data',
+      'Typosquatting',
+      'Well Known Domains',
+      'ZxcvbnData',
+      'segmentation_platform'
     ];
 
+    const bloatFileNames = [
+      'History',
+      'History-journal',
+      'load_statistics.db',
+      'load_statistics.db-journal',
+      'load_statistics.db-wal',
+      'load_statistics.db-shm',
+      'Visited Links',
+      'Top Sites',
+      'Top Sites-journal',
+      'Shortcuts',
+      'Shortcuts-journal',
+      'Network Action Predictor',
+      'Network Action Predictor-journal',
+      'heavy_ad_intervention_opt_out.db',
+      'heavy_ad_intervention_opt_out.db-journal'
+    ];
+
+    // Perfis obsoletos de testes antigos a descartar completamente
+    const obsoleteProfileDirs = ['auroria', 'auroria_launcher', 'auroria_warmed', 'test_solver', 'puppeteer_auroria_profile'];
+
     let pruned = 0;
-    for (const pDir of profileDirs) {
-      const fullPDir = path.join(baseDir, pDir);
-      try {
-        if (!fs.statSync(fullPDir).isDirectory()) continue;
 
-        // Limpa stale locks primeiro
-        cleanStaleLocks(fullPDir);
-        cleanStaleLocks(path.join(fullPDir, 'Default'));
+    for (const baseDir of candidateDirs) {
+      let entries = [];
+      try { entries = fs.readdirSync(baseDir); } catch { continue; }
 
-        const checkBases = [fullPDir, path.join(fullPDir, 'Default')];
-        for (const base of checkBases) {
-          if (!fs.existsSync(base)) continue;
-          for (const cName of cacheNames) {
-            const target = path.join(base, cName);
-            if (fs.existsSync(target)) {
-              try {
-                fs.rmSync(target, { recursive: true, force: true, maxRetries: 1 });
-                pruned++;
-              } catch {}
-            }
+      for (const pDir of entries) {
+        const fullPDir = path.join(baseDir, pDir);
+        try {
+          const stat = fs.statSync(fullPDir);
+          if (!stat.isDirectory()) continue;
+
+          // Se for perfil de teste obsoleto, descarta por completo
+          if (obsoleteProfileDirs.includes(pDir)) {
+            try {
+              fs.rmSync(fullPDir, { recursive: true, force: true, maxRetries: 1 });
+              pruned++;
+              continue;
+            } catch {}
           }
 
-          // Descarta arquivos de métricas soltos (*.pma) e *.tmp
-          try {
-            const items = fs.readdirSync(base);
-            for (const item of items) {
-              if (item.endsWith('.pma') || item.endsWith('.tmp') || item.startsWith('BrowserMetrics-')) {
+          // Limpa stale locks primeiro
+          cleanStaleLocks(fullPDir);
+          cleanStaleLocks(path.join(fullPDir, 'Default'));
+
+          const checkBases = [fullPDir, path.join(fullPDir, 'Default')];
+          for (const base of checkBases) {
+            if (!fs.existsSync(base)) continue;
+
+            // 1. Remove pastas de bloat/cache
+            for (const cName of bloatDirNames) {
+              const target = path.join(base, cName);
+              if (fs.existsSync(target)) {
                 try {
-                  fs.unlinkSync(path.join(base, item));
+                  fs.rmSync(target, { recursive: true, force: true, maxRetries: 1 });
                   pruned++;
                 } catch {}
               }
             }
-          } catch {}
-        }
-      } catch {}
+
+            // 2. Remove arquivos de telemetria, métricas (*.pma), *.tmp e histórico
+            try {
+              const items = fs.readdirSync(base);
+              for (const item of items) {
+                const lowerItem = item.toLowerCase();
+                const isBloatFile = bloatFileNames.includes(item) ||
+                                    lowerItem.endsWith('.pma') ||
+                                    lowerItem.endsWith('.tmp') ||
+                                    lowerItem.startsWith('browsermetrics-');
+
+                if (isBloatFile) {
+                  try {
+                    fs.unlinkSync(path.join(base, item));
+                    pruned++;
+                  } catch {}
+                }
+              }
+            } catch {}
+          }
+        } catch {}
+      }
     }
 
+    // 3. Limpa dumps soltos de HTML/PNG na pasta do scraper-worker
+    try {
+      const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+      const workerRoot = path.resolve(moduleDir, '../../');
+      const dumpFiles = [
+        'guild_page.html',
+        'highscores.png',
+        'highscores_page8.html',
+        'highscores_page8.png',
+        'kit_apanha.png',
+        'kit_apanha2.html',
+        'kit_apanha2.png',
+        'transfers.html'
+      ];
+      for (const df of dumpFiles) {
+        const fp = path.join(workerRoot, df);
+        if (fs.existsSync(fp)) {
+          try { fs.unlinkSync(fp); pruned++; } catch {}
+        }
+      }
+
+      // Limpa debug_screenshots com mais de 60 minutos
+      const ssDir = path.join(workerRoot, 'debug_screenshots');
+      if (fs.existsSync(ssDir)) {
+        const now = Date.now();
+        const ssFiles = fs.readdirSync(ssDir);
+        for (const ss of ssFiles) {
+          const ssPath = path.join(ssDir, ss);
+          try {
+            const st = fs.statSync(ssPath);
+            if (now - st.mtimeMs > 60 * 60 * 1000) {
+              fs.unlinkSync(ssPath);
+              pruned++;
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
     if (pruned > 0) {
-      console.log(`[STORAGE] 🗂️ Perfis otimizados: ${pruned} itens de cache/métricas descartados.`);
+      console.log(`[STORAGE] 🗂️ Perfis e artefatos otimizados: ${pruned} itens de cache/bloat descartados.`);
     }
     return pruned;
   } catch (err) {
@@ -297,11 +420,14 @@ export function getLeanChromeArgs(extraArgs = []) {
     '--disable-application-cache',
     '--disable-gpu-shader-disk-cache',
     '--disable-gpu-program-cache',
+    '--disable-angle-features=enable_shader_cache',
     '--disable-component-update',
     '--disable-background-networking',
     '--disable-default-apps',
     '--disable-domain-reliability',
-    '--disable-features=OptimizationHints,Translate,MediaRouter,EdgeEntityExtraction,EdgeSmartScreen,AutofillServerCommunication,CalculateNativeWinOcclusion',
+    '--disable-features=OptimizationHints,Translate,MediaRouter,EdgeEntityExtraction,EdgeSmartScreen,AutofillServerCommunication,CalculateNativeWinOcclusion,EdgeCoupons,EdgeSidebar,EdgeShopping,EdgeWallet,EdgeLanguageDetection,EdgeCollections,EdgeHub,EdgeDiscover,EdgeNtp,EdgeSignalTriggers,SegmentationPlatform',
+    '--disable-history-quick-provider',
+    '--disable-history-url-provider',
     '--disable-sync',
     '--metrics-recording-only=false',
     '--no-report-upload',
@@ -313,7 +439,6 @@ export function getLeanChromeArgs(extraArgs = []) {
     '--mute-audio',
     ...extraArgs
   ];
-
 }
 
 /**

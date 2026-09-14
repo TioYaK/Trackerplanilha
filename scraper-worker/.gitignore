@@ -24,3 +24,4 @@ upx*
 *.exe
 *.zip
 debug_screenshots/
+*.png

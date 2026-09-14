@@ -50,6 +50,7 @@ scraper-worker/ts3_clients.txt
 scraper-worker/ts3_dump.txt
 scraper-worker/online.html
 scraper-worker/*.html
+scraper-worker/*.png
 
 # Build artifacts e binarios
 scraper-worker/dist/
