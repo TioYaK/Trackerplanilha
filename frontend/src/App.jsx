@@ -60,6 +60,7 @@ const BazaarMarketIndex = lazy(() => import('./views/BazaarMarketIndex'));
 const StreamerCompanion = lazy(() => import('./views/StreamerCompanion'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
+import ProfileModal from './components/ProfileModal';
 import GlobalSearchModal from './components/GlobalSearchModal';
 
 function ModuleFallback() {

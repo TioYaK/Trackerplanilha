@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Menu, Search, Globe, LogIn, User, Bell, 
   ChevronDown, Sparkles, Crosshair, Shield, Compass, Swords, Gem, 
-  Skull, Calculator, Coins, BookOpen, Gift, CalendarDays, TrendingDown
+  Skull, Calculator, Coins, BookOpen, Gift, CalendarDays, TrendingDown, Users
 } from 'lucide-react';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 import { useAuth } from './AuthContext';
