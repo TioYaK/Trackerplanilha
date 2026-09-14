@@ -179,6 +179,10 @@ export default function SidebarNav({
     }).filter(g => g.matches || g.title.toLowerCase().includes(q));
   }, [groups, searchFilter]);
 
+  const totalFilteredCount = useMemo(() => {
+    return filteredGroups.reduce((acc, g) => acc + g.items.length, 0);
+  }, [filteredGroups]);
+
   return (
     <>
       {/* Backdrop com Blur no Mobile */}
@@ -192,11 +196,11 @@ export default function SidebarNav({
       {/* Sidebar Container */}
       <aside className={`
         fixed top-0 bottom-0 left-0 z-50 
-        bg-[#07080c]/98 text-gray-200
-        border-r border-yellow-500/15
+        bg-gradient-to-b from-[#0c0d16]/98 via-[#07080d]/98 to-[#040508]/98 text-gray-200
+        border-r border-amber-500/20
         flex flex-col justify-between 
         transition-all duration-300 ease-in-out
-        shadow-[4px_0_30px_rgba(0,0,0,0.85)]
+        shadow-[10px_0_40px_rgba(0,0,0,0.85),inset_-1px_0_0_rgba(245,158,11,0.08)]
         backdrop-blur-2xl
         ${isCollapsed ? 'w-[72px]' : 'w-64 sm:w-72'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -205,25 +209,31 @@ export default function SidebarNav({
         {/* ===================================================================== */}
         {/* TOPO: LOGO & STATUS DO SERVIDOR                                        */}
         {/* ===================================================================== */}
-        <div className="p-3.5 border-b border-white/10 flex items-center justify-between gap-2 shrink-0 bg-gradient-to-r from-yellow-950/40 via-amber-950/15 to-transparent">
+        <div className="p-3.5 border-b border-white/10 flex items-center justify-between gap-2 shrink-0 bg-gradient-to-r from-amber-950/40 via-yellow-950/20 to-transparent">
           
           {/* Logo & Marca */}
           <div 
             onClick={() => handleNavClick('home')}
-            className="flex items-center gap-2.5 cursor-pointer overflow-hidden group"
+            className="flex items-center gap-3 cursor-pointer overflow-hidden group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-500/30 via-amber-600/20 to-black border border-yellow-500/60 flex items-center justify-center shrink-0 shadow-lg shadow-yellow-500/20 group-hover:scale-105 group-hover:border-yellow-400 transition-all duration-300">
-              <span className="text-xl filter drop-shadow-[0_2px_4px_rgba(234,179,8,0.5)]">👑</span>
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400/30 via-yellow-600/20 to-black border border-amber-400/60 flex items-center justify-center shrink-0 shadow-[0_0_18px_rgba(245,158,11,0.25)] group-hover:scale-105 group-hover:border-amber-300 group-hover:shadow-[0_0_25px_rgba(245,158,11,0.4)] transition-all duration-300">
+              <span className="text-xl filter drop-shadow-[0_2px_6px_rgba(245,158,11,0.8)]">👑</span>
             </div>
 
             {!isCollapsed && (
               <div className="flex flex-col leading-tight animate-fade-in truncate">
-                <span className="font-medieval text-base sm:text-lg text-gradient-gold tracking-wide truncate group-hover:brightness-110 transition-all">
-                  RubinOT Tracker
-                </span>
-                <span className="text-[10px] text-gray-400 font-mono tracking-widest uppercase flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80] animate-pulse" /> 
-                  <span>16 Mundos Online</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-medieval text-base sm:text-lg text-gradient-gold tracking-wide truncate group-hover:brightness-110 transition-all">
+                    RubinOT Tracker
+                  </span>
+                  <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold shrink-0">
+                    v2.5
+                  </span>
+                </div>
+                <span className="text-[10px] text-gray-400 font-mono tracking-widest uppercase flex items-center gap-1.5 mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981] animate-pulse shrink-0" /> 
+                  <span className="truncate">16 Mundos Online</span>
+                  <span className="text-gray-500 text-[9px]">• 18ms</span>
                 </span>
               </div>
             )}
@@ -242,7 +252,7 @@ export default function SidebarNav({
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               title={isCollapsed ? 'Expandir Menu Completo' : 'Recolher para Modo Dock'}
-              className="hidden lg:flex p-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-yellow-400 hover:border-yellow-500/40 transition-all"
+              className="hidden lg:flex p-1.5 rounded-xl bg-white/[0.04] hover:bg-amber-500/15 border border-white/10 text-gray-400 hover:text-amber-300 hover:border-amber-500/40 transition-all shadow-sm"
             >
               {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             </button>
@@ -255,16 +265,16 @@ export default function SidebarNav({
         {/* ===================================================================== */}
         {!isCollapsed && (
           <div className="px-3 pt-3 pb-1 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2 text-gray-500" size={13} />
+            <div className="relative group">
+              <Search className="absolute left-2.5 top-2.5 text-amber-400/60 group-focus-within:text-amber-400 transition-colors" size={13} />
               <input
                 type="text"
                 placeholder="Filtrar ferramentas..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                className="w-full bg-black/60 border border-white/10 hover:border-yellow-500/40 rounded-xl pl-8 pr-7 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-yellow-500/80 focus:ring-1 focus:ring-yellow-500/30 transition-all"
+                className="w-full bg-[#0c0d16]/90 border border-white/10 hover:border-amber-500/40 rounded-xl pl-8 pr-7 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-amber-400/80 focus:ring-1 focus:ring-amber-500/30 transition-all shadow-inner"
               />
-              {searchFilter && (
+              {searchFilter ? (
                 <button
                   onClick={() => setSearchFilter('')}
                   className="absolute right-2 top-1.5 text-gray-500 hover:text-white text-xs p-0.5"
@@ -272,22 +282,33 @@ export default function SidebarNav({
                 >
                   <X size={12} />
                 </button>
+              ) : (
+                <kbd className="absolute right-2.5 top-2 text-[9px] font-mono px-1 py-0.2 rounded bg-white/5 text-gray-500 border border-white/10 pointer-events-none">
+                  /
+                </kbd>
               )}
             </div>
+
+            {searchFilter && (
+              <div className="text-[10px] text-amber-400/90 font-mono mt-1 px-1 flex items-center justify-between animate-fade-in">
+                <span>{totalFilteredCount} ferramenta{totalFilteredCount !== 1 ? 's' : ''} encontrada{totalFilteredCount !== 1 ? 's' : ''}</span>
+                <span className="text-gray-500">ESC limpa</span>
+              </div>
+            )}
           </div>
         )}
 
         {/* ===================================================================== */}
         {/* NAVEGAÇÃO PRINCIPAL COM ACORDEÕES E SUBMENUS                           */}
         {/* ===================================================================== */}
-        <div className="flex-1 overflow-y-auto px-2.5 py-2.5 space-y-2.5 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3 custom-scrollbar">
           
           {/* ATALHOS PRINCIPAIS EM DESTAQUE (Topo fixo) */}
-          <div className="space-y-1 pb-2 border-b border-white/5">
+          <div className="space-y-1.5 pb-2.5 border-b border-white/[0.08]">
             {[
-              { id: 'live', label: 'Portal Central Rubinot', icon: Globe, color: 'text-amber-400', activeStyle: 'from-amber-500/25 via-amber-500/10 to-transparent border-amber-400' },
-              { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas', icon: Compass, color: 'text-yellow-400', badge: 'NOVO', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40', activeStyle: 'from-yellow-500/25 via-yellow-500/10 to-transparent border-yellow-400' },
-              { id: 'bazaar', label: 'Bazaar Sniper (Leilões)', icon: Gem, color: 'text-emerald-400', badge: 'VIP', badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40', activeStyle: 'from-emerald-500/25 via-emerald-500/10 to-transparent border-emerald-400' }
+              { id: 'live', label: 'Portal Central Rubinot', icon: Globe, color: 'text-amber-400', iconBg: 'bg-amber-500/15 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.15)]', activeStyle: 'from-amber-500/25 via-amber-500/10 to-transparent border-amber-400 text-amber-300 font-bold shadow-[0_0_15px_rgba(245,158,11,0.12)]' },
+              { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas', icon: Compass, color: 'text-yellow-400', iconBg: 'bg-yellow-500/15 border-yellow-500/30 shadow-[0_0_10px_rgba(234,179,8,0.15)]', badge: 'NOVO', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.25)]', activeStyle: 'from-yellow-500/25 via-yellow-500/10 to-transparent border-yellow-400 text-yellow-300 font-bold shadow-[0_0_15px_rgba(234,179,8,0.12)]' },
+              { id: 'bazaar', label: 'Bazaar Sniper (Leilões)', icon: Gem, color: 'text-emerald-400', iconBg: 'bg-emerald-500/15 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]', badge: 'VIP', badgeColor: 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.3)]', activeStyle: 'from-emerald-500/25 via-emerald-500/10 to-transparent border-emerald-400 text-emerald-300 font-bold shadow-[0_0_15px_rgba(16,185,129,0.12)]' }
             ].map(item => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
@@ -297,21 +318,21 @@ export default function SidebarNav({
                   <button
                     onClick={() => handleNavClick(item.id)}
                     className={`
-                      w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-xs font-semibold
+                      w-full flex items-center gap-3 px-2.5 py-2.5 rounded-2xl text-xs font-semibold
                       transition-all duration-200 relative select-none
                       ${isActive 
-                        ? `bg-gradient-to-r ${item.activeStyle} text-yellow-300 border-l-2 font-bold shadow-md shadow-yellow-500/10` 
-                        : 'text-gray-300 hover:text-white hover:bg-white/5 hover:translate-x-1'
+                        ? `bg-gradient-to-r ${item.activeStyle} border-l-2` 
+                        : 'text-gray-300 hover:text-white hover:bg-white/[0.06] hover:translate-x-1.5'
                       }
                       ${isCollapsed ? 'justify-center px-0' : ''}
                     `}
                   >
-                    <div className={`p-1 rounded-lg ${isActive ? 'bg-yellow-500/20' : 'bg-white/5'} shrink-0`}>
-                      <Icon size={16} className={isActive ? 'text-yellow-400' : item.color} />
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-105 ${item.iconBg}`}>
+                      <Icon size={16} className={item.color} />
                     </div>
 
                     {!isCollapsed && (
-                      <span className="truncate flex-1 text-left">
+                      <span className="truncate flex-1 text-left font-medium">
                         {item.label}
                       </span>
                     )}
@@ -325,7 +346,7 @@ export default function SidebarNav({
 
                   {/* Tooltip no Modo Dock (72px) */}
                   {isCollapsed && (
-                    <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-none absolute left-[68px] top-1/2 -translate-y-1/2 z-50 px-3 py-1.5 rounded-xl bg-[#0c0d14]/95 border border-yellow-500/50 text-xs font-bold text-yellow-300 whitespace-nowrap shadow-2xl backdrop-blur-md transition-all flex items-center gap-2">
+                    <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-none absolute left-[70px] top-1/2 -translate-y-1/2 z-50 px-3 py-1.5 rounded-xl bg-[#0a0b12]/98 border border-amber-500/50 text-xs font-bold text-amber-300 whitespace-nowrap shadow-2xl backdrop-blur-md transition-all flex items-center gap-2">
                       <span>{item.label}</span>
                       {item.badge && (
                         <span className={`text-[9px] px-1 py-0.5 rounded border ${item.badgeColor}`}>
@@ -340,7 +361,7 @@ export default function SidebarNav({
           </div>
 
           {/* SUBMENUS / ACORDEÕES TEMÁTICOS */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {filteredGroups.map(group => {
               const GroupIcon = group.icon;
               const isOpen = openGroups[group.id] || searchFilter.trim().length > 0;
@@ -363,14 +384,14 @@ export default function SidebarNav({
                       className={`
                         w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold
                         transition-all select-none
-                        ${hasActiveChild ? 'text-yellow-400' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}
+                        ${hasActiveChild ? 'text-amber-300' : 'text-gray-400 hover:text-gray-100 hover:bg-white/[0.04]'}
                         ${isCollapsed ? 'justify-center px-0' : ''}
                       `}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border ${
+                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
                           hasActiveChild 
-                            ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300 shadow-[0_0_10px_rgba(234,179,8,0.2)]' 
+                            ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]' 
                             : `${group.iconBg} ${group.accentColor}`
                         }`}>
                           <GroupIcon size={14} />
@@ -385,12 +406,12 @@ export default function SidebarNav({
 
                       {!isCollapsed && (
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-gray-500 font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/5">
+                          <span className="text-[10px] text-gray-500 font-mono px-1.5 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.08]">
                             {group.items.length}
                           </span>
                           <ChevronDown 
                             size={13} 
-                            className={`text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180 text-yellow-400' : ''}`} 
+                            className={`text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180 text-amber-400' : ''}`} 
                           />
                         </div>
                       )}
@@ -398,31 +419,31 @@ export default function SidebarNav({
 
                     {/* Popover flutuante no modo Dock (72px) ao passar o mouse */}
                     {isCollapsed && (
-                      <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-auto absolute left-[68px] top-0 z-50 py-2.5 px-3 rounded-2xl bg-[#0c0d14]/95 backdrop-blur-xl border border-yellow-500/40 shadow-2xl transition-all duration-150 flex flex-col gap-1 min-w-[230px]">
-                        <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-white/10">
-                          <span className="text-[10px] font-bold uppercase text-yellow-400 tracking-wider flex items-center gap-1.5">
-                            <GroupIcon size={12} />
+                      <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-auto absolute left-[70px] top-0 z-50 py-3 px-3 rounded-2xl bg-[#090a12]/98 backdrop-blur-2xl border border-amber-500/40 shadow-[0_15px_40px_rgba(0,0,0,0.95)] transition-all duration-150 flex flex-col gap-1 min-w-[240px]">
+                        <div className="flex items-center justify-between pb-2 mb-1 border-b border-white/10">
+                          <span className="text-[11px] font-bold uppercase text-amber-300 tracking-wider flex items-center gap-2">
+                            <GroupIcon size={13} className={group.accentColor} />
                             {group.title}
                           </span>
-                          <span className="text-[9px] text-gray-400 font-mono bg-white/10 px-1 rounded">
+                          <span className="text-[9px] text-gray-400 font-mono bg-white/10 px-1.5 py-0.5 rounded">
                             {group.items.length}
                           </span>
                         </div>
 
-                        <div className="max-h-[300px] overflow-y-auto space-y-0.5 custom-scrollbar pr-1">
+                        <div className="max-h-[320px] overflow-y-auto space-y-1 custom-scrollbar pr-1">
                           {group.items.map(child => (
                             <button
                               key={child.id}
                               onClick={() => handleNavClick(child.id)}
-                              className={`w-full flex items-center justify-between text-left text-xs py-1.5 px-2 rounded-lg transition-all ${
+                              className={`w-full flex items-center justify-between text-left text-xs py-2 px-2.5 rounded-xl transition-all ${
                                 currentView === child.id 
-                                  ? 'bg-yellow-500/20 text-yellow-300 font-bold border border-yellow-500/30' 
+                                  ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/35 shadow-sm' 
                                   : 'text-gray-300 hover:bg-white/10 hover:text-white'
                               }`}
                             >
                               <span className="truncate">{child.label}</span>
                               {child.badge && (
-                                <span className={`text-[9px] px-1 rounded border shrink-0 ${child.badgeColor || 'border-yellow-500/30'}`}>
+                                <span className={`text-[9px] px-1 rounded border shrink-0 ${child.badgeColor || 'border-amber-500/30'}`}>
                                   {child.badge}
                                 </span>
                               )}
@@ -435,7 +456,7 @@ export default function SidebarNav({
 
                   {/* ITENS DO SUBMENU (EXPANDIDO) COM LINHA GUIA ELEGANTE */}
                   {!isCollapsed && isOpen && (
-                    <div className="ml-5 pl-3 border-l border-white/10 space-y-0.5 py-1 animate-fade-in relative">
+                    <div className="ml-5 pl-3.5 border-l border-white/10 space-y-1 py-1.5 animate-fade-in relative">
                       {group.items.map(item => {
                         const ItemIcon = item.icon;
                         const isActive = currentView === item.id;
@@ -445,19 +466,19 @@ export default function SidebarNav({
                             key={item.id}
                             onClick={() => handleNavClick(item.id)}
                             className={`
-                              w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium
+                              w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium
                               transition-all duration-150 select-none group/item relative
                               ${isActive 
-                                ? 'bg-yellow-500/20 text-yellow-300 font-bold shadow-[0_0_12px_rgba(234,179,8,0.15)] border border-yellow-500/30' 
-                                : 'text-gray-400 hover:text-gray-200 hover:bg-white/5 hover:translate-x-1'
+                                ? 'bg-gradient-to-r from-amber-500/20 via-amber-500/5 to-transparent text-amber-300 font-bold shadow-[0_0_15px_rgba(245,158,11,0.12)] border border-amber-500/35' 
+                                : 'text-gray-400 hover:text-gray-100 hover:bg-white/[0.05] hover:translate-x-1'
                               }
                             `}
                           >
-                            <div className="flex items-center gap-2 truncate">
-                              <span className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
+                            <div className="flex items-center gap-2.5 truncate">
+                              <span className={`w-1.5 h-1.5 rounded-full transition-all duration-200 shrink-0 ${
                                 isActive 
-                                  ? 'bg-yellow-400 shadow-[0_0_6px_#facc15] scale-125' 
-                                  : 'bg-gray-600 group-hover/item:bg-gray-400'
+                                  ? 'bg-amber-400 shadow-[0_0_8px_#f59e0b] scale-125' 
+                                  : 'bg-gray-600 group-hover/item:bg-amber-400/80'
                               }`} />
                               <span className="truncate">{item.label}</span>
                             </div>
@@ -483,7 +504,7 @@ export default function SidebarNav({
         {/* ===================================================================== */}
         {/* RODAPÉ DA SIDEBAR: CARD DO USUÁRIO & LOGIN                              */}
         {/* ===================================================================== */}
-        <div className="p-3 border-t border-white/10 bg-black/70 shrink-0">
+        <div className="p-3.5 border-t border-white/10 bg-gradient-to-t from-black via-black/80 to-transparent shrink-0">
           
           {user ? (
             <div className="flex items-center justify-between gap-2">
@@ -492,16 +513,16 @@ export default function SidebarNav({
                 className={`flex items-center gap-2.5 cursor-pointer flex-1 min-w-0 group ${isCollapsed ? 'justify-center' : ''}`}
                 title="Abrir Meu Perfil"
               >
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/30 to-black border border-yellow-500/50 flex items-center justify-center text-yellow-300 font-bold shrink-0 text-xs shadow-inner group-hover:border-yellow-400 transition-colors">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400/30 via-yellow-600/20 to-black border border-amber-400/50 flex items-center justify-center text-amber-300 font-bold shrink-0 text-xs shadow-inner group-hover:border-amber-300 group-hover:shadow-[0_0_12px_rgba(245,158,11,0.3)] transition-all">
                   {profile?.main_character ? profile.main_character.charAt(0).toUpperCase() : 'U'}
                 </div>
 
                 {!isCollapsed && (
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-bold text-gray-200 truncate group-hover:text-yellow-400 transition-colors">
+                    <span className="text-xs font-bold text-gray-200 truncate group-hover:text-amber-300 transition-colors">
                       {profile?.main_character || user.email?.split('@')[0]}
                     </span>
-                    <span className="text-[10px] text-yellow-400/90 font-semibold flex items-center gap-1">
+                    <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
                       {isPremium ? '👑 VIP RubinOT' : 'Membro RubinOT'}
                     </span>
                   </div>
@@ -511,7 +532,7 @@ export default function SidebarNav({
               {!isCollapsed && (
                 <button
                   onClick={onOpenProfile}
-                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                  className="p-2 rounded-xl bg-white/5 hover:bg-amber-500/15 border border-white/10 hover:border-amber-500/40 text-gray-400 hover:text-amber-300 transition-all shadow-sm"
                   title="Configurações de Conta"
                 >
                   <User size={15} />
@@ -522,7 +543,7 @@ export default function SidebarNav({
             <button
               onClick={() => handleNavClick('auth')}
               className={`
-                w-full py-2 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-700 hover:from-yellow-500 hover:to-amber-600 text-black font-bold font-medieval text-xs shadow-lg transition-all hover:scale-[1.02] flex items-center justify-center gap-2
+                w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-600 to-amber-700 hover:from-amber-400 hover:to-yellow-500 text-black font-bold font-medieval text-xs shadow-[0_4px_15px_rgba(245,158,11,0.25)] transition-all hover:scale-[1.02] flex items-center justify-center gap-2
                 ${isCollapsed ? 'px-0' : 'px-3'}
               `}
             >
