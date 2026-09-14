@@ -83,11 +83,11 @@ export const NAVIGATION_GROUPS = [
     bgGradient: 'from-yellow-950/30 to-transparent',
     items: [
       { id: 'party_finder', label: 'Party Finder (Buscar Time)', icon: Users },
-      { id: 'roster', label: 'Censo & Exército de Players', icon: Users },
+      { id: 'roster', label: 'Membros da Guilda (Roster)', icon: Users },
       { id: 'daily_spin', label: 'Roleta da Fortuna', icon: Gift },
       { id: 'sorteio', label: 'Sorteios da Comunidade', icon: Gift },
       { id: 'guides', label: 'Guias & Estratégias', icon: BookOpen },
-      { id: 'tracker', label: 'Monitor Global de Players', icon: Search },
+      { id: 'tracker', label: 'Rastreador de Players', icon: Search },
       { id: 'analytics', label: 'Rankings Globais', icon: TrendingDown },
       { id: 'contribute', label: 'Baixar Worker (VIP Grátis)', icon: Cpu, badge: 'FREE', badgeColor: 'bg-green-500/20 text-green-300 border-green-500/40' },
       { id: 'developers', label: 'API para Desenvolvedores', icon: Code2 }
@@ -286,8 +286,8 @@ export default function SidebarNav({
           <div className="space-y-1 pb-2 border-b border-white/5">
             {[
               { id: 'live', label: 'Portal Central Rubinot', icon: Globe, color: 'text-amber-400', activeStyle: 'from-amber-500/25 via-amber-500/10 to-transparent border-amber-400' },
-              { id: 'companion', label: 'Mini HUD Gamer (Monitor 2)', icon: Monitor, color: 'text-cyan-400', badge: 'HOT', badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40', activeStyle: 'from-cyan-500/25 via-cyan-500/10 to-transparent border-cyan-400' },
-              { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas', icon: Compass, color: 'text-yellow-400', badge: 'NOVO', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40', activeStyle: 'from-yellow-500/25 via-yellow-500/10 to-transparent border-yellow-400' }
+              { id: 'hunt_finder', label: 'Hunt Finder 2.0 & Rotas', icon: Compass, color: 'text-yellow-400', badge: 'NOVO', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40', activeStyle: 'from-yellow-500/25 via-yellow-500/10 to-transparent border-yellow-400' },
+              { id: 'bazaar', label: 'Bazaar Sniper (Leilões)', icon: Gem, color: 'text-emerald-400', badge: 'VIP', badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40', activeStyle: 'from-emerald-500/25 via-emerald-500/10 to-transparent border-emerald-400' }
             ].map(item => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
