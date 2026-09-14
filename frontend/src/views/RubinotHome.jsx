@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 import LiveWarFeed from '../components/LiveWarFeed';
+import BoostedDailyWidget from '../components/BoostedDailyWidget';
 
 // Censo Oficial dos 16 Mundos do Rubinot (Base Oficial em Tempo Real)
 const WORLD_CENSUS = {
@@ -441,8 +442,10 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
             </div>
           </div>
         </div>
-
       </div>
+
+      {/* 👹 BOSS & CRIATURA BOOSTADA DO DIA (TEMPO REAL & SERVER SAVE) */}
+      <BoostedDailyWidget onNavigate={onNavigate} />
 
       {/* BANNER OFICIAL DE SORTEIO ATIVO 🎁 */}
       <div 
