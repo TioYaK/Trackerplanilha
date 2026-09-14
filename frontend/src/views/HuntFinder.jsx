@@ -42,18 +42,27 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
     }
   }, []);
 
-  // Bloqueia scroll do fundo e adiciona atalho ESC ao abrir modal
+  // Bloqueia scroll do fundo preservando o viewport exato do usuário e adiciona atalho ESC
   useEffect(() => {
     if (!selectedHunt) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') handleCloseModal();
     };
     window.addEventListener('keydown', handleKeyDown);
-    const prevOverflow = document.body.style.overflow;
+
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
     document.body.style.overflow = 'hidden';
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = prevOverflow;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, scrollY);
     };
   }, [selectedHunt]);
 
@@ -502,18 +511,43 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
       {/* ========================================================================= */}
       {selectedHunt && typeof document !== 'undefined' && createPortal(
         <div 
-          className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            margin: 0,
+            padding: '16px'
+          }}
           onClick={(e) => {
             if (e.target === e.currentTarget) handleCloseModal();
           }}
         >
           <div 
-            className="bg-gradient-to-b from-gray-950 via-black to-black border-2 border-yellow-500/60 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto animate-fade-in relative"
+            style={{
+              width: '100%',
+              maxWidth: '920px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative'
+            }}
+            className="bg-gradient-to-b from-gray-950 via-black to-black border-2 border-yellow-500/60 rounded-3xl shadow-2xl overflow-hidden animate-fade-in"
             onClick={(e) => e.stopPropagation()}
           >
             
             {/* Header do Modal */}
-            <div className="relative p-5 sm:p-6 border-b border-tibia-border bg-gradient-to-r from-yellow-950/40 via-black to-black flex items-start justify-between gap-4">
+            <div className="relative p-5 sm:p-6 border-b border-tibia-border bg-gradient-to-r from-yellow-950/40 via-black to-black flex items-start justify-between gap-4 shrink-0">
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <span className="px-2.5 py-0.5 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-xs font-bold rounded-lg uppercase">
@@ -566,7 +600,7 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
             </div>
 
             {/* Faixa de Resumo Rápido de Números */}
-            <div className="bg-black/90 border-b border-tibia-border/60 px-6 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="bg-black/90 border-b border-tibia-border/60 px-6 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs shrink-0">
               <div>
                 <span className="text-[10px] text-gray-400 uppercase font-bold block">XP Média / Hora:</span>
                 <span className="font-bold text-green-400 font-mono text-sm">{selectedHunt.rawXp}</span>
@@ -586,7 +620,7 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
             </div>
 
             {/* Navegação de Abas do Modal */}
-            <div className="bg-black/80 px-6 pt-3 flex border-b border-tibia-border gap-2 overflow-x-auto">
+            <div className="bg-black/80 px-6 pt-3 flex border-b border-tibia-border gap-2 overflow-x-auto shrink-0">
               <button
                 onClick={() => setModalTab('video')}
                 className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all flex items-center gap-1.5 border-t border-x cursor-pointer ${
@@ -1151,7 +1185,7 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
             </div>
 
             {/* Rodapé do Modal */}
-            <div className="p-4 border-t border-tibia-border bg-black/95 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs">
+            <div className="p-4 border-t border-tibia-border bg-black/95 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs shrink-0">
               <span className="text-gray-400 text-center sm:text-left">
                 💡 Dica RubinOT: Lembre-se de verificar se o respawn possui leilão ou claim ativo no servidor.
               </span>
@@ -1166,7 +1200,7 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
           </div>
 
         </div>,
-        document.body
+        document.getElementById('modal-root') || document.body
       )}
 
       {/* Banner de Anúncios AdSense */}
