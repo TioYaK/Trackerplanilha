@@ -4250,5 +4250,2633 @@ export const HUNTS_DATABASE = [
     "youtubeId": "U9xR1mK2aP7",
     "youtubeTitle": "Ingol -3 Solo EK & Duo Hunt Guide 20kk/h",
     "description": "Laboratórios subterrâneos da ilha de Ingol. Monstros híbridos com excelente equilíbrio entre experiência extrema e lucro de jóias raras."
+  },
+
+  // =========================================================================
+  // --- EXPANSÃO ULTRA MASTER 100+ HUNTS: POI, INQ, WARZONES, FERUMBRAS, ZAO, DREFIA, EARLY GAME ---
+  // =========================================================================
+  {
+    "id": "poi-dt-city",
+    "name": "Pits of Inferno: Dark Torturers City (PoI)",
+    "city": "Plains of Havoc (PoI)",
+    "category": "meta_hunts",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 300,
+    "recommendedLevel": 450,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Duo",
+      "Team 4x"
+    ],
+    "rawXp": "8.5M - 15M/h",
+    "profit": "800k - 2.0M/h",
+    "danger": 4,
+    "tier": "Clássico S-Tier",
+    "tags": [
+      "PoI",
+      "Dark Torturers",
+      "Hellfire Fighters",
+      "Steel Boots",
+      "Plaguesmiths"
+    ],
+    "elements": [
+      "Physical",
+      "Fire",
+      "Death"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Physical",
+        "percent": "40%+",
+        "note": "Guilhotinas e serras dos Dark Torturers"
+      },
+      {
+        "element": "Fire",
+        "percent": "35%+",
+        "note": "Chamas dos Hellfire Fighters"
+      },
+      {
+        "element": "Death",
+        "percent": "25%+",
+        "note": "Maldições dos Spectres"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Dark Torturer",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      },
+      {
+        "monster": "Hellfire Fighter",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+25%), Energy (+15%)"
+      },
+      {
+        "monster": "Juggernaut",
+        "charm": "Freeze / Enflame",
+        "weakness": "Ice (+15%), Fire (+10%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Critical Tier 3 + Mana Leech + Ice",
+      "armor": "Life Leech + Fire Protection (Dragon Hide)",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Lurar os corredores de sangue e fogo da cidade dos Dark Torturers. Manter armas de gelo ativas para destruir os Hellfire Fighters.",
+    "roles": {
+      "ek": "Box encostado nas colunas com Exori Gran e rotação de gelo.",
+      "ed": "Avalanche constante e cura no EK.",
+      "ms": "Energy Wave e Great Fireball.",
+      "rp": "Diamond Arrows com flechas de gelo."
+    },
+    "youtubeId": "A7mX9eQ0y4U",
+    "youtubeTitle": "PoI Dark Torturer City Solo & Duo Guide 12kk/h",
+    "description": "A metrópole dos suplícios nas profundezas de Pits of Inferno. Um dos marcos mais reverenciados da história de caçadas no Tibia."
+  },
+  {
+    "id": "poi-levers",
+    "name": "Pits of Inferno: Phantasm & Spectre Halls",
+    "city": "Plains of Havoc (PoI)",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 180,
+    "recommendedLevel": 280,
+    "modes": [
+      "Solo Mage",
+      "Duo (EK+ED)"
+    ],
+    "rawXp": "5.5M - 10M/h",
+    "profit": "400k - 900k/h",
+    "danger": 3,
+    "tier": "Mage Ice Rush",
+    "tags": [
+      "Phantasms",
+      "Spectres",
+      "Avalanche Rush",
+      "PoI"
+    ],
+    "elements": [
+      "Death",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "40%+",
+        "note": "Life drain severo dos Phantasms"
+      },
+      {
+        "element": "Physical",
+        "percent": "25%+",
+        "note": "Golpes das mãos espectrais"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Phantasm",
+        "charm": "Enflame / Divine Wrath",
+        "weakness": "Fire (+25%), Holy (+20%)"
+      },
+      {
+        "monster": "Spectre",
+        "charm": "Enflame / Zap",
+        "weakness": "Fire (+25%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Mana Leech + Critical + Fire",
+      "armor": "Death Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Death Shield"
+    },
+    "pullStrategy": "Correr os salões de mármore branco tacando Great Fireball e Avalanche. Cuidado com o mana drain absurdo dos Spectres.",
+    "roles": {
+      "ek": "Box de 8 com armas de fogo.",
+      "ed": "GFB e cura.",
+      "ms": "Flam Hur e Great Fireball.",
+      "rp": "Burst Arrows de fogo."
+    },
+    "youtubeId": "F9xR1mK2aP8",
+    "youtubeTitle": "PoI Phantasm Halls Mage Hunt Guide",
+    "description": "Salões espectrais de PoI com alta imunidade a dano físico e fraqueza colossal a dano de fogo e holy."
+  },
+  {
+    "id": "inquisition-fury-dungeon",
+    "name": "MotA Fury Dungeon (Museum of Arts)",
+    "city": "Thais (Museum)",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 160,
+    "recommendedLevel": 260,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Solo Mage"
+    ],
+    "rawXp": "4.8M - 8.5M/h",
+    "profit": "600k - 1.6M/h",
+    "danger": 3,
+    "tier": "Profit S-Tier",
+    "tags": [
+      "Furies",
+      "Red POC",
+      "Gold Ingot",
+      "Thais"
+    ],
+    "elements": [
+      "Fire",
+      "Death",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Fire",
+        "percent": "35%+",
+        "note": "Combustão contínua das Furies"
+      },
+      {
+        "element": "Physical",
+        "percent": "30%+",
+        "note": "Ataques corpo-a-corpo velozes"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Fury",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Mana Leech + Critical",
+      "armor": "Fire Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Fire Shield"
+    },
+    "pullStrategy": "Lurar 4 a 6 Furies pelos corredores estreitos do museu. Focar gelo para derreter a vida rapidamente.",
+    "roles": {
+      "ek": "Lurar 5 furies e fechar diagonal no corredor.",
+      "ed": "Ice Wave e Avalanche.",
+      "ms": "Energy Wave e SD finisher.",
+      "rp": "Diamond Arrows e Divine Caldera."
+    },
+    "youtubeId": "T8mR1nK4vB2",
+    "youtubeTitle": "MotA Fury Dungeon Thais Solo EK Guide Profit Insano",
+    "description": "Porões do Museu de Artes em Thais infestados de Fúrias. Um dos melhores spots do jogo para lucro de Red Piece of Cloth e joias."
+  },
+  {
+    "id": "inquisition-vats",
+    "name": "The Inquisition: The Vats (Ushuriel)",
+    "city": "Thais (Inquisition)",
+    "category": "meta_hunts",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 320,
+    "recommendedLevel": 460,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Team 4x"
+    ],
+    "rawXp": "8M - 14M/h",
+    "profit": "700k - 1.8M/h",
+    "danger": 4,
+    "tier": "Inquisition Clássico",
+    "tags": [
+      "Hellhounds",
+      "Son of Verminor",
+      "The Vats",
+      "Demon Dust"
+    ],
+    "elements": [
+      "Earth",
+      "Fire",
+      "Death",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Earth",
+        "percent": "40%+",
+        "note": "Veneno fétido dos Sons of Verminor"
+      },
+      {
+        "element": "Fire",
+        "percent": "35%+",
+        "note": "Waves dos Hellhounds"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Hellhound",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      },
+      {
+        "monster": "Son of Verminor",
+        "charm": "Enflame / Divine Wrath",
+        "weakness": "Fire (+25%), Holy (+20%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire Damage ou Ice + Critical",
+      "armor": "Earth Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Fire / Earth Protection"
+    },
+    "pullStrategy": "Andar pelas passarelas de ácido e lodo tóxico puxando Hellhounds e Sons of Verminor. Ter Poison Cure preparado.",
+    "roles": {
+      "ek": "Travar Hellhounds de costas para os shooters.",
+      "ed": "Cura prioritária e Avalanche.",
+      "ms": "Great Fireball e Energy Wave.",
+      "rp": "Diamond Arrows + Mas San."
+    },
+    "youtubeId": "K9xL2aB3vM1",
+    "youtubeTitle": "Inquisition The Vats Solo & Team 10kk/h Guide",
+    "description": "Os tanques de lodo e dejetos demoníacos da Inquisição. Excelente para farmar Demon Dust e loots de alto valor."
+  },
+  {
+    "id": "lizard-chosen-corruption-hole",
+    "name": "Lizard Chosen: Corruption Hole (Zao)",
+    "city": "Farmine (Zao)",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 100,
+    "recommendedLevel": 160,
+    "modes": [
+      "Solo RP",
+      "Solo Mage",
+      "Solo EK"
+    ],
+    "rawXp": "2.5M - 5.5M/h",
+    "profit": "300k - 750k/h",
+    "danger": 2,
+    "tier": "Midgame King",
+    "tags": [
+      "Lizard Chosen",
+      "Zao",
+      "Corruption Hole",
+      "Lizard Scales"
+    ],
+    "elements": [
+      "Physical",
+      "Earth"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Physical",
+        "percent": "30%+",
+        "note": "Ataques corpo a corpo pesados"
+      },
+      {
+        "element": "Earth",
+        "percent": "20%+",
+        "note": "Spits de veneno"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Lizard Chosen",
+        "charm": "Zap / Freeze",
+        "weakness": "Energy (+20%), Ice (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Energy Damage + Critical + Mana Leech",
+      "armor": "Life Leech + Earth Protection",
+      "helmet": "Mana Leech",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Correr nos degraus de templo ou fazer box de 5 a 8 Chosen. Os Chosen são lentos, ideais para kite com flechas e magias.",
+    "roles": {
+      "ek": "Box de 8 com Exori Gran e rotação Energy.",
+      "ed": "Avalanche e cura.",
+      "ms": "Energy Wave e Great Fireball.",
+      "rp": "Kiting com Drill Bolts ou Diamond Arrows."
+    },
+    "youtubeId": "L8mN1kP4aZ3",
+    "youtubeTitle": "Lizard Chosen Corruption Hole Solo Hunt Guide",
+    "description": "O fosso de corrupção dos Lizards em Zao. Um clássico consagrado para Paladinos e Cavaleiros intermediários lucrarem."
+  },
+  {
+    "id": "dragonblaze-peaks-drakens",
+    "name": "Dragonblaze Peaks: Draken Elite & Warmasters (Zao)",
+    "city": "Farmine (Zao)",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 220,
+    "recommendedLevel": 320,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Duo (EK+ED)"
+    ],
+    "rawXp": "5.5M - 9.5M/h",
+    "profit": "500k - 1.2M/h",
+    "danger": 3,
+    "tier": "Zao Meta",
+    "tags": [
+      "Draken Warmaster",
+      "Draken Elite",
+      "Zao Mountains",
+      "Zaoan Helmet"
+    ],
+    "elements": [
+      "Physical",
+      "Fire"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Physical",
+        "percent": "35%+",
+        "note": "Golpes cortantes dos Drakens"
+      },
+      {
+        "element": "Fire",
+        "percent": "30%+",
+        "note": "Explosões de fogo"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Draken Warmaster",
+        "charm": "Ice / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      },
+      {
+        "monster": "Draken Elite",
+        "charm": "Zap / Freeze",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Critical + Mana Leech",
+      "armor": "Fire Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Lurar os topos montanhosos de Dragonblaze Peaks. Drakens Elites curam muito rápido, foque os Elites primeiro no single target.",
+    "roles": {
+      "ek": "Box com armas de Gelo.",
+      "ed": "Ice Wave e cura contínua.",
+      "ms": "Energy Wave e SD no Elite.",
+      "rp": "Diamond Arrows e Crystalline Arrows."
+    },
+    "youtubeId": "D7xK2mP9aQ1",
+    "youtubeTitle": "Dragonblaze Peaks Draken Solo EK Guide 8kk/h",
+    "description": "Picos nevados e vulcânicos de Zao com alta densidade de Warmasters e Elites. Ótimo drop de Zaoan Helmets e Legs."
+  },
+  {
+    "id": "drefia-grim-reapers",
+    "name": "Drefia Grim Reapers (The Hellway)",
+    "city": "Darashia (Drefia)",
+    "category": "mid_game",
+    "vocations": [
+      "Paladin",
+      "Mage",
+      "Knight",
+      "Monk"
+    ],
+    "minLevel": 150,
+    "recommendedLevel": 250,
+    "modes": [
+      "Solo RP",
+      "Solo Mage",
+      "Solo EK"
+    ],
+    "rawXp": "4.5M - 9M/h",
+    "profit": "200k - 600k/h",
+    "danger": 4,
+    "tier": "XP Rush Clássico",
+    "tags": [
+      "Grim Reaper",
+      "Drefia",
+      "Rush Level",
+      "Nightmare Blade"
+    ],
+    "elements": [
+      "Death",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "45%+",
+        "note": "Beam frontal de Death devastador (evitar ficar na reta)"
+      },
+      {
+        "element": "Physical",
+        "percent": "25%+",
+        "note": "Corte da Foice da Morte"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Grim Reaper",
+        "charm": "Divine Wrath / Enflame",
+        "weakness": "Holy (+25%), Fire (+20%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire Damage ou Holy + Critical",
+      "armor": "Death Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Death Shield"
+    },
+    "pullStrategy": "NUNCA fique na reta frontal do Grim Reaper! Corra em círculos com Firebombs ou lurar de 3 a 5 e estourar Mas San.",
+    "roles": {
+      "ek": "Ficar na diagonal absoluta com armas de Fire.",
+      "ed": "GFB e Exura Sio.",
+      "ms": "Flam Hur e Great Fireball.",
+      "rp": "Crystalline Arrows ou Diamond Arrows com Mas San."
+    },
+    "youtubeId": "G8mR2kP1vX4",
+    "youtubeTitle": "Drefia Grim Reapers Solo RP Rush Level Guide",
+    "description": "As catacumbas sagradas da Morte em Drefia. O melhor ponto de rush de XP puro para Paladinos e Magos do level 150 ao 300."
+  },
+  {
+    "id": "yalahar-grim-reapers",
+    "name": "Yalahar Grim Reapers (Cemetery Quarter -3)",
+    "city": "Yalahar",
+    "category": "mid_game",
+    "vocations": [
+      "Paladin",
+      "Mage",
+      "Knight",
+      "Monk"
+    ],
+    "minLevel": 130,
+    "recommendedLevel": 220,
+    "modes": [
+      "Solo RP",
+      "Solo Mage"
+    ],
+    "rawXp": "3.5M - 7M/h",
+    "profit": "150k - 500k/h",
+    "danger": 4,
+    "tier": "Paladin Heaven",
+    "tags": [
+      "Grim Reaper",
+      "Yalahar Cemetery",
+      "Firebomb Kite"
+    ],
+    "elements": [
+      "Death",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "40%+",
+        "note": "Beams frontais de morte letal"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Grim Reaper",
+        "charm": "Divine Wrath / Enflame",
+        "weakness": "Holy (+25%), Fire (+20%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Critical Tier 3 + Mana Leech",
+      "armor": "Death Protection (Lit Moon Mirror / Koshei)",
+      "helmet": "Mana Leech",
+      "shield": "Death Shield"
+    },
+    "pullStrategy": "Tacar Firebomb no chão para travar a movimentação dos Grims e correr em volta dando Crystalline Arrows e Mas San.",
+    "roles": {
+      "ek": "Cuidado extremo com múltiplos Grims nos corredores estreitos.",
+      "ed": "Fireball e cura rápida.",
+      "ms": "Fire Wave e SD.",
+      "rp": "Kite com Firebomb e Holy damage."
+    },
+    "youtubeId": "Y9xL1mK4aV2",
+    "youtubeTitle": "Yalahar Cemetery Grim Reapers Solo Paladin 5kk/h",
+    "description": "Subsolo profundo do Cemetery Quarter em Yalahar. Clássico histórico de Paladinos subindo centenas de levels com Firebombs."
+  },
+  {
+    "id": "okolnir-frost-dragons",
+    "name": "Svargrond Frost Dragons (Okolnir)",
+    "city": "Svargrond",
+    "category": "mid_game",
+    "vocations": [
+      "Mage",
+      "Paladin",
+      "Knight",
+      "Monk"
+    ],
+    "minLevel": 90,
+    "recommendedLevel": 160,
+    "modes": [
+      "Solo Mage (SD Rush)",
+      "Solo RP",
+      "Solo EK"
+    ],
+    "rawXp": "2.5M - 5M/h",
+    "profit": "-50k - 300k/h (Pode ser waste em rush SD)",
+    "danger": 3,
+    "tier": "SD Rush Clássico",
+    "tags": [
+      "Frost Dragon",
+      "Okolnir",
+      "SD Rush",
+      "Dragon Slayer"
+    ],
+    "elements": [
+      "Ice",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Ice",
+        "percent": "40%+",
+        "note": "Ondas de gelo que paralisam"
+      },
+      {
+        "element": "Physical",
+        "percent": "20%+",
+        "note": "Dano de mordida"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Frost Dragon",
+        "charm": "Enflame / Zap",
+        "weakness": "Fire (+25%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire Damage + Critical",
+      "armor": "Ice Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Glacier Shield"
+    },
+    "pullStrategy": "Lurar os dragões de gelo na montanha de Okolnir. Eles têm fraqueza extrema a dano de fogo. Mages podem usar SDs e Great Fireballs.",
+    "roles": {
+      "ek": "Box com arma de Fire e Glacier Amulet.",
+      "ed": "Fire Wave e Great Fireball.",
+      "ms": "Hell's Core, Flam Hur e SD.",
+      "rp": "Fire Arrows ou Diamond Arrows."
+    },
+    "youtubeId": "O8mK1nP4aV3",
+    "youtubeTitle": "Okolnir Frost Dragons Mage SD Rush Fast Level",
+    "description": "A montanha gélida de Okolnir ao norte de Svargrond. O spot lendário de caça com Sudden Death para catapultar magos novatos."
+  },
+  {
+    "id": "fenrock-dragon-lords",
+    "name": "Fenrock Dragon Lords (Secret Pyre)",
+    "city": "Yalahar (Fenrock)",
+    "category": "mid_game",
+    "vocations": [
+      "Paladin",
+      "Mage",
+      "Knight",
+      "Monk"
+    ],
+    "minLevel": 80,
+    "recommendedLevel": 140,
+    "modes": [
+      "Solo RP",
+      "Solo Mage",
+      "Solo EK"
+    ],
+    "rawXp": "2.0M - 4.5M/h",
+    "profit": "100k - 400k/h",
+    "danger": 3,
+    "tier": "Mito da Comunidade",
+    "tags": [
+      "Dragon Lord",
+      "Fenrock",
+      "Golden Machete",
+      "Dragon Scale Mail"
+    ],
+    "elements": [
+      "Fire",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Fire",
+        "percent": "45%+",
+        "note": "Fire waves e Great Fireballs dos DLs"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Dragon Lord",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+25%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Critical",
+      "armor": "Fire Protection (Dragon Hide)",
+      "helmet": "Mana Leech",
+      "shield": "Magma / Fire Shield"
+    },
+    "pullStrategy": "Navegar até a caverna secreta de Fenrock passando pelos Beregar dwarfs. Manter Magma Amulet ativo o tempo todo.",
+    "roles": {
+      "ek": "Ficar na diagonal para não tomar fire wave.",
+      "ed": "Ice Wave e cura constante.",
+      "ms": "Energy Wave e SD nos DLs.",
+      "rp": "Kite com Crystalline Arrows e Exori Con."
+    },
+    "youtubeId": "F1xL3mK8aP0",
+    "youtubeTitle": "Fenrock Dragon Lords Guia Completo e Rotação",
+    "description": "O spawn lendário nas cavernas de Fenrock. Um dos santuários mais amados pela comunidade do Tibia para nostalgia e caça descontraída."
+  },
+  {
+    "id": "warzone-1-gnomebase",
+    "name": "Warzone 1: Deathstrike Cavern (Gnomebase Alpha)",
+    "city": "Kazordoon (Gnomebase)",
+    "category": "meta_hunts",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 200,
+    "recommendedLevel": 300,
+    "modes": [
+      "Team 4x",
+      "Duo",
+      "Solo EK 350+"
+    ],
+    "rawXp": "5.5M - 10M/h",
+    "profit": "800k - 2.0M/h",
+    "danger": 3,
+    "tier": "Lucro de Tokens",
+    "tags": [
+      "Warzone 1",
+      "Deathstrike",
+      "Gnomebase",
+      "Major Crystalline Token"
+    ],
+    "elements": [
+      "Physical",
+      "Earth",
+      "Death"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Earth",
+        "percent": "35%+",
+        "note": "Veneno e lama dos monstros subterrâneos"
+      },
+      {
+        "element": "Physical",
+        "percent": "35%+",
+        "note": "Pancadas dos golens e besouros"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Armadile",
+        "charm": "Ice / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      },
+      {
+        "monster": "Hideous Fungus",
+        "charm": "Enflame / Freeze",
+        "weakness": "Fire (+25%), Ice (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire / Ice + Critical + Mana Leech",
+      "armor": "Earth Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Earth Shield"
+    },
+    "pullStrategy": "Lurar os cogumelos e golens no caminho do boss Deathstrike. Matar em packs grandes aproveitando o dano de área.",
+    "roles": {
+      "ek": "Puxar 8 monstros nos cruzamentos.",
+      "ed": "Avalanche ou GFB com cura rápida.",
+      "ms": "Great Fireball e Energy Wave.",
+      "rp": "Diamond Arrows e Mas San."
+    },
+    "youtubeId": "W1xL4mK7aZ8",
+    "youtubeTitle": "Warzone 1 Cavern Hunt Guide & Token Farm",
+    "description": "Primeira zona de guerra dos gnomos. Rende centenas de cristais, Major Tokens e itens raros de forja gnomica."
+  },
+  {
+    "id": "warzone-2-gnomebase",
+    "name": "Warzone 2: Gnomevil Lair & Humongous Fungus",
+    "city": "Kazordoon (Gnomebase)",
+    "category": "meta_hunts",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 220,
+    "recommendedLevel": 320,
+    "modes": [
+      "Team 4x",
+      "Duo",
+      "Solo EK"
+    ],
+    "rawXp": "6M - 11M/h",
+    "profit": "900k - 2.2M/h",
+    "danger": 3,
+    "tier": "Lucro de Tokens",
+    "tags": [
+      "Warzone 2",
+      "Gnomevil",
+      "Fungus",
+      "Gnome Shield"
+    ],
+    "elements": [
+      "Earth",
+      "Death",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Earth",
+        "percent": "40%+",
+        "note": "Esporos dos fungos gigantes"
+      },
+      {
+        "element": "Death",
+        "percent": "30%+",
+        "note": "Magias necróticas"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Humongous Fungus",
+        "charm": "Enflame / Freeze",
+        "weakness": "Fire (+25%), Ice (+15%)"
+      },
+      {
+        "monster": "Cliff Strider",
+        "charm": "Ice / Zap",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire Damage + Critical + Mana Leech",
+      "armor": "Earth Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Avançar pelas câmaras de esporos destruindo os fungos parasitários com grande alcance de fogo.",
+    "roles": {
+      "ek": "Box central com Exori Gran de Fire.",
+      "ed": "Great Fireball e suporte ao EK.",
+      "ms": "Flam Hur e Great Fireball.",
+      "rp": "Diamond Arrows de Fire."
+    },
+    "youtubeId": "W2xL5mK8aP1",
+    "youtubeTitle": "Warzone 2 Deep Farm & Gnomevil Path",
+    "description": "Segunda zona de guerra dos gnomos repleta de fungos colossais e insetos petrificados ricos em minérios."
+  },
+  {
+    "id": "warzone-3-gnomebase",
+    "name": "Warzone 3: Versperoth & Parasites Deep Abyss",
+    "city": "Kazordoon (Gnomebase)",
+    "category": "meta_hunts",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 250,
+    "recommendedLevel": 360,
+    "modes": [
+      "Team 4x",
+      "Duo",
+      "Solo EK 400+"
+    ],
+    "rawXp": "7M - 12M/h",
+    "profit": "1.0M - 2.5M/h",
+    "danger": 4,
+    "tier": "Warzone Master",
+    "tags": [
+      "Warzone 3",
+      "Abyssador",
+      "Parasites",
+      "Iron Ore"
+    ],
+    "elements": [
+      "Energy",
+      "Physical",
+      "Death"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Energy",
+        "percent": "35%+",
+        "note": "Eletricidade dos golens"
+      },
+      {
+        "element": "Physical",
+        "percent": "35%+",
+        "note": "Pancadas dos Ironblights"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Ironblight",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+20%), Energy (+10%)"
+      },
+      {
+        "monster": "Orewalker",
+        "charm": "Freeze / Enflame",
+        "weakness": "Ice (+20%), Fire (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Critical + Mana Leech",
+      "armor": "Energy Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Physical Shield"
+    },
+    "pullStrategy": "Lurar os Ironblights em formato de cruz. Seus ataques quebram defesa física com grande intensidade.",
+    "roles": {
+      "ek": "Encostar na parede para reduzir os ângulos de ataque.",
+      "ed": "Avalanche constante e Mass Healing.",
+      "ms": "Great Fireball e Energy Wave.",
+      "rp": "Diamond Arrows + Mas San."
+    },
+    "youtubeId": "W3xL6mK9aV4",
+    "youtubeTitle": "Warzone 3 High Level Team Hunt Guide",
+    "description": "O abismo mais profundo das Warzones clássicas. Monólitos de ferro ambulantes com alto índice de gemas raras e tokens."
+  },
+  {
+    "id": "demona-warlocks",
+    "name": "Demona: Warlock Lair (Maze of Lost Souls)",
+    "city": "Carlin (Maze of Lost Souls)",
+    "category": "mid_game",
+    "vocations": [
+      "Paladin",
+      "Knight",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 100,
+    "recommendedLevel": 160,
+    "modes": [
+      "Solo RP",
+      "Solo EK",
+      "Solo Mage"
+    ],
+    "rawXp": "2.0M - 4.5M/h",
+    "profit": "250k - 700k/h",
+    "danger": 3,
+    "tier": "Nostalgia Pura",
+    "tags": [
+      "Warlock",
+      "Demona",
+      "Ring of the Sky",
+      "Skull Staff",
+      "Blue Robe"
+    ],
+    "elements": [
+      "Fire",
+      "Energy",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Fire",
+        "percent": "35%+",
+        "note": "Fire wave e Great Fireball"
+      },
+      {
+        "element": "Energy",
+        "percent": "30%+",
+        "note": "Energy beam devastador"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Warlock",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Mana Leech",
+      "armor": "Fire Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Fire Shield"
+    },
+    "pullStrategy": "Navegar o labirinto de Demona até a cidade antiga. Warlocks ficam invisíveis com frequência; leve Energy Wall ou Bomb para revelar a posição.",
+    "roles": {
+      "ek": "Usar Exori Mas ou Ice para quebrar invisibilidade.",
+      "ed": "Ice Wave e Exori Frigo.",
+      "ms": "SD e Energy Wall.",
+      "rp": "Crystalline Arrows e Holy Flash."
+    },
+    "youtubeId": "M7xP1mK3aZ2",
+    "youtubeTitle": "Demona Warlocks Solo Hunt Guide Nostalgia",
+    "description": "A cidade subterrânea escondida após o Labirinto das Almas Perdidas. Berço dos Warlocks clássicos do Tibia."
+  },
+  {
+    "id": "goroma-demon-hell",
+    "name": "Goroma: Demon Hell & Volcano",
+    "city": "Liberty Bay (Goroma)",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 160,
+    "recommendedLevel": 250,
+    "modes": [
+      "Solo RP",
+      "Solo EK",
+      "Solo Mage",
+      "Duo"
+    ],
+    "rawXp": "3.5M - 7.5M/h",
+    "profit": "400k - 1.2M/h",
+    "danger": 3,
+    "tier": "Demon Task Meta",
+    "tags": [
+      "Demon",
+      "Goroma",
+      "Demon Task",
+      "Magic Plate Armor",
+      "Fire Axe"
+    ],
+    "elements": [
+      "Fire",
+      "Physical",
+      "Energy"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Fire",
+        "percent": "45%+",
+        "note": "Fire wave, Great Fireball e fields"
+      },
+      {
+        "element": "Energy",
+        "percent": "20%+",
+        "note": "Energy beam"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Demon",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+25%), Energy (+15%), Holy (+20%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Critical + Mana Leech",
+      "armor": "Fire Protection (Dragon Hide Tier 3)",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Fire / Magma Shield"
+    },
+    "pullStrategy": "Lurar Demons um a um ou duplas no vulcão de Goroma. Mantenha-se fora da linha de frente para não levar fire wave direta.",
+    "roles": {
+      "ek": "Travar o Demon na diagonal com arma de Gelo.",
+      "ed": "Ice Wave e Avalanche com cura.",
+      "ms": "Energy Wave e SD.",
+      "rp": "Crystalline Arrows com Holy San."
+    },
+    "youtubeId": "G1xP5mK8aB9",
+    "youtubeTitle": "Goroma Demon Hell Solo Hunt Demon Task Guide",
+    "description": "O lendário inferno vulcânico de Goroma. Principal local para realizar a clássica Demon Task dos 6666 Demons."
+  },
+  {
+    "id": "seacrest-grounds-subaquatic",
+    "name": "Seacrest Grounds: Underwater Oramond",
+    "city": "Rathleton (Oramond)",
+    "category": "meta_hunts",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 250,
+    "recommendedLevel": 350,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Duo (EK+ED)"
+    ],
+    "rawXp": "6.5M - 11M/h",
+    "profit": "600k - 1.5M/h",
+    "danger": 3,
+    "tier": "Oramond Secreto",
+    "tags": [
+      "Seacrest Pearl",
+      "Seacrest Serpent",
+      "Oramond Underwater"
+    ],
+    "elements": [
+      "Ice",
+      "Energy",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Ice",
+        "percent": "35%+",
+        "note": "Rajadas glaciais das Seacrest Serpents"
+      },
+      {
+        "element": "Energy",
+        "percent": "30%+",
+        "note": "Choques elétricos subaquáticos"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Seacrest Serpent",
+        "charm": "Enflame / Wound",
+        "weakness": "Fire (+20%), Physical (+10%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire Damage + Critical + Mana Leech",
+      "armor": "Ice Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Ice Shield"
+    },
+    "pullStrategy": "Navegar as profundezas oceânicas de Oramond lurando Seacrest Serpents em círculos. Elas dropam Seacrest Pearls que garantem lucro alto.",
+    "roles": {
+      "ek": "Box nos corais com armas de Fogo.",
+      "ed": "Energy Wave ou Great Fireball com cura.",
+      "ms": "Great Fireball e Flam Hur.",
+      "rp": "Diamond Arrows de Fogo."
+    },
+    "youtubeId": "S7xQ2mK9aR3",
+    "youtubeTitle": "Seacrest Grounds Oramond Solo EK Guide 9kk/h",
+    "description": "Gruta abissal submersa de Rathleton. Excelente combinação de caçada dinâmica com pérolas raras de alto valor nos NPCs de Rathleton."
+  },
+  {
+    "id": "glooth-tower-oramond",
+    "name": "Glooth Tower (Oramond Minotaur & Golems)",
+    "city": "Rathleton (Oramond)",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 180,
+    "recommendedLevel": 260,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Solo Mage"
+    ],
+    "rawXp": "4.5M - 8M/h",
+    "profit": "400k - 900k/h",
+    "danger": 3,
+    "tier": "Oramond Clássico",
+    "tags": [
+      "Glooth Golem",
+      "Rustheap Golem",
+      "Minotaur Hunter",
+      "Oramond Tower"
+    ],
+    "elements": [
+      "Energy",
+      "Physical",
+      "Earth"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Energy",
+        "percent": "35%+",
+        "note": "Eletricidade dos Rustheap Golems"
+      },
+      {
+        "element": "Physical",
+        "percent": "30%+",
+        "note": "Tiros de minotauro e golens"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Glooth Golem",
+        "charm": "Freeze / Enflame",
+        "weakness": "Ice (+20%), Fire (+15%)"
+      },
+      {
+        "monster": "Rustheap Golem",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Critical + Mana Leech",
+      "armor": "Energy Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Subir os andares da torre lurando os golens e minotauros até o terraço. Use Ice Wave ou Avalanche para rápido burst.",
+    "roles": {
+      "ek": "Box de 8 no centro da sala da torre.",
+      "ed": "Avalanche contínua e Mas Res.",
+      "ms": "Energy Wave e Great Fireball.",
+      "rp": "Diamond Arrows com Avalanche."
+    },
+    "youtubeId": "G9xP3mK4aL2",
+    "youtubeTitle": "Glooth Tower Oramond Solo EK & Mage Hunt Guide",
+    "description": "A torre tecnológica de Rathleton habitada por golens de esgoto e minotauros armados. Ótimo spot para exp equilibrada e loots mecânicos."
+  },
+  {
+    "id": "yalahar-war-golems",
+    "name": "Yalahar War Golems (Factory Quarter)",
+    "city": "Yalahar",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 100,
+    "recommendedLevel": 170,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Solo Mage",
+      "Duo"
+    ],
+    "rawXp": "2.5M - 5M/h",
+    "profit": "300k - 800k/h",
+    "danger": 2,
+    "tier": "Eazy Profit",
+    "tags": [
+      "War Golem",
+      "Factory Quarter",
+      "Epee",
+      "Tin Key",
+      "Energy"
+    ],
+    "elements": [
+      "Energy",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Energy",
+        "percent": "40%+",
+        "note": "Feixes de choque elétrico"
+      },
+      {
+        "element": "Physical",
+        "percent": "25%+",
+        "note": "Soco metálico dos golens"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "War Golem",
+        "charm": "Freeze / Enflame",
+        "weakness": "Ice (+20%), Fire (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Mana Leech",
+      "armor": "Energy Protection (Lightning Coat)",
+      "helmet": "Mana Leech",
+      "shield": "Lightning Shield"
+    },
+    "pullStrategy": "Usar as alavancas e portas de fábrica em Yalahar. Puxar War Golems em corredores ou box solo com arma elemental de Ice.",
+    "roles": {
+      "ek": "Box encostado nas esteiras mecânicas.",
+      "ed": "Ice Wave e Exori Frigo.",
+      "ms": "Energy Wave e SD.",
+      "rp": "Crystalline Arrows de longe."
+    },
+    "youtubeId": "Y1xW8mK3aP5",
+    "youtubeTitle": "Yalahar War Golems Solo Hunt Tin Key Farm",
+    "description": "O setor fabril do Factory Quarter em Yalahar. Famoso pela chance de dropar a lendária Tin Key (montaria Tin Lizzard) e barras de ferro."
+  },
+  {
+    "id": "yalahar-mutated-tigers",
+    "name": "Mutated Tigers & Bats (Yalahar Arena & Alchemist)",
+    "city": "Yalahar",
+    "category": "early_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 50,
+    "recommendedLevel": 90,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Solo Mage"
+    ],
+    "rawXp": "900k - 2.2M/h",
+    "profit": "200k - 500k/h",
+    "danger": 2,
+    "tier": "Sabretooth Farm King",
+    "tags": [
+      "Mutated Tiger",
+      "Sabretooth",
+      "Alchemist Quarter",
+      "Arena Quarter"
+    ],
+    "elements": [
+      "Earth",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Earth",
+        "percent": "30%+",
+        "note": "Veneno dos tigres e morcegos"
+      },
+      {
+        "element": "Physical",
+        "percent": "20%+",
+        "note": "Ataques corpo a corpo"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Mutated Tiger",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      },
+      {
+        "monster": "Mutated Bat",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice / Fire + Mana Leech",
+      "armor": "Life Leech + Earth Protection",
+      "helmet": "Mana Leech",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Lurar os andares superiores do Arena Quarter ou o circo do Alchemist. Mutated Tigers dropam Sabretooth em abundância (imbuement essencial).",
+    "roles": {
+      "ek": "Box de 4 a 6 tigres com Exori.",
+      "ed": "Avalanche contínua e Exura.",
+      "ms": "Great Fireball e Energy Strike.",
+      "rp": "Burst Arrows ou flechas de fogo."
+    },
+    "youtubeId": "M1xT4mK9aV8",
+    "youtubeTitle": "Yalahar Mutated Tigers Sabretooth Farm Guide",
+    "description": "O melhor local para jogadores iniciantes e intermediários garantirem centenas de Sabretooths para imbuements de Critical no mercado."
+  },
+  {
+    "id": "the-spike-lower",
+    "name": "The Spike: Lower Floors (Svargrond Undead Rush)",
+    "city": "Kazordoon (The Spike)",
+    "category": "early_game",
+    "vocations": [
+      "Mage",
+      "Paladin",
+      "Knight",
+      "Monk"
+    ],
+    "minLevel": 50,
+    "recommendedLevel": 80,
+    "modes": [
+      "Solo Mage (Avalanche / GFB)",
+      "Solo RP"
+    ],
+    "rawXp": "1.2M - 2.8M/h",
+    "profit": "50k - 200k/h",
+    "danger": 3,
+    "tier": "Early Game Speedrun",
+    "tags": [
+      "The Spike",
+      "Zombie",
+      "Demon Skeleton",
+      "Corym",
+      "Level 50-80"
+    ],
+    "elements": [
+      "Death",
+      "Earth",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "30%+",
+        "note": "Dano necrótico dos Demon Skeletons e Zombies"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Demon Skeleton",
+        "charm": "Divine Wrath / Enflame",
+        "weakness": "Holy (+25%), Fire (+20%)"
+      },
+      {
+        "monster": "Corym Vanguard",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire / Holy + Mana Leech",
+      "armor": "Death Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Demon Shield"
+    },
+    "pullStrategy": "Caverna exclusiva para personagens entre level 50 e 80 (ou andares inferiores). Lurar packs inteiros e castigar com Great Fireball e Avalanche.",
+    "roles": {
+      "ek": "Box com Exori e rotação rápida.",
+      "ed": "Avalanche constante e cura rápida.",
+      "ms": "Great Fireball e Flam Hur.",
+      "rp": "Burst Arrows de Fogo."
+    },
+    "youtubeId": "S1xP9mK2aZ4",
+    "youtubeTitle": "The Spike Level 50-80 Speedrun Mage Guide",
+    "description": "Cavernas de The Spike com teleports e restrições por faixa de nível. Uma das formas mais aceleradas de rushar magos do level 50 ao 80."
+  },
+  {
+    "id": "cyclopolis-behemoths",
+    "name": "Cyclopolis: Behemoth Depths (Edron)",
+    "city": "Edron",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 90,
+    "recommendedLevel": 150,
+    "modes": [
+      "Solo RP",
+      "Solo EK",
+      "Solo Mage",
+      "Duo"
+    ],
+    "rawXp": "1.8M - 4.0M/h",
+    "profit": "250k - 650k/h",
+    "danger": 2,
+    "tier": "Nostalgia Behemoth",
+    "tags": [
+      "Behemoth",
+      "Cyclopolis",
+      "Steel Boots",
+      "Titan Axe",
+      "Edron"
+    ],
+    "elements": [
+      "Physical",
+      "Earth"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Physical",
+        "percent": "35%+",
+        "note": "Arremesso de pedregulhos e socos pesados"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Behemoth",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Mana Leech + Critical",
+      "armor": "Physical Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Physical Shield"
+    },
+    "pullStrategy": "Descer até o último andar de Cyclopolis. Travar os Behemoths nos corredores de pedra e usar armas ou magias de gelo.",
+    "roles": {
+      "ek": "Box de 3 a 5 Behemoths encostado na parede.",
+      "ed": "Avalanche e Exori Frigo com cura.",
+      "ms": "Energy Wave e SD.",
+      "rp": "Kite com Crystalline Arrows de longe."
+    },
+    "youtubeId": "C1xB4mK8aP2",
+    "youtubeTitle": "Cyclopolis Behemoths Solo Hunt Guide Edron",
+    "description": "O clássico labirinto de Cyclopolis em Edron. Destino lendário onde guerreiros antigos conquistavam suas primeiras Steel Boots."
+  },
+  {
+    "id": "yalahar-hellspawns-surface",
+    "name": "Yalahar Hellspawns & Plaguesmiths (Magician Surface)",
+    "city": "Yalahar",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Mage",
+      "Paladin",
+      "Monk"
+    ],
+    "minLevel": 100,
+    "recommendedLevel": 170,
+    "modes": [
+      "Duo (EK+ED)",
+      "Solo EK 150+",
+      "Solo RP"
+    ],
+    "rawXp": "2.5M - 5.5M/h",
+    "profit": "200k - 500k/h",
+    "danger": 3,
+    "tier": "Duo Clássico",
+    "tags": [
+      "Hellspawn",
+      "Plaguesmith",
+      "Magician Quarter",
+      "Duo Level 100"
+    ],
+    "elements": [
+      "Fire",
+      "Physical",
+      "Death"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Fire",
+        "percent": "35%+",
+        "note": "Fire waves dos Hellspawns"
+      },
+      {
+        "element": "Physical",
+        "percent": "30%+",
+        "note": "Pancada e martelo dos Plaguesmiths"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Hellspawn",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+25%), Energy (+15%)"
+      },
+      {
+        "monster": "Plaguesmith",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Mana Leech + Critical",
+      "armor": "Fire Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Fire Shield"
+    },
+    "pullStrategy": "Subir os portões mágicos do Magician Quarter. O EK puxa 4 a 6 Hellspawns e o ED spamma Avalanche e Exura Sio freneticamente.",
+    "roles": {
+      "ek": "Virar as costas dos Hellspawns para o Druid.",
+      "ed": "Posicionar na diagonal e spammar Sio + Avalanche.",
+      "ms": "Energy Wave e Great Fireball.",
+      "rp": "Diamond Arrows e cura secundária."
+    },
+    "youtubeId": "H1xS7mK3aZ9",
+    "youtubeTitle": "Yalahar Hellspawns Duo EK+ED Level 100-150 Guide",
+    "description": "O spot de Duo mais tradicional da história do Tibia moderno. Consolidou gerações de duplas de EK e ED upando em sinergia."
+  },
+  {
+    "id": "nargor-pirates",
+    "name": "Nargor Pirates & Buccaneer Caves",
+    "city": "Liberty Bay (Nargor)",
+    "category": "early_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 45,
+    "recommendedLevel": 80,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Solo Mage"
+    ],
+    "rawXp": "800k - 1.8M/h",
+    "profit": "250k - 600k/h",
+    "danger": 2,
+    "tier": "Pirate Task & Bosses",
+    "tags": [
+      "Pirate",
+      "Nargor",
+      "Ron the Ripper",
+      "Brutus Bloodbeard",
+      "Pirate Hat"
+    ],
+    "elements": [
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Physical",
+        "percent": "25%+",
+        "note": "Tiros de bacamarte e espadas piratas"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Pirate Buccaneer",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+15%), Physical (+10%)"
+      },
+      {
+        "monster": "Pirate Corsair",
+        "charm": "Zap / Freeze",
+        "weakness": "Energy (+20%), Ice (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Mana Leech + Critical",
+      "armor": "Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Lurar os andares superiores do navio pirata e as cavernas subterrâneas de Nargor. Excelente para a task dos 3000 Piratas.",
+    "roles": {
+      "ek": "Box nos corredores do navio com Exori.",
+      "ed": "Avalanche ou GFB.",
+      "ms": "Great Fireball e Energy Strike.",
+      "rp": "Burst Arrows ou flechas normais."
+    },
+    "youtubeId": "N1xP8mK4aT6",
+    "youtubeTitle": "Nargor Pirates Solo Hunt & Task Guide",
+    "description": "O esconderijo da pirataria ao sul de Liberty Bay. Essencial para matar os 4 chefes piratas e conquistar itens de addon raríssimos."
+  },
+  {
+    "id": "ankrahmun-peninsula-tomb",
+    "name": "Peninsula Tomb - Subsolo 4 (Ankrahmun Vampires)",
+    "city": "Ankrahmun",
+    "category": "early_game",
+    "vocations": [
+      "Mage",
+      "Knight",
+      "Paladin",
+      "Monk"
+    ],
+    "minLevel": 40,
+    "recommendedLevel": 75,
+    "modes": [
+      "Solo Mage (GFB Rush)",
+      "Solo EK",
+      "Solo RP"
+    ],
+    "rawXp": "900k - 2.0M/h",
+    "profit": "150k - 400k/h",
+    "danger": 2,
+    "tier": "GFB Rush Clássico",
+    "tags": [
+      "Vampire Teeth",
+      "Necromancer",
+      "Boots of Haste",
+      "Ankrahmun Tomb"
+    ],
+    "elements": [
+      "Death",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "30%+",
+        "note": "Dreno de vida dos Vampires"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Vampire",
+        "charm": "Divine Wrath / Enflame",
+        "weakness": "Holy (+25%), Fire (+20%)"
+      },
+      {
+        "monster": "Necromancer",
+        "charm": "Divine Wrath / Freeze",
+        "weakness": "Holy (+25%), Ice (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire / Holy + Mana Leech",
+      "armor": "Death Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Vampire Shield"
+    },
+    "pullStrategy": "Passar pela fenda de moedas de escaravelho (Scarab Coin) para acessar os andares após a chama azul. Lurar múmias, vampiros e necromantes com GFB.",
+    "roles": {
+      "ek": "Box de 8 nos corredores de areia com Exori.",
+      "ed": "Great Fireball contínua.",
+      "ms": "Great Fireball e Flam Hur.",
+      "rp": "Burst Arrows de fogo."
+    },
+    "youtubeId": "A1xT5mK9aP3",
+    "youtubeTitle": "Ankrahmun Peninsula Tomb -4 GFB Rush Guide",
+    "description": "A tumba clássica da península de Ankrahmun. Excelente drop de Vampire Teeth (produto valioso para imbuement de Life Leech)."
+  },
+  {
+    "id": "vengoth-castle-towers",
+    "name": "Vengoth Castle (Blood Brother Towers)",
+    "city": "Yalahar (Vengoth)",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 140,
+    "recommendedLevel": 220,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Duo (EK+ED)"
+    ],
+    "rawXp": "3.0M - 6.5M/h",
+    "profit": "300k - 800k/h",
+    "danger": 3,
+    "tier": "Vengoth Vampire",
+    "tags": [
+      "Vampire Bride",
+      "Haunted Treeling",
+      "Spectre",
+      "Vengoth Castle"
+    ],
+    "elements": [
+      "Death",
+      "Physical",
+      "Earth"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "40%+",
+        "note": "Dano sombrio e maldições dos vampiros"
+      },
+      {
+        "element": "Physical",
+        "percent": "30%+",
+        "note": "Galhos dos Treelings"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Haunted Treeling",
+        "charm": "Enflame / Zap",
+        "weakness": "Fire (+25%), Energy (+15%)"
+      },
+      {
+        "monster": "Vampire Bride",
+        "charm": "Divine Wrath / Freeze",
+        "weakness": "Holy (+25%), Ice (+15%)"
+      },
+      {
+        "monster": "Spectre",
+        "charm": "Enflame / Zap",
+        "weakness": "Fire (+25%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Mana Leech + Critical + Fire",
+      "armor": "Death Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Death Shield"
+    },
+    "pullStrategy": "Subir as torres do castelo de Vengoth. Cuidado com o andar dos Spectres que exigem dano elemental de fogo para morrer rapidamente.",
+    "roles": {
+      "ek": "Box nos arcos góticos com armas de Fire.",
+      "ed": "Avalanche ou GFB com cura.",
+      "ms": "Great Fireball e Energy Wave.",
+      "rp": "Burst Arrows ou Diamond Arrows."
+    },
+    "youtubeId": "F7xR1mK2aP2",
+    "youtubeTitle": "Vengoth Castle Solo & Duo Hunt Guide",
+    "description": "O castelo gótico da família Blood Brother em Vengoth. Ambiente sombrio e repleto de vampiros aristocratas e fantasmas torturados."
+  },
+  {
+    "id": "formorgar-mines-deep",
+    "name": "Formorgar Mines: The Deep Abyss (Svargrond)",
+    "city": "Svargrond",
+    "category": "meta_hunts",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 240,
+    "recommendedLevel": 350,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Duo (EK+ED)",
+      "Team 4x"
+    ],
+    "rawXp": "6.5M - 12M/h",
+    "profit": "600k - 1.5M/h",
+    "danger": 4,
+    "tier": "Svargrond Clássico",
+    "tags": [
+      "Plaguesmith",
+      "Destroyer",
+      "Lost Soul",
+      "Behemoth",
+      "Svargrond Mines"
+    ],
+    "elements": [
+      "Physical",
+      "Death",
+      "Fire"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Physical",
+        "percent": "40%+",
+        "note": "Marretas dos Destroyers e Plaguesmiths"
+      },
+      {
+        "element": "Death",
+        "percent": "30%+",
+        "note": "Life drain dos Lost Souls"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Destroyer",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      },
+      {
+        "monster": "Plaguesmith",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Critical + Mana Leech",
+      "armor": "Physical Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Physical / Death Shield"
+    },
+    "pullStrategy": "Descer os elevadores congelados de Formorgar Mines. Os Destroyers batem pesado em área, manter box encostado nas paredes de gelo.",
+    "roles": {
+      "ek": "Fechar box nas quinas de gelo com arma de Ice.",
+      "ed": "Avalanche contínua e Sio prioritário.",
+      "ms": "Energy Wave e Great Fireball.",
+      "rp": "Diamond Arrows e Crystalline Arrows."
+    },
+    "youtubeId": "F4xM8mK1aP9",
+    "youtubeTitle": "Formorgar Mines Deep Solo & Duo Guide 10kk/h",
+    "description": "As profundezas gélidas das minas de Formorgar ao norte de Svargrond. Berço dos temidos Plaguesmiths e Destroyers colossais."
+  },
+  {
+    "id": "ferumbras-tarbaz-grounds",
+    "name": "Ferumbras Ascendant: Grounds of Tarbaz (The Despair)",
+    "city": "Darashia (Ferumbras Citadel)",
+    "category": "ferumbras",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 450,
+    "recommendedLevel": 600,
+    "modes": [
+      "Team 4x",
+      "Duo (EK+ED 650+)",
+      "Solo EK 700+"
+    ],
+    "rawXp": "15M - 26M/h",
+    "profit": "1.2M - 3.0M/h",
+    "danger": 5,
+    "tier": "Ferumbras End-Game",
+    "tags": [
+      "Tarbaz",
+      "Hellflayer",
+      "Vexclaw",
+      "Grimeleech",
+      "Ferumbras Ascendant"
+    ],
+    "elements": [
+      "Fire",
+      "Death",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Fire",
+        "percent": "40%+",
+        "note": "Chamas e inferno dos Vexclaws"
+      },
+      {
+        "element": "Death",
+        "percent": "35%+",
+        "note": "Beams mortais de Hellflayer"
+      },
+      {
+        "element": "Physical",
+        "percent": "30%+",
+        "note": "Garras devastadoras"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Hellflayer",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      },
+      {
+        "monster": "Vexclaw",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      },
+      {
+        "monster": "Grimeleech",
+        "charm": "Enflame / Freeze",
+        "weakness": "Fire (+20%), Ice (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Critical + Mana Leech",
+      "armor": "Fire Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Fire / Death Protection"
+    },
+    "pullStrategy": "Puxar os salões de tortura de Tarbaz. Jamais deixe o Hellflayer na reta do ED ou MS. O EK precisa girar os monstros de costas para o time.",
+    "roles": {
+      "ek": "Box de 8 virado contra a parede com Exori Gran.",
+      "ed": "Avalanche constante e Mass Healing.",
+      "ms": "Energy Wave e Great Fireball nos Hellflayers.",
+      "rp": "Diamond Arrows de Gelo + Mas San."
+    },
+    "youtubeId": "F5xT9mK4aL1",
+    "youtubeTitle": "Ferumbras Tarbaz Seal Team Hunt 25kk/h Guide",
+    "description": "O selo de desespero de Tarbaz dentro da cidadela de Ferumbras. Extrema intensidade de dano elemental de fogo e trevas."
+  },
+  {
+    "id": "ferumbras-zamulosh-grounds",
+    "name": "Ferumbras Ascendant: Grounds of Zamulosh (The Illusion)",
+    "city": "Darashia (Ferumbras Citadel)",
+    "category": "ferumbras",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 450,
+    "recommendedLevel": 620,
+    "modes": [
+      "Team 4x",
+      "Duo (EK+ED 650+)"
+    ],
+    "rawXp": "16M - 27M/h",
+    "profit": "1.2M - 3.2M/h",
+    "danger": 5,
+    "tier": "Ferumbras End-Game",
+    "tags": [
+      "Zamulosh",
+      "Grim Reaper",
+      "Hellflayer",
+      "Vexclaw",
+      "Ferumbras Ascendant"
+    ],
+    "elements": [
+      "Death",
+      "Fire",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "45%+",
+        "note": "Beams frontais e maldições de Grim Reapers e Hellflayers"
+      },
+      {
+        "element": "Fire",
+        "percent": "35%+",
+        "note": "Lava dos Vexclaws"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Grim Reaper",
+        "charm": "Divine Wrath / Enflame",
+        "weakness": "Holy (+25%), Fire (+20%)"
+      },
+      {
+        "monster": "Hellflayer",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage ou Fire + Critical",
+      "armor": "Death Protection + Life Leech",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Death Shield"
+    },
+    "pullStrategy": "Selo das ilusões de Zamulosh. Cuidado extremo com os Grims e clones espectrais que aumentam o dano da box exponencialmente.",
+    "roles": {
+      "ek": "Box rápida com proteção de Death ativa.",
+      "ed": "Cura ininterrupta e Avalanche.",
+      "ms": "Great Fireball e Energy Wave.",
+      "rp": "Diamond Arrows + Mas San."
+    },
+    "youtubeId": "F6xZ1mK7aQ8",
+    "youtubeTitle": "Ferumbras Zamulosh Seal Team Hunt Guide",
+    "description": "O selo da ilusão de Zamulosh na ascensão de Ferumbras. Uma das rotas de time mais desafiadoras e recompensadoras de todo o Tibia."
+  },
+  {
+    "id": "svargrond-chyllfrost-wyrms",
+    "name": "Chyllfrost: Ice Wyrms & Frost Dragons (Svargrond)",
+    "city": "Svargrond",
+    "category": "mid_game",
+    "vocations": [
+      "Mage",
+      "Paladin",
+      "Knight",
+      "Monk"
+    ],
+    "minLevel": 120,
+    "recommendedLevel": 190,
+    "modes": [
+      "Solo Mage",
+      "Solo RP",
+      "Solo EK"
+    ],
+    "rawXp": "3.0M - 6.0M/h",
+    "profit": "200k - 500k/h",
+    "danger": 3,
+    "tier": "Ice Island Solo",
+    "tags": [
+      "Frost Dragon",
+      "Ursagrodon",
+      "Chyllfrost",
+      "Ice Wyrms"
+    ],
+    "elements": [
+      "Ice",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Ice",
+        "percent": "40%+",
+        "note": "Waves glaciais severas e paralisia"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Frost Dragon",
+        "charm": "Enflame / Zap",
+        "weakness": "Fire (+25%), Energy (+15%)"
+      },
+      {
+        "monster": "Ice Wyrm",
+        "charm": "Enflame / Wound",
+        "weakness": "Fire (+25%), Physical (+10%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire Damage + Critical + Mana Leech",
+      "armor": "Ice Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Glacier Shield"
+    },
+    "pullStrategy": "Explorar a ilha descongelada temporária de Chyllfrost. Lurar os grupos de dragões de gelo e usar Great Fireballs.",
+    "roles": {
+      "ek": "Box com arma de Fogo.",
+      "ed": "Great Fireball e Fire Wave.",
+      "ms": "Flam Hur e Great Fireball.",
+      "rp": "Flechas de Fogo ou Diamond Arrows."
+    },
+    "youtubeId": "C8xY2mK9aT1",
+    "youtubeTitle": "Chyllfrost Frost Dragons Solo Mage Guide",
+    "description": "A ilha gélida de Chyllfrost ao norte de Svargrond. Lar do Ursagrodon e grandes densidades de Frost Dragons."
+  },
+  {
+    "id": "edron-dragon-lair",
+    "name": "Edron Dragon Lair (D-Lair & Dragon Lords)",
+    "city": "Edron",
+    "category": "early_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 60,
+    "recommendedLevel": 110,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Solo Mage"
+    ],
+    "rawXp": "1.2M - 2.8M/h",
+    "profit": "100k - 300k/h",
+    "danger": 2,
+    "tier": "Clássico Imortal",
+    "tags": [
+      "Dragon",
+      "Dragon Lord",
+      "Edron D-Lair",
+      "Dragon Slayer"
+    ],
+    "elements": [
+      "Fire",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Fire",
+        "percent": "35%+",
+        "note": "Fire waves frontais dos dragões"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Dragon",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      },
+      {
+        "monster": "Dragon Lord",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+25%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Mana Leech",
+      "armor": "Fire Protection (Dragon Hide)",
+      "helmet": "Mana Leech",
+      "shield": "Dragon Shield"
+    },
+    "pullStrategy": "Lurar os dragões nos pátios de pedra de Edron. Nunca fique na frente da reta dos dragões para evitar rajadas de fogo.",
+    "roles": {
+      "ek": "Sempre ficar na diagonal do dragão com Exori.",
+      "ed": "Ice Wave e Avalanche.",
+      "ms": "Frigo Hur e SD nos DLs.",
+      "rp": "Kite com flechas ou bolts de gelo."
+    },
+    "youtubeId": "E1xD5mK7aZ0",
+    "youtubeTitle": "Edron Dragon Lair Solo Hunt Level 60-100 Guide",
+    "description": "A mais tradicional e clássica caverna de dragões do Tibia. Local de treino e rito de passagem para todo guerreiro de Edron."
+  },
+  {
+    "id": "mount-sternum-undead",
+    "name": "Mount Sternum: Undead Catacombs & Cycs (Thais)",
+    "city": "Thais",
+    "category": "early_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 35,
+    "recommendedLevel": 70,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Solo Mage"
+    ],
+    "rawXp": "600k - 1.5M/h",
+    "profit": "80k - 200k/h",
+    "danger": 1,
+    "tier": "Iniciante Ouro",
+    "tags": [
+      "Crypt Shambler",
+      "Mummy",
+      "Cyclops",
+      "Mount Sternum",
+      "Thais"
+    ],
+    "elements": [
+      "Death",
+      "Physical",
+      "Earth"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "25%+",
+        "note": "Golpes de Crypt Shambler e paralisia de Mummy"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Crypt Shambler",
+        "charm": "Divine Wrath / Enflame",
+        "weakness": "Holy (+25%), Fire (+20%)"
+      },
+      {
+        "monster": "Cyclops",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire / Holy + Mana Leech",
+      "armor": "Death Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Limpar os andares subterrâneos do Monte Sternum. Os Crypt Shamblers batem forte corpo a corpo, então lute recuando se for mage.",
+    "roles": {
+      "ek": "Box com Exori e arma de fogo.",
+      "ed": "GFB e Exori Flam.",
+      "ms": "Flam Hur e Great Fireball.",
+      "rp": "Kite com flechas ou Mas San."
+    },
+    "youtubeId": "M1xS3mK9aP4",
+    "youtubeTitle": "Mount Sternum Undead Solo Mage & RP Level 40 Guide",
+    "description": "As famosas catacumbas sob o Mount Sternum entre Thais e Kazordoon. Lar de incontáveis múmias e mortos-vivos para iniciantes."
+  },
+  {
+    "id": "dark-cathedral-sanctuary",
+    "name": "Dark Cathedral: Lower Sanctuaries (Plains of Havoc)",
+    "city": "Plains of Havoc (PoH)",
+    "category": "early_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 40,
+    "recommendedLevel": 80,
+    "modes": [
+      "Solo EK",
+      "Solo RP",
+      "Solo Mage"
+    ],
+    "rawXp": "700k - 1.6M/h",
+    "profit": "150k - 350k/h",
+    "danger": 2,
+    "tier": "Addon & Cult Farm",
+    "tags": [
+      "Assassin",
+      "Dark Monk",
+      "Witch",
+      "Dark Cathedral",
+      "Rope Belt"
+    ],
+    "elements": [
+      "Physical",
+      "Death"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Physical",
+        "percent": "25%+",
+        "note": "Adagas velozes dos Assassins"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Assassin",
+        "charm": "Freeze / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      },
+      {
+        "monster": "Dark Monk",
+        "charm": "Enflame / Zap",
+        "weakness": "Fire (+20%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Mana Leech + Critical",
+      "armor": "Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Descer os 3 andares da Catedral Sombria em Plains of Havoc. Os Dark Monks curam e Assassins dropam panos raros de addon.",
+    "roles": {
+      "ek": "Lurar os corredores de mármore escuro com Exori.",
+      "ed": "GFB e Avalanche.",
+      "ms": "Great Fireball contínua.",
+      "rp": "Burst Arrows de fogo."
+    },
+    "youtubeId": "D1xC6mK8aV2",
+    "youtubeTitle": "Dark Cathedral PoH Solo Hunt Guide Level 40-70",
+    "description": "A basílica corrompida escondida nas profundezas de Plains of Havoc. Local repleto de foras-da-lei, monges renegados e assassinos perigosos."
+  },
+  {
+    "id": "helheim-bonebeasts",
+    "name": "Helheim: Bonebeast & Braindeath Caverns (Svargrond)",
+    "city": "Svargrond",
+    "category": "early_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 50,
+    "recommendedLevel": 95,
+    "modes": [
+      "Solo EK",
+      "Solo Mage (GFB)",
+      "Solo RP"
+    ],
+    "rawXp": "1.0M - 2.4M/h",
+    "profit": "120k - 300k/h",
+    "danger": 2,
+    "tier": "Bonebeast Task Master",
+    "tags": [
+      "Bonebeast",
+      "Braindeath",
+      "Demon Skeleton",
+      "Helheim",
+      "Bonelord Eye"
+    ],
+    "elements": [
+      "Death",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "30%+",
+        "note": "Beams e magias necróticas dos Braindeaths"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Bonebeast",
+        "charm": "Divine Wrath / Enflame",
+        "weakness": "Holy (+25%), Fire (+20%)"
+      },
+      {
+        "monster": "Braindeath",
+        "charm": "Enflame / Zap",
+        "weakness": "Fire (+20%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Fire / Holy + Mana Leech",
+      "armor": "Death Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Death Shield"
+    },
+    "pullStrategy": "Viajar com Buddel até Helheim e descer até o -4 e -5. Densidade perfeita de Bonebeasts para fechar tasks com Great Fireballs.",
+    "roles": {
+      "ek": "Box de 8 Bonebeasts com arma de Fire.",
+      "ed": "Great Fireball constante.",
+      "ms": "Great Fireball e Flam Hur.",
+      "rp": "Burst Arrows ou flechas de Holy."
+    },
+    "youtubeId": "H1xB7mK2aR0",
+    "youtubeTitle": "Helheim Bonebeast Task Solo Hunt Guide",
+    "description": "A ilha maldita de Helheim acessível pelos mares de Svargrond. Famosa pelo grind das tasks de Bonebeasts e olhos de Braindeaths."
+  },
+  {
+    "id": "poi-dragon-lords",
+    "name": "Pits of Inferno: Blood Pits & Dragon Lords (PoI D-Lair)",
+    "city": "Plains of Havoc (PoI)",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 140,
+    "recommendedLevel": 220,
+    "modes": [
+      "Solo RP",
+      "Solo EK",
+      "Solo Mage"
+    ],
+    "rawXp": "3.5M - 7.0M/h",
+    "profit": "250k - 600k/h",
+    "danger": 3,
+    "tier": "PoI DL Master",
+    "tags": [
+      "Dragon Lord",
+      "PoI D-Lair",
+      "Firewalker Boots",
+      "Royal Helmet"
+    ],
+    "elements": [
+      "Fire",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Fire",
+        "percent": "45%+",
+        "note": "Fire waves devastadoras em túneis estreitos"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Dragon Lord",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+25%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Critical + Mana Leech",
+      "armor": "Fire Protection (Dragon Hide)",
+      "helmet": "Mana Leech + Skill",
+      "shield": "Magma Shield"
+    },
+    "pullStrategy": "Entrar na caverna de DLs de Pits of Inferno. Use Firewalker Boots para não tomar dano de lava e lurar em linha com flechas ou magias de gelo.",
+    "roles": {
+      "ek": "Box na diagonal com arma de Gelo.",
+      "ed": "Ice Wave e Avalanche.",
+      "ms": "Energy Wave e SD.",
+      "rp": "Diamond Arrows de Gelo e Mas San."
+    },
+    "youtubeId": "P1xD9mK4aZ8",
+    "youtubeTitle": "PoI Dragon Lair Solo Hunt Guide & Firewalker Boots",
+    "description": "O covil profundo de Dragon Lords localizado nas entranhas de Pits of Inferno. Pátios de lava fervente repletos de dragões vermelhos."
+  },
+  {
+    "id": "liberty-bay-behemoth-cave",
+    "name": "Liberty Bay: Behemoth Caves (Cyclopolis Deep)",
+    "city": "Liberty Bay",
+    "category": "mid_game",
+    "vocations": [
+      "Paladin",
+      "Knight",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 110,
+    "recommendedLevel": 180,
+    "modes": [
+      "Solo RP",
+      "Solo EK",
+      "Solo Mage"
+    ],
+    "rawXp": "2.2M - 4.8M/h",
+    "profit": "300k - 700k/h",
+    "danger": 2,
+    "tier": "Task 2000 Behemoths",
+    "tags": [
+      "Behemoth",
+      "Titan Axe",
+      "Steel Boots",
+      "Liberty Bay Caves"
+    ],
+    "elements": [
+      "Physical",
+      "Earth"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Physical",
+        "percent": "35%+",
+        "note": "Pedregulhos arremessados"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Behemoth",
+        "charm": "Freeze / Zap",
+        "weakness": "Ice (+20%), Energy (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Critical + Mana Leech",
+      "armor": "Physical Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Physical Shield"
+    },
+    "pullStrategy": "Descer as cavernas montanhosas ao norte de Liberty Bay. Kiting com paladino ou fechar quina de caverna com o cavaleiro.",
+    "roles": {
+      "ek": "Travar até 4 Behemoths por quina de pedra.",
+      "ed": "Avalanche e cura.",
+      "ms": "Energy Wave e SD.",
+      "rp": "Crystalline Arrows e Holy Flash."
+    },
+    "youtubeId": "L1xB2mK7aQ4",
+    "youtubeTitle": "Liberty Bay Behemoth Cave Solo Hunt & Task Guide",
+    "description": "Caverna isolada de Behemoths em Liberty Bay. Ideal para a grande task de 2000 Behemoths do Grizzly Adams para liberar bosses."
+  },
+  {
+    "id": "tarpit-tomb-deep",
+    "name": "Ankrahmun Tombs: Tarpit Tomb Deep (-4 / -5)",
+    "city": "Ankrahmun",
+    "category": "mid_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 90,
+    "recommendedLevel": 160,
+    "modes": [
+      "Solo Mage (GFB / Avalanche)",
+      "Solo EK",
+      "Solo RP"
+    ],
+    "rawXp": "1.8M - 4.2M/h",
+    "profit": "200k - 500k/h",
+    "danger": 2,
+    "tier": "Tomb Master",
+    "tags": [
+      "Vampire",
+      "Lich",
+      "Necromancer",
+      "Banshee",
+      "Ankrahmun Tomb"
+    ],
+    "elements": [
+      "Death",
+      "Earth",
+      "Physical"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Death",
+        "percent": "35%+",
+        "note": "Maldições de Liches e gritos de Banshees"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Lich",
+        "charm": "Divine Wrath / Enflame",
+        "weakness": "Holy (+25%), Fire (+20%)"
+      },
+      {
+        "monster": "Banshee",
+        "charm": "Divine Wrath / Freeze",
+        "weakness": "Holy (+25%), Ice (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Holy / Fire + Mana Leech + Critical",
+      "armor": "Death Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Death Shield"
+    },
+    "pullStrategy": "Passar da chama azul de Tarpit Tomb com Scarab Coin. Lurar salas imensas de Liches, Vampiros e Banshees destruindo com Great Fireball.",
+    "roles": {
+      "ek": "Box de 8 no centro da sala funerária.",
+      "ed": "Great Fireball e Avalanche.",
+      "ms": "Great Fireball e Flam Hur.",
+      "rp": "Burst Arrows de Fogo e Mas San."
+    },
+    "youtubeId": "T1xT8mK3aZ1",
+    "youtubeTitle": "Tarpit Tomb -4/-5 Mage GFB Solo Rush Guide",
+    "description": "O subsolo mais amplo e repleto de mortos-vivos das tumbas de Ankrahmun. Excelente para quem busca XP rápida e loots de Blue Robe e Vampire Teeth."
+  },
+  {
+    "id": "lions-rock-darashia",
+    "name": "Lion's Rock Sanctum (Darashia Roaring Lions)",
+    "city": "Darashia",
+    "category": "early_game",
+    "vocations": [
+      "Knight",
+      "Paladin",
+      "Mage",
+      "Monk"
+    ],
+    "minLevel": 50,
+    "recommendedLevel": 90,
+    "modes": [
+      "Solo Mage (Ice / Fire)",
+      "Solo EK",
+      "Solo RP"
+    ],
+    "rawXp": "1.0M - 2.4M/h",
+    "profit": "150k - 400k/h",
+    "danger": 2,
+    "tier": "Early Game Meta",
+    "tags": [
+      "Roaring Lion",
+      "Ancient Scarab",
+      "Noble Lion",
+      "Lion's Rock",
+      "Darashia"
+    ],
+    "elements": [
+      "Earth",
+      "Physical",
+      "Fire"
+    ],
+    "protectionPriorities": [
+      {
+        "element": "Earth",
+        "percent": "30%+",
+        "note": "Veneno de Ancient Scarabs"
+      },
+      {
+        "element": "Physical",
+        "percent": "25%+",
+        "note": "Garras dos Roaring Lions"
+      }
+    ],
+    "charms": [
+      {
+        "monster": "Roaring Lion",
+        "charm": "Ice / Wound",
+        "weakness": "Ice (+20%), Physical (+10%)"
+      },
+      {
+        "monster": "Ancient Scarab",
+        "charm": "Enflame / Freeze",
+        "weakness": "Fire (+25%), Ice (+15%)"
+      }
+    ],
+    "imbuements": {
+      "weapon": "Ice Damage + Mana Leech",
+      "armor": "Earth Protection + Life Leech",
+      "helmet": "Mana Leech",
+      "shield": "Physical Protection"
+    },
+    "pullStrategy": "Fazer o acesso rápido de Lion's Rock em Darashia e descer ao santuário sagrado. Correr com Avalanche e Great Fireball aproveitando a fraqueza mútua de gelo e fogo.",
+    "roles": {
+      "ek": "Box encostado nos pilares leoninos com Exori.",
+      "ed": "Avalanche contínua e Exura.",
+      "ms": "Great Fireball e Energy Strike.",
+      "rp": "Burst Arrows ou Diamond Arrows."
+    },
+    "youtubeId": "L1xR9mK4aP8",
+    "youtubeTitle": "Lion's Rock Darashia Fast Level 50-80 Guide",
+    "description": "A rocha dos leões no deserto de Darashia. Um dos santuários mais recomendados para personagens de nível 50 a 90 uparem com segurança e bom lucro."
   }
 ];
