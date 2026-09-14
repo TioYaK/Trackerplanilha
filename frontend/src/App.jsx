@@ -902,7 +902,7 @@ export default function App() {
       />
 
       {/* Conteúdo Principal ao lado da Sidebar */}
-      <div className={`flex flex-col flex-1 min-w-0 min-h-screen transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-64 sm:lg:pl-72'}`}>
+      <div className={`flex flex-col flex-1 min-w-0 min-h-screen transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-72'}`}>
         
         {/* Barra Superior Minimalista */}
         <TopHeader

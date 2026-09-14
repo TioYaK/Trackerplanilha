@@ -206,61 +206,97 @@ export default function SidebarNav({
         transition-all duration-300 ease-in-out
         shadow-[10px_0_40px_rgba(0,0,0,0.85),inset_-1px_0_0_rgba(245,158,11,0.08)]
         backdrop-blur-2xl
-        ${isCollapsed ? 'w-[72px]' : 'w-64 sm:w-72'}
+        ${isCollapsed ? 'w-[72px]' : 'w-72'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         
         {/* ===================================================================== */}
-        {/* TOPO: LOGO & STATUS DO SERVIDOR                                        */}
+        {/* TOPO: LOGO & STATUS DO SERVIDOR (DESIGN RPG PREMIUM)                    */}
         {/* ===================================================================== */}
-        <div className="p-3.5 border-b border-white/10 flex items-center justify-between gap-2 shrink-0 bg-gradient-to-r from-amber-950/40 via-yellow-950/20 to-transparent">
+        <div className="p-3 border-b border-amber-500/20 bg-gradient-to-b from-amber-950/30 via-[#0a0c12] to-transparent shrink-0">
           
-          {/* Logo & Marca */}
-          <div 
-            onClick={() => handleNavClick('home')}
-            className="flex items-center gap-3 cursor-pointer overflow-hidden group"
-          >
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400/30 via-yellow-600/20 to-black border border-amber-400/60 flex items-center justify-center shrink-0 shadow-[0_0_18px_rgba(245,158,11,0.25)] group-hover:scale-105 group-hover:border-amber-300 group-hover:shadow-[0_0_25px_rgba(245,158,11,0.4)] transition-all duration-300">
-              <span className="text-xl filter drop-shadow-[0_2px_6px_rgba(245,158,11,0.8)]">👑</span>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            {/* Logo & Marca */}
+            <div 
+              onClick={() => handleNavClick('home')}
+              className={`flex items-center gap-2.5 cursor-pointer min-w-0 group ${isCollapsed ? 'mx-auto' : 'flex-1'}`}
+              title="RubinOT Tracker • Início"
+            >
+              {/* Insígnia / Brasão */}
+              <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/25 via-yellow-700/15 to-black/90 border border-amber-400/50 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(245,158,11,0.2)] group-hover:scale-105 group-hover:border-amber-300 group-hover:shadow-[0_0_22px_rgba(245,158,11,0.4)] transition-all duration-300">
+                <span className="text-xl filter drop-shadow-[0_2px_4px_rgba(245,158,11,0.7)] select-none">👑</span>
+                <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-amber-400 rounded-full shadow-[0_0_6px_#fbbf24]" />
+              </div>
 
-            {!isCollapsed && (
-              <div className="flex flex-col leading-tight animate-fade-in truncate">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medieval text-base sm:text-lg text-gradient-gold tracking-wide truncate group-hover:brightness-110 transition-all">
-                    RubinOT Tracker
-                  </span>
-                  <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold shrink-0">
-                    v2.5
+              {!isCollapsed && (
+                <div className="flex flex-col min-w-0 leading-tight">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medieval text-base font-bold text-gradient-gold tracking-wide whitespace-nowrap group-hover:brightness-110 transition-all">
+                      RubinOT
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold uppercase tracking-wider">
+                      Tracker
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5 font-semibold">
+                    Planilhado • Hub
                   </span>
                 </div>
-                <span className="text-[10px] text-gray-400 font-mono tracking-widest uppercase flex items-center gap-1.5 mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981] animate-pulse shrink-0" /> 
-                  <span className="truncate">16 Mundos Online</span>
-                  <span className="text-gray-500 text-[9px]">• 18ms</span>
+              )}
+            </div>
+
+            {/* Botão de Fechar Mobile ou Recolher Desktop */}
+            <div className={`flex items-center shrink-0 ${isCollapsed ? 'hidden' : ''}`}>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="lg:hidden p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                title="Fechar menu"
+              >
+                <X size={18} />
+              </button>
+
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                title={isCollapsed ? 'Expandir Menu Completo' : 'Recolher para Modo Dock'}
+                className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-gray-400 hover:text-amber-300 transition-all shadow-sm cursor-pointer"
+              >
+                <ChevronLeft size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Se estiver recolhido, exibe botão de expandir centralizado */}
+          {isCollapsed && (
+            <div className="mt-2 pt-2 border-t border-white/5 flex justify-center">
+              <button
+                onClick={() => setIsCollapsed(false)}
+                title="Expandir Menu Completo"
+                className="w-8 h-8 rounded-lg bg-white/[0.04] hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-gray-400 hover:text-amber-300 flex items-center justify-center transition-all shadow-sm cursor-pointer"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* Sub-barra de Telemetria (visível quando expandido) */}
+          {!isCollapsed && (
+            <div className="mt-2.5 pt-2 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-gray-400 px-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-emerald-400 font-semibold tracking-wider uppercase text-[9px]">
+                  16 Mundos Online
                 </span>
               </div>
-            )}
-          </div>
-
-          {/* Botão de Fechar Mobile ou Recolher Desktop */}
-          <div className="flex items-center">
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="lg:hidden p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-              title="Fechar menu"
-            >
-              <X size={18} />
-            </button>
-
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              title={isCollapsed ? 'Expandir Menu Completo' : 'Recolher para Modo Dock'}
-              className="hidden lg:flex p-1.5 rounded-xl bg-white/[0.04] hover:bg-amber-500/15 border border-white/10 text-gray-400 hover:text-amber-300 hover:border-amber-500/40 transition-all shadow-sm"
-            >
-              {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            </button>
-          </div>
+              <div className="flex items-center gap-1.5 text-gray-500 text-[9px]">
+                <span>18ms</span>
+                <span>•</span>
+                <span className="text-amber-400/90 font-bold">v2.5</span>
+              </div>
+            </div>
+          )}
 
         </div>
 
