@@ -60,6 +60,7 @@ const BazaarMarketIndex = lazy(() => import('./views/BazaarMarketIndex'));
 const StreamerCompanion = lazy(() => import('./views/StreamerCompanion'));
 const QuestChecklists = lazy(() => import('./views/QuestChecklists'));
 const HunterToolbelt = lazy(() => import('./views/HunterToolbelt'));
+const BiSMarketBoard = lazy(() => import('./views/BiSMarketBoard'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import ProfileModal from './components/ProfileModal';
@@ -213,6 +214,10 @@ const ROUTE_TO_VIEW = {
   '/quest-checklists': 'quest_checklists',
   '/acessos': 'quest_checklists',
   '/toolbelt': 'hunter_toolbelt',
+  '/bis-market': 'bis_market',
+  '/bis': 'bis_market',
+  '/market-board': 'bis_market',
+  '/itens': 'bis_market',
   '/calculadoras': 'hunter_toolbelt',
   '/utilitarios': 'hunter_toolbelt',
   '/share': 'hunter_toolbelt',
@@ -238,6 +243,7 @@ const VIEW_TO_ROUTE = {
   hunt_finder: '/hunt-finder',
   quest_checklists: '/quests',
   hunter_toolbelt: '/toolbelt',
+  bis_market: '/bis-market',
   contribute: '/contribute',
   bazaar: '/bazaar',
   radar: '/radar',
@@ -273,6 +279,7 @@ const VIEW_TITLES = {
   live: 'Rubinot Tracker | Portal Central',
   quest_checklists: 'Rubinot Tracker | Spoilers & Checklists de Quests 📜',
   hunter_toolbelt: 'Rubinot Tracker | Hunter\'s Toolbelt & Calculadoras 🧰',
+  bis_market: 'Rubinot Tracker | Market Board de Itens BiS & Preços Médios 💎',
   guild_war: 'Rubinot Tracker | Comparador de Guildas & War Heatmap 🎯',
   party_finder: 'Rubinot Tracker | Party Finder & Buscador de Time 🏆',
   loot_splitter: 'Rubinot Tracker | Divisão de Loot da Party 💰',
@@ -636,6 +643,9 @@ export default function App() {
     }
     if (currentView === 'hunter_toolbelt' || currentView === 'toolbelt' || currentView === 'calculadoras' || currentView === 'share' || currentView === 'stamina' || currentView === 'bless') {
       return <HunterToolbelt />;
+    }
+    if (currentView === 'bis_market' || currentView === 'bis' || currentView === 'market_board' || currentView === 'itens') {
+      return <BiSMarketBoard onNavigate={navigateView} />;
     }
     if (currentView === 'fame') {
       return <Rankings initialTab="fame" isAdmin={isAdmin} onPlayerClick={handlePlayerClick} />;

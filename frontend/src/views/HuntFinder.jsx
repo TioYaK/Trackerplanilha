@@ -4,7 +4,8 @@ import {
   Compass, Search, MapPin, Coins, Zap, Shield, Flame, Skull, 
   ExternalLink, Filter, Star, Sparkles, CheckCircle2, Play, Video, 
   X, Copy, Check, Users, User, ArrowUpDown, ChevronRight, Award,
-  AlertTriangle, Heart, ShieldAlert, BookOpen, Layers, Target, Info
+  AlertTriangle, Heart, ShieldAlert, BookOpen, Layers, Target, Info,
+  Map, Navigation, Crosshair, ArrowRight, ShieldCheck, Footprints
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 import { HUNTS_DATABASE, HUNT_CATEGORIES } from '../data/huntsDatabase';
@@ -23,7 +24,8 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
   
   // Modal de Detalhes da Hunt
   const [selectedHunt, setSelectedHunt] = useState(null);
-  const [modalTab, setModalTab] = useState('video'); // 'video', 'protection', 'charms', 'roles'
+  const [modalTab, setModalTab] = useState('video'); // 'video', 'protection', 'charms', 'roles', 'map'
+  const [activePoi, setActivePoi] = useState('box1');
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Deep linking: verifica se há ?hunt=id na URL ao carregar
@@ -632,6 +634,18 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
                 <Users size={14} className={modalTab === 'roles' ? 'text-yellow-400' : ''} />
                 Funções da Party (EK/ED/MS/RP)
               </button>
+
+              <button
+                onClick={() => setModalTab('map')}
+                className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all flex items-center gap-1.5 border-t border-x cursor-pointer ${
+                  modalTab === 'map'
+                    ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50'
+                    : 'bg-transparent text-gray-400 border-transparent hover:text-gray-200'
+                }`}
+              >
+                <Map size={14} className={modalTab === 'map' ? 'text-yellow-400' : ''} />
+                Planta / Mapa Tático
+              </button>
             </div>
 
             {/* Conteúdo Dinâmico das Abas */}
@@ -828,6 +842,309 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
                     </div>
 
                   </div>
+                </div>
+              )}
+
+              {/* ABA 5: PLANTA / MAPA TÁTICO DO RESPAWN */}
+              {modalTab === 'map' && (
+                <div className="flex flex-col gap-5 animate-fade-in">
+                  
+                  {/* Topo do Mapa: Título & Botão TibiaMaps */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-black/70 border border-yellow-500/30 rounded-2xl p-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-yellow-400 flex items-center gap-2">
+                        <Map size={16} className="text-yellow-400" />
+                        Planta Tática & Vetores de Rotação ({selectedHunt.name})
+                      </h4>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Posicionamento do EK (Wall-Hug), distância segura de shooters e ciclo de puxada contínua.
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`https://tibiamaps.io/map#33000,32000,7:2`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3.5 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                      >
+                        <Navigation size={13} className="text-yellow-400" />
+                        Abrir no TibiaMaps Interativo
+                        <ExternalLink size={11} />
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Blueprint SVG Tático */}
+                  <div className="relative w-full bg-gray-950/90 border border-tibia-border rounded-2xl p-4 overflow-hidden shadow-2xl flex flex-col items-center">
+                    
+                    {/* Badge de Indicador do Blueprint */}
+                    <div className="w-full flex justify-between items-center text-[11px] text-gray-400 mb-2 px-1">
+                      <span className="flex items-center gap-1.5 font-mono">
+                        <Crosshair size={12} className="text-yellow-500" />
+                        SETOR TÁTICO: <strong className="text-gray-200 uppercase">{selectedHunt.city}</strong>
+                      </span>
+                      <span className="bg-black/60 px-2 py-0.5 rounded border border-white/10 text-yellow-400 font-bold font-mono">
+                        GRADE SQM TÁTICA (1 SQM = 32px)
+                      </span>
+                    </div>
+
+                    {/* SVG Blueprint Canvas */}
+                    <div className="w-full max-w-2xl aspect-[16/10] relative rounded-xl border border-yellow-500/20 bg-[#090d13] overflow-hidden flex items-center justify-center select-none shadow-inner">
+                      
+                      <svg 
+                        viewBox="0 0 640 400" 
+                        className="w-full h-full"
+                        style={{ filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.5))' }}
+                      >
+                        <defs>
+                          {/* Grid Pattern SQM */}
+                          <pattern id="tactical-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+                            <rect width="32" height="32" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                          </pattern>
+                          
+                          {/* Seta de Lure */}
+                          <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+                          </marker>
+
+                          {/* Glow Filtro */}
+                          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="3" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                          </filter>
+                        </defs>
+
+                        {/* Fundo com Grade */}
+                        <rect width="100%" height="100%" fill="#0a0e14" />
+                        <rect width="100%" height="100%" fill="url(#tactical-grid)" />
+
+                        {/* Paredes da Caverna / Dungeon Bounds */}
+                        <path 
+                          d="M 20,20 L 620,20 L 620,80 L 520,80 L 520,200 L 620,200 L 620,380 L 20,380 L 20,260 L 100,260 L 100,140 L 20,140 Z" 
+                          fill="rgba(30, 41, 59, 0.3)" 
+                          stroke="#334155" 
+                          strokeWidth="3" 
+                          strokeDasharray="4,4"
+                        />
+
+                        {/* Obstáculos Internos de Rocha / Pilares para Trapar */}
+                        <rect x="220" y="70" width="40" height="40" rx="6" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+                        <rect x="380" y="270" width="40" height="40" rx="6" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+                        
+                        {/* Zona de Fogo / Cone de Wave das Criaturas (Avisando Shooters) */}
+                        <polygon 
+                          points="280,180 180,120 180,240" 
+                          fill="rgba(239, 68, 68, 0.15)" 
+                          stroke="rgba(239, 68, 68, 0.4)" 
+                          strokeWidth="1.5" 
+                          strokeDasharray="3,3"
+                        />
+                        <text x="185" y="185" fill="#f87171" fontSize="10" fontWeight="bold">CONE DE WAVE (PERIGO)</text>
+
+                        {/* Vetores de Lure (Linha tracejada de tração com setas) */}
+                        <path 
+                          d="M 540,140 C 480,110 380,130 300,175" 
+                          fill="none" 
+                          stroke="#f59e0b" 
+                          strokeWidth="2.5" 
+                          strokeDasharray="6,4" 
+                          markerEnd="url(#arrow)"
+                        />
+                        <path 
+                          d="M 300,185 C 340,240 380,310 460,310" 
+                          fill="none" 
+                          stroke="#10b981" 
+                          strokeWidth="2.5" 
+                          strokeDasharray="6,4" 
+                          markerEnd="url(#arrow)"
+                        />
+
+                        {/* POI 1: Escada de Acesso / Safe Spot */}
+                        <g 
+                          className="cursor-pointer" 
+                          onClick={() => setActivePoi('ladder')}
+                          filter={activePoi === 'ladder' ? 'url(#glow)' : undefined}
+                        >
+                          <circle cx="60" cy="80" r="18" fill="#0284c7" fillOpacity="0.3" stroke="#38bdf8" strokeWidth="2" />
+                          <text x="60" y="84" textAnchor="middle" fill="#38bdf8" fontSize="11" fontWeight="bold">🚪</text>
+                          <text x="60" y="112" textAnchor="middle" fill="#7dd3fc" fontSize="10" fontWeight="bold">Escada / Safe</text>
+                        </g>
+
+                        {/* POI 2: Box Principal 1 (Wall Hug do EK) */}
+                        <g 
+                          className="cursor-pointer" 
+                          onClick={() => setActivePoi('box1')}
+                          filter={activePoi === 'box1' ? 'url(#glow)' : undefined}
+                        >
+                          <circle cx="280" cy="180" r="24" fill="rgba(234, 179, 8, 0.25)" stroke="#eab308" strokeWidth="2.5" />
+                          <circle cx="280" cy="180" r="32" fill="none" stroke="#eab308" strokeWidth="1" strokeDasharray="3,3" className="animate-pulse" />
+                          <text x="280" y="185" textAnchor="middle" fill="#fef08a" fontSize="13" fontWeight="bold">🛡️ Box 1</text>
+                          <text x="280" y="218" textAnchor="middle" fill="#fde047" fontSize="10" fontWeight="bold">Spot Primário (EK)</text>
+                        </g>
+
+                        {/* POI 3: Zona Segura dos Shooters (ED / MS / RP) */}
+                        <g 
+                          className="cursor-pointer" 
+                          onClick={() => setActivePoi('shooters')}
+                          filter={activePoi === 'shooters' ? 'url(#glow)' : undefined}
+                        >
+                          <rect x="340" y="150" width="80" height="60" rx="8" fill="rgba(59, 130, 246, 0.2)" stroke="#3b82f6" strokeWidth="2" />
+                          <text x="380" y="176" textAnchor="middle" fill="#93c5fd" fontSize="11" fontWeight="bold">⚡ Shooters</text>
+                          <text x="380" y="196" textAnchor="middle" fill="#bfdbfe" fontSize="9">ED / MS / RP</text>
+                        </g>
+
+                        {/* POI 4: Box Secundário 2 (Transição de Rotação) */}
+                        <g 
+                          className="cursor-pointer" 
+                          onClick={() => setActivePoi('box2')}
+                          filter={activePoi === 'box2' ? 'url(#glow)' : undefined}
+                        >
+                          <circle cx="480" cy="310" r="22" fill="rgba(16, 185, 129, 0.25)" stroke="#10b981" strokeWidth="2" />
+                          <text x="480" y="315" textAnchor="middle" fill="#a7f3d0" fontSize="12" fontWeight="bold">🛡️ Box 2</text>
+                          <text x="480" y="344" textAnchor="middle" fill="#6ee7b7" fontSize="10" fontWeight="bold">Puxada Seguinte</text>
+                        </g>
+
+                        {/* Ponto de Invasão de Mobs Long Range */}
+                        <g 
+                          className="cursor-pointer" 
+                          onClick={() => setActivePoi('danger_zone')}
+                          filter={activePoi === 'danger_zone' ? 'url(#glow)' : undefined}
+                        >
+                          <circle cx="530" cy="120" r="14" fill="rgba(239, 68, 68, 0.3)" stroke="#ef4444" strokeWidth="1.5" />
+                          <text x="530" y="124" textAnchor="middle" fill="#fca5a5" fontSize="10">⚠️</text>
+                          <text x="530" y="145" textAnchor="middle" fill="#fca5a5" fontSize="9">Spawns Ranged</text>
+                        </g>
+
+                      </svg>
+
+                      {/* Legenda Flutuante dos Marcadores */}
+                      <div className="absolute bottom-2 left-2 bg-black/85 backdrop-blur-sm border border-white/10 rounded-lg p-2 flex items-center gap-3 text-[10px]">
+                        <span className="flex items-center gap-1 text-yellow-400">
+                          <span className="w-2 h-2 rounded-full bg-yellow-400"></span> Box do Knight
+                        </span>
+                        <span className="flex items-center gap-1 text-blue-400">
+                          <span className="w-2 h-2 rounded-full bg-blue-400"></span> Zona Shooters
+                        </span>
+                        <span className="flex items-center gap-1 text-emerald-400">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Vetor de Lure
+                        </span>
+                        <span className="flex items-center gap-1 text-red-400">
+                          <span className="w-2 h-2 rounded-full bg-red-400"></span> Cone de Wave
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Detalhes Interativos do Ponto Clicado */}
+                    <div className="w-full mt-3 bg-black/60 border border-yellow-500/20 rounded-xl p-3 text-xs">
+                      {activePoi === 'box1' && (
+                        <div className="flex items-start gap-2.5 animate-fade-in">
+                          <ShieldCheck size={18} className="text-yellow-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-yellow-300 uppercase block">
+                              Posicionamento no Box 1 (Spot Primário / Wall-Hug):
+                            </span>
+                            <p className="text-gray-300 mt-0.5 leading-relaxed">
+                              O Knight deve colar na parede virado de costas para os shooters. Isto garante que até 8 criaturas fiquem travadas sem quebrar o cone de ataque nas costas do EK, permitindo que o Druid cure com Mass Healing seguro.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {activePoi === 'box2' && (
+                        <div className="flex items-start gap-2.5 animate-fade-in">
+                          <Footprints size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-emerald-300 uppercase block">
+                              Transição para Box 2 (Fluxo de Lure Contínuo):
+                            </span>
+                            <p className="text-gray-300 mt-0.5 leading-relaxed">
+                              Quando as criaturas do Box 1 estiverem abaixo de 20% de HP (vida vermelha), o Paladin já inicia o lure da sala seguinte para o Box 2, garantindo que a party não fique nenhum segundo ociosa.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {activePoi === 'shooters' && (
+                        <div className="flex items-start gap-2.5 animate-fade-in">
+                          <Zap size={18} className="text-blue-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-blue-300 uppercase block">
+                              Posicionamento dos Shooters (ED, MS, RP):
+                            </span>
+                            <p className="text-gray-300 mt-0.5 leading-relaxed">
+                              Manter rigorosamente 4 a 5 SQMs de distância diagonal em relação ao EK. Nunca ficar na linha reta de visão frontal das criaturas para não ser atingido por beams ou waves repentinas.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {activePoi === 'ladder' && (
+                        <div className="flex items-start gap-2.5 animate-fade-in">
+                          <Compass size={18} className="text-sky-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-sky-300 uppercase block">
+                              Rota de Escape & Safe Spot de Emergência:
+                            </span>
+                            <p className="text-gray-300 mt-0.5 leading-relaxed">
+                              Em caso de trap descontrolado, disconnect de membro ou combo crítico, a party inteira deve recuar em fila para a escada/pilar de acesso para resetar o aggro individual.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {activePoi === 'danger_zone' && (
+                        <div className="flex items-start gap-2.5 animate-fade-in">
+                          <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-red-400 uppercase block">
+                              Zona de Criaturas de Alcance (Ranged Spawns):
+                            </span>
+                            <p className="text-gray-300 mt-0.5 leading-relaxed">
+                              Atenção a criaturas com ataques à distância e retarget. O Paladin ou Sorcerer deve usar Magic Wall ou Wild Growth para forçar o fechamento do mob sem expor o Elder Druid.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Protocolos Táticos & Checklist do Respawn */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="bg-black/70 border border-tibia-border rounded-2xl p-4 flex flex-col gap-2">
+                      <h5 className="font-bold text-yellow-400 uppercase flex items-center gap-1.5">
+                        <Compass size={14} /> Protocolo de Puxada Específico desta Hunt
+                      </h5>
+                      <p className="text-gray-300 leading-relaxed text-xs">
+                        {selectedHunt.pullStrategy}
+                      </p>
+                    </div>
+
+                    <div className="bg-black/70 border border-tibia-border rounded-2xl p-4 flex flex-col gap-2">
+                      <h5 className="font-bold text-yellow-400 uppercase flex items-center gap-1.5">
+                        <ShieldAlert size={14} /> Checklist de Sobrevivência no Respawn
+                      </h5>
+                      <ul className="space-y-1.5 text-gray-300">
+                        <li className="flex items-center gap-1.5">
+                          <Check size={13} className="text-emerald-400 shrink-0" />
+                          <span>Knight com Stone Skin Amulets e Might Rings na hotkey</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <Check size={13} className="text-emerald-400 shrink-0" />
+                          <span>Druid com linha de visão 100% desobstruída para Sio</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <Check size={13} className="text-emerald-400 shrink-0" />
+                          <span>Sorcerer pronto com Sap Strength no fechamento do box</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <Check size={13} className="text-emerald-400 shrink-0" />
+                          <span>Proteções equipadas: {selectedHunt.elements?.join(', ')}</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
                 </div>
               )}
 

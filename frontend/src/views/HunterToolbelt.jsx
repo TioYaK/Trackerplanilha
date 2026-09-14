@@ -170,6 +170,111 @@ export default function HunterToolbelt() {
   // =========================================================================
   // 5. DOSSIÊ DE CRIATURAS & BOSSES (FRAQUEZAS ELEMENTAIS)
   // =========================================================================
+  const [dossierSubTab, setDossierSubTab] = useState('versus'); // 'catalog' ou 'versus'
+  const [monsterAId, setMonsterAId] = useState('hellflayer');
+  const [monsterBId, setMonsterBId] = useState('dark-torturer');
+  const [weaponElement, setWeaponElement] = useState('ice'); // 'physical', 'fire', 'ice', 'energy', 'earth', 'holy', 'death'
+  const [playerBaseDamage, setPlayerBaseDamage] = useState(800);
+
+  // Set de Proteção do Jogador para o Simulador de Dano Recebido (%)
+  const [playerProtections, setPlayerProtections] = useState({
+    physical: 25,
+    fire: 30,
+    death: 20,
+    earth: 15,
+    ice: 10,
+    energy: 10,
+    holy: 0
+  });
+
+  const monsterA = useMemo(() => {
+    return MONSTERS_VULNERABILITY_DATABASE.find(m => m.id === monsterAId) || MONSTERS_VULNERABILITY_DATABASE[0];
+  }, [monsterAId]);
+
+  const monsterB = useMemo(() => {
+    return MONSTERS_VULNERABILITY_DATABASE.find(m => m.id === monsterBId) || MONSTERS_VULNERABILITY_DATABASE[1];
+  }, [monsterBId]);
+
+  // Cálculos de TTK e Dano Relativo com a Arma Escolhida
+  const ttkAnalysis = useMemo(() => {
+    const resA = monsterA.res[weaponElement] ?? 100;
+    const resB = monsterB.res[weaponElement] ?? 100;
+
+    const dmgA = Math.round(playerBaseDamage * (resA / 100));
+    const dmgB = Math.round(playerBaseDamage * (resB / 100));
+
+    const hitsA = dmgA > 0 ? Math.ceil(monsterA.hp / dmgA) : Infinity;
+    const hitsB = dmgB > 0 ? Math.ceil(monsterB.hp / dmgB) : Infinity;
+
+    const faster = hitsA < hitsB ? 'A' : hitsB < hitsA ? 'B' : 'EQUAL';
+    const percentFaster = hitsA > 0 && hitsB > 0 && hitsA !== Infinity && hitsB !== Infinity
+      ? Math.abs(((hitsB - hitsA) / Math.max(hitsA, hitsB)) * 100).toFixed(1)
+      : '0';
+
+    return { resA, resB, dmgA, dmgB, hitsA, hitsB, faster, percentFaster };
+  }, [monsterA, monsterB, weaponElement, playerBaseDamage]);
+
+  // Cálculos de Charm DPS (5% do HP * Fraqueza)
+  const charmList = [
+    { id: 'freeze', name: 'Freeze (Gelo)', element: 'ice', icon: '❄️' },
+    { id: 'zap', name: 'Zap (Energia)', element: 'energy', icon: '⚡' },
+    { id: 'enflame', name: 'Enflame (Fogo)', element: 'fire', icon: '🔥' },
+    { id: 'poison', name: 'Poison (Terra)', element: 'earth', icon: '🌿' },
+    { id: 'wound', name: 'Wound (Físico)', element: 'physical', icon: '⚔️' },
+    { id: 'curse', name: 'Curse (Morte)', element: 'death', icon: '💀' },
+    { id: 'divine', name: 'Divine Wrath (Holy)', element: 'holy', icon: '✨' },
+  ];
+
+  const charmAnalysis = useMemo(() => {
+    return charmList.map(c => {
+      const multA = (monsterA.res[c.element] ?? 100) / 100;
+      const multB = (monsterB.res[c.element] ?? 100) / 100;
+
+      const dmgA = Math.round(monsterA.hp * 0.05 * multA);
+      const dmgB = Math.round(monsterB.hp * 0.05 * multB);
+
+      return {
+        ...c,
+        dmgA,
+        dmgB,
+        diff: dmgA - dmgB,
+        betterOn: dmgA > dmgB ? 'A' : dmgB > dmgA ? 'B' : 'EQUAL'
+      };
+    });
+  }, [monsterA, monsterB]);
+
+  // Simulador de Dano Recebido por Turno e por Box
+  const survivabilityAnalysis = useMemo(() => {
+    const calcDamage = (mon) => {
+      const prof = mon.attackProfile || { primaryType: 'Physical', secondaryType: 'Fire', avgTurnDamage: 1000, maxCombo: 1800 };
+      const protPrim = (playerProtections[prof.primaryType.toLowerCase()] || 0) / 100;
+      const protSec = (playerProtections[prof.secondaryType.toLowerCase()] || 0) / 100;
+      
+      const avgProt = (protPrim * 0.65) + (protSec * 0.35);
+      const mitigatedTurn = Math.round(prof.avgTurnDamage * (1 - avgProt));
+      const mitigatedCombo = Math.round(prof.maxCombo * (1 - avgProt));
+      const box4 = mitigatedTurn * 4;
+      const box8 = mitigatedTurn * 8;
+
+      return {
+        rawTurn: prof.avgTurnDamage,
+        rawCombo: prof.maxCombo,
+        mitigatedTurn,
+        mitigatedCombo,
+        box4,
+        box8,
+        primaryType: prof.primaryType,
+        secondaryType: prof.secondaryType,
+        avgReductionPct: Math.round(avgProt * 100)
+      };
+    };
+
+    return {
+      monA: calcDamage(monsterA),
+      monB: calcDamage(monsterB)
+    };
+  }, [monsterA, monsterB, playerProtections]);
+
   const [monsterSearch, setMonsterSearch] = useState('');
   const [monsterCategory, setMonsterCategory] = useState('ALL');
   const [selectedMonster, setSelectedMonster] = useState(null);
@@ -813,12 +918,439 @@ export default function HunterToolbelt() {
         )}
 
         {/* ========================================================================= */}
-        {/* 5. ABA DOSSIÊ DE FRAQUEZAS ELEMENTAIS (ESTILO HAKAI MARKET)                */}
+        {/* 5. ABA DOSSIÊ DE FRAQUEZAS ELEMENTAIS & COMPARADOR 1V1 (ESTILO HAKAI)      */}
         {/* ========================================================================= */}
         {activeTab === 'dossier' && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Header com Filtro */}
-            <div className="bg-slate-900/90 border border-purple-500/30 rounded-2xl p-6 space-y-4 shadow-xl">
+            {/* Sub-Navegação: 1v1 Versus vs Catálogo Geral */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 border border-purple-500/30 rounded-2xl p-4 shadow-xl">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Skull className="w-6 h-6 text-purple-400" /> Dossiê de Criaturas & Comparador 1v1
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Coloque monstros frente a frente, calcule fraquezas relativas, charm DPS e simule o dano que você vai levar no box.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button
+                  onClick={() => setDossierSubTab('versus')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    dossierSubTab === 'versus'
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Swords size={14} /> Comparador 1v1 (Lado a Lado)
+                </button>
+                <button
+                  onClick={() => setDossierSubTab('catalog')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    dossierSubTab === 'catalog'
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Target size={14} /> Catálogo Geral de Fraquezas
+                </button>
+              </div>
+            </div>
+
+            {/* MODO 1: COMPARADOR 1V1 LADO A LADO */}
+            {dossierSubTab === 'versus' && (
+              <div className="space-y-6 animate-fadeIn">
+                {/* Seletores Monstro A vs Monstro B */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Monstro A */}
+                  <div className="bg-slate-900/90 border-2 border-red-500/40 rounded-2xl p-5 space-y-3 shadow-xl">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Skull size={14} /> Monstro A (Lado Esquerdo)
+                      </span>
+                      <span className="text-[10px] bg-red-500/20 text-red-300 font-bold px-2 py-0.5 rounded border border-red-500/30">
+                        {monsterA.category}
+                      </span>
+                    </div>
+
+                    <select
+                      value={monsterAId}
+                      onChange={(e) => setMonsterAId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none focus:border-red-500"
+                    >
+                      {MONSTERS_VULNERABILITY_DATABASE.map(m => (
+                        <option key={m.id} value={m.id}>{m.name} ({m.hp.toLocaleString()} HP)</option>
+                      ))}
+                    </select>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Vida Total</span>
+                        <span className="font-mono font-bold text-red-400">{monsterA.hp.toLocaleString()} HP</span>
+                      </div>
+                      <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Experiência</span>
+                        <span className="font-mono font-bold text-yellow-400">{monsterA.exp.toLocaleString()} XP</span>
+                      </div>
+                      <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Melhor Dano</span>
+                        <span className="font-mono font-bold text-emerald-400">{monsterA.bestElement}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Monstro B */}
+                  <div className="bg-slate-900/90 border-2 border-blue-500/40 rounded-2xl p-5 space-y-3 shadow-xl">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Skull size={14} /> Monstro B (Lado Direito)
+                      </span>
+                      <span className="text-[10px] bg-blue-500/20 text-blue-300 font-bold px-2 py-0.5 rounded border border-blue-500/30">
+                        {monsterB.category}
+                      </span>
+                    </div>
+
+                    <select
+                      value={monsterBId}
+                      onChange={(e) => setMonsterBId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none focus:border-blue-500"
+                    >
+                      {MONSTERS_VULNERABILITY_DATABASE.map(m => (
+                        <option key={m.id} value={m.id}>{m.name} ({m.hp.toLocaleString()} HP)</option>
+                      ))}
+                    </select>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Vida Total</span>
+                        <span className="font-mono font-bold text-blue-400">{monsterB.hp.toLocaleString()} HP</span>
+                      </div>
+                      <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Experiência</span>
+                        <span className="font-mono font-bold text-yellow-400">{monsterB.exp.toLocaleString()} XP</span>
+                      </div>
+                      <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Melhor Dano</span>
+                        <span className="font-mono font-bold text-emerald-400">{monsterB.bestElement}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* COMPARATIVO DE RESISTÊNCIAS LADO A LADO */}
+                <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <ArrowRightLeft className="w-5 h-5 text-purple-400" /> Matriz Comparativa de Resistências
+                    </h3>
+                    <span className="text-[11px] text-gray-400">Verde = Toma mais dano</span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+                        <tr>
+                          <th className="p-3">Elemento</th>
+                          <th className="p-3 text-red-400 font-bold text-center">{monsterA.name}</th>
+                          <th className="p-3 text-blue-400 font-bold text-center">{monsterB.name}</th>
+                          <th className="p-3 text-right">Comparativo / Vantagem</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-mono">
+                        {[
+                          { id: 'physical', label: '⚔️ Físico' },
+                          { id: 'fire', label: '🔥 Fogo' },
+                          { id: 'ice', label: '❄️ Gelo' },
+                          { id: 'energy', label: '⚡ Energia' },
+                          { id: 'earth', label: '🌿 Terra' },
+                          { id: 'holy', label: '✨ Holy' },
+                          { id: 'death', label: '💀 Morte' },
+                        ].map(elem => {
+                          const valA = monsterA.res[elem.id] ?? 100;
+                          const valB = monsterB.res[elem.id] ?? 100;
+                          const diff = valA - valB;
+                          return (
+                            <tr key={elem.id} className="hover:bg-slate-950/40">
+                              <td className="p-3 font-sans font-bold text-white">{elem.label}</td>
+                              <td className={`p-3 text-center font-bold ${
+                                valA > valB ? 'text-emerald-400 bg-emerald-500/10' : valA === 0 ? 'text-rose-500 line-through' : 'text-slate-300'
+                              }`}>
+                                {valA === 0 ? 'IMUNE' : `${valA}%`}
+                              </td>
+                              <td className={`p-3 text-center font-bold ${
+                                valB > valA ? 'text-emerald-400 bg-emerald-500/10' : valB === 0 ? 'text-rose-500 line-through' : 'text-slate-300'
+                              }`}>
+                                {valB === 0 ? 'IMUNE' : `${valB}%`}
+                              </td>
+                              <td className="p-3 text-right font-sans">
+                                {diff > 0 && <span className="text-red-400 font-semibold">{monsterA.name} toma +{diff}% a mais</span>}
+                                {diff < 0 && <span className="text-blue-400 font-semibold">{monsterB.name} toma +{Math.abs(diff)}% a mais</span>}
+                                {diff === 0 && <span className="text-slate-500">Resistências idênticas</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* CALCULADORA DE FRAQUEZA RELATIVA & TTK (TEMPO ATÉ O ABATE) */}
+                <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-yellow-500/40 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">
+                        <Calculator className="w-5 h-5 text-yellow-400" /> Cálculo de Fraqueza Relativa com sua Arma
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Escolha o elemento da sua arma e veja qual das duas criaturas morre mais rápido na sua rotação.
+                      </p>
+                    </div>
+
+                    {/* Veridito Rápido */}
+                    <div className={`px-3.5 py-1.5 rounded-xl border text-xs font-bold ${
+                      ttkAnalysis.faster === 'A' 
+                        ? 'bg-red-500/20 text-red-300 border-red-500/40' 
+                        : ttkAnalysis.faster === 'B'
+                        ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                        : 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40'
+                    }`}>
+                      {ttkAnalysis.faster === 'A' && `${monsterA.name} morre ${ttkAnalysis.percentFaster}% mais rápido!`}
+                      {ttkAnalysis.faster === 'B' && `${monsterB.name} morre ${ttkAnalysis.percentFaster}% mais rápido!`}
+                      {ttkAnalysis.faster === 'EQUAL' && 'Tempo de abate equivalente'}
+                    </div>
+                  </div>
+
+                  {/* Controles de Arma & Dano Médio */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase font-bold text-gray-400">Elemento da sua Arma / Rotação:</label>
+                      <div className="grid grid-cols-4 sm:grid-cols-7 gap-1">
+                        {[
+                          { id: 'ice', label: 'Gelo', icon: '❄️' },
+                          { id: 'energy', label: 'Energ', icon: '⚡' },
+                          { id: 'fire', label: 'Fogo', icon: '🔥' },
+                          { id: 'earth', label: 'Terra', icon: '🌿' },
+                          { id: 'physical', label: 'Fís', icon: '⚔️' },
+                          { id: 'holy', label: 'Holy', icon: '✨' },
+                          { id: 'death', label: 'Morte', icon: '💀' }
+                        ].map(el => (
+                          <button
+                            key={el.id}
+                            onClick={() => setWeaponElement(el.id)}
+                            className={`p-2 rounded-lg text-xs font-bold transition flex flex-col items-center gap-0.5 border ${
+                              weaponElement === el.id
+                                ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50 shadow-md'
+                                : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                            }`}
+                          >
+                            <span>{el.icon}</span>
+                            <span className="text-[10px]">{el.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase font-bold text-gray-400">Seu Dano Médio Base por Hit / Turno:</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          step="50"
+                          value={playerBaseDamage}
+                          onChange={(e) => setPlayerBaseDamage(Math.max(10, parseInt(e.target.value) || 10))}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-mono font-bold text-yellow-300 focus:outline-none focus:border-yellow-500"
+                        />
+                        <span className="text-xs text-gray-400 whitespace-nowrap">DMG / Turno</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resultados Lado a Lado do TTK */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+                    <div className="bg-slate-950 p-4 rounded-xl border border-red-500/30 space-y-2">
+                      <div className="text-xs font-bold text-red-400 flex justify-between">
+                        <span>{monsterA.name}</span>
+                        <span>Res: {ttkAnalysis.resA}%</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400">Dano Efetivo por Ataque:</span>
+                        <span className="font-mono font-bold text-white">{ttkAnalysis.dmgA} DMG</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400">Turnos Médios para Abater (TTK):</span>
+                        <span className="font-mono font-bold text-red-400 text-sm">~{ttkAnalysis.hitsA} Hits</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 space-y-2">
+                      <div className="text-xs font-bold text-blue-400 flex justify-between">
+                        <span>{monsterB.name}</span>
+                        <span>Res: {ttkAnalysis.resB}%</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400">Dano Efetivo por Ataque:</span>
+                        <span className="font-mono font-bold text-white">{ttkAnalysis.dmgB} DMG</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400">Turnos Médios para Abater (TTK):</span>
+                        <span className="font-mono font-bold text-blue-400 text-sm">~{ttkAnalysis.hitsB} Hits</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CALCULADORA DE CHARM DPS (5% HP * MULTIPLICADOR) */}
+                <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-emerald-400" /> Comparativo de Charms Ofensivos (Dano por Proc)
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Fórmula oficial: 5% do HP máximo escalado pela fraqueza da criatura. Veja em qual monstro seu Charm dá maior retorno.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                    {charmAnalysis.map(c => (
+                      <div key={c.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-white flex items-center gap-1">
+                            {c.icon} {c.name}
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                            c.betterOn === 'A' ? 'bg-red-500/20 text-red-300' : c.betterOn === 'B' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400'
+                          }`}>
+                            {c.betterOn === 'A' ? `Melhor no ${monsterA.name}` : c.betterOn === 'B' ? `Melhor no ${monsterB.name}` : 'Empate'}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between text-slate-400 font-mono text-[11px] pt-1 border-t border-slate-900">
+                          <span>{monsterA.name}: <strong className="text-red-400">{c.dmgA.toLocaleString()}</strong></span>
+                          <span>{monsterB.name}: <strong className="text-blue-400">{c.dmgB.toLocaleString()}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* SIMULADOR DE DANO RECEBIDO (SURVIVABILITY SIMULATOR) */}
+                <div className="bg-gradient-to-b from-gray-900/90 to-black border border-rose-500/40 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-rose-400" /> Simulador de Dano Recebido & Sobrevivência no Box
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Informe as proteções do seu set equipado e veja o dano médio mitigado que você receberá em situações de box fechado.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Inputs de Proteções do Jogador */}
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
+                    {[
+                      { key: 'physical', label: '⚔️ Físico %' },
+                      { key: 'fire', label: '🔥 Fogo %' },
+                      { key: 'death', label: '💀 Morte %' },
+                      { key: 'earth', label: '🌿 Terra %' },
+                      { key: 'ice', label: '❄️ Gelo %' },
+                      { key: 'energy', label: '⚡ Energia %' }
+                    ].map(p => (
+                      <div key={p.key} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                        <label className="text-[10px] text-gray-400 block font-semibold">{p.label}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={playerProtections[p.key]}
+                          onChange={(e) => {
+                            const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                            setPlayerProtections(prev => ({ ...prev, [p.key]: val }));
+                          }}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-white text-center focus:outline-none focus:border-rose-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Simulação de Dano Médio Lado a Lado */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Simulação Monstro A */}
+                    <div className="bg-slate-950 p-4 rounded-xl border border-red-500/30 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm text-red-400">{monsterA.name}</span>
+                        <span className="text-[10px] bg-red-500/20 text-red-300 font-bold px-2 py-0.5 rounded">
+                          {survivabilityAnalysis.monA.primaryType} + {survivabilityAnalysis.monA.secondaryType}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between text-slate-400">
+                          <span>Dano Bruto por Turno:</span>
+                          <span className="font-mono text-slate-300">{survivabilityAnalysis.monA.rawTurn} HP</span>
+                        </div>
+                        <div className="flex justify-between text-slate-400">
+                          <span>Mitigação do seu Set:</span>
+                          <span className="font-mono text-emerald-400 font-bold">-{survivabilityAnalysis.monA.avgReductionPct}%</span>
+                        </div>
+                        <div className="flex justify-between text-white font-bold pt-1 border-t border-slate-800">
+                          <span>Dano Mitigado (1 bicho):</span>
+                          <span className="font-mono text-rose-300">{survivabilityAnalysis.monA.mitigatedTurn} HP / turno</span>
+                        </div>
+                        <div className="flex justify-between text-yellow-300 font-bold">
+                          <span>Meio Box (4 bichos):</span>
+                          <span className="font-mono">{survivabilityAnalysis.monA.box4.toLocaleString()} HP / turno</span>
+                        </div>
+                        <div className="flex justify-between text-red-400 font-bold">
+                          <span>Full Box (8 bichos):</span>
+                          <span className="font-mono">{survivabilityAnalysis.monA.box8.toLocaleString()} HP / turno</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Simulação Monstro B */}
+                    <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/30 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm text-blue-400">{monsterB.name}</span>
+                        <span className="text-[10px] bg-blue-500/20 text-blue-300 font-bold px-2 py-0.5 rounded">
+                          {survivabilityAnalysis.monB.primaryType} + {survivabilityAnalysis.monB.secondaryType}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between text-slate-400">
+                          <span>Dano Bruto por Turno:</span>
+                          <span className="font-mono text-slate-300">{survivabilityAnalysis.monB.rawTurn} HP</span>
+                        </div>
+                        <div className="flex justify-between text-slate-400">
+                          <span>Mitigação do seu Set:</span>
+                          <span className="font-mono text-emerald-400 font-bold">-{survivabilityAnalysis.monB.avgReductionPct}%</span>
+                        </div>
+                        <div className="flex justify-between text-white font-bold pt-1 border-t border-slate-800">
+                          <span>Dano Mitigado (1 bicho):</span>
+                          <span className="font-mono text-rose-300">{survivabilityAnalysis.monB.mitigatedTurn} HP / turno</span>
+                        </div>
+                        <div className="flex justify-between text-yellow-300 font-bold">
+                          <span>Meio Box (4 bichos):</span>
+                          <span className="font-mono">{survivabilityAnalysis.monB.box4.toLocaleString()} HP / turno</span>
+                        </div>
+                        <div className="flex justify-between text-blue-400 font-bold">
+                          <span>Full Box (8 bichos):</span>
+                          <span className="font-mono">{survivabilityAnalysis.monB.box8.toLocaleString()} HP / turno</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODO 2: CATÁLOGO GERAL DE FRAQUEZAS */}
+            {dossierSubTab === 'catalog' && (
+              <div className="space-y-6 animate-fadeIn">
+                {/* Header com Filtro */}
+                <div className="bg-slate-900/90 border border-purple-500/30 rounded-2xl p-6 space-y-4 shadow-xl">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -971,6 +1503,8 @@ export default function HunterToolbelt() {
                 );
               })}
             </div>
+              </div>
+            )}
           </div>
         )}
 

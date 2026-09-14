@@ -60,6 +60,7 @@ export default function TopNav({
     hunt_finder: { label: 'Hunt Finder 2.0 & Rotas 🗺️', icon: <Compass size={16} className="text-yellow-400" /> },
     quest_checklists: { label: 'Quests & Acessos (Checklists) 📜', icon: <BookOpen size={16} className="text-indigo-400" /> },
     hunter_toolbelt: { label: 'Hunter Toolbelt (Stamina & Share) 🧰', icon: <Calculator size={16} className="text-emerald-400" /> },
+    bis_market: { label: 'Market Board de Itens BiS 💎', icon: <Gem size={16} className="text-amber-400" /> },
     rotten_blood: { label: 'Rotten Blood & Soul War Hub 🩸', icon: <Skull size={16} className="text-red-400" /> },
     bazaar_fipe: { label: 'FIPE Histórica Gráfica 📈', icon: <TrendingUp size={16} className="text-emerald-400" /> },
     exercise_calc: { label: 'Calculadora de Treino 🧮', icon: <Calculator size={16} className="text-yellow-400" /> },
@@ -110,7 +111,7 @@ export default function TopNav({
       title: 'Mega Premium 💎',
       icon: <Gem size={18} className="text-yellow-400" />,
       badge: isPremium ? 'VIP' : 'PRO',
-      items: ['bazaar', 'bazaar_flip', 'bazaar_fipe', 'discord_webhooks', 'radar', 'extreme', 'companion']
+      items: ['bis_market', 'bazaar', 'bazaar_flip', 'bazaar_fipe', 'discord_webhooks', 'radar', 'extreme', 'companion']
     }
   ];
 

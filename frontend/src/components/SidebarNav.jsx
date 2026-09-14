@@ -53,6 +53,7 @@ export const NAVIGATION_GROUPS = [
     borderColor: 'border-emerald-500/30',
     bgGradient: 'from-emerald-950/30 to-transparent',
     items: [
+      { id: 'bis_market', label: 'Itens BiS & Preços Médios', icon: Gem, badge: 'NOVO', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
       { id: 'bazaar', label: 'Bazaar Sniper (Leilões)', icon: Gem, badge: 'VIP', badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
       { id: 'bazaar_flip', label: 'Calculadora de Revenda (Flip)', icon: Calculator },
       { id: 'bazaar_fipe', label: 'FIPE Histórica Gráfica', icon: TrendingUp, badge: '17k', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },

@@ -24,6 +24,7 @@ const VIEW_TITLES = {
   rotten_blood: { title: 'Rotten Blood & Soul War Strategy Hub', icon: Skull, color: 'text-red-400' },
   quest_checklists: { title: 'Quests & Acessos (Checklists & Spoilers)', icon: BookOpen, color: 'text-indigo-400' },
   hunter_toolbelt: { title: "Hunter's Toolbelt (Stamina & Party Share)", icon: Calculator, color: 'text-emerald-400' },
+  bis_market: { title: 'Market Board de Itens BiS & Preços Médios', icon: Gem, color: 'text-amber-400' },
   attendance: { title: 'Killboard de Guerra & Presença', icon: CalendarDays, color: 'text-gray-300' },
   guild_war: { title: 'Comparador de Guildas & War', icon: Swords, color: 'text-red-400' },
   versus: { title: 'Comparador Versus 1v1', icon: Swords, color: 'text-red-400' },
