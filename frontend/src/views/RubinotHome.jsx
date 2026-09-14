@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { parseUtcDate, toBrtTimeStr } from '../lib/tibiaUtils';
 import { useWorld } from '../context/WorldContext';
@@ -38,6 +38,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
   const [recentDeaths, setRecentDeaths] = useState([]);
   const [deathsCount24h, setDeathsCount24h] = useState(582);
   const [topRushers, setTopRushers] = useState([]);
+  const [rushersLimit, setRushersLimit] = useState(10);
   const [onlineCount, setOnlineCount] = useState(0);
   const [activeWorkers, setActiveWorkers] = useState(2);
   const [loading, setLoading] = useState(true);
@@ -65,13 +66,13 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         .select('*', { count: 'exact', head: true })
         .gte('death_time', since24h);
       
-      // 3. Top Rushers (24h)
+      // 3. Top Rushers (24h) - Busca 500 para cobrir todos os servidores
       let rushersQuery = supabase
         .from('view_top_rushers_24h')
         .select('*')
         .gt('exp_gained', 0)
         .order('exp_gained', { ascending: false })
-        .limit(6);
+        .limit(500);
 
       // 4. Contagem de Onlines mais recente (ordenada pelo campo real 'timestamp')
       let onlineQuery = supabase
@@ -112,7 +113,51 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         setDeathsCount24h(deaths24hRes.count);
       }
 
-      if (rushersRes.data) setTopRushers(rushersRes.data);
+      if (rushersRes.data && rushersRes.data.length > 0) {
+        const rawRushers = rushersRes.data;
+        const names = rawRushers.map(r => r.name).filter(Boolean);
+        const CHUNK_SIZE = 100;
+        const chunks = [];
+        for (let i = 0; i < names.length; i += CHUNK_SIZE) {
+          chunks.push(names.slice(i, i + CHUNK_SIZE));
+        }
+
+        const [statesChunks, perksChunks] = await Promise.all([
+          Promise.all(
+            chunks.map(chunk =>
+              supabase
+                .from('current_character_state')
+                .select('character_name, level, vocation')
+                .in('character_name', chunk)
+                .then(res => res.data || [])
+            )
+          ),
+          Promise.all(
+            chunks.map(chunk =>
+              supabase
+                .from('guild_perk_members')
+                .select('character_name, world')
+                .in('character_name', chunk)
+                .then(res => res.data || [])
+            )
+          )
+        ]);
+
+        const stateMap = new Map(statesChunks.flat().map(s => [s.character_name.toLowerCase(), s]));
+        const perkMap = new Map(perksChunks.flat().map(p => [p.character_name.toLowerCase(), p.world]));
+
+        const enriched = rawRushers.map(r => {
+          const s = stateMap.get((r.name || '').toLowerCase());
+          const w = perkMap.get((r.name || '').toLowerCase()) || 'Auroria';
+          return {
+            ...r,
+            level: s?.level || null,
+            vocation: s?.vocation || null,
+            world: w
+          };
+        });
+        setTopRushers(enriched);
+      }
 
       if (onlineRes.data && onlineRes.data.online_count > 0) {
         setOnlineCount(onlineRes.data.online_count);
@@ -127,6 +172,12 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
       setLoading(false);
     }
   };
+
+  const filteredHomeRushers = useMemo(() => {
+    if (!topRushers || topRushers.length === 0) return [];
+    if (!selectedWorld || selectedWorld === 'ALL') return topRushers;
+    return topRushers.filter(r => (r.world || '').toLowerCase() === selectedWorld.toLowerCase());
+  }, [topRushers, selectedWorld]);
 
   const safeFormatTime = (isoString) => {
     if (!isoString) return '';
@@ -639,21 +690,36 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
               </div>
             </div>
 
-            <button
-              onClick={() => onNavigate('analytics')}
-              className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 font-bold cursor-pointer"
-            >
-              Rankings <ChevronRight size={14} />
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-lg border border-yellow-500/30 text-xs">
+                {[10, 25, 50].map(lim => (
+                  <button
+                    key={lim}
+                    onClick={() => setRushersLimit(lim)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                      rushersLimit === lim ? 'bg-yellow-500 text-black font-black' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Top {lim}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => onNavigate('analytics')}
+                className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 font-bold cursor-pointer"
+              >
+                Rankings <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2.5 flex-1">
-            {topRushers.length === 0 ? (
+            {filteredHomeRushers.length === 0 ? (
               <div className="py-12 text-center text-gray-500 font-sans text-xs">
-                Aguardando consolidação dos rushers de hoje.
+                Nenhum rusher registrado para este servidor no momento.
               </div>
             ) : (
-              topRushers.slice(0, 7).map((r, idx) => (
+              filteredHomeRushers.slice(0, rushersLimit).map((r, idx) => (
                 <div 
                   key={idx}
                   onClick={() => onPlayerClick && onPlayerClick(r.character_name || r.name, selectedWorld !== 'ALL' ? selectedWorld : null)}
@@ -672,8 +738,14 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                       <div className="text-sm font-bold text-white group-hover:text-yellow-400 transition-colors">
                         {r.character_name || r.name}
                       </div>
-                      <div className="text-[11px] text-gray-400">
-                        {r.vocation ? `${r.vocation} • ` : ''}{r.level ? `Level ${r.level}` : 'Top Rusher 24h'}
+                      <div className="text-[11px] text-gray-400 flex items-center gap-1.5 flex-wrap">
+                        {r.vocation ? <span>{r.vocation} • </span> : null}
+                        {r.level ? <span>Level {r.level}</span> : <span>Top Rusher 24h</span>}
+                        {(!selectedWorld || selectedWorld === 'ALL') && r.world && (
+                          <span className="bg-black/80 border border-white/10 text-yellow-400/90 text-[10px] px-1.5 py-0.2 rounded font-semibold">
+                            {r.world}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -685,6 +757,16 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                   </div>
                 </div>
               ))
+            )}
+            {filteredHomeRushers.length > rushersLimit && (
+              <div className="pt-2 text-center">
+                <button
+                  onClick={() => onNavigate('analytics')}
+                  className="text-xs text-amber-400 hover:text-amber-300 font-bold hover:underline"
+                >
+                  Ver todos os {filteredHomeRushers.length} rushers registrados em Rankings →
+                </button>
+              </div>
             )}
           </div>
         </div>

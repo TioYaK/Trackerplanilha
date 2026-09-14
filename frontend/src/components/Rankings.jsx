@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trophy, Flame, Crown, Globe, Search, RefreshCw, Users, Sparkles, Shield, ChevronRight } from 'lucide-react';
+import { Trophy, Flame, Crown, Globe, Search, RefreshCw, Users, Sparkles, Shield, ChevronRight, ChevronLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatVocation } from '../lib/tibiaUtils';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
@@ -18,6 +18,12 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
   const [padeiros, setPadeiros] = useState([]);
   const [topFraggers, setTopFraggers] = useState([]);
   const [imortais, setImortais] = useState([]);
+  const [pageSize, setPageSize] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedWorld, searchTerm, vocationFilter, activeTab, pageSize]);
 
   // Sincroniza se o activeWorld mudar externamente
   useEffect(() => {
@@ -30,21 +36,39 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
     setLoading(true);
 
     try {
-      // 1. Top Rushers 24h
-      const { data: rushersData } = await supabase
-        .from('view_top_rushers_24h')
-        .select('*')
-        .gt('exp_gained', 0)
-        .order('exp_gained', { ascending: false })
-        .limit(60);
+      // 1. Top Rushers 24h (2,000 registros para cobrir todos os mundos)
+      const [rPage1, rPage2] = await Promise.all([
+        supabase
+          .from('view_top_rushers_24h')
+          .select('*')
+          .gt('exp_gained', 0)
+          .order('exp_gained', { ascending: false })
+          .range(0, 999),
+        supabase
+          .from('view_top_rushers_24h')
+          .select('*')
+          .gt('exp_gained', 0)
+          .order('exp_gained', { ascending: false })
+          .range(1000, 1999)
+      ]);
+      const rushersData = [...(rPage1.data || []), ...(rPage2.data || [])];
 
-      // 2. Top Nível (Highscores)
-      const { data: levelData } = await supabase
-        .from('current_character_state')
-        .select('character_name, level, vocation, xp_total')
-        .gt('level', 0)
-        .order('level', { ascending: false })
-        .limit(100);
+      // 2. Top Nível (Highscores - 2,000 registros para cobrir todos os mundos)
+      const [lPage1, lPage2] = await Promise.all([
+        supabase
+          .from('current_character_state')
+          .select('character_name, level, vocation, xp_total')
+          .gt('level', 0)
+          .order('level', { ascending: false })
+          .range(0, 999),
+        supabase
+          .from('current_character_state')
+          .select('character_name, level, vocation, xp_total')
+          .gt('level', 0)
+          .order('level', { ascending: false })
+          .range(1000, 1999)
+      ]);
+      const levelData = [...(lPage1.data || []), ...(lPage2.data || [])];
 
       // 3. PT de Elite (Maior XP Registrada no Dia)
       const { data: partiesDataXP } = await supabase
@@ -120,20 +144,45 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
         }
       }
 
-      // 4. Cruzamento de Mundos e Dados de Personagens
+      // 4. Cruzamento de Mundos e Dados de Personagens (em lotes de 100 para evitar URI Too Long)
       const allNames = new Set();
       (rushersData || []).forEach(r => r.name && allNames.add(r.name));
       (levelData || []).forEach(l => l.character_name && allNames.add(l.character_name));
 
       const namesArr = Array.from(allNames);
-      const [{ data: statesData }, { data: perksData }] = await Promise.all([
-        namesArr.length > 0
-          ? supabase.from('current_character_state').select('character_name, level, vocation, xp_total').in('character_name', namesArr)
-          : { data: [] },
-        namesArr.length > 0
-          ? supabase.from('guild_perk_members').select('character_name, world').in('character_name', namesArr)
-          : { data: [] }
+      const CHUNK_SIZE = 100;
+      const chunks = [];
+      for (let i = 0; i < namesArr.length; i += CHUNK_SIZE) {
+        chunks.push(namesArr.slice(i, i + CHUNK_SIZE));
+      }
+
+      const [statesChunks, perksChunks] = await Promise.all([
+        chunks.length > 0
+          ? Promise.all(
+              chunks.map(chunk =>
+                supabase
+                  .from('current_character_state')
+                  .select('character_name, level, vocation, xp_total')
+                  .in('character_name', chunk)
+                  .then(res => res.data || [])
+              )
+            )
+          : [[]],
+        chunks.length > 0
+          ? Promise.all(
+              chunks.map(chunk =>
+                supabase
+                  .from('guild_perk_members')
+                  .select('character_name, world')
+                  .in('character_name', chunk)
+                  .then(res => res.data || [])
+              )
+            )
+          : [[]]
       ]);
+
+      const statesData = statesChunks.flat();
+      const perksData = perksChunks.flat();
 
       const stateMap = new Map((statesData || []).map(s => [s.character_name.toLowerCase(), s]));
       const perkMap = new Map((perksData || []).map(p => [p.character_name.toLowerCase(), p.world]));
@@ -210,6 +259,28 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
       return matchWorld && matchSearch && matchVoc;
     });
   }, [topLevels, selectedWorld, searchTerm, vocationFilter]);
+
+  const paginatedRushers = useMemo(() => {
+    if (pageSize === 'ALL') return filteredRushers;
+    const start = (currentPage - 1) * Number(pageSize);
+    return filteredRushers.slice(start, start + Number(pageSize));
+  }, [filteredRushers, currentPage, pageSize]);
+
+  const totalRushersPages = useMemo(() => {
+    if (pageSize === 'ALL') return 1;
+    return Math.max(1, Math.ceil(filteredRushers.length / Number(pageSize)));
+  }, [filteredRushers, pageSize]);
+
+  const paginatedLevels = useMemo(() => {
+    if (pageSize === 'ALL') return filteredLevels;
+    const start = (currentPage - 1) * Number(pageSize);
+    return filteredLevels.slice(start, start + Number(pageSize));
+  }, [filteredLevels, currentPage, pageSize]);
+
+  const totalLevelsPages = useMemo(() => {
+    if (pageSize === 'ALL') return 1;
+    return Math.max(1, Math.ceil(filteredLevels.length / Number(pageSize)));
+  }, [filteredLevels, pageSize]);
 
   const handleWorldChange = (wId) => {
     setSelectedWorld(wId);
@@ -383,9 +454,26 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
               <Flame className="text-amber-400" size={20} />
               <h3 className="font-bold text-white text-lg">Maiores Ganhos de Experiência (Últimas 24h)</h3>
             </div>
-            <span className="text-xs text-gray-400">
-              Servidor: <strong className="text-white">{selectedWorld === 'ALL' ? 'Todos os Mundos' : selectedWorld}</strong>
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs text-gray-400">
+                Servidor: <strong className="text-white">{selectedWorld === 'ALL' ? 'Todos os Mundos' : selectedWorld}</strong>
+                {' '}(<strong className="text-amber-400 font-bold">{filteredRushers.length}</strong> encontrados)
+              </span>
+              <div className="flex items-center gap-1 bg-black/60 px-2 py-1 rounded-lg border border-tibia-border/60 text-xs">
+                <span className="text-gray-400 text-[11px] mr-1">Exibir:</span>
+                {[25, 50, 100, 'ALL'].map(size => (
+                  <button
+                    key={size}
+                    onClick={() => setPageSize(size)}
+                    className={`px-2 py-0.5 rounded text-xs font-bold transition-all ${
+                      pageSize === size ? 'bg-amber-500 text-black font-black' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {size === 'ALL' ? 'Todos' : size}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -416,14 +504,16 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
                     </td>
                   </tr>
                 ) : (
-                  filteredRushers.map((r, i) => (
+                  paginatedRushers.map((r, i) => {
+                    const rankIdx = pageSize === 'ALL' ? i : (currentPage - 1) * Number(pageSize) + i;
+                    return (
                     <tr 
                       key={r.name}
                       onClick={() => onPlayerClick && onPlayerClick(r.name, r.world)}
                       className="hover:bg-amber-500/5 transition-colors cursor-pointer group"
                     >
                       <td className="px-6 py-4 text-center">
-                        {getRankBadge(i)}
+                        {getRankBadge(rankIdx)}
                       </td>
                       <td className="px-6 py-4 font-bold text-white group-hover:text-amber-300 transition-colors flex items-center gap-2">
                         <span>{r.name}</span>
@@ -449,11 +539,40 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
                         </span>
                       </td>
                     </tr>
-                  ))
+                  );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Paginação Rushers */}
+          {pageSize !== 'ALL' && totalRushersPages > 1 && (
+            <div className="p-4 bg-black/40 border-t border-tibia-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-400">
+              <div>
+                Exibindo <strong className="text-white">{(currentPage - 1) * Number(pageSize) + 1}</strong> a <strong className="text-white">{Math.min(currentPage * Number(pageSize), filteredRushers.length)}</strong> de <strong className="text-white">{filteredRushers.length}</strong> líderes de rush
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-black/80 border border-tibia-border text-gray-300 hover:text-white hover:border-amber-500/50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                >
+                  <ChevronLeft size={14} /> Anterior
+                </button>
+                <span className="px-3 py-1 bg-black/60 rounded border border-tibia-border font-bold text-amber-400">
+                  Página {currentPage} de {totalRushersPages}
+                </span>
+                <button
+                  disabled={currentPage >= totalRushersPages}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalRushersPages))}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-black/80 border border-tibia-border text-gray-300 hover:text-white hover:border-amber-500/50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                >
+                  Próxima <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -466,6 +585,21 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
               <h3 className="font-bold text-white text-lg">Top Níveis do Rubinot</h3>
             </div>
 
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1 bg-black/60 px-2 py-1 rounded-lg border border-tibia-border/60 text-xs">
+                <span className="text-gray-400 text-[11px] mr-1">Exibir:</span>
+                {[25, 50, 100, 'ALL'].map(size => (
+                  <button
+                    key={size}
+                    onClick={() => setPageSize(size)}
+                    className={`px-2 py-0.5 rounded text-xs font-bold transition-all ${
+                      pageSize === size ? 'bg-yellow-500 text-black font-black' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {size === 'ALL' ? 'Todos' : size}
+                  </button>
+                ))}
+              </div>
             {/* Filtro por Vocação */}
             <div className="flex items-center gap-1 bg-black/60 p-1 rounded-lg border border-tibia-border/60">
               <button
@@ -510,6 +644,7 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
               </button>
             </div>
           </div>
+        </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-gray-300">
@@ -540,14 +675,16 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
                     </td>
                   </tr>
                 ) : (
-                  filteredLevels.map((p, i) => (
+                  paginatedLevels.map((p, i) => {
+                    const rankIdx = pageSize === 'ALL' ? i : (currentPage - 1) * Number(pageSize) + i;
+                    return (
                     <tr 
                       key={p.name}
                       onClick={() => onPlayerClick && onPlayerClick(p.name, p.world)}
                       className="hover:bg-yellow-500/5 transition-colors cursor-pointer group"
                     >
                       <td className="px-6 py-4 text-center">
-                        {getRankBadge(i)}
+                        {getRankBadge(rankIdx)}
                       </td>
                       <td className="px-6 py-4 font-bold text-white group-hover:text-yellow-300 transition-colors flex items-center gap-2">
                         <span>{p.name}</span>
@@ -570,11 +707,40 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
                         {p.xp_total ? formatXP(p.xp_total) : '-'}
                       </td>
                     </tr>
-                  ))
+                  );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Paginação Highscores */}
+          {pageSize !== 'ALL' && totalLevelsPages > 1 && (
+            <div className="p-4 bg-black/40 border-t border-tibia-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-400">
+              <div>
+                Exibindo <strong className="text-white">{(currentPage - 1) * Number(pageSize) + 1}</strong> a <strong className="text-white">{Math.min(currentPage * Number(pageSize), filteredLevels.length)}</strong> de <strong className="text-white">{filteredLevels.length}</strong> guerreiros
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-black/80 border border-tibia-border text-gray-300 hover:text-white hover:border-yellow-500/50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                >
+                  <ChevronLeft size={14} /> Anterior
+                </button>
+                <span className="px-3 py-1 bg-black/60 rounded border border-tibia-border font-bold text-yellow-400">
+                  Página {currentPage} de {totalLevelsPages}
+                </span>
+                <button
+                  disabled={currentPage >= totalLevelsPages}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalLevelsPages))}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-black/80 border border-tibia-border text-gray-300 hover:text-white hover:border-yellow-500/50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                >
+                  Próxima <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

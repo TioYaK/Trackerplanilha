@@ -443,11 +443,20 @@ export default function GlobalTracker({ onPlayerClick }) {
     try {
       let query = supabase
         .from('current_character_state')
-        .select('character_name, level, vocation, xp_total, last_active, session_start_xp, world', { count: 'exact' })
+        .select('character_name, level, vocation, xp_total, last_active, session_start_xp', { count: 'exact' })
         .not('level', 'is', null);
 
+      // Nota: o campo 'world' reside em guild_perk_members; se um mundo for selecionado, busca nomes desse servidor
       if (selectedWorld && selectedWorld !== 'ALL') {
-        query = query.eq('world', selectedWorld);
+        const { data: worldMembers } = await supabase
+          .from('guild_perk_members')
+          .select('character_name')
+          .eq('world', selectedWorld)
+          .limit(1000);
+        if (worldMembers && worldMembers.length > 0) {
+          const memberNames = worldMembers.map(m => m.character_name);
+          query = query.in('character_name', memberNames.slice(0, 100));
+        }
       }
 
       if (searchTerm.trim()) {
