@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { supabase } from './db.js';
 
 const WORKER_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -18,22 +19,51 @@ export const checkForUpdates = async () => {
     } else {
         // 2. Ambiente Node.js (Worker instalado ou Ambiente de Desenvolvimento)
         const gitDir = path.join(REPO_ROOT, '.git');
-        const isWorkerInstallation = REPO_ROOT.toLowerCase().includes('auroriaworker');
+        const isWorkerInstallation = REPO_ROOT.toLowerCase().includes('auroriaworker') || WORKER_ROOT.toLowerCase().includes('auroriaworker');
 
-        // Se for instalação de worker remoto (AuroriaWorker), NUNCA use Git para atualizar
-        // Remove a pasta .git caso tenha sido criada por versões antigas do instalador
+        // Se for instalação de worker remoto (AuroriaWorker), atualiza via pacote seguro (worker.zip)
         if (isWorkerInstallation) {
+            // Remove a pasta .git caso tenha sido criada por versões antigas do instalador para evitar popups do Git
             if (fs.existsSync(gitDir)) {
                 try {
                     fs.rmSync(gitDir, { recursive: true, force: true });
                     console.log('[UPDATER] 🧹 Pasta .git removida da instalação do worker para prevenir popups do Git.');
                 } catch (e) {}
             }
-            return false;
+
+            try {
+                console.log('[UPDATER] 📦 Verificando e baixando atualização do worker a partir do pacote oficial...');
+                const zipUrl = 'https://trackerplanilha.vercel.app/worker.zip';
+                const tempZip = path.join(os.tmpdir(), `worker_update_${Date.now()}.zip`);
+
+                const res = await fetch(zipUrl, { signal: AbortSignal.timeout(30000) });
+                if (!res.ok) {
+                    console.warn(`[UPDATER] Falha ao baixar worker.zip (HTTP ${res.status}).`);
+                    return false;
+                }
+
+                const buffer = Buffer.from(await res.arrayBuffer());
+                fs.writeFileSync(tempZip, buffer);
+
+                // Descompacta sobrescrevendo os arquivos em WORKER_ROOT
+                try {
+                    execSync(`tar.exe -xf "${tempZip}" -C "${WORKER_ROOT}"`, { stdio: 'ignore' });
+                } catch {
+                    // Fallback para PowerShell caso tar.exe falhe
+                    execSync(`powershell -NoProfile -Command "Expand-Archive -Path '${tempZip}' -DestinationPath '${WORKER_ROOT}' -Force"`, { stdio: 'ignore' });
+                }
+
+                try { fs.unlinkSync(tempZip); } catch {}
+
+                console.log('[UPDATER] ✅ Worker atualizado com sucesso! Reiniciando processo...');
+                return true;
+            } catch (err) {
+                console.error('[UPDATER] Erro ao atualizar worker remoto:', err.message);
+                return false;
+            }
         }
 
-        // Se for o repositório principal de desenvolvimento, NUNCA dê git reset --hard
-        // Isso previne que commits locais não-pushados sejam apagados
+        // Se for o repositório principal de desenvolvimento local, não sobrescreve código de desenvolvimento
         return false;
     }
 

@@ -7,7 +7,7 @@ import { ExternalLink, Sparkles, Megaphone, X } from 'lucide-react';
  * e exibição imediata e elegante do anúncio/parceiro caso o Google ainda não tenha entregue anúncio no leilão.
  */
 export default function AdBanner({
-  slot = import.meta.env.VITE_ADSENSE_SLOT || null,
+  slot = import.meta.env.VITE_ADSENSE_SLOT || '6915670740',
   client = import.meta.env.VITE_ADSENSE_CLIENT_ID || 'ca-pub-6600830490965208',
   format = 'auto',
   responsive = true,
@@ -27,10 +27,12 @@ export default function AdBanner({
   // Considera AdSense configurado quando houver client válido do Google (ca-pub-...)
   const isAdSenseConfigured = client && client.startsWith('ca-pub-') && !client.includes('XXXX');
   
-  // Verifica se há slot numérico específico
-  const numericSlot = (slot && /^\d+$/.test(slot)) 
-    ? slot 
-    : (import.meta.env.VITE_ADSENSE_SLOT && /^\d+$/.test(import.meta.env.VITE_ADSENSE_SLOT) ? import.meta.env.VITE_ADSENSE_SLOT : null);
+  // Garante que o slot numérico seja sempre o slot oficial do usuário (6915670740)
+  const numericSlot = (slot && /^\d+$/.test(String(slot).trim())) 
+    ? String(slot).trim() 
+    : (import.meta.env.VITE_ADSENSE_SLOT && /^\d+$/.test(String(import.meta.env.VITE_ADSENSE_SLOT).trim()) 
+        ? String(import.meta.env.VITE_ADSENSE_SLOT).trim() 
+        : '6915670740');
 
   useEffect(() => {
     if (!isAdSenseConfigured || dismissed) return;
