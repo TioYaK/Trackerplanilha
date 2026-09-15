@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   X, ExternalLink, Globe, Shield, Trophy, Flame, Skull, 
-  ChevronRight, Activity, Swords, Award, Sparkles, User, Crosshair
+  ChevronRight, Activity, Swords, Award, Sparkles, User, Crosshair, Star
 } from 'lucide-react';
 import { WORLDS_LIST } from '../context/WorldContext';
 import { formatVocation, parseUtcDate } from '../lib/tibiaUtils';
 import { soundFX } from '../lib/soundEffects';
+import { isPlayerPinned, togglePinPlayer, subscribeWatchlist } from '../lib/watchlistService';
 
 export default function PlayerModal({ playerName, initialWorld, onClose, onOpenFull, onVersus }) {
   const [loading, setLoading] = useState(true);
@@ -19,6 +20,15 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
   const [recentDeaths, setRecentDeaths] = useState([]);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showWorldDropdown, setShowWorldDropdown] = useState(false);
+  const [isPinned, setIsPinned] = useState(() => isPlayerPinned(playerName));
+
+  useEffect(() => {
+    setIsPinned(isPlayerPinned(playerName));
+    const unsub = subscribeWatchlist(() => {
+      setIsPinned(isPlayerPinned(playerName));
+    });
+    return unsub;
+  }, [playerName]);
 
   useEffect(() => {
     if (!playerName) return;
@@ -196,13 +206,36 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-black/60 hover:bg-red-950/60 border border-white/10 hover:border-red-500/50 flex items-center justify-center text-gray-400 hover:text-red-300 transition-all cursor-pointer"
-            title="Fechar (Esc)"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const nextState = togglePinPlayer({
+                  name: playerName,
+                  world: selectedWorld || activeWorldObj?.name,
+                  level: charInfo?.level,
+                  vocation: charInfo?.vocation
+                });
+                setIsPinned(nextState);
+                soundFX.playTacticalPing();
+              }}
+              className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
+                isPinned
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md shadow-amber-500/20'
+                  : 'bg-black/60 text-gray-400 border-white/10 hover:text-amber-400 hover:border-amber-500/40'
+              }`}
+              title={isPinned ? 'Remover da Watchlist' : 'Fixar na Watchlist (Favoritos) ⭐'}
+            >
+              <Star size={18} className={isPinned ? 'text-amber-400 fill-amber-400' : ''} />
+            </button>
+
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl bg-black/60 hover:bg-red-950/60 border border-white/10 hover:border-red-500/50 flex items-center justify-center text-gray-400 hover:text-red-300 transition-all cursor-pointer"
+              title="Fechar (Esc)"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Corpo com Rolagem */}

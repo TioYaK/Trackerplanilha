@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, X, User, Globe, FileText, ArrowRight, 
   Sparkles, Gem, Swords, TrendingUp, Cpu, Gift, ExternalLink,
-  BookOpen, Compass, Calculator, Skull, Shield
+  BookOpen, Compass, Calculator, Skull, Shield, Star
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 import { GUIDES_INDEX } from '../data/guidesIndex';
+import { getPinnedPlayers, isPlayerPinned, togglePinPlayer, subscribeWatchlist } from '../lib/watchlistService';
 
 const APP_ROUTES = [
   { id: 'gear', label: 'Calculadora de Proteção de Set (Gear Builder) 🛡️', desc: 'Resistências compostas, simulação de dano e link compartilhável via URL', icon: Shield, category: 'Arsenal' },
@@ -32,6 +33,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
   const [playerResults, setPlayerResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [pinnedPlayers, setPinnedPlayers] = useState(getPinnedPlayers);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -39,9 +41,17 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
       setQuery('');
       setPlayerResults([]);
       setSelectedIndex(0);
+      setPinnedPlayers(getPinnedPlayers());
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const unsub = subscribeWatchlist((updatedList) => {
+      setPinnedPlayers(updatedList);
+    });
+    return unsub;
+  }, []);
 
   // Escuta tecla ESC
   useEffect(() => {
@@ -225,36 +235,90 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
         {/* Resultados */}
         <div className="max-h-[60vh] overflow-y-auto p-3 space-y-4">
           
-          {/* Se nenhuma busca foi feita, mostra atalhos rápidos */}
+          {/* Se nenhuma busca foi feita, mostra fixados e atalhos rápidos */}
           {!query.trim() && (
-            <div className="p-4 text-xs text-gray-400 space-y-3">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-yellow-500/80 font-mono">
-                Acessos Rápidos
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {APP_ROUTES.map((r) => {
-                  const Icon = r.icon;
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => {
-                        onNavigate?.(r.id);
-                        onClose();
-                      }}
-                      className="flex items-center gap-2.5 p-2.5 rounded-xl bg-black/40 hover:bg-white/5 border border-white/5 text-left transition-all group cursor-pointer"
-                    >
-                      <div className="p-2 rounded-lg bg-yellow-500/10 text-yellow-400 group-hover:scale-110 transition-transform">
-                        <Icon size={16} />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-white group-hover:text-yellow-300">
-                          {r.label}
+            <div className="p-4 text-xs text-gray-400 space-y-4">
+              {/* Jogadores Fixados na Watchlist */}
+              {pinnedPlayers.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400/90 font-mono flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Star size={13} className="text-amber-400 fill-amber-400" />
+                      Jogadores Fixados ({pinnedPlayers.length})
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-normal">Watchlist Rápida</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {pinnedPlayers.map(p => (
+                      <div
+                        key={p.name}
+                        onClick={() => {
+                          onPlayerClick?.(p.name, p.world);
+                          onClose();
+                        }}
+                        className="group flex items-center justify-between p-2.5 rounded-xl bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/20 hover:border-amber-500/40 text-left transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 font-medieval font-bold text-sm shrink-0">
+                            {p.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-gray-100 group-hover:text-amber-300 truncate font-sans">
+                              {p.name}
+                            </div>
+                            <div className="text-[10px] text-gray-400 flex items-center gap-1.5 font-mono">
+                              {p.level && <span className="text-amber-400 font-bold">Lvl {p.level}</span>}
+                              {p.vocation && <span className="truncate">{p.vocation}</span>}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-[10px] text-gray-500">{r.desc}</div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePinPlayer(p);
+                          }}
+                          className="p-1 rounded-lg text-amber-400 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+                          title="Desafixar da Watchlist"
+                        >
+                          <Star size={14} className="fill-amber-400 text-amber-400" />
+                        </button>
                       </div>
-                    </button>
-                  );
-                })}
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Seção de Acessos Rápidos */}
+              <div className="space-y-2">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-yellow-500/80 font-mono">
+                  Acessos Rápidos
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {APP_ROUTES.map((r) => {
+                    const Icon = r.icon;
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => {
+                          onNavigate?.(r.id);
+                          onClose();
+                        }}
+                        className="flex items-center gap-2.5 p-2.5 rounded-xl bg-black/40 hover:bg-white/5 border border-white/5 text-left transition-all group cursor-pointer"
+                      >
+                        <div className="p-2 rounded-lg bg-yellow-500/10 text-yellow-400 group-hover:scale-110 transition-transform">
+                          <Icon size={16} />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white group-hover:text-yellow-300">
+                            {r.label}
+                          </div>
+                          <div className="text-[10px] text-gray-500">{r.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -301,9 +365,33 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
                         </div>
                       </div>
                     </div>
-                    <span className="text-xs text-yellow-400 flex items-center gap-1 font-sans">
-                      Abrir Dossiê <ArrowRight size={13} />
-                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePinPlayer({
+                            name: p.name,
+                            world: p.world,
+                            level: p.level,
+                            vocation: p.vocation
+                          });
+                        }}
+                        className={`p-1.5 rounded-lg border transition-all ${
+                          isPlayerPinned(p.name)
+                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                            : 'bg-white/5 text-gray-400 border-white/10 hover:text-amber-400 hover:border-amber-500/30'
+                        }`}
+                        title={isPlayerPinned(p.name) ? 'Remover da Watchlist' : 'Fixar na Watchlist ⭐'}
+                      >
+                        <Star size={13} className={isPlayerPinned(p.name) ? 'fill-amber-400 text-amber-400' : ''} />
+                      </button>
+
+                      <span className="text-xs text-yellow-400 flex items-center gap-1 font-sans">
+                        Abrir Dossiê <ArrowRight size={13} />
+                      </span>
+                    </div>
                   </button>
                 ))}
               </div>

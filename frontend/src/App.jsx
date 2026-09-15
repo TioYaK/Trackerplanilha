@@ -917,6 +917,7 @@ export default function App() {
           isAdmin={isAdmin}
           isPremium={isPremium}
           onOpenProfile={() => setProfileModalOpen(true)}
+          onPlayerClick={handlePlayerClick}
         />
       
       {/* Banner de Publicidade Oficial (nunca exibe em telas de login ou institucionais para cumprir regras do AdSense) */}

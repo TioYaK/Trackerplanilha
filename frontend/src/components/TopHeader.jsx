@@ -3,12 +3,13 @@ import {
   Menu, Search, Globe, LogIn, User, Bell, 
   ChevronDown, Sparkles, Crosshair, Shield, Compass, Swords, Gem, 
   Skull, Calculator, Coins, BookOpen, Gift, CalendarDays, TrendingDown, Users,
-  Check, LogOut, Settings, Crown, ExternalLink
+  Check, LogOut, Settings, Crown, ExternalLink, Star, Trash2
 } from 'lucide-react';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 import { useAuth } from './AuthContext';
 import InstallPWA from './InstallPWA';
 import PushNotificationBell from './PushNotificationBell';
+import { getPinnedPlayers, removePinnedPlayer, subscribeWatchlist } from '../lib/watchlistService';
 
 // Mapeamento de Títulos e Ícones para a Barra Superior
 const VIEW_TITLES = {
@@ -56,7 +57,8 @@ export default function TopHeader({
   profile,
   isAdmin,
   isPremium,
-  onOpenProfile
+  onOpenProfile,
+  onPlayerClick
 }) {
   const { activeWorld, setActiveWorld, activeWorldObj } = useWorld();
   const { logout } = useAuth();
@@ -64,10 +66,22 @@ export default function TopHeader({
   // Dropdown States
   const [worldDropdownOpen, setWorldDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [watchlistOpen, setWatchlistOpen] = useState(false);
+  const [pinnedPlayers, setPinnedPlayers] = useState(getPinnedPlayers);
   const [worldSearch, setWorldSearch] = useState('');
 
   const worldDropdownRef = useRef(null);
   const profileDropdownRef = useRef(null);
+  const watchlistDropdownRef = useRef(null);
+
+  // Sincronização reativa da Watchlist
+  useEffect(() => {
+    setPinnedPlayers(getPinnedPlayers());
+    const unsub = subscribeWatchlist((updatedList) => {
+      setPinnedPlayers(updatedList);
+    });
+    return unsub;
+  }, []);
 
   // Fecha dropdowns ao clicar fora
   useEffect(() => {
@@ -77,6 +91,9 @@ export default function TopHeader({
       }
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
         setProfileDropdownOpen(false);
+      }
+      if (watchlistDropdownRef.current && !watchlistDropdownRef.current.contains(event.target)) {
+        setWatchlistOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -147,6 +164,101 @@ export default function TopHeader({
             Ctrl K
           </kbd>
         </button>
+
+        {/* Watchlist / Jogadores Fixados ⭐ */}
+        <div className="relative" ref={watchlistDropdownRef}>
+          <button
+            onClick={() => setWatchlistOpen(prev => !prev)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm ${
+              pinnedPlayers.length > 0
+                ? 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/40 text-amber-300'
+                : 'bg-black/70 hover:bg-white/5 border-tibia-border text-gray-400 hover:text-gray-200'
+            }`}
+            title="Jogadores Fixados (Watchlist Rápida)"
+          >
+            <Star 
+              size={14} 
+              className={pinnedPlayers.length > 0 ? 'text-amber-400 fill-amber-400' : 'text-gray-400'} 
+            />
+            <span className="hidden md:inline font-sans">Watchlist</span>
+            {pinnedPlayers.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-amber-500/30 border border-amber-500/50 text-amber-300">
+                {pinnedPlayers.length}
+              </span>
+            )}
+          </button>
+
+          {/* Menu Dropdown de Jogadores Fixados */}
+          {watchlistOpen && (
+            <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-neutral-950 border border-amber-500/40 rounded-2xl shadow-2xl z-50 overflow-hidden animate-fade-in backdrop-blur-xl">
+              <div className="p-3 border-b border-white/10 bg-black/40 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Star size={15} className="text-amber-400 fill-amber-400" />
+                  <span className="text-xs font-bold text-gray-100 uppercase tracking-wider font-mono">
+                    Watchlist ({pinnedPlayers.length})
+                  </span>
+                </div>
+                <span className="text-[10px] text-gray-400 font-mono">
+                  {pinnedPlayers.length}/15 slots
+                </span>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto p-1.5 space-y-1 custom-scrollbar">
+                {pinnedPlayers.length === 0 ? (
+                  <div className="p-5 text-center text-xs text-gray-400 space-y-2">
+                    <Star size={24} className="mx-auto text-gray-600" />
+                    <p className="font-sans">Nenhum jogador fixado ainda.</p>
+                    <p className="text-[10px] text-gray-500">
+                      Abra o dossiê de qualquer jogador e clique na estrela <span className="text-amber-400">⭐</span> para acesso rápido!
+                    </p>
+                  </div>
+                ) : (
+                  pinnedPlayers.map(p => (
+                    <div
+                      key={p.name}
+                      className="group flex items-center justify-between p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-amber-500/30 transition-all cursor-pointer"
+                      onClick={() => {
+                        onPlayerClick?.(p.name, p.world);
+                        setWatchlistOpen(false);
+                      }}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-300 font-medieval font-bold text-xs shrink-0">
+                          {p.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col min-w-0 text-left">
+                          <span className="text-xs font-bold text-gray-200 group-hover:text-amber-300 truncate">
+                            {p.name}
+                          </span>
+                          <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-mono">
+                            {p.level && <span className="text-amber-400 font-bold">Lvl {p.level}</span>}
+                            {p.vocation && <span className="truncate">{p.vocation}</span>}
+                            {p.world && (
+                              <span className="text-gray-500">• {p.world}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removePinnedPlayer(p.name);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                          title="Remover da Watchlist"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Seletor de Mundo Customizado (Gamer Dropdown) */}
         <div className="relative" ref={worldDropdownRef}>
