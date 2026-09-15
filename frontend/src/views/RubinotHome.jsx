@@ -34,6 +34,12 @@ const WORLD_CENSUS = {
 
 const TOTAL_CENSUS_ONLINES = Object.values(WORLD_CENSUS).reduce((acc, curr) => acc + curr.onlines, 0); // ~12.959
 
+// Cache em memória para dados da Home (TTL 45s)
+let homeCache = {
+  timestamp: 0,
+  data: null
+};
+
 export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user }) {
   const { activeWorld: selectedWorld, setActiveWorld: setSelectedWorld, worlds: RUBINOT_WORLDS } = useWorld();
   const [recentDeaths, setRecentDeaths] = useState([]);
@@ -50,7 +56,18 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
   const [lootResult, setLootResult] = useState(null);
   const [copiedLoot, setCopiedLoot] = useState(false);
 
-  const fetchHomeData = async () => {
+  const fetchHomeData = async (forceRefresh = false) => {
+    // 0. Cache em memória instantâneo se dados tiverem menos de 45 segundos
+    if (!forceRefresh && homeCache.data && (Date.now() - homeCache.timestamp < 45000)) {
+      setRecentDeaths(homeCache.data.recentDeaths);
+      setDeathsCount24h(homeCache.data.deathsCount24h);
+      setTopRushers(homeCache.data.topRushers);
+      if (homeCache.data.onlineCount > 0) setOnlineCount(homeCache.data.onlineCount);
+      setActiveWorkers(homeCache.data.activeWorkers);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       // 1. Mortes recentes
@@ -67,13 +84,13 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         .select('*', { count: 'exact', head: true })
         .gte('death_time', since24h);
       
-      // 3. Top Rushers (24h) - Busca 500 para cobrir todos os servidores
+      // 3. Top Rushers (24h) - Busca 150 para cobrir com folga todos os servidores
       let rushersQuery = supabase
         .from('view_top_rushers_24h')
         .select('*')
         .gt('exp_gained', 0)
         .order('exp_gained', { ascending: false })
-        .limit(500);
+        .limit(150);
 
       // 4. Contagem de Onlines mais recente (ordenada pelo campo real 'timestamp')
       let onlineQuery = supabase
@@ -98,9 +115,10 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         workersQuery
       ]);
 
+      let dedupedDeaths = [];
       if (deathsRes.data) {
         const seen = new Set();
-        const dedupedDeaths = deathsRes.data.filter(d => {
+        dedupedDeaths = deathsRes.data.filter(d => {
           const timeKey = d.death_time ? d.death_time.slice(0, 16) : '';
           const key = `${(d.character_name || '').toLowerCase()}__${timeKey}`;
           if (seen.has(key)) return false;
@@ -110,44 +128,31 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         setRecentDeaths(dedupedDeaths);
       }
 
+      let currentDeaths24h = 582;
       if (deaths24hRes && deaths24hRes.count !== null && deaths24hRes.count !== undefined) {
-        setDeathsCount24h(deaths24hRes.count);
+        currentDeaths24h = deaths24hRes.count;
+        setDeathsCount24h(currentDeaths24h);
       }
 
+      let enriched = [];
       if (rushersRes.data && rushersRes.data.length > 0) {
         const rawRushers = rushersRes.data;
         const names = rawRushers.map(r => r.name).filter(Boolean);
-        const CHUNK_SIZE = 100;
-        const chunks = [];
-        for (let i = 0; i < names.length; i += CHUNK_SIZE) {
-          chunks.push(names.slice(i, i + CHUNK_SIZE));
-        }
 
-        const [statesChunks, perksChunks] = await Promise.all([
-          Promise.all(
-            chunks.map(chunk =>
-              supabase
-                .from('current_character_state')
-                .select('character_name, level, vocation')
-                .in('character_name', chunk)
-                .then(res => res.data || [])
-            )
-          ),
-          Promise.all(
-            chunks.map(chunk =>
-              supabase
-                .from('guild_perk_members')
-                .select('character_name, world')
-                .in('character_name', chunk)
-                .then(res => res.data || [])
-            )
-          )
+        // Consulta direta em lote único (ultra-rápida, sem chunk flooding)
+        const [statesRes, perksRes] = await Promise.all([
+          names.length > 0
+            ? supabase.from('current_character_state').select('character_name, level, vocation').in('character_name', names).then(r => r.data || [])
+            : Promise.resolve([]),
+          names.length > 0
+            ? supabase.from('guild_perk_members').select('character_name, world').in('character_name', names).then(r => r.data || [])
+            : Promise.resolve([])
         ]);
 
-        const stateMap = new Map(statesChunks.flat().map(s => [s.character_name.toLowerCase(), s]));
-        const perkMap = new Map(perksChunks.flat().map(p => [p.character_name.toLowerCase(), p.world]));
+        const stateMap = new Map(statesRes.map(s => [(s.character_name || '').toLowerCase(), s]));
+        const perkMap = new Map(perksRes.map(p => [(p.character_name || '').toLowerCase(), p.world]));
 
-        const enriched = rawRushers.map(r => {
+        enriched = rawRushers.map(r => {
           const s = stateMap.get((r.name || '').toLowerCase());
           const w = perkMap.get((r.name || '').toLowerCase()) || 'Auroria';
           return {
@@ -160,13 +165,30 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         setTopRushers(enriched);
       }
 
+      let currentOnline = 0;
       if (onlineRes.data && onlineRes.data.online_count > 0) {
-        setOnlineCount(onlineRes.data.online_count);
+        currentOnline = onlineRes.data.online_count;
+        setOnlineCount(currentOnline);
       }
 
+      let currentWorkers = 2;
       if (workersRes && workersRes.count !== null && workersRes.count !== undefined) {
-        setActiveWorkers(workersRes.count);
+        currentWorkers = workersRes.count;
+        setActiveWorkers(currentWorkers);
       }
+
+      // Salva no cache de 45s
+      homeCache = {
+        timestamp: Date.now(),
+        data: {
+          recentDeaths: dedupedDeaths,
+          deathsCount24h: currentDeaths24h,
+          topRushers: enriched,
+          onlineCount: currentOnline,
+          activeWorkers: currentWorkers
+        }
+      };
+
     } catch (err) {
       console.error('Erro ao carregar dados do Rubinot Hub:', err);
     } finally {
@@ -191,9 +213,9 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
 
   useEffect(() => {
     fetchHomeData();
-    const interval = setInterval(fetchHomeData, 45000); // 45s
+    const interval = setInterval(() => fetchHomeData(true), 45000); // 45s
     return () => clearInterval(interval);
-  }, [selectedWorld]);
+  }, []);
 
   // Parser de Loot Split do Client Tibia
   const parseLootLog = () => {

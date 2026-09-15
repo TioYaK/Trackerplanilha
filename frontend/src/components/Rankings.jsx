@@ -4,6 +4,53 @@ import { supabase } from '../lib/supabase';
 import { formatVocation } from '../lib/tibiaUtils';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 
+// Cache em memória compartilhado (TTL 60s)
+let rankingsCache = {
+  timestamp: 0,
+  data: null
+};
+
+// Termos de criaturas para filtrar em logs de PvP
+const MONSTER_TERMS = [
+  'golem', 'skeleton', 'dragon', 'demon', 'werelion', 'behemoth', 'hydra', 
+  'cultist', 'spider', 'rat', 'orc', 'rotworm', 'bonelord', 'stalker',
+  'ghost', 'vampire', 'witch', 'mummy', 'ghoul', 'slime', 'beholder',
+  'cyclops', 'dwarf', 'elf', 'minotaur', 'wolf', 'bear', 'snake', 'crawler',
+  'warrior', 'mage', 'sorcerer', 'priest', 'assassin', 'hunter', 'knight',
+  'elemental', 'monstros', 'monster'
+];
+
+function isValidPlayerName(name) {
+  if (!name || name.length < 2 || name.length > 29) return false;
+  if (/^(a |an |the |field |fire |poison |energy |hazard )/i.test(name)) return false;
+  const firstChar = name[0];
+  if (firstChar !== firstChar.toUpperCase() || firstChar === firstChar.toLowerCase()) return false;
+  const lower = name.toLowerCase();
+  for (const term of MONSTER_TERMS) {
+    if (lower === term || lower.includes(' ' + term) || lower.includes(term + ' ')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function extractPvPKiller(killedBy) {
+  if (!killedBy || typeof killedBy !== 'string') return null;
+  const str = killedBy.trim();
+  const mostDamageMatch = str.match(/\(maior dano por\s+([^)]+)\)/i);
+  if (mostDamageMatch) {
+    const candidate = mostDamageMatch[1].trim();
+    if (isValidPlayerName(candidate)) return candidate;
+  }
+  const clean = str.replace(/\s*\([^)]*\)/g, '').trim();
+  const parts = clean.split(/\s*,\s*|\s+and\s+|\s+e\s+/i);
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (isValidPlayerName(trimmed)) return trimmed;
+  }
+  return null;
+}
+
 export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
   const { activeWorld, setActiveWorld, worlds } = useWorld();
   const [selectedWorld, setSelectedWorld] = useState(activeWorld || 'ALL');
@@ -32,51 +79,55 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
     }
   }, [activeWorld]);
 
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
+    // 0. Cache em memória instantâneo se dados tiverem menos de 60 segundos
+    if (!forceRefresh && rankingsCache.data && (Date.now() - rankingsCache.timestamp < 60000)) {
+      setTopRushers(rankingsCache.data.topRushers);
+      setTopLevels(rankingsCache.data.topLevels);
+      setTopParty(rankingsCache.data.topParty);
+      setPadeiros(rankingsCache.data.padeiros);
+      setTopFraggers(rankingsCache.data.topFraggers);
+      setImortais(rankingsCache.data.imortais);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // 1. Top Rushers 24h (2,000 registros para cobrir todos os mundos)
-      const [rPage1, rPage2] = await Promise.all([
+      // 1. Consultas principais paralelas de alta velocidade
+      const [rushersRes, levelsRes, partiesRes, deathsRes] = await Promise.all([
         supabase
           .from('view_top_rushers_24h')
           .select('*')
           .gt('exp_gained', 0)
           .order('exp_gained', { ascending: false })
-          .range(0, 999),
+          .limit(350),
         supabase
-          .from('view_top_rushers_24h')
+          .from('current_character_state')
+          .select('character_name, level, vocation, xp_total')
+          .gt('level', 0)
+          .order('level', { ascending: false })
+          .limit(350),
+        supabase
+          .from('parties_planilhadas')
           .select('*')
-          .gt('exp_gained', 0)
-          .order('exp_gained', { ascending: false })
-          .range(1000, 1999)
-      ]);
-      const rushersData = [...(rPage1.data || []), ...(rPage2.data || [])];
-
-      // 2. Top Nível (Highscores - 2,000 registros para cobrir todos os mundos)
-      const [lPage1, lPage2] = await Promise.all([
+          .limit(25),
         supabase
-          .from('current_character_state')
-          .select('character_name, level, vocation, xp_total')
-          .gt('level', 0)
-          .order('level', { ascending: false })
-          .range(0, 999),
-        supabase
-          .from('current_character_state')
-          .select('character_name, level, vocation, xp_total')
-          .gt('level', 0)
-          .order('level', { ascending: false })
-          .range(1000, 1999)
+          .from('recent_deaths')
+          .select('character_name, killed_by, level, death_time')
+          .order('death_time', { ascending: false })
+          .limit(250)
       ]);
-      const levelData = [...(lPage1.data || []), ...(lPage2.data || [])];
 
-      // 3. PT de Elite (Maior XP Registrada no Dia)
-      const { data: partiesDataXP } = await supabase
-        .from('parties_planilhadas')
-        .select('*');
+      const rushersData = rushersRes.data || [];
+      const levelData = levelsRes.data || [];
+      const partiesDataXP = partiesRes.data || [];
+      const deathsData = deathsRes.data || [];
 
+      // 2. PT de Elite (Maior XP Registrada no Dia)
       let bestParty = null;
-      if (partiesDataXP && partiesDataXP.length > 0) {
+      if (partiesDataXP.length > 0) {
         let maxXP = -1;
         partiesDataXP.forEach(p => {
           let numericXp = 0;
@@ -95,82 +146,68 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
       }
       setTopParty(bestParty);
 
-      // Busca mortes para o Salão da Fama (Padeiros, Top Fraggers e Imortais)
-      const { data: deathsData } = await supabase
-        .from('recent_deaths')
-        .select('character_name, killed_by, level, world, death_time')
-        .order('death_time', { ascending: false })
-        .limit(250);
+      // 3. Salão da Fama: Padeiros, Top Fraggers PvP e Imortais
+      const deathCounts = {};
+      const pvpKillerCounts = {};
+      const deadSet = new Set();
 
-      if (deathsData && deathsData.length > 0) {
-        // Padeiros (mais mortes)
-        const deathCounts = {};
-        const pvpKillerCounts = {};
-        const deadSet = new Set();
-
-        deathsData.forEach(d => {
-          if (d.character_name) {
-            deadSet.add(d.character_name.toLowerCase());
-            deathCounts[d.character_name] = (deathCounts[d.character_name] || 0) + 1;
-          }
-          if (d.killed_by) {
-            const kb = d.killed_by.trim();
-            const lower = kb.toLowerCase();
-            const isMonster = lower.startsWith('a ') || lower.startsWith('an ') || lower.includes('dragon') || lower.includes('demon') || lower.includes('skeleton');
-            if (!isMonster && kb.length > 2) {
-              pvpKillerCounts[kb] = (pvpKillerCounts[kb] || 0) + 1;
-            }
-          }
-        });
-
-        const sortedPadeiros = Object.entries(deathCounts)
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 10);
-        setPadeiros(sortedPadeiros);
-
-        const sortedFraggers = Object.entries(pvpKillerCounts)
-          .map(([name, kills]) => ({ name, kills }))
-          .sort((a, b) => b.kills - a.kills)
-          .slice(0, 10);
-        setTopFraggers(sortedFraggers);
-
-        // Imortais: rushers com mais de 0 XP que NÃO morreram
-        if (rushersData) {
-          const aliveRushers = rushersData
-            .filter(r => r.name && !deadSet.has(r.name.toLowerCase()) && r.exp_gained > 0)
-            .slice(0, 10);
-          setImortais(aliveRushers);
+      deathsData.forEach(d => {
+        if (d.character_name) {
+          deadSet.add(d.character_name.toLowerCase());
+          deathCounts[d.character_name] = (deathCounts[d.character_name] || 0) + 1;
         }
-      }
+        const killer = extractPvPKiller(d.killed_by);
+        if (killer) {
+          pvpKillerCounts[killer] = (pvpKillerCounts[killer] || 0) + 1;
+        }
+      });
 
-      // 4. Cruzamento de Mundos e Dados de Personagens (em lotes de 100 para evitar URI Too Long)
-      const allNames = new Set();
-      (rushersData || []).forEach(r => r.name && allNames.add(r.name));
-      (levelData || []).forEach(l => l.character_name && allNames.add(l.character_name));
+      const sortedPadeiros = Object.entries(deathCounts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+      setPadeiros(sortedPadeiros);
 
-      const namesArr = Array.from(allNames);
-      const CHUNK_SIZE = 100;
-      const chunks = [];
-      for (let i = 0; i < namesArr.length; i += CHUNK_SIZE) {
-        chunks.push(namesArr.slice(i, i + CHUNK_SIZE));
-      }
+      const sortedFraggers = Object.entries(pvpKillerCounts)
+        .map(([name, kills]) => ({ name, kills }))
+        .sort((a, b) => b.kills - a.kills)
+        .slice(0, 10);
+      setTopFraggers(sortedFraggers);
 
-      const [statesChunks, perksChunks] = await Promise.all([
-        chunks.length > 0
+      const aliveRushers = rushersData
+        .filter(r => r.name && !deadSet.has(r.name.toLowerCase()) && r.exp_gained > 0)
+        .slice(0, 10);
+      setImortais(aliveRushers);
+
+      // 4. Enriquecimento de Dados em Poucos Lotes Otimizados (máx 2 batches de 200)
+      const rusherNames = rushersData.map(r => r.name).filter(Boolean);
+      const levelNames = levelData.map(l => l.character_name).filter(Boolean);
+      const allUniqueNames = Array.from(new Set([...rusherNames, ...levelNames]));
+
+      const chunkArray = (arr, size) => {
+        const res = [];
+        for (let i = 0; i < arr.length; i += size) res.push(arr.slice(i, i + size));
+        return res;
+      };
+
+      const rusherChunks = chunkArray(rusherNames, 200);
+      const perkChunks = chunkArray(allUniqueNames, 200);
+
+      const [statesResList, perksResList] = await Promise.all([
+        rusherChunks.length > 0
           ? Promise.all(
-              chunks.map(chunk =>
+              rusherChunks.map(chunk =>
                 supabase
                   .from('current_character_state')
-                  .select('character_name, level, vocation, xp_total')
+                  .select('character_name, level, vocation')
                   .in('character_name', chunk)
                   .then(res => res.data || [])
               )
             )
-          : [[]],
-        chunks.length > 0
+          : Promise.resolve([[]]),
+        perkChunks.length > 0
           ? Promise.all(
-              chunks.map(chunk =>
+              perkChunks.map(chunk =>
                 supabase
                   .from('guild_perk_members')
                   .select('character_name, world')
@@ -178,19 +215,16 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
                   .then(res => res.data || [])
               )
             )
-          : [[]]
+          : Promise.resolve([[]])
       ]);
 
-      const statesData = statesChunks.flat();
-      const perksData = perksChunks.flat();
-
-      const stateMap = new Map((statesData || []).map(s => [s.character_name.toLowerCase(), s]));
-      const perkMap = new Map((perksData || []).map(p => [p.character_name.toLowerCase(), p.world]));
+      const stateMap = new Map(statesResList.flat().map(s => [(s.character_name || '').toLowerCase(), s]));
+      const perkMap = new Map(perksResList.flat().map(p => [(p.character_name || '').toLowerCase(), p.world]));
 
       // Enriquecer Rushers
-      const enrichedRushers = (rushersData || []).map(r => {
-        const state = stateMap.get(r.name.toLowerCase());
-        const world = perkMap.get(r.name.toLowerCase()) || 'Auroria';
+      const enrichedRushers = rushersData.map(r => {
+        const state = stateMap.get((r.name || '').toLowerCase());
+        const world = perkMap.get((r.name || '').toLowerCase()) || 'Auroria';
         return {
           name: r.name,
           exp_gained: Number(r.exp_gained) || 0,
@@ -202,9 +236,9 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
       });
       setTopRushers(enrichedRushers);
 
-      // Enriquecer Top Levels
-      const enrichedLevels = (levelData || []).map(l => {
-        const world = perkMap.get(l.character_name.toLowerCase()) || 'Auroria';
+      // Enriquecer Top Levels (já possui level, vocação e xp_total da tabela current_character_state!)
+      const enrichedLevels = levelData.map(l => {
+        const world = perkMap.get((l.character_name || '').toLowerCase()) || 'Auroria';
         return {
           name: l.character_name,
           level: Number(l.level) || 0,
@@ -214,6 +248,19 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
         };
       });
       setTopLevels(enrichedLevels);
+
+      // Grava no cache de 60 segundos
+      rankingsCache = {
+        timestamp: Date.now(),
+        data: {
+          topRushers: enrichedRushers,
+          topLevels: enrichedLevels,
+          topParty: bestParty,
+          padeiros: sortedPadeiros,
+          topFraggers: sortedFraggers,
+          imortais: aliveRushers
+        }
+      };
 
     } catch (err) {
       console.error('Erro ao carregar rankings:', err);
@@ -332,7 +379,7 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
         </div>
 
         <button 
-          onClick={fetchData}
+          onClick={() => fetchData(true)}
           disabled={loading}
           className="glass-button text-tibia-highlight px-4 py-2 rounded-lg flex items-center font-bold text-sm self-stretch md:self-auto justify-center transition-all hover:border-yellow-500/50"
         >
@@ -765,7 +812,9 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
 
                 <div className="space-y-2">
                   {imortais.length === 0 ? (
-                    <div className="text-xs text-gray-500 italic text-center py-6">Carregando guerreiros imortais...</div>
+                    <div className="text-xs text-gray-500 italic text-center py-6">
+                      {loading ? 'Carregando guerreiros imortais...' : 'Nenhum guerreiro imortal recente'}
+                    </div>
                   ) : (
                     imortais.slice(0, 5).map((p, idx) => (
                       <div 
@@ -801,7 +850,9 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
 
                 <div className="space-y-2">
                   {padeiros.length === 0 ? (
-                    <div className="text-xs text-gray-500 italic text-center py-6">Carregando estatísticas do templo...</div>
+                    <div className="text-xs text-gray-500 italic text-center py-6">
+                      {loading ? 'Carregando estatísticas do templo...' : 'Nenhum registro de mortes recente'}
+                    </div>
                   ) : (
                     padeiros.slice(0, 5).map((p, idx) => (
                       <div 
@@ -837,7 +888,9 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
 
                 <div className="space-y-2">
                   {topFraggers.length === 0 ? (
-                    <div className="text-xs text-gray-500 italic text-center py-6">Carregando maiores matadores...</div>
+                    <div className="text-xs text-gray-500 italic text-center py-6">
+                      {loading ? 'Carregando maiores matadores...' : 'Nenhum registro de frags PvP recente'}
+                    </div>
                   ) : (
                     topFraggers.slice(0, 5).map((p, idx) => (
                       <div 
