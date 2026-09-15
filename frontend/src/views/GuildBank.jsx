@@ -33,10 +33,21 @@ export default function GuildBank({ isAdmin }) {
 
   const [selectedMonth, setSelectedMonth] = useState(getBillingMonth());
 
-  const fetchData = async () => {
+// Cache em memória para Guild Bank (TTL 30s)
+let guildBankCache = new Map();
+
+  const fetchData = async (forceRefresh = false) => {
+    const cached = guildBankCache.get(selectedMonth);
+    if (!forceRefresh && cached && (Date.now() - cached.timestamp < 30000)) {
+      setPayments(cached.payments);
+      setRoster(cached.roster);
+      setTransactions(cached.transactions);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
-    
-    // Test tables
+
     const { error: testErr } = await supabase.from('guild_bank_payments').select('id').limit(1);
     if (testErr && testErr.code === '42P01') {
       setNeedsSetup(true);
@@ -45,44 +56,35 @@ export default function GuildBank({ isAdmin }) {
     }
 
     const fetchPaymentsP = async () => {
-      let pData = [];
-      let pPage = 0;
-      while (true) {
-        const { data } = await supabase
-          .from('guild_bank_payments')
-          .select('*')
-          .eq('payment_month', selectedMonth)
-          .range(pPage * 1000, (pPage + 1) * 1000 - 1);
-        if (!data || data.length === 0) break;
-        pData.push(...data);
-        if (data.length < 1000) break;
-        pPage++;
-      }
-      return pData;
+      const { data } = await supabase
+        .from('guild_bank_payments')
+        .select('*')
+        .eq('payment_month', selectedMonth)
+        .limit(1000);
+      return data || [];
     };
 
     const fetchRosterP = async () => {
-      let allRoster = [];
-      let page = 0;
-      while (true) {
-        const { data } = await supabase
-          .from('guild_members')
-          .select('*')
-          .range(page * 1000, (page + 1) * 1000 - 1);
-        if (!data || data.length === 0) break;
-        allRoster.push(...data);
-        if (data.length < 1000) break;
-        page++;
-      }
+      const { data: members } = await supabase
+        .from('guild_members')
+        .select('id, name, rank, level, vocation')
+        .order('level', { ascending: false })
+        .limit(1000);
 
-      // Mapeia mundos através de guild_perk_members
-      const { data: perkMapData } = await supabase
-        .from('guild_perk_members')
-        .select('character_name, world');
-      const worldMap = new Map();
-      (perkMapData || []).forEach(p => {
-        if (p.character_name) worldMap.set(p.character_name.toLowerCase(), p.world);
-      });
+      const allRoster = members || [];
+      const names = allRoster.map(m => m.name).filter(Boolean);
+
+      // Mapeia mundos através de guild_perk_members para os membros encontrados
+      let worldMap = new Map();
+      if (names.length > 0) {
+        const { data: perkMapData } = await supabase
+          .from('guild_perk_members')
+          .select('character_name, world')
+          .in('character_name', names.slice(0, 500));
+        (perkMapData || []).forEach(p => {
+          if (p.character_name) worldMap.set(p.character_name.toLowerCase(), p.world);
+        });
+      }
 
       return allRoster.map(m => ({
         ...m,
@@ -93,7 +95,8 @@ export default function GuildBank({ isAdmin }) {
     const fetchTxP = supabase
       .from('guild_bank_transactions')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(100);
 
     const [pData, allRoster, { data: txData }] = await Promise.all([
       fetchPaymentsP(),
@@ -101,9 +104,20 @@ export default function GuildBank({ isAdmin }) {
       fetchTxP
     ]);
 
-    setPayments(pData || []);
-    setRoster(allRoster || []);
-    if (txData) setTransactions(txData);
+    const finalPayments = pData || [];
+    const finalRoster = allRoster || [];
+    const finalTx = txData || [];
+
+    setPayments(finalPayments);
+    setRoster(finalRoster);
+    setTransactions(finalTx);
+
+    guildBankCache.set(selectedMonth, {
+      timestamp: Date.now(),
+      payments: finalPayments,
+      roster: finalRoster,
+      transactions: finalTx
+    });
     
     setLoading(false);
   };

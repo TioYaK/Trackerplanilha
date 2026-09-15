@@ -30,16 +30,12 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
     const fetchAreasP = supabase.from('respawn_areas').select('name').order('name');
     
     const fetchPartiesP = async () => {
-      let allParties = [];
-      let page = 0;
-      while(true) {
-          const { data, error } = await supabase.from('parties_planilhadas').select('*').order('slot_start', { ascending: true }).range(page*1000, (page+1)*1000-1);
-          if (error || !data || data.length === 0) break;
-          allParties.push(...data);
-          if (data.length < 1000) break;
-          page++;
-      }
-      return allParties;
+      const { data } = await supabase
+        .from('parties_planilhadas')
+        .select('*')
+        .order('slot_start', { ascending: true })
+        .limit(1000);
+      return data || [];
     };
 
     const [{ data: areasData }, allParties] = await Promise.all([

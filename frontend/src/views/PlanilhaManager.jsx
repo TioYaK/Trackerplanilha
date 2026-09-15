@@ -24,16 +24,12 @@ export default function PlanilhaManager({ isAdmin }) {
       }
     }
 
-    let allParties = [];
-    let page = 0;
-    while(true) {
-        const { data } = await supabase.from('parties_planilhadas').select('*').order('created_at', { ascending: false }).range(page*1000, (page+1)*1000-1);
-        if (!data || data.length === 0) break;
-        allParties.push(...data);
-        if (data.length < 1000) break;
-        page++;
-    }
-    setParties(allParties);
+    const { data: partiesData } = await supabase
+      .from('parties_planilhadas')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1000);
+    setParties(partiesData || []);
     setLoading(false);
   };
 

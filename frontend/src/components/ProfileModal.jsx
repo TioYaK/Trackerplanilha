@@ -157,23 +157,15 @@ export default function ProfileModal({ onClose }) {
         list.forEach(m => allEnteredMakers.push({ server, name: m }));
       });
 
-      let allProfiles = [];
-      let page = 0;
-      while (true) {
-        const { data: pData, error: profErr } = await supabase
-          .from('profiles')
-          .select('id, main_character, makers')
-          .range(page * 1000, (page + 1) * 1000 - 1);
-        if (profErr) throw profErr;
-        if (!pData || pData.length === 0) break;
-        allProfiles.push(...pData);
-        if (pData.length < 1000) break;
-        page++;
-      }
+      const { data: allProfiles, error: profErr } = await supabase
+        .from('profiles')
+        .select('id, main_character, makers')
+        .limit(500);
+      if (profErr) throw profErr;
 
       for (const item of allEnteredMakers) {
         const makerName = item.name;
-        for (const p of allProfiles) {
+        for (const p of (allProfiles || [])) {
           if (p.main_character && p.main_character.toLowerCase() === makerName.toLowerCase() && p.id !== user.id) {
             throw new Error(`O personagem "${makerName}" (${item.server}) já é o Main Character do jogador ${p.main_character}.`);
           }
