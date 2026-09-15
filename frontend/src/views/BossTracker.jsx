@@ -1,8 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Skull, Clock, CheckCircle2, Circle, Sparkles, Flame, ShieldAlert, Coins, RefreshCw, AlertCircle, Calendar } from 'lucide-react';
+import { getTodayBoosted } from '../data/boostedDailyData';
+import { supabase } from '../lib/supabase';
 
 const BOSS_DATABASE = [
   // Express Diário (Fácil & Muito Lucrativo)
+  {
+    id: 'katex',
+    name: 'Katex Blood Tongue',
+    location: 'Iks Ruins / Mitmah Bastion',
+    category: 'daily',
+    cooldownHours: 20,
+    estMinutes: 5,
+    avgProfitK: 260,
+    bisDrops: ['Mitmah Chestplate', 'Mitmah Boots', 'Iks Faulds', 'Katex Blood Amulet'],
+    element: 'Físico / Morte / Sangue',
+    weakness: 'Santo (-15%), Energia (-10%)',
+    tip: 'Cuidado com as ondas de sangue e invocações de Iks. Foque dano em Holy e Energy.'
+  },
   {
     id: 'oberon',
     name: 'Grand Master Oberon',
@@ -179,6 +194,51 @@ export default function BossTracker() {
 
   const [activeCategory, setActiveCategory] = useState('all');
   const [now, setNow] = useState(Date.now());
+  const [boostedData, setBoostedData] = useState(() => getTodayBoosted());
+
+  // Carrega configuração dinâmica do RubinOT via Supabase
+  useEffect(() => {
+    let isMounted = true;
+    async function loadBoosted() {
+      try {
+        const { data } = await supabase
+          .from('app_settings')
+          .select('*')
+          .eq('id', 102)
+          .maybeSingle();
+
+        if (isMounted && data) {
+          const cfg = data.visible_tabs || data;
+          if (cfg?.boss_name || cfg?.creature_name) {
+            setBoostedData(getTodayBoosted(new Date(), cfg));
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar boosted settings:', err);
+      }
+    }
+    loadBoosted();
+
+    const channel = supabase
+      .channel('realtime_boss_tracker_boosted')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings', filter: 'id=eq.102' },
+        (payload) => {
+          const doc = payload.new;
+          if (doc) {
+            const cfg = doc.visible_tabs || doc;
+            setBoostedData(getTodayBoosted(new Date(), cfg));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Atualizador de tempo regressivo em tempo real
   useEffect(() => {
@@ -355,31 +415,55 @@ export default function BossTracker() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-auto">
             {/* Boosted Boss */}
             <div className="bg-black/60 border border-purple-500/40 rounded-xl p-3 flex items-center gap-3 min-w-[240px]">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-lg">
-                👑
+              <div className="w-10 h-10 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-lg shrink-0">
+                {boostedData?.boss?.spriteUrl ? (
+                  <img
+                    src={boostedData.boss.spriteUrl}
+                    alt={boostedData.boss.name}
+                    className="max-h-8 max-w-8 object-contain drop-shadow"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      if (e.target.parentNode) e.target.parentNode.innerText = '👑';
+                    }}
+                  />
+                ) : (
+                  '👑'
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-purple-300 font-bold uppercase">Boss Boostado</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">+Loot Roll</span>
                 </div>
-                <div className="text-sm font-bold text-white truncate">Grand Master Oberon</div>
-                <div className="text-[10px] text-gray-400">+50% XP e chance extra de BiS drop</div>
+                <div className="text-sm font-bold text-white truncate">{boostedData?.boss?.name || 'Katex Blood Tongue'}</div>
+                <div className="text-[10px] text-gray-400 truncate">{boostedData?.boss?.bonusText || '+50% XP e chance extra de BiS drop'}</div>
               </div>
             </div>
 
             {/* Boosted Creature */}
             <div className="bg-black/60 border border-emerald-500/40 rounded-xl p-3 flex items-center gap-3 min-w-[240px]">
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
-                🐉
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg shrink-0">
+                {boostedData?.creature?.spriteUrl ? (
+                  <img
+                    src={boostedData.creature.spriteUrl}
+                    alt={boostedData.creature.name}
+                    className="max-h-8 max-w-8 object-contain drop-shadow"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      if (e.target.parentNode) e.target.parentNode.innerText = '🐉';
+                    }}
+                  />
+                ) : (
+                  '🐉'
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-emerald-300 font-bold uppercase">Criatura Boostada</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">+XP & Respawn</span>
                 </div>
-                <div className="text-sm font-bold text-white truncate">Vexclaw / Grimeleech</div>
-                <div className="text-[10px] text-gray-400">+50% XP, +100% Loot e respawn veloz</div>
+                <div className="text-sm font-bold text-white truncate">{boostedData?.creature?.name || 'Deepling Tyra'}</div>
+                <div className="text-[10px] text-gray-400 truncate">{boostedData?.creature?.bonusText || '+50% XP, +100% Loot e respawn veloz'}</div>
               </div>
             </div>
           </div>

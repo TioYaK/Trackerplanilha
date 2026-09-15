@@ -145,10 +145,38 @@ export const RUBINOT_BOOSTED_CREATURES = [
     spriteUrl: 'https://tibiopedia.pl/images/static/monsters/cobra_assassin.gif',
     huntQuery: 'cobra',
     bonusText: 'Bastion rush com 13.6k XP e chance de Cobra Amulets'
+  },
+  {
+    id: 'deepling-tyra',
+    name: 'Deepling Tyra',
+    slug: 'deepling_tyra',
+    category: 'Fiehonja / Deeplings',
+    hp: 1900,
+    baseExp: 1700,
+    boostedExp: 3400,
+    bestElement: 'Terra (Earth) / Físico',
+    bestElementMultiplier: '+10%',
+    bestDefense: 'Gelo + Drown',
+    bestCharm: 'Envenom / Wound',
+    spriteUrl: 'https://tibiopedia.pl/images/static/monsters/deepling_tyra.gif',
+    huntQuery: 'deepling',
+    bonusText: 'XP Dobrada (3.4k) & Drops raros de Fiehonja'
   }
 ];
 
 export const RUBINOT_BOOSTED_BOSSES = [
+  {
+    id: 'katex-blood-tongue',
+    name: 'Katex Blood Tongue',
+    slug: 'katex_blood_tongue',
+    category: 'Iks / Mitmah Vanguard',
+    location: 'Iks Ruins / Mitmah Bastion',
+    spriteUrl: 'https://tibiopedia.pl/images/static/monsters/katex_blood_tongue.gif',
+    keyDrops: ['Mitmah Chestplate', 'Mitmah Boots', 'Iks Faulds', 'Katex Blood Amulet'],
+    bonusText: 'Drop boostado de equipamentos Mitmah e itens raros de Katex!',
+    mechanicsTip: 'Cuidado com as ondas de sangue e invocações. Foque dano em Holy/Energy.',
+    bossRoute: '/bosses'
+  },
   {
     id: 'grand-master-oberon',
     name: 'Grand Master Oberon',
@@ -211,9 +239,14 @@ export const RUBINOT_BOOSTED_BOSSES = [
   }
 ];
 
-export function getTodayBoosted(referenceDate = new Date()) {
+export const CURRENT_RUBINOT_BOOSTED = {
+  boss_name: 'Katex Blood Tongue',
+  creature_name: 'Deepling Tyra'
+};
+
+export function getTodayBoosted(referenceDate = new Date(), dynamicOverride = null) {
   const now = new Date(referenceDate);
-  const ssHourUtc = 10;
+  const ssHourUtc = 10; // 07:00 BRT
   
   const nextSs = new Date(Date.UTC(
     now.getUTCFullYear(),
@@ -225,14 +258,52 @@ export function getTodayBoosted(referenceDate = new Date()) {
     nextSs.setUTCDate(nextSs.getUTCDate() + 1);
   }
 
-  const cycleTime = now.getTime() - (ssHourUtc * 3600 * 1000);
-  const epochDay = Math.floor(cycleTime / (24 * 3600 * 1000));
+  // Active configuration (priority: dynamicOverride -> CURRENT_RUBINOT_BOOSTED)
+  const activeCfg = dynamicOverride || CURRENT_RUBINOT_BOOSTED;
+  const targetCreatureName = (activeCfg?.creature_name || activeCfg?.creature || 'Deepling Tyra').trim().toLowerCase();
+  const targetBossName = (activeCfg?.boss_name || activeCfg?.boss || 'Katex Blood Tongue').trim().toLowerCase();
 
-  const creatureIndex = Math.abs((epochDay * 37 + 13) % RUBINOT_BOOSTED_CREATURES.length);
-  const bossIndex = Math.abs((epochDay * 53 + 7) % RUBINOT_BOOSTED_BOSSES.length);
+  let creature = RUBINOT_BOOSTED_CREATURES.find(c => c.name.toLowerCase() === targetCreatureName);
+  if (!creature) {
+    // Dynamic fallback creature object if name is a new RubinOT monster
+    const rawName = activeCfg?.creature_name || 'Deepling Tyra';
+    const slug = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    creature = {
+      id: slug,
+      name: rawName,
+      slug: slug,
+      category: 'RubinOT Spawns',
+      hp: 2000,
+      baseExp: 1700,
+      boostedExp: 3400,
+      bestElement: 'Físico / Energy',
+      bestElementMultiplier: '+15%',
+      bestDefense: 'All Elements',
+      bestCharm: 'Wound / Freeze',
+      spriteUrl: `https://tibiopedia.pl/images/static/monsters/${slug}.gif`,
+      huntQuery: rawName,
+      bonusText: 'XP Dobrada & Loot 2x no RubinOT'
+    };
+  }
 
-  const creature = RUBINOT_BOOSTED_CREATURES[creatureIndex];
-  const boss = RUBINOT_BOOSTED_BOSSES[bossIndex];
+  let boss = RUBINOT_BOOSTED_BOSSES.find(b => b.name.toLowerCase() === targetBossName);
+  if (!boss) {
+    // Dynamic fallback boss object if name is a new RubinOT boss
+    const rawBoss = activeCfg?.boss_name || 'Katex Blood Tongue';
+    const slug = rawBoss.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    boss = {
+      id: slug,
+      name: rawBoss,
+      slug: slug,
+      category: 'RubinOT Boss',
+      location: 'RubinOT Special Dungeons',
+      spriteUrl: `https://tibiopedia.pl/images/static/monsters/${slug}.gif`,
+      keyDrops: ['RubinOT Rare Equipment', 'BiS Token'],
+      bonusText: 'Chance de Drop BiS aumentada hoje no RubinOT!',
+      mechanicsTip: 'Verifique a tática e mecânica no canal de bosses do Discord.',
+      bossRoute: '/bosses'
+    };
+  }
 
   const diffMs = Math.max(0, nextSs.getTime() - now.getTime());
   const hours = Math.floor(diffMs / (1000 * 60 * 60));

@@ -1,21 +1,76 @@
 import React, { useState, useEffect } from 'react';
 import { getTodayBoosted } from '../data/boostedDailyData';
+import { supabase } from '../lib/supabase';
 import { 
   Sparkles, Flame, Award, Zap, Target, Copy, Check, ChevronRight, Swords 
 } from 'lucide-react';
 
 export default function BoostedDailyWidget({ onNavigate }) {
+  const [override, setOverride] = useState(null);
   const [boosted, setBoosted] = useState(() => getTodayBoosted());
   const [copied, setCopied] = useState(false);
 
+  // Carrega configuração dinâmica de Boss & Criatura do RubinOT via Supabase
+  useEffect(() => {
+    let isMounted = true;
+    async function loadBoostedOverride() {
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('*')
+          .eq('id', 102)
+          .maybeSingle();
+
+        if (error) {
+          console.warn('Aviso ao carregar boosted settings:', error.message);
+          return;
+        }
+
+        if (isMounted && data) {
+          const cfg = data.visible_tabs || data;
+          if (cfg?.boss_name || cfg?.creature_name) {
+            setOverride(cfg);
+            setBoosted(getTodayBoosted(new Date(), cfg));
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao sincronizar boosted do RubinOT:', err);
+      }
+    }
+
+    loadBoostedOverride();
+
+    // Inscrição Realtime caso o admin altere via banco
+    const channel = supabase
+      .channel('realtime_boosted_102')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings', filter: 'id=eq.102' },
+        (payload) => {
+          const doc = payload.new;
+          if (doc) {
+            const cfg = doc.visible_tabs || doc;
+            setOverride(cfg);
+            setBoosted(getTodayBoosted(new Date(), cfg));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => {
-      const data = getTodayBoosted();
+      const data = getTodayBoosted(new Date(), override);
       setBoosted(data);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [override]);
 
   const { creature, boss, formattedCountdown } = boosted;
 
