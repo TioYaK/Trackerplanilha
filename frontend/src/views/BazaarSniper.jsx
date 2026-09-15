@@ -247,7 +247,84 @@ function calculateCharFipe(char) {
   const discountPct = (avgFipe > 0 && currentBid > 0) ? Math.round(((avgFipe - currentBid) / avgFipe) * 100) : 0;
   const estimatedProfitTc = Math.max(0, Math.round(avgFipe * 0.88 - 50 - currentBid));
 
-  return { avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, tierBonus, sanguineBonus, soulwarBonus, baseTc, charmsBonus };
+  // ALGORITMO DEAL SCORE (1 A 99) - AVALIAÇÃO DE BARBADAS DO BAZAAR
+  let dealScore = 50; // Inicia em patamar neutro
+  const dealReasons = [];
+
+  // 1. Componente de Desconto em relação à FIPE
+  if (discountPct >= 40) {
+    dealScore += 35;
+    dealReasons.push(`${discountPct}% abaixo da FIPE`);
+  } else if (discountPct >= 25) {
+    dealScore += 25;
+    dealReasons.push(`${discountPct}% abaixo da FIPE`);
+  } else if (discountPct >= 10) {
+    dealScore += 12;
+    dealReasons.push(`${discountPct}% abaixo da FIPE`);
+  } else if (discountPct < -25) {
+    dealScore -= 28;
+    dealReasons.push(`${Math.abs(discountPct)}% acima da FIPE`);
+  } else if (discountPct < -10) {
+    dealScore -= 15;
+  }
+
+  // 2. Margem Líquida de Arbitragem (Lucro de revenda)
+  if (estimatedProfitTc >= 700) {
+    dealScore += 20;
+    dealReasons.push(`+${estimatedProfitTc.toLocaleString()} TC margem líquida`);
+  } else if (estimatedProfitTc >= 350) {
+    dealScore += 14;
+    dealReasons.push(`+${estimatedProfitTc.toLocaleString()} TC margem líquida`);
+  } else if (estimatedProfitTc >= 120) {
+    dealScore += 8;
+  }
+
+  // 3. Itens Valiosos Inclusos
+  if (sanguineBonus > 0) {
+    dealScore += 12;
+    dealReasons.push('🩸 Sanguine BiS incluso');
+  }
+  if (soulwarBonus > 0) {
+    dealScore += 6;
+    dealReasons.push('💀 Soulwar incluso');
+  }
+  if (tierBonus > 0) {
+    dealScore += 5;
+    dealReasons.push('⚡ Equipamento com Tier');
+  }
+
+  // 4. Charms Avançados
+  if (ch >= 3500) {
+    dealScore += 6;
+    dealReasons.push(`⭐ ${ch.toLocaleString()} Charm Points`);
+  }
+
+  // Limites e Classificação
+  dealScore = Math.min(99, Math.max(5, dealScore));
+
+  let dealTier = 'JUSTO';
+  let dealBadgeColor = 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
+  let dealBadgeLabel = 'PREÇO JUSTO';
+
+  if (dealScore >= 80) {
+    dealTier = 'BARBADA';
+    dealBadgeColor = 'bg-emerald-500 text-stone-950 font-black border-emerald-400 shadow-md shadow-emerald-500/20';
+    dealBadgeLabel = '💎 BARBADA';
+  } else if (dealScore >= 65) {
+    dealTier = 'OPORTUNIDADE';
+    dealBadgeColor = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 font-bold';
+    dealBadgeLabel = '⚡ OPORTUNIDADE';
+  } else if (dealScore < 38) {
+    dealTier = 'CARO';
+    dealBadgeColor = 'bg-red-500/20 text-red-400 border-red-500/40';
+    dealBadgeLabel = '⚠️ SUPERFATURADO';
+  }
+
+  return { 
+    avgFipe, minFipe, maxFipe, discountPct, estimatedProfitTc, 
+    tierBonus, sanguineBonus, soulwarBonus, baseTc, charmsBonus,
+    dealScore, dealTier, dealBadgeColor, dealBadgeLabel, dealReasons 
+  };
 }
 
 export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
@@ -576,6 +653,9 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       if (minShielding && (a.skills_data?.shielding || 0) < Number(minShielding)) return false;
 
       // Chips Rápidos
+      if (activeChip === 'barbadas') {
+        return (a._fipe?.dealScore || 0) >= 80;
+      }
       if (activeChip === 'opportunity') {
         return (a._fipe?.discountPct || 0) >= 20 || a.is_sniping_opportunity;
       }
@@ -611,6 +691,9 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
 
       if (sortOption === 'ending') {
         return isEndedA ? (b._endTimeMs - a._endTimeMs) : (a._endTimeMs - b._endTimeMs);
+      }
+      if (sortOption === 'deal_score') {
+        return (b._fipe?.dealScore || 0) - (a._fipe?.dealScore || 0);
       }
       if (sortOption === 'profit_desc') {
         return (b._fipe?.estimatedProfitTc || 0) - (a._fipe?.estimatedProfitTc || 0);
@@ -648,6 +731,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     let tieredCount = 0;
     let sanguineCount = 0;
     let soulCount = 0;
+    let barbadasCount = 0;
 
     let sanguineOrSoulCount = 0;
 
@@ -661,6 +745,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       } else {
         endedCount++;
       }
+      if ((a._fipe?.dealScore || 0) >= 80) barbadasCount++;
       if ((a._fipe?.discountPct || 0) >= 20 || a.is_sniping_opportunity) opportunities++;
       if ((a._highestTier || 0) > 0) tieredCount++;
       if (a._hasSanguine) sanguineCount++;
@@ -668,7 +753,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
       if (a._hasSanguineOrSoul) sanguineOrSoulCount++;
     }
 
-    return { total, activeCount, endedCount, opportunities, endingSoon, tieredCount, sanguineCount, soulCount, sanguineOrSoulCount, favoritesCount: favorites.length };
+    return { 
+      total, activeCount, endedCount, opportunities, endingSoon, 
+      tieredCount, sanguineCount, soulCount, sanguineOrSoulCount, 
+      barbadasCount, favoritesCount: favorites.length 
+    };
   }, [alerts, favorites, nowTimestamp]);
 
   const handleShareAuction = (auction) => {
@@ -1264,6 +1353,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
               className="w-full bg-stone-900 border border-white/10 text-xs text-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-yellow-500 font-bold cursor-pointer"
             >
               <option value="ending">⏳ Término / Venda Recente</option>
+              <option value="deal_score">🎯 Maior Deal Score (Barbadas Primeiro)</option>
               <option value="profit_desc">🔥 Maior Lucro FIPE (Revenda)</option>
               <option value="price_asc">💰 Menor Preço (TC)</option>
               <option value="price_desc">💎 Maior Preço (TC)</option>
@@ -1318,6 +1408,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
           <div className="flex flex-wrap gap-1.5">
             {[
               { id: 'all', label: '🌟 Todos' },
+              { id: 'barbadas', label: `🎯 Barbadas (${stats.barbadasCount})` },
               { id: 'sanguine', label: `🩸 Com Sanguine (${stats.sanguineCount})` },
               { id: 'soulwar', label: `💀 Com Soulwar (${stats.soulCount})` },
               { id: 'sanguine_or_soul', label: `👑 Sanguine ou Soul (${stats.sanguineOrSoulCount})` },
@@ -1393,6 +1484,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                   <th className="p-3.5">Grails (Sanguine/Soul)</th>
                   <th className="p-3.5">Preço (TC)</th>
                   <th className="p-3.5">FIPE Real</th>
+                  <th className="p-3.5">Deal Score</th>
                   <th className="p-3.5">Status</th>
                   <th className="p-3.5 text-right">Inspecionar</th>
                 </tr>
@@ -1452,6 +1544,12 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       </td>
                       <td className="p-3 font-bold text-yellow-400 font-mono">{bidVal.toLocaleString()} TC</td>
                       <td className="p-3 text-gray-400 font-mono">~{fipe?.avgFipe?.toLocaleString() || 0} TC</td>
+                      <td className="p-3">
+                        <span className={`text-[10px] px-2 py-0.5 rounded border font-mono font-black inline-flex items-center gap-1 ${fipe?.dealBadgeColor || 'bg-stone-800 text-gray-400'}`}>
+                          <span>{fipe?.dealBadgeLabel || 'JUSTO'}</span>
+                          <span>({fipe?.dealScore || 50})</span>
+                        </span>
+                      </td>
                       <td className="p-3">
                         {timeInfo.isEnded ? (
                           <span className="text-gray-500 text-[11px]">Finalizado</span>
@@ -1559,9 +1657,10 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                         </span>
                       )}
 
-                      {(fipe?.discountPct || 0) >= 20 && !timeInfo.isEnded && (
-                        <span className="bg-emerald-500 text-stone-950 text-[10px] font-black uppercase px-2 py-0.5 rounded shadow flex items-center gap-1">
-                          <Flame size={12} /> {fipe.discountPct}% Abaixo FIPE
+                      {!timeInfo.isEnded && fipe?.dealBadgeLabel && (
+                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border shadow flex items-center gap-1 ${fipe.dealBadgeColor}`}>
+                          <span>{fipe.dealBadgeLabel}</span>
+                          <span className="font-mono text-[9px] opacity-90">({fipe.dealScore} pts)</span>
                         </span>
                       )}
                     </div>
@@ -1656,7 +1755,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                                 isSanguine 
                                   ? 'bg-red-950/80 border-red-500 shadow-sm shadow-red-500/50' 
                                   : isSoul 
-                                  ? 'bg-purple-950/80 border-purple-500 shadow-sm shadow-purple-500/50'
+                                  ? 'bg-purple-950/80 border-purple-500 shadow-sm shadow-purple-500/50' 
                                   : 'bg-stone-900/60 border-stone-700/40'
                               }`}
                               onError={(e) => { e.target.style.display = 'none'; }}
@@ -1679,7 +1778,7 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                 </div>
 
                 {/* PREÇO FINAL & BOTÃO DE INSPEÇÃO */}
-                <div className="pt-3 border-t border-white/10 space-y-3">
+                <div className="pt-3 border-t border-white/10 space-y-2.5">
                   <div className="flex justify-between items-center bg-black/60 p-2.5 rounded-xl border border-white/5">
                     <div>
                       <span className="text-[10px] text-gray-400 block">
@@ -1700,6 +1799,14 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                       </span>
                     </div>
                   </div>
+
+                  {/* Reasons do Deal Score */}
+                  {fipe?.dealReasons?.length > 0 && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono px-2 py-1 bg-emerald-950/30 rounded-lg border border-emerald-500/20">
+                      <Sparkles size={11} className="shrink-0 text-emerald-400" />
+                      <span className="truncate">{fipe.dealReasons.slice(0, 2).join(' • ')}</span>
+                    </div>
+                  )}
 
                   <button
                     type="button"
@@ -2308,6 +2415,53 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
                           <span className="text-[10px] text-gray-400 uppercase font-bold block">Lucro Líquido Revenda</span>
                           <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">+{fipe.estimatedProfitTc.toLocaleString()} TC</div>
                         </div>
+                      </div>
+
+                      {/* Deal Score Gauge & Insights da IA */}
+                      <div className="p-3.5 rounded-xl bg-black/70 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black font-mono border ${
+                            (fipe.dealScore || 50) >= 80 
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-lg shadow-emerald-500/20' 
+                              : (fipe.dealScore || 50) >= 65 
+                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' 
+                              : (fipe.dealScore || 50) < 38 
+                              ? 'bg-red-500/20 text-red-400 border-red-500/40' 
+                              : 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40'
+                          }`}>
+                            <span className="text-xl leading-none">{fipe.dealScore || 50}</span>
+                            <span className="text-[8px] uppercase tracking-wider text-gray-400">Score</span>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider border ${fipe.dealBadgeColor}`}>
+                                {fipe.dealBadgeLabel}
+                              </span>
+                              <span className="text-xs text-gray-300 font-bold">Classificação Sniper</span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-1">
+                              {(fipe.dealScore || 50) >= 80
+                                ? 'Personagem com margem excelente de revenda ou custo-benefício brutal para jogar!'
+                                : (fipe.dealScore || 50) >= 65
+                                ? 'Bom negócio com preço atrativo em relação aos itens e skills inclusos.'
+                                : (fipe.dealScore || 50) < 38
+                                ? 'Preço acima da média de mercado. Recomenda-se cautela ou aguardar lances menores.'
+                                : 'Preço alinhado com a média praticada nos leilões do RubinOT.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {fipe.dealReasons?.length > 0 && (
+                          <div className="flex flex-col gap-1 sm:text-right shrink-0">
+                            <span className="text-[9px] uppercase font-bold text-gray-500">Fatores Chave:</span>
+                            {fipe.dealReasons.slice(0, 3).map((r, i) => (
+                              <span key={i} className="text-[10px] font-mono text-yellow-400/90 font-bold">
+                                • {r}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Discriminação de Composição */}
