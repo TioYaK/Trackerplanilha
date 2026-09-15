@@ -61,6 +61,7 @@ const StreamerCompanion = lazy(() => import('./views/StreamerCompanion'));
 const QuestChecklists = lazy(() => import('./views/QuestChecklists'));
 const HunterToolbelt = lazy(() => import('./views/HunterToolbelt'));
 const BiSMarketBoard = lazy(() => import('./views/BiSMarketBoard'));
+const VipPerksHub = lazy(() => import('./views/VipPerksHub'));
 import Footer from './components/Footer';
 import PlayerModal from './components/PlayerModal';
 import ProfileModal from './components/ProfileModal';
@@ -193,6 +194,12 @@ const ROUTE_TO_VIEW = {
   '/guild-perks': 'home',
   '/guild_perks': 'home',
   '/pearks': 'home',
+  '/vip': 'vip_hub',
+  '/vip-hub': 'vip_hub',
+  '/central-vip': 'vip_hub',
+  '/premium': 'vip_hub',
+  '/assinante': 'vip_hub',
+  '/vip-perks': 'vip_hub',
   '/invite': 'invite',
   '/invites': 'invite',
   '/convite': 'invite',
@@ -276,6 +283,8 @@ const VIEW_TO_ROUTE = {
   boss_tracker: '/bosses',
   daily_spin: '/roleta',
   wheel_planner: '/wheel',
+  vip_hub: '/vip',
+  vip: '/vip',
 };
 
 const VIEW_TITLES = {
@@ -301,6 +310,8 @@ const VIEW_TITLES = {
   attendance: 'Rubinot Tracker | Mural de Mortes & Frags',
   tracker: 'Rubinot Tracker | Monitor Global de Players',
   analytics: 'Rubinot Tracker | Rankings Globais',
+  vip_hub: 'Rubinot Tracker | Central do Assinante VIP & Telemetria 👑',
+  vip: 'Rubinot Tracker | Central do Assinante VIP & Telemetria 👑',
   contribute: 'Rubinot Tracker | Baixar Worker & Acesso VIP',
   bazaar: 'Rubinot Tracker | Bazaar Sniper Mega Premium 💎',
   privacy: 'Rubinot Tracker | Política de Privacidade',
@@ -383,12 +394,11 @@ function parseCurrentLocation() {
 }
 
 export default function App() {
-  const { user, profile, loading, logout } = useAuth();
+  const { user, profile, loading, logout, hasActiveWorker, isPremium, isAdmin } = useAuth();
   const [currentView, setCurrentView] = useState(() => parseCurrentLocation().view);
   const [selectedPlayer, setSelectedPlayer] = useState(() => parseCurrentLocation().player);
   const [selectedParty, setSelectedParty] = useState(null);
   const [visibleTabs, setVisibleTabs] = useState(null);
-  const [hasActiveWorker, setHasActiveWorker] = useState(false);
   const [inspectedPlayer, setInspectedPlayer] = useState(null);
   const [inspectedPlayerWorld, setInspectedPlayerWorld] = useState(null);
   const [previousView, setPreviousView] = useState('home');
@@ -468,68 +478,7 @@ export default function App() {
     document.title = title;
   }, [currentView, selectedPlayer]);
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'pifot16@gmail.com';
   const isGuildMember = profile?.status === 'active';
-
-  // Concede Premium automático para quem tem um worker ativo (local na porta 3001 ou remoto via heartbeat)
-  useEffect(() => {
-    let isMounted = true;
-
-    const checkWorker = async () => {
-      try {
-        // 1. Detecção Local Instantânea (para quem roda o worker no próprio PC)
-        if (typeof window !== 'undefined') {
-          try {
-            const localRes = await fetch('http://localhost:3001/api/health', {
-              signal: AbortSignal.timeout(1500)
-            });
-            if (localRes.ok) {
-              const localData = await localRes.json();
-              if (localData && localData.status === 'online') {
-                if (isMounted) setHasActiveWorker(true);
-                return;
-              }
-            }
-          } catch (localErr) {
-            // Worker não está rodando neste localhost, segue para verificação remota
-          }
-        }
-
-        // 2. Detecção Remota via Supabase (para quem roda em outro computador / VPS)
-        const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-        const { data } = await supabase
-          .from('worker_heartbeats')
-          .select('metadata')
-          .gte('last_ping', fifteenMinsAgo);
-
-        if (data && isMounted) {
-          const charName = (profile?.main_character || '').toLowerCase();
-          const pName = (profile?.name || '').toLowerCase();
-          const pEmail = (profile?.email || user?.email || '').toLowerCase();
-
-          const match = data.some(w => {
-            const owner = (w.metadata?.owner || '').toLowerCase();
-            return (
-              owner &&
-              owner !== 'anônimo' &&
-              owner !== 'anonimo' &&
-              (owner === charName || owner === pName || owner === pEmail || (charName && owner.includes(charName)))
-            );
-          });
-          setHasActiveWorker(match);
-        }
-      } catch (e) {}
-    };
-
-    checkWorker();
-    const interval = setInterval(checkWorker, 45000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [profile, user]);
-
-  const isPremium = isAdmin || profile?.role === 'premium' || profile?.is_premium === true || hasActiveWorker;
 
   // Telemetria assíncrona de navegação & métricas por perfil de usuário
   useEffect(() => {
@@ -779,6 +728,15 @@ export default function App() {
             initialWorld={inspectedPlayerWorld}
           />
         </div>
+      );
+    }
+
+    if (currentView === 'vip_hub' || currentView === 'vip') {
+      return (
+        <VipPerksHub 
+          onNavigate={navigateView} 
+          onPlayerClick={handlePlayerClick} 
+        />
       );
     }
 

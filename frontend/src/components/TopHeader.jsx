@@ -9,12 +9,14 @@ import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 import { useAuth } from './AuthContext';
 import InstallPWA from './InstallPWA';
 import PushNotificationBell from './PushNotificationBell';
-import { getPinnedPlayers, removePinnedPlayer, subscribeWatchlist } from '../lib/watchlistService';
+import { getPinnedPlayers, removePinnedPlayer, subscribeWatchlist, MAX_FREE, MAX_VIP } from '../lib/watchlistService';
 
 // Mapeamento de Títulos e Ícones para a Barra Superior
 const VIEW_TITLES = {
   home: { title: 'Portal Central Rubinot', icon: Globe, color: 'text-amber-400' },
   live: { title: 'Portal Central Rubinot', icon: Globe, color: 'text-amber-400' },
+  vip_hub: { title: 'Central do Assinante VIP & Telemetria', icon: Crown, color: 'text-yellow-400' },
+  vip: { title: 'Central do Assinante VIP & Telemetria', icon: Crown, color: 'text-yellow-400' },
   companion: { title: 'Mini HUD Gamer (Segundo Monitor)', icon: Crosshair, color: 'text-cyan-400' },
   hunt_finder: { title: 'Hunt Finder 2.0 & Rotas Meta', icon: Compass, color: 'text-yellow-400' },
   bazaar: { title: 'Bazaar Sniper (Leilões)', icon: Gem, color: 'text-yellow-400' },
@@ -199,7 +201,7 @@ export default function TopHeader({
                   </span>
                 </div>
                 <span className="text-[10px] text-gray-400 font-mono">
-                  {pinnedPlayers.length}/15 slots
+                  {pinnedPlayers.length}/{isPremium ? MAX_VIP : MAX_FREE} slots
                 </span>
               </div>
 
@@ -256,6 +258,21 @@ export default function TopHeader({
                   ))
                 )}
               </div>
+
+              {!isPremium && (
+                <div className="p-2.5 bg-gradient-to-r from-amber-950/40 via-yellow-950/30 to-black border-t border-amber-500/20 text-center">
+                  <button
+                    onClick={() => {
+                      setWatchlistOpen(false);
+                      setCurrentView('vip_hub');
+                    }}
+                    className="text-[11px] text-amber-300 hover:text-amber-200 font-bold flex items-center justify-center gap-1.5 mx-auto transition-transform hover:scale-105"
+                  >
+                    <Crown size={13} className="text-yellow-400 animate-pulse" />
+                    <span>Desbloquear até 30 slots com VIP</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -342,6 +359,22 @@ export default function TopHeader({
           )}
         </div>
 
+        {/* Central VIP Button */}
+        <button
+          onClick={() => setCurrentView('vip_hub')}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm ${
+            isPremium
+              ? 'bg-gradient-to-r from-yellow-500/20 to-amber-600/20 border-yellow-500/40 text-yellow-300 hover:border-yellow-400 shadow-yellow-500/10'
+              : 'bg-black/70 hover:bg-yellow-950/40 border-yellow-500/30 text-yellow-400 hover:text-yellow-200'
+          }`}
+          title={isPremium ? 'Central do Assinante VIP (Ativo) 👑' : 'Conhecer Benefícios VIP 👑'}
+        >
+          <Crown size={14} className={isPremium ? 'text-yellow-400 animate-pulse' : 'text-yellow-400'} />
+          <span className="hidden sm:inline font-medieval">
+            {isPremium ? 'VIP' : 'Seja VIP'}
+          </span>
+        </button>
+
         {/* Push Notification Bell */}
         <PushNotificationBell />
 
@@ -402,6 +435,17 @@ export default function TopHeader({
                   >
                     <User size={14} className="text-yellow-400" />
                     <span>Meu Dossiê & Personagens</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setProfileDropdownOpen(false);
+                      setCurrentView('vip_hub');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-yellow-300 hover:bg-yellow-500/10 transition-colors text-left font-semibold"
+                  >
+                    <Crown size={14} className="text-yellow-400" />
+                    <span>Central do Assinante VIP</span>
                   </button>
 
                   {isAdmin && (

@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ExternalLink, Sparkles, Megaphone, X } from 'lucide-react';
+import { useAuth } from './AuthContext';
 
 /**
  * AdBanner Component
  * Suporta Google AdSense oficial com detecção em tempo real de preenchimento (filled/unfilled)
  * e exibição imediata e elegante do anúncio/parceiro caso o Google ainda não tenha entregue anúncio no leilão.
+ * Membros VIP (ou com Worker ativo) navegam 100% livres de anúncios.
  */
 export default function AdBanner({
   slot = import.meta.env.VITE_ADSENSE_SLOT || '6915670740',
@@ -18,11 +20,18 @@ export default function AdBanner({
   customLink = 'https://discord.gg',
   customButtonText = 'Anuncie Conosco',
   allowDismiss = true,
+  hideIfVip = true,
 }) {
+  const { isPremium } = useAuth() || {};
   const adRef = useRef(null);
   const containerRef = useRef(null);
   const [adFilled, setAdFilled] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  // VIPs e Operadores de Worker têm experiência 100% ad-free (zero publicidade)
+  if (hideIfVip && isPremium) {
+    return null;
+  }
 
   // Considera AdSense configurado quando houver client válido do Google (ca-pub-...)
   const isAdSenseConfigured = client && client.startsWith('ca-pub-') && !client.includes('XXXX');

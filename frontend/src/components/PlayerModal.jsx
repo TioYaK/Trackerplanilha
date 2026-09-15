@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   X, ExternalLink, Globe, Shield, Trophy, Flame, Skull, 
-  ChevronRight, Activity, Swords, Award, Sparkles, User, Crosshair, Star, Share2
+  ChevronRight, Activity, Swords, Award, Sparkles, User, Crosshair, Star, Share2,
+  Crown, Lock, AlertCircle
 } from 'lucide-react';
 import { WORLDS_LIST } from '../context/WorldContext';
 import { formatVocation, parseUtcDate } from '../lib/tibiaUtils';
 import { soundFX } from '../lib/soundEffects';
 import { isPlayerPinned, togglePinPlayer, subscribeWatchlist } from '../lib/watchlistService';
+import { useAuth } from './AuthContext';
 import PlayerCardShareModal from './PlayerCardShareModal';
 
 export default function PlayerModal({ playerName, initialWorld, onClose, onOpenFull, onVersus }) {
+  const { isPremium } = useAuth() || {};
   const [loading, setLoading] = useState(true);
   const [charInfo, setCharInfo] = useState(null);
   const [selectedWorld, setSelectedWorld] = useState(initialWorld || 'ALL');
@@ -23,6 +26,8 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
   const [showWorldDropdown, setShowWorldDropdown] = useState(false);
   const [isPinned, setIsPinned] = useState(() => isPlayerPinned(playerName));
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [limitNotice, setLimitNotice] = useState(null);
+  const [suspectedMakers, setSuspectedMakers] = useState([]);
 
   useEffect(() => {
     setIsPinned(isPlayerPinned(playerName));
@@ -138,6 +143,62 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
       setRecentDeaths(deathsRes?.data || []);
       setRusherInfo(rushRes?.data || null);
 
+      // 6. Investigação de Makers & Alts (Exclusivo VIP)
+      let detectedSuspects = [];
+      if (isPremium) {
+        // A. Contas cadastradas no perfil
+        if (profile?.makers && typeof profile.makers === 'object') {
+          for (const [wName, cName] of Object.entries(profile.makers)) {
+            if (cName && typeof cName === 'string' && cName.toLowerCase() !== playerName.toLowerCase() && !wName.startsWith('_')) {
+              detectedSuspects.push({
+                name: cName,
+                world: wName,
+                reason: 'Conta Cadastrada Vinculada',
+                badge: 'VINCULADO',
+                badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+              });
+            }
+          }
+        }
+
+        // B. Co-Mortes em combate recente (janela de 3 minutos)
+        if (deathsRes?.data && deathsRes.data.length > 0) {
+          const deathTimes = deathsRes.data.map(d => new Date(d.death_time || d.created_at).getTime()).filter(t => !isNaN(t));
+          if (deathTimes.length > 0) {
+            const minTime = new Date(Math.min(...deathTimes) - 180000).toISOString();
+            const maxTime = new Date(Math.max(...deathTimes) + 180000).toISOString();
+
+            try {
+              const { data: coDeaths } = await supabase
+                .from('recent_deaths')
+                .select('character_name, level, death_time, killed_by')
+                .gte('death_time', minTime)
+                .lte('death_time', maxTime)
+                .neq('character_name', playerName)
+                .limit(8);
+
+              if (coDeaths && coDeaths.length > 0) {
+                for (const cd of coDeaths) {
+                  const cdTime = new Date(cd.death_time).getTime();
+                  const isMatch = deathTimes.some(dt => Math.abs(dt - cdTime) <= 180000);
+                  if (isMatch && !detectedSuspects.some(s => s.name.toLowerCase() === cd.character_name.toLowerCase())) {
+                    detectedSuspects.push({
+                      name: cd.character_name,
+                      level: cd.level,
+                      world: detectedWorld,
+                      reason: 'Morte simultânea em batalha',
+                      badge: 'CO-MORTE',
+                      badgeColor: 'bg-red-500/20 text-red-300 border-red-500/40'
+                    });
+                  }
+                }
+              }
+            } catch (cdErr) {}
+          }
+        }
+      }
+      setSuspectedMakers(detectedSuspects.slice(0, 6));
+
     } catch (err) {
       console.error('Erro ao buscar detalhes do jogador no modal:', err);
     } finally {
@@ -216,6 +277,9 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
                   world: selectedWorld || activeWorldObj?.name,
                   level: charInfo?.level,
                   vocation: charInfo?.vocation
+                }, isPremium, ({ max }) => {
+                  setLimitNotice(`Limite de ${max} chares atingido no modo Grátis! Seja VIP para fixar até 30 chares.`);
+                  setTimeout(() => setLimitNotice(null), 4500);
                 });
                 setIsPinned(nextState);
                 soundFX.playTacticalPing();
@@ -225,7 +289,7 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md shadow-amber-500/20'
                   : 'bg-black/60 text-gray-400 border-white/10 hover:text-amber-400 hover:border-amber-500/40'
               }`}
-              title={isPinned ? 'Remover da Watchlist' : 'Fixar na Watchlist (Favoritos) ⭐'}
+              title={isPinned ? 'Remover da Watchlist' : `Fixar na Watchlist (${isPremium ? 'Até 30 chares VIP' : 'Até 5 chares Free'}) ⭐`}
             >
               <Star size={18} className={isPinned ? 'text-amber-400 fill-amber-400' : ''} />
             </button>
@@ -247,6 +311,24 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
             </button>
           </div>
         </div>
+
+        {limitNotice && (
+          <div className="bg-amber-950/80 border-b border-amber-500/40 p-2.5 px-4 text-center text-xs text-amber-300 font-bold flex items-center justify-between gap-2 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <Crown size={15} className="text-yellow-400 animate-pulse shrink-0" />
+              <span>{limitNotice}</span>
+            </div>
+            <button
+              onClick={() => {
+                onClose && onClose();
+                onOpenFull && onOpenFull(null, 'vip_hub');
+              }}
+              className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-300 transition-colors shrink-0"
+            >
+              Virar VIP ↗
+            </button>
+          </div>
+        )}
 
         {/* Corpo com Rolagem */}
         <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
@@ -470,6 +552,79 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
                   </div>
                 </div>
               )}
+
+              {/* Detector de Makers & Alts (Exclusivo VIP) */}
+              <div className="p-4 rounded-xl bg-gradient-to-b from-stone-950 via-black to-stone-950 border border-yellow-500/30 space-y-3 relative overflow-hidden shadow-lg">
+                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+                  <span className="flex items-center gap-1.5 text-yellow-400">
+                    <Skull size={14} /> Detector de Makers & Contas Vinculadas
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${
+                    isPremium ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' : 'bg-red-500/20 text-red-300 border-red-500/40'
+                  }`}>
+                    {isPremium ? '👑 VIP ATIVO' : '🔒 EXCLUSIVO VIP'}
+                  </span>
+                </div>
+
+                {isPremium ? (
+                  suspectedMakers.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="text-[11px] text-gray-400 font-sans">
+                        Detectamos <strong className="text-yellow-300">{suspectedMakers.length}</strong> conta(s) com forte correlação recente nos registros:
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {suspectedMakers.map((s, idx) => (
+                          <div 
+                            key={idx}
+                            onClick={() => {
+                              fetchPlayerDetails(s.world);
+                            }}
+                            className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-yellow-500/40 flex items-center justify-between transition-all cursor-pointer group"
+                            title="Ver telemetria deste personagem"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-6 h-6 rounded-lg bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center text-yellow-300 font-medieval font-bold text-xs shrink-0">
+                                {s.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0 text-left">
+                                <div className="text-xs font-bold text-gray-200 group-hover:text-yellow-300 truncate">
+                                  {s.name}
+                                </div>
+                                <div className="text-[10px] text-gray-400 font-mono">
+                                  {s.level ? `Lvl ${s.level} • ` : ''}{s.world || selectedWorld}
+                                </div>
+                              </div>
+                            </div>
+                            <span className={`px-1.5 py-0.2 text-[9px] rounded font-bold uppercase border font-mono shrink-0 ${s.badgeColor}`}>
+                              {s.badge}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 text-center text-xs text-gray-400 font-sans bg-black/40 rounded-xl border border-white/5">
+                      Nenhuma conta secundária suspeita identificada nos combates recentes de 3 minutos.
+                    </div>
+                  )
+                ) : (
+                  <div className="space-y-3 py-1 text-center sm:text-left">
+                    <p className="text-xs text-gray-400 font-sans leading-relaxed">
+                      Desvende a identidade oculta de guerreiros inimigos. O algoritmo de IA do RubinOT correlaciona mortes conjuntas em guerra e perfis cadastrados para rastrear makers.
+                    </p>
+                    <button
+                      onClick={() => {
+                        onClose && onClose();
+                        onOpenFull && onOpenFull(null, 'vip_hub');
+                      }}
+                      className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-700 hover:from-yellow-500 hover:to-amber-600 text-black text-xs font-bold shadow-md transition-all hover:scale-105 flex items-center justify-center gap-1.5"
+                    >
+                      <Crown size={14} />
+                      <span>Liberar Detector com VIP ou Worker Grátis</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

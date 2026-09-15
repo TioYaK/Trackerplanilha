@@ -96,6 +96,80 @@ export const AuthProvider = ({ children }) => {
     return authData.user;
   };
 
+  const [hasActiveWorker, setHasActiveWorker] = useState(false);
+
+  // Concede Premium automático para quem tem um worker ativo (local na porta 3001 ou remoto via heartbeat)
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkWorker = async () => {
+      try {
+        // 1. Detecção Local Instantânea (para quem roda o worker no próprio PC)
+        if (typeof window !== 'undefined') {
+          try {
+            const localRes = await fetch('http://localhost:3001/api/health', {
+              signal: AbortSignal.timeout(1500)
+            });
+            if (localRes.ok) {
+              const localData = await localRes.json();
+              if (localData && localData.status === 'online') {
+                if (isMounted) setHasActiveWorker(true);
+                return;
+              }
+            }
+          } catch (localErr) {
+            // Worker não está rodando neste localhost, segue para verificação remota
+          }
+        }
+
+        // 2. Detecção Remota via Supabase (para quem roda em outro computador / VPS)
+        const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        const { data } = await supabase
+          .from('worker_heartbeats')
+          .select('metadata')
+          .gte('last_ping', fifteenMinsAgo);
+
+        if (data && isMounted) {
+          const charName = (profile?.main_character || '').toLowerCase();
+          const pName = (profile?.name || '').toLowerCase();
+          const pEmail = (profile?.email || user?.email || '').toLowerCase();
+
+          const match = data.some(w => {
+            const owner = (w.metadata?.owner || '').toLowerCase();
+            return (
+              owner &&
+              owner !== 'anônimo' &&
+              owner !== 'anonimo' &&
+              (owner === charName || owner === pName || owner === pEmail || (charName && owner.includes(charName)))
+            );
+          });
+          setHasActiveWorker(match);
+        }
+      } catch (e) {}
+    };
+
+    checkWorker();
+    const interval = setInterval(checkWorker, 45000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [profile, user]);
+
+  const isAdmin = Boolean(
+    profile?.role === 'admin' || 
+    profile?.role === 'super_admin' || 
+    profile?.email?.toLowerCase() === 'pifot16@gmail.com' ||
+    user?.email?.toLowerCase() === 'pifot16@gmail.com'
+  );
+
+  const isPremium = Boolean(
+    isAdmin || 
+    profile?.role === 'premium' || 
+    profile?.is_premium === true || 
+    hasActiveWorker
+  );
+
   const refreshProfile = async () => {
     if (user?.id) {
       await fetchProfile(user.id);
@@ -109,7 +183,10 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     register,
-    refreshProfile
+    refreshProfile,
+    hasActiveWorker,
+    isPremium,
+    isAdmin
   };
 
   return (

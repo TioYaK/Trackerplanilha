@@ -1,9 +1,11 @@
 // Serviço de Armazenamento Local da Watchlist / Jogadores Fixados
 // Rubinot Tracker - Sincronização em Tempo Real via CustomEvent
 
+export const MAX_FREE = 5;
+export const MAX_VIP = 30;
 const STORAGE_KEY = 'rubinot_pinned_players';
-const MAX_PINNED = 15;
 const EVENT_NAME = 'rubinot_watchlist_updated';
+export const EVENT_LIMIT_REACHED = 'rubinot_watchlist_limit_reached';
 
 export function getPinnedPlayers() {
   if (typeof window === 'undefined') return [];
@@ -18,6 +20,17 @@ export function getPinnedPlayers() {
   }
 }
 
+export function getWatchlistLimits(isVip = false) {
+  const list = getPinnedPlayers();
+  const max = isVip ? MAX_VIP : MAX_FREE;
+  return {
+    count: list.length,
+    max,
+    isFull: list.length >= max,
+    isVip
+  };
+}
+
 export function isPlayerPinned(playerName) {
   if (!playerName || typeof window === 'undefined') return false;
   const list = getPinnedPlayers();
@@ -25,7 +38,7 @@ export function isPlayerPinned(playerName) {
   return list.some(p => (p.name || '').trim().toLowerCase() === target);
 }
 
-export function togglePinPlayer(player) {
+export function togglePinPlayer(player, isVip = false, onLimitReached = null) {
   if (!player || !player.name || typeof window === 'undefined') return false;
   
   const list = getPinnedPlayers();
@@ -40,6 +53,20 @@ export function togglePinPlayer(player) {
     nextList = list.filter((_, idx) => idx !== existingIdx);
     isPinned = false;
   } else {
+    // Verificar limite
+    const max = isVip ? MAX_VIP : MAX_FREE;
+    if (list.length >= max) {
+      if (typeof onLimitReached === 'function') {
+        onLimitReached({ count: list.length, max, isVip });
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(EVENT_LIMIT_REACHED, {
+          detail: { count: list.length, max, isVip, attemptedName: nameNorm }
+        }));
+      }
+      return false;
+    }
+
     // Fixar
     const newItem = {
       name: nameNorm,
@@ -48,8 +75,7 @@ export function togglePinPlayer(player) {
       vocation: player.vocation || null,
       pinnedAt: new Date().toISOString()
     };
-    // Adiciona no início e limita a MAX_PINNED
-    nextList = [newItem, ...list.filter(p => (p.name || '').trim().toLowerCase() !== nameNorm.toLowerCase())].slice(0, MAX_PINNED);
+    nextList = [newItem, ...list.filter(p => (p.name || '').trim().toLowerCase() !== nameNorm.toLowerCase())].slice(0, max);
     isPinned = true;
   }
 

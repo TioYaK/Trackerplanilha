@@ -5,7 +5,7 @@ import {
   TrendingDown, Code2, Cpu, Users, UserPlus, Lock, Server, 
   ChevronLeft, ChevronRight, X, LogIn, LogOut, User, Bell, 
   TrendingUp, Monitor, Sparkles, ChevronDown, Award, Zap,
-  Layers, Shield, Target, Flame, Play, HelpCircle
+  Layers, Shield, Target, Flame, Play, HelpCircle, Crown
 } from 'lucide-react';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 
@@ -72,6 +72,7 @@ export const NAVIGATION_GROUPS = [
     borderColor: 'border-indigo-500/30',
     bgGradient: 'from-indigo-950/30 to-transparent',
     items: [
+      { id: 'vip_hub', label: 'Central do Assinante VIP 👑', icon: Crown, badge: 'VIP', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
       { id: 'discord_webhooks', label: 'Webhooks Discord', icon: Bell },
       { id: 'radar', label: 'Radar de Inimigos 👑', icon: ShieldAlert, badge: 'VIP', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
       { id: 'extreme', label: 'Radar de Transfers & Mortes 👑', icon: Crosshair, badge: 'VIP', badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' }
