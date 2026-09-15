@@ -3,17 +3,20 @@ import {
   Calculator, Users, Clock, Shield, Coins, Sparkles, 
   CheckCircle2, Copy, Check, Bell, BellOff, ArrowRight,
   TrendingUp, AlertTriangle, Info, Zap, Heart, Flame,
-  Skull, Package, Search, Filter, Plus, Minus, Trash2, MapPin, Target, ExternalLink
+  Skull, Package, Search, Filter, Plus, Minus, Trash2, MapPin, Target, ExternalLink,
+  ShieldAlert
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 import { MONSTERS_VULNERABILITY_DATABASE } from '../data/monstersVulnerability';
 import { LOOT_BUYERS_DATABASE } from '../data/lootBuyersDatabase';
 import GearSetCalculator from '../components/GearSetCalculator';
+import BossSurvivalCalculator from '../components/BossSurvivalCalculator';
 
 export default function HunterToolbelt() {
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search);
+      if (p.get('tab') === 'survival' || p.get('boss') || p.get('ehp')) return 'survival';
       if (p.get('tab') === 'gear' || p.get('h') || p.get('set')) return 'gear';
     } catch (e) {}
     return 'gear';
@@ -508,11 +511,27 @@ export default function HunterToolbelt() {
           >
             <Package className="w-4 h-4 text-amber-400" /> Compradores de Loot (Yasir / Djinns)
           </button>
+
+          <button
+            onClick={() => setActiveTab('survival')}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition border ${
+              activeTab === 'survival'
+                ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-600/20'
+                : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-red-400" /> 💀 EHP & Headshot de Bosses
+          </button>
         </div>
 
         {/* 0. ABA SET & RESISTÊNCIAS COMPOSTAS (GEAR BUILDER COM LINK COMPARTILHÁVEL) */}
         {activeTab === 'gear' && (
           <GearSetCalculator />
+        )}
+
+        {/* 0.1 ABA EHP & HEADSHOT DE BOSSES ENDGAME */}
+        {activeTab === 'survival' && (
+          <BossSurvivalCalculator />
         )}
 
         {/* 1. ABA EXP SHARE */}
