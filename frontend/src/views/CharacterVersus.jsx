@@ -3,9 +3,11 @@ import { supabase } from '../lib/supabase';
 import { 
   Swords, Shield, Heart, Zap, Sparkles, Trophy, 
   ArrowRight, ArrowLeftRight, Share2, Search, Check, 
-  AlertCircle, ExternalLink, Activity, Clock, Skull, User 
+  AlertCircle, ExternalLink, Activity, Clock, Skull, User, Star 
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
+import { getPinnedPlayers, subscribeWatchlist } from '../lib/watchlistService';
+import VersusCardShareModal from '../components/VersusCardShareModal';
 
 // Cálculo clássico de experiência de Tibia
 const calculateTotalXp = (level) => {
@@ -76,6 +78,8 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
   const [p1Data, setP1Data] = useState(null);
   const [p2Data, setP2Data] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pinnedPlayers, setPinnedPlayers] = useState(getPinnedPlayers);
+  const [versusShareModalOpen, setVersusShareModalOpen] = useState(false);
 
   // Sugestões de autocomplete
   const [p1Query, setP1Query] = useState('');
@@ -84,6 +88,15 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
   const [p2Suggestions, setP2Suggestions] = useState([]);
 
   const [copied, setCopied] = useState(false);
+
+  // Sincronização reativa da Watchlist
+  useEffect(() => {
+    setPinnedPlayers(getPinnedPlayers());
+    const unsub = subscribeWatchlist((updatedList) => {
+      setPinnedPlayers(updatedList);
+    });
+    return unsub;
+  }, []);
 
   // Busca dados de um jogador
   const fetchPlayerData = async (name) => {
@@ -144,28 +157,66 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
     loadComparison(player1Name, player2Name);
   }, []);
 
-  // Autocomplete P1
+  // Autocomplete P1 (Busca ampla em todos os 42.000+ personagens rastreados)
   useEffect(() => {
     if (!p1Query || p1Query.length < 2) {
       setP1Suggestions([]);
       return;
     }
     const t = setTimeout(async () => {
-      const { data } = await supabase.from('guild_members').select('name, level, vocation').ilike('name', `%${p1Query}%`).limit(5);
-      setP1Suggestions(data || []);
+      try {
+        const { data: charData } = await supabase
+          .from('current_character_state')
+          .select('character_name, level, vocation')
+          .ilike('character_name', `%${p1Query}%`)
+          .order('level', { ascending: false })
+          .limit(6);
+
+        if (charData && charData.length > 0) {
+          setP1Suggestions(charData.map(c => ({
+            name: c.character_name,
+            level: c.level,
+            vocation: c.vocation
+          })));
+        } else {
+          const { data } = await supabase.from('guild_members').select('name, level, vocation').ilike('name', `%${p1Query}%`).limit(5);
+          setP1Suggestions(data || []);
+        }
+      } catch (e) {
+        setP1Suggestions([]);
+      }
     }, 250);
     return () => clearTimeout(t);
   }, [p1Query]);
 
-  // Autocomplete P2
+  // Autocomplete P2 (Busca ampla em todos os 42.000+ personagens rastreados)
   useEffect(() => {
     if (!p2Query || p2Query.length < 2) {
       setP2Suggestions([]);
       return;
     }
     const t = setTimeout(async () => {
-      const { data } = await supabase.from('guild_members').select('name, level, vocation').ilike('name', `%${p2Query}%`).limit(5);
-      setP2Suggestions(data || []);
+      try {
+        const { data: charData } = await supabase
+          .from('current_character_state')
+          .select('character_name, level, vocation')
+          .ilike('character_name', `%${p2Query}%`)
+          .order('level', { ascending: false })
+          .limit(6);
+
+        if (charData && charData.length > 0) {
+          setP2Suggestions(charData.map(c => ({
+            name: c.character_name,
+            level: c.level,
+            vocation: c.vocation
+          })));
+        } else {
+          const { data } = await supabase.from('guild_members').select('name, level, vocation').ilike('name', `%${p2Query}%`).limit(5);
+          setP2Suggestions(data || []);
+        }
+      } catch (e) {
+        setP2Suggestions([]);
+      }
     }, 250);
     return () => clearTimeout(t);
   }, [p2Query]);
@@ -265,15 +316,63 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
           </p>
         </div>
 
-        {/* Botão de Compartilhar */}
-        <button
-          onClick={handleShare}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-black/60 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition-all shadow-md cursor-pointer"
-        >
-          {copied ? <Check size={14} className="text-green-400" /> : <Share2 size={14} />}
-          <span>{copied ? 'Link Copiado!' : 'Compartilhar Duelo'}</span>
-        </button>
+        {/* Botões de Ação */}
+        <div className="flex items-center gap-2">
+          {/* Botão de Card Visual de Duelo */}
+          <button
+            onClick={() => setVersusShareModalOpen(true)}
+            disabled={!p1Data || !p2Data}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-red-600 via-amber-600 to-yellow-600 hover:from-red-500 hover:to-yellow-500 text-white transition-all shadow-md shadow-red-500/20 hover:scale-105 cursor-pointer disabled:opacity-50"
+            title="Gerar Card Visual para Discord / Redes Sociais"
+          >
+            <Swords size={14} />
+            <span>Gerar Card de Duelo 📸</span>
+          </button>
+
+          {/* Botão de Compartilhar Link */}
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-black/60 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition-all shadow-md cursor-pointer"
+          >
+            {copied ? <Check size={14} className="text-green-400" /> : <Share2 size={14} />}
+            <span>{copied ? 'Link Copiado!' : 'Copiar Link'}</span>
+          </button>
+        </div>
       </div>
+
+      {/* Jogadores Fixados da Watchlist para Seleção Rápida */}
+      {pinnedPlayers.length > 0 && (
+        <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1 font-mono">
+            <Star size={12} className="fill-amber-400 text-amber-400" /> Seus Fixados:
+          </span>
+          {pinnedPlayers.map(p => (
+            <div key={p.name} className="inline-flex items-center rounded-lg bg-black/60 border border-amber-500/30 overflow-hidden shrink-0 text-xs shadow-sm">
+              <span className="px-2.5 py-1 text-gray-200 font-bold font-medieval">{p.name}</span>
+              <button
+                onClick={() => {
+                  setPlayer1Name(p.name);
+                  loadComparison(p.name, player2Name);
+                }}
+                className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 font-mono text-[10px] font-bold border-l border-white/10 transition-colors cursor-pointer"
+                title="Colocar no Guerreiro 1 (Lado Azul)"
+              >
+                P1
+              </button>
+              <button
+                onClick={() => {
+                  setPlayer2Name(p.name);
+                  loadComparison(player1Name, p.name);
+                }}
+                className="px-2 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-300 font-mono text-[10px] font-bold border-l border-white/10 transition-colors cursor-pointer"
+                title="Colocar no Guerreiro 2 (Lado Vermelho)"
+              >
+                P2
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Sugestões de Rivalidades */}
       <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -592,6 +691,17 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
       <div className="my-8">
         <AdBanner slot="versus-bottom" format="auto" />
       </div>
+
+      {/* Modal de Compartilhamento de Card 1v1 */}
+      {versusShareModalOpen && (
+        <VersusCardShareModal
+          p1Data={p1Data}
+          p2Data={p2Data}
+          headToHead={headToHead}
+          diff={diff}
+          onClose={() => setVersusShareModalOpen(false)}
+        />
+      )}
 
     </div>
   );
