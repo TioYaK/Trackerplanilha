@@ -161,10 +161,38 @@ export const RUBINOT_BOOSTED_CREATURES = [
     spriteUrl: 'https://tibiopedia.pl/images/static/monsters/deepling_tyra.gif',
     huntQuery: 'deepling',
     bonusText: 'XP Dobrada (3.4k) & Drops raros de Fiehonja'
+  },
+  {
+    id: 'young-goanna',
+    name: 'Young Goanna',
+    slug: 'young_goanna',
+    category: 'Kilmaresh / Issavi',
+    hp: 2300,
+    baseExp: 1900,
+    boostedExp: 3800,
+    bestElement: 'Gelo (Ice)',
+    bestElementMultiplier: '+15%',
+    bestDefense: 'Fogo + Físico',
+    bestCharm: 'Freeze / Wound',
+    spriteUrl: 'https://tibiopedia.pl/images/static/monsters/young_goanna.gif',
+    huntQuery: 'goanna',
+    bonusText: 'XP Dobrada (3.8k) & Farm acelerado em Kilmaresh'
   }
 ];
 
 export const RUBINOT_BOOSTED_BOSSES = [
+  {
+    id: 'ravenous-hunger',
+    name: 'Ravenous Hunger',
+    slug: 'ravenous_hunger',
+    category: 'Rascacoon Island',
+    location: 'Rascacoon Island / Pirate Dungeons',
+    spriteUrl: 'https://tibiopedia.pl/images/static/monsters/ravenous_hunger.gif',
+    keyDrops: ['Rascacoon Boots', 'Wreck Louse Shell', 'Gold Token', 'Silver Token'],
+    bonusText: 'Drop boostado de equipamentos de Rascacoon e tokens raros!',
+    mechanicsTip: 'Evite pisar nas poças de gosma e derrote os adds vorazes rapidamente.',
+    bossRoute: '/bosses'
+  },
   {
     id: 'katex-blood-tongue',
     name: 'Katex Blood Tongue',
@@ -240,8 +268,8 @@ export const RUBINOT_BOOSTED_BOSSES = [
 ];
 
 export const CURRENT_RUBINOT_BOOSTED = {
-  boss_name: 'Katex Blood Tongue',
-  creature_name: 'Deepling Tyra'
+  boss_name: 'Ravenous Hunger',
+  creature_name: 'Young Goanna'
 };
 
 export function getTodayBoosted(referenceDate = new Date(), dynamicOverride = null) {
@@ -260,26 +288,26 @@ export function getTodayBoosted(referenceDate = new Date(), dynamicOverride = nu
 
   // Active configuration (priority: dynamicOverride -> CURRENT_RUBINOT_BOOSTED)
   const activeCfg = dynamicOverride || CURRENT_RUBINOT_BOOSTED;
-  const targetCreatureName = (activeCfg?.creature_name || activeCfg?.creature || 'Deepling Tyra').trim().toLowerCase();
-  const targetBossName = (activeCfg?.boss_name || activeCfg?.boss || 'Katex Blood Tongue').trim().toLowerCase();
+  const targetCreatureName = (activeCfg?.creature_name || activeCfg?.creature || 'Young Goanna').trim().toLowerCase();
+  const targetBossName = (activeCfg?.boss_name || activeCfg?.boss || 'Ravenous Hunger').trim().toLowerCase();
 
   let creature = RUBINOT_BOOSTED_CREATURES.find(c => c.name.toLowerCase() === targetCreatureName);
   if (!creature) {
     // Dynamic fallback creature object if name is a new RubinOT monster
-    const rawName = activeCfg?.creature_name || 'Deepling Tyra';
+    const rawName = activeCfg?.creature_name || 'Young Goanna';
     const slug = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
     creature = {
       id: slug,
       name: rawName,
       slug: slug,
       category: 'RubinOT Spawns',
-      hp: 2000,
-      baseExp: 1700,
-      boostedExp: 3400,
-      bestElement: 'Físico / Energy',
+      hp: 2300,
+      baseExp: 1900,
+      boostedExp: 3800,
+      bestElement: 'Gelo / Ice',
       bestElementMultiplier: '+15%',
       bestDefense: 'All Elements',
-      bestCharm: 'Wound / Freeze',
+      bestCharm: 'Freeze / Wound',
       spriteUrl: `https://tibiopedia.pl/images/static/monsters/${slug}.gif`,
       huntQuery: rawName,
       bonusText: 'XP Dobrada & Loot 2x no RubinOT'
@@ -289,7 +317,7 @@ export function getTodayBoosted(referenceDate = new Date(), dynamicOverride = nu
   let boss = RUBINOT_BOOSTED_BOSSES.find(b => b.name.toLowerCase() === targetBossName);
   if (!boss) {
     // Dynamic fallback boss object if name is a new RubinOT boss
-    const rawBoss = activeCfg?.boss_name || 'Katex Blood Tongue';
+    const rawBoss = activeCfg?.boss_name || 'Ravenous Hunger';
     const slug = rawBoss.toLowerCase().replace(/[^a-z0-9]/g, '_');
     boss = {
       id: slug,

@@ -6,6 +6,19 @@ import { supabase } from '../lib/supabase';
 const BOSS_DATABASE = [
   // Express Diário (Fácil & Muito Lucrativo)
   {
+    id: 'ravenous-hunger',
+    name: 'Ravenous Hunger',
+    location: 'Rascacoon Island (Pirate Reef)',
+    category: 'daily',
+    cooldownHours: 20,
+    estMinutes: 5,
+    avgProfitK: 220,
+    bisDrops: ['Rascacoon Boots', 'Wreck Louse Shell', 'Gold Token'],
+    element: 'Físico / Terra / Veneno',
+    weakness: 'Fogo (-10%), Energia (-10%)',
+    tip: 'Evite pisar nas poças de veneno/gosma e limpe os adds vorazes rapidamente.'
+  },
+  {
     id: 'katex',
     name: 'Katex Blood Tongue',
     location: 'Iks Ruins / Mitmah Bastion',
@@ -435,7 +448,7 @@ export default function BossTracker() {
                   <span className="text-[10px] text-purple-300 font-bold uppercase">Boss Boostado</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">+Loot Roll</span>
                 </div>
-                <div className="text-sm font-bold text-white truncate">{boostedData?.boss?.name || 'Katex Blood Tongue'}</div>
+                <div className="text-sm font-bold text-white truncate">{boostedData?.boss?.name || 'Ravenous Hunger'}</div>
                 <div className="text-[10px] text-gray-400 truncate">{boostedData?.boss?.bonusText || '+50% XP e chance extra de BiS drop'}</div>
               </div>
             </div>
@@ -462,7 +475,7 @@ export default function BossTracker() {
                   <span className="text-[10px] text-emerald-300 font-bold uppercase">Criatura Boostada</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">+XP & Respawn</span>
                 </div>
-                <div className="text-sm font-bold text-white truncate">{boostedData?.creature?.name || 'Deepling Tyra'}</div>
+                <div className="text-sm font-bold text-white truncate">{boostedData?.creature?.name || 'Young Goanna'}</div>
                 <div className="text-[10px] text-gray-400 truncate">{boostedData?.creature?.bonusText || '+50% XP, +100% Loot e respawn veloz'}</div>
               </div>
             </div>
