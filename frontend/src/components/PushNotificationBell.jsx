@@ -95,15 +95,29 @@ export default function PushNotificationBell() {
     <button 
       onClick={toggleSubscription}
       disabled={loading}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+      className={`relative flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border shadow-sm ${
         isSubscribed 
-          ? 'bg-green-900/40 text-green-400 border-green-500/50 hover:bg-green-800/60' 
-          : 'bg-black/40 text-gray-400 border-gray-700 hover:bg-black/60 hover:text-white'
+          ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/50 hover:border-emerald-400/60' 
+          : 'bg-black/60 text-gray-400 border-tibia-border hover:bg-white/5 hover:text-gray-200 hover:border-yellow-500/30'
       }`}
-      title={isSubscribed ? 'Desativar Alertas' : 'Ativar Alertas da Guilda'}
+      title={isSubscribed ? 'Alertas de Guerra & Invasão Ativos (Clique para desativar)' : 'Ativar Notificações & Alertas de Guerra'}
     >
-      {isSubscribed ? <Bell size={14} className="animate-pulse" /> : <BellOff size={14} />}
-      <span className="hidden md:inline">{isSubscribed ? 'Sirene ON' : 'Ativar Alertas'}</span>
+      <div className="relative flex items-center justify-center">
+        {isSubscribed ? (
+          <>
+            <Bell size={14} className="text-emerald-400" />
+            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </>
+        ) : (
+          <BellOff size={14} className="text-gray-500" />
+        )}
+      </div>
+      <span className="hidden md:inline font-mono text-[11px]">
+        {isSubscribed ? 'Alertas ON' : 'Alertas'}
+      </span>
     </button>
   );
 }
