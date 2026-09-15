@@ -12,6 +12,15 @@ import { isPlayerPinned, togglePinPlayer, subscribeWatchlist } from '../lib/watc
 import { useAuth } from './AuthContext';
 import PlayerCardShareModal from './PlayerCardShareModal';
 
+// Cache em memória para detalhes de personagens (TTL 60s)
+const playerDetailsCache = new Map();
+
+// Cache global para contagem total de players rastreados (TTL 10min)
+let cachedTotalTracked = {
+  value: 44200,
+  timestamp: 0
+};
+
 export default function PlayerModal({ playerName, initialWorld, onClose, onOpenFull, onVersus }) {
   const { isPremium } = useAuth() || {};
   const [loading, setLoading] = useState(true);
@@ -19,7 +28,7 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
   const [selectedWorld, setSelectedWorld] = useState(initialWorld || 'ALL');
   const [worldRank, setWorldRank] = useState(null);
   const [globalRank, setGlobalRank] = useState(null);
-  const [totalTracked, setTotalTracked] = useState(12365);
+  const [totalTracked, setTotalTracked] = useState(cachedTotalTracked.value);
   const [rusherInfo, setRusherInfo] = useState(null);
   const [recentDeaths, setRecentDeaths] = useState([]);
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -51,6 +60,23 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
 
   const fetchPlayerDetails = async (targetWorld = null) => {
     if (!playerName) return;
+
+    const cacheKey = playerName.trim().toLowerCase();
+    const cached = playerDetailsCache.get(cacheKey);
+    if (!targetWorld && cached && (Date.now() - cached.timestamp < 60000)) {
+      setCharInfo(cached.charInfo);
+      setSelectedWorld(cached.selectedWorld);
+      setWorldRank(cached.worldRank);
+      setGlobalRank(cached.globalRank);
+      setTotalTracked(cached.totalTracked);
+      setAvatarUrl(cached.avatarUrl);
+      setRecentDeaths(cached.recentDeaths);
+      setRusherInfo(cached.rusherInfo);
+      setSuspectedMakers(cached.suspectedMakers);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -109,15 +135,24 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
       }
       setWorldRank(parsedWorldRank);
 
-      // 5. Ranking Global & Total de Jogadores
+      // 5. Ranking Global & Total de Jogadores (otimizado com cache de 10 min para o count global)
+      let gRank = null;
       if (level) {
+        const needFreshTotal = Date.now() - cachedTotalTracked.timestamp > 10 * 60 * 1000;
         const [higherRes, totalRes] = await Promise.all([
           supabase.from('current_character_state').select('*', { count: 'exact', head: true }).gt('level', level),
-          supabase.from('current_character_state').select('*', { count: 'exact', head: true })
+          needFreshTotal
+            ? supabase.from('current_character_state').select('*', { count: 'exact', head: true })
+            : Promise.resolve({ count: cachedTotalTracked.value })
         ]);
-        const gRank = (higherRes.count || 0) + 1;
+
+        gRank = (higherRes.count || 0) + 1;
         setGlobalRank(gRank);
-        if (totalRes.count) setTotalTracked(totalRes.count);
+
+        if (totalRes.count) {
+          cachedTotalTracked = { value: totalRes.count, timestamp: Date.now() };
+          setTotalTracked(totalRes.count);
+        }
 
         if (!parsedWorldRank) {
           const approxWorldRank = Math.max(1, Math.round(gRank / 16));
@@ -197,7 +232,32 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
           }
         }
       }
-      setSuspectedMakers(detectedSuspects.slice(0, 6));
+      const finalCharInfo = {
+        name: playerName,
+        level,
+        vocation,
+        xpTotal,
+        isOnline,
+        lastActive,
+        guildName: resolvedGuildName,
+        guildRank: gMem?.rank || null,
+        isHunted: Boolean(hunted || deathsRes?.data?.[0]?.is_hunted)
+      };
+
+      const finalWorldRank = parsedWorldRank || (gRank ? Math.max(1, Math.round(gRank / 16)) : null);
+
+      playerDetailsCache.set(cacheKey, {
+        timestamp: Date.now(),
+        charInfo: finalCharInfo,
+        selectedWorld: detectedWorld,
+        worldRank: finalWorldRank,
+        globalRank: gRank,
+        totalTracked: cachedTotalTracked.value,
+        avatarUrl: profile?.avatar_url || null,
+        recentDeaths: deathsRes?.data || [],
+        rusherInfo: rushRes?.data || null,
+        suspectedMakers: detectedSuspects.slice(0, 6)
+      });
 
     } catch (err) {
       console.error('Erro ao buscar detalhes do jogador no modal:', err);

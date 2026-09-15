@@ -90,11 +90,10 @@ export default function RadarHunters({ isAdmin }) {
             }
 
             const chunkPromises = chunks.map(chunk => {
-              const orChar = chunk.map(n => `character_name.ilike."${n.trim().replace(/"/g, '')}"`).join(',');
               return supabase
                 .from('current_character_state')
                 .select('character_name, xp_total, session_start_xp, last_active')
-                .or(orChar);
+                .in('character_name', chunk);
             });
 
             const results = await Promise.all(chunkPromises);

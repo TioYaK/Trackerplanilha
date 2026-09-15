@@ -405,7 +405,19 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
     return () => clearInterval(timer);
   }, []);
 
-  const fetchAlerts = async () => {
+// Cache em memória para leilões do Bazaar (TTL 60s)
+let bazaarCache = {
+  timestamp: 0,
+  data: null
+};
+
+  const fetchAlerts = async (forceRefresh = false) => {
+    if (!forceRefresh && bazaarCache.data && (Date.now() - bazaarCache.timestamp < 60000)) {
+      setAlerts(bazaarCache.data);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const nowIso = new Date().toISOString();
@@ -485,6 +497,11 @@ export default function BazaarSniper({ onPlayerClick, onNavigate, isPremium }) {
           _endTimeMs: endTimeMs
         };
       });
+
+      bazaarCache = {
+        timestamp: Date.now(),
+        data: preprocessed
+      };
 
       setAlerts(preprocessed);
     } catch (err) {

@@ -125,42 +125,32 @@ export default function GlobalTracker({ onPlayerClick }) {
         const fetchPartiesP = supabase.from('parties_planilhadas').select('hunt_name, slot_start, slot_end, delta_xp, members').not('delta_xp', 'is', null);
         
         const fetchRosterP = async () => {
-          let allRoster = [];
-          let page = 0;
-          while (true) {
-            const { data: rosterData } = await supabase
-              .from('view_guild_roster')
-              .select('*')
-              .range(page * 1000, (page + 1) * 1000 - 1);
-            if (!rosterData || rosterData.length === 0) break;
-            allRoster.push(...rosterData);
-            if (rosterData.length < 1000) break; // optimize: if less than max page, it's the last one
-            page++;
-          }
+          // 1. Busca direta em guild_members (evita timeout 57014 na view_guild_roster)
+          const { data: members } = await supabase
+            .from('guild_members')
+            .select('id, name, rank, level, vocation, is_online, last_xp_date')
+            .order('level', { ascending: false })
+            .limit(1000);
 
-          let allStates = [];
-          let statePage = 0;
-          while (true) {
-            const { data: stateData } = await supabase
-              .from('current_character_state')
-              .select('character_name, xp_total, session_start_xp')
-              .not('session_start_xp', 'is', null)
-              .range(statePage * 1000, (statePage + 1) * 1000 - 1);
-            if (!stateData || stateData.length === 0) break;
-            allStates.push(...stateData);
-            if (stateData.length < 1000) break;
-            statePage++;
-          }
+          if (!members || members.length === 0) return [];
 
-          const stateMap = new Map();
-          allStates.forEach(s => {
-            const activeXp = Math.max(0, (s.xp_total || 0) - (s.session_start_xp || s.xp_total || 0));
-            if (activeXp > 0 && s.character_name) stateMap.set(s.character_name.toLowerCase(), activeXp);
-          });
+          // 2. Busca de ganho de XP 24h a partir de view_top_rushers_24h
+          const { data: rushers } = await supabase
+            .from('view_top_rushers_24h')
+            .select('name, exp_gained')
+            .gt('exp_gained', 0)
+            .limit(500);
 
-          return allRoster.map(m => {
-            const activeXp = m.name ? (stateMap.get(m.name.toLowerCase()) || 0) : 0;
-            return { ...m, xp_gained_24h: (m.xp_gained_24h || 0) + activeXp };
+          const rusherMap = new Map((rushers || []).map(r => [(r.name || '').toLowerCase(), Number(r.exp_gained) || 0]));
+
+          return members.map(m => {
+            const xp24h = rusherMap.get((m.name || '').toLowerCase()) || 0;
+            return {
+              ...m,
+              level: m.level || 0,
+              vocation: m.vocation || 'Unknown',
+              xp_gained_24h: xp24h
+            };
           });
         };
 

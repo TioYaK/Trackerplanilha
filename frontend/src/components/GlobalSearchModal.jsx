@@ -65,11 +65,22 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Busca rápida de personagens no Supabase com debounce
+// Cache em memória para buscas globais (TTL 90s)
+const searchCache = new Map();
+
+  // Busca rápida de personagens no Supabase com debounce e cache em memória
   useEffect(() => {
     const cleanQ = (query || '').replace(/["'“”]/g, '').trim();
     if (!cleanQ || cleanQ.length < 2) {
       setPlayerResults([]);
+      return;
+    }
+
+    const cacheKey = cleanQ.toLowerCase();
+    const cached = searchCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < 90000)) {
+      setPlayerResults(cached.results);
+      setSearching(false);
       return;
     }
 
@@ -114,6 +125,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
             };
           });
 
+          searchCache.set(cacheKey, { timestamp: Date.now(), results });
           setPlayerResults(results);
         } else {
           // Fallback para recent_deaths caso seja um personagem muito novo
@@ -124,14 +136,17 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
             .limit(4);
 
           if (deathData && deathData.length > 0) {
-            setPlayerResults(deathData.map(d => ({
+            const fallbackResults = deathData.map(d => ({
               name: d.character_name,
               level: d.level,
               vocation: null,
               world: null,
               source: 'Combate'
-            })));
+            }));
+            searchCache.set(cacheKey, { timestamp: Date.now(), results: fallbackResults });
+            setPlayerResults(fallbackResults);
           } else {
+            searchCache.set(cacheKey, { timestamp: Date.now(), results: [] });
             setPlayerResults([]);
           }
         }

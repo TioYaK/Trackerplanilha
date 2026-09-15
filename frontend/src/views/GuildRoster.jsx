@@ -4,6 +4,9 @@ import { Search, User, UserCheck, UserMinus, Crosshair, Crown, Globe } from 'luc
 import { formatVocation } from '../lib/tibiaUtils';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 
+// Cache em memória para Guild Roster por mundo (TTL 60s)
+let rosterCache = new Map();
+
 export default function GuildRoster({ onPlayerClick, isAdmin }) {
   const { activeWorld, setActiveWorld } = useWorld();
   const [selectedWorld, setSelectedWorld] = useState(activeWorld || 'ALL');
@@ -28,50 +31,30 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
     }
   }, [activeWorld]);
 
-  const fetchMembers = async () => {
+  const fetchMembers = async (forceRefresh = false) => {
+    // 0. Cache em memória instantâneo se menos de 60 segundos
+    const cacheKey = (selectedWorld || 'ALL').toLowerCase();
+    const cached = rosterCache.get(cacheKey);
+    if (!forceRefresh && cached && (Date.now() - cached.timestamp < 60000)) {
+      setMembers(cached.data);
+      if (cached.avatarsMap) setAvatarsMap(cached.avatarsMap);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const fetchProfilesP = supabase
-        .from('profiles')
-        .select('main_character, avatar_url')
-        .not('avatar_url', 'is', null);
-
-      const fetchStatesP = async () => {
-        let allStates = [];
-        let page = 0;
-        while (true) {
-          const { data } = await supabase
-            .from('current_character_state')
-            .select('character_name, level, vocation, xp_total, session_start_xp')
-            .range(page * 1000, (page + 1) * 1000 - 1);
-          if (!data || data.length === 0) break;
-          allStates.push(...data);
-          if (data.length < 1000) break;
-          page++;
-        }
-        return allStates;
-      };
-
+      // 1. Busca direta na tabela guild_members (evita timeout na view e correlated subqueries)
       let rosterMembers = [];
 
       if (selectedWorld === 'ALL' || selectedWorld.toLowerCase() === 'auroria') {
-        let allData = [];
-        let page = 0;
-        const pageSize = 1000;
-        while (true) {
-          const { data, error } = await supabase
-            .from('view_guild_roster')
-            .select('*')
-            .order('level', { ascending: false })
-            .range(page * pageSize, (page + 1) * pageSize - 1);
-            
-          if (error || !data || data.length === 0) break;
-          allData.push(...data);
-          if (data.length < pageSize) break;
-          page++;
-        }
-        rosterMembers = allData.map(m => ({ ...m, world: 'Auroria' }));
+        const { data: gmData } = await supabase
+          .from('guild_members')
+          .select('id, name, rank, level, vocation, is_online, last_xp_date')
+          .order('level', { ascending: false })
+          .limit(1000);
+        rosterMembers = (gmData || []).map(m => ({ ...m, world: 'Auroria' }));
       } else {
         const { data: perkMembers } = await supabase
           .from('guild_perk_members')
@@ -90,45 +73,59 @@ export default function GuildRoster({ onPlayerClick, isAdmin }) {
         }));
       }
 
-      const [{ data: profs }, states] = await Promise.all([
-        fetchProfilesP,
-        fetchStatesP()
+      // 2. Busca de XP 24h (view_top_rushers_24h) e avatares em paralelo
+      const [rushersRes, profsRes] = await Promise.all([
+        supabase.from('view_top_rushers_24h').select('name, exp_gained').gt('exp_gained', 0).limit(500),
+        supabase.from('profiles').select('main_character, avatar_url').not('avatar_url', 'is', null)
       ]);
 
-      if (profs) {
-        const map = {};
-        profs.forEach(p => {
+      const rusherMap = new Map((rushersRes.data || []).map(r => [(r.name || '').toLowerCase(), Number(r.exp_gained) || 0]));
+
+      let avatars = {};
+      if (profsRes.data) {
+        profsRes.data.forEach(p => {
           if (p.main_character && p.avatar_url) {
-            map[p.main_character.toLowerCase()] = p.avatar_url;
+            avatars[p.main_character.toLowerCase()] = p.avatar_url;
           }
         });
-        setAvatarsMap(map);
+        setAvatarsMap(avatars);
       }
 
-      const stateMap = new Map();
-      if (states) {
-        states.forEach(s => {
-          if (!s || !s.character_name) return;
-          stateMap.set(s.character_name.toLowerCase(), s);
+      // 3. Enriquecimento de vocação/level apenas para membros que ainda não possuem (ex: perk members)
+      const needStateNames = rosterMembers.filter(m => !m.level || !m.vocation).map(m => m.name).filter(Boolean);
+      let stateMap = new Map();
+      if (needStateNames.length > 0) {
+        const chunks = [];
+        for (let i = 0; i < needStateNames.length; i += 200) chunks.push(needStateNames.slice(i, i + 200));
+        const statesChunks = await Promise.all(
+          chunks.map(c => supabase.from('current_character_state').select('character_name, level, vocation').in('character_name', c).then(r => r.data || []))
+        );
+        statesChunks.flat().forEach(s => {
+          if (s?.character_name) stateMap.set(s.character_name.toLowerCase(), s);
         });
       }
 
       const mergedData = rosterMembers.map(m => {
-        const s = m && m.name ? stateMap.get(m.name.toLowerCase()) : null;
-        const activeXp = s ? Math.max(0, (s.xp_total || 0) - (s.session_start_xp || s.xp_total || 0)) : 0;
-        const totalXp = (m.xp_gained_24h || 0) + activeXp;
+        const s = stateMap.get((m.name || '').toLowerCase());
+        const xp24h = rusherMap.get((m.name || '').toLowerCase()) || 0;
         return {
           ...m,
           level: m.level || s?.level || 0,
           vocation: m.vocation || s?.vocation || 'Desconhecido',
-          xp_gained_24h: totalXp
+          xp_gained_24h: xp24h
         };
       });
 
-      // Ordena por Level decrescente
       mergedData.sort((a, b) => (b.level || 0) - (a.level || 0));
-
       setMembers(mergedData);
+
+      // Salva no cache de 60s
+      rosterCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: mergedData,
+        avatarsMap: avatars
+      });
+
     } catch (err) {
       console.error('Erro ao buscar membros:', err);
     } finally {
