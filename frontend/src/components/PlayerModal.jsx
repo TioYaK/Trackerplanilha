@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   X, ExternalLink, Globe, Shield, Trophy, Flame, Skull, 
-  ChevronRight, Activity, Swords, Award, Sparkles, User, Crosshair, Star
+  ChevronRight, Activity, Swords, Award, Sparkles, User, Crosshair, Star, Share2
 } from 'lucide-react';
 import { WORLDS_LIST } from '../context/WorldContext';
 import { formatVocation, parseUtcDate } from '../lib/tibiaUtils';
 import { soundFX } from '../lib/soundEffects';
 import { isPlayerPinned, togglePinPlayer, subscribeWatchlist } from '../lib/watchlistService';
+import PlayerCardShareModal from './PlayerCardShareModal';
 
 export default function PlayerModal({ playerName, initialWorld, onClose, onOpenFull, onVersus }) {
   const [loading, setLoading] = useState(true);
@@ -21,6 +22,7 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showWorldDropdown, setShowWorldDropdown] = useState(false);
   const [isPinned, setIsPinned] = useState(() => isPlayerPinned(playerName));
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   useEffect(() => {
     setIsPinned(isPlayerPinned(playerName));
@@ -226,6 +228,14 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
               title={isPinned ? 'Remover da Watchlist' : 'Fixar na Watchlist (Favoritos) ⭐'}
             >
               <Star size={18} className={isPinned ? 'text-amber-400 fill-amber-400' : ''} />
+            </button>
+
+            <button
+              onClick={() => setShareModalOpen(true)}
+              className="w-9 h-9 rounded-xl bg-black/60 hover:bg-yellow-950/60 border border-white/10 hover:border-yellow-500/40 flex items-center justify-center text-gray-400 hover:text-yellow-400 transition-all cursor-pointer"
+              title="Gerar e Compartilhar Card Gamer 📸"
+            >
+              <Share2 size={17} />
             </button>
 
             <button
@@ -478,6 +488,15 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
+              onClick={() => setShareModalOpen(true)}
+              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              title="Gerar Card Gamer para Redes e Discord"
+            >
+              <Share2 size={14} />
+              Card 📸
+            </button>
+
+            <button
               onClick={() => {
                 onClose();
                 onVersus?.(playerName);
@@ -506,6 +525,22 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
           </div>
         </div>
       </div>
+
+      {/* Modal de Compartilhamento de Card Gamer */}
+      {shareModalOpen && (
+        <PlayerCardShareModal
+          playerName={playerName}
+          charInfo={charInfo}
+          selectedWorld={selectedWorld}
+          tierBadge={tierBadge}
+          globalRank={globalRank}
+          totalTracked={totalTracked}
+          rusherInfo={rusherInfo}
+          recentDeaths={recentDeaths}
+          avatarUrl={avatarUrl}
+          onClose={() => setShareModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
