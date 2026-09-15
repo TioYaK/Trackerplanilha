@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldAlert, Crosshair, UserPlus, Clock, Trash2, Skull, Volume2, VolumeX, Radio } from 'lucide-react';
+import { 
+  ShieldAlert, Crosshair, UserPlus, Clock, Trash2, Skull, 
+  Volume2, VolumeX, Radio, Star, Mic, MicOff, Copy, Check, Megaphone 
+} from 'lucide-react';
 import { parseUtcDate } from '../lib/tibiaUtils';
 import { soundFX } from '../lib/soundEffects';
+import { getPinnedPlayers, subscribeWatchlist } from '../lib/watchlistService';
 
 export default function RadarHunters({ isAdmin }) {
   const [huntedList, setHuntedList] = useState([]);
@@ -10,12 +14,28 @@ export default function RadarHunters({ isAdmin }) {
   const [newName, setNewName] = useState('');
   const [newReason, setNewReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(soundFX.isEnabled());
+  const [audioEnabled, setAudioEnabled] = useState(() => soundFX.isEnabled());
+  const [voiceEnabled, setVoiceEnabled] = useState(() => soundFX.isVoiceEnabled());
   const [activeAlert, setActiveAlert] = useState(null);
+  const [copiedExiva, setCopiedExiva] = useState(null);
+
+  // Watchlist de Jogadores Monitorados
+  const [pinnedPlayers, setPinnedPlayers] = useState(getPinnedPlayers);
+  const [pinnedOnlineMap, setPinnedOnlineMap] = useState({});
 
   useEffect(() => {
     fetchHunted();
-    const interval = setInterval(fetchHunted, 30000); // Poll a cada 30s
+    checkPinnedPlayersOnline();
+    const interval = setInterval(() => {
+      fetchHunted();
+      checkPinnedPlayersOnline();
+    }, 30000); // Poll a cada 30s
+
+    // Assina mudanças na Watchlist
+    const unsubWatchlist = subscribeWatchlist((updated) => {
+      setPinnedPlayers(updated);
+      checkPinnedPlayersOnline(updated);
+    });
 
     // Assinatura em tempo real para detectar logins de hunteds instantaneamente
     const channel = supabase
@@ -24,6 +44,7 @@ export default function RadarHunters({ isAdmin }) {
         const { new: newRow, old: oldRow } = payload;
         if (newRow && oldRow && newRow.is_online && !oldRow.is_online) {
           soundFX.playEnemyAlert();
+          soundFX.speakTactical(`Atenção: Inimigo ${newRow.name} entrou online no servidor!`);
           setActiveAlert({
             name: newRow.name,
             reason: newRow.reason || 'Inimigo da Guilda',
@@ -39,6 +60,7 @@ export default function RadarHunters({ isAdmin }) {
 
     return () => {
       clearInterval(interval);
+      unsubWatchlist();
       supabase.removeChannel(channel);
     };
   }, []);
@@ -143,9 +165,53 @@ export default function RadarHunters({ isAdmin }) {
     }
   };
 
+  const checkPinnedPlayersOnline = async (overrideList = null) => {
+    const list = overrideList || pinnedPlayers;
+    if (!list || list.length === 0) {
+      setPinnedOnlineMap({});
+      return;
+    }
+
+    try {
+      const names = list.map(p => p.name);
+      const [{ data: huntedData }, { data: gmData }] = await Promise.all([
+        supabase.from('hunted_list').select('name, is_online').in('name', names),
+        supabase.from('guild_members').select('name, is_online').in('name', names)
+      ]);
+
+      const onlineMap = {};
+      (huntedData || []).forEach(h => {
+        if (h.is_online) onlineMap[h.name.toLowerCase()] = true;
+      });
+      (gmData || []).forEach(g => {
+        if (g.is_online) onlineMap[g.name.toLowerCase()] = true;
+      });
+
+      setPinnedOnlineMap(onlineMap);
+    } catch (e) {
+      console.warn('Erro ao checar status da watchlist:', e);
+    }
+  };
+
   const handleToggleAudio = () => {
     const newState = soundFX.toggle();
     setAudioEnabled(newState);
+  };
+
+  const handleToggleVoice = () => {
+    const newState = soundFX.toggleVoice();
+    setVoiceEnabled(newState);
+  };
+
+  const handleTestVoice = () => {
+    soundFX.speakTactical('Alerta tático de satélite Rubinot. Sistema de rastreamento de alvos cem por cento operacional.');
+  };
+
+  const handleCopyExiva = (charName) => {
+    navigator.clipboard.writeText(`exiva "${charName}"`);
+    setCopiedExiva(charName);
+    soundFX.playTacticalPing();
+    setTimeout(() => setCopiedExiva(null), 2000);
   };
 
   if (loading) {
@@ -153,6 +219,7 @@ export default function RadarHunters({ isAdmin }) {
   }
 
   const onlineCount = huntedList.filter(h => h.is_online).length;
+  const pinnedOnlineCount = pinnedPlayers.filter(p => pinnedOnlineMap[p.name.toLowerCase()]).length;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto w-full animate-fade-in">
@@ -162,24 +229,51 @@ export default function RadarHunters({ isAdmin }) {
           <div>
             <h2 className="text-4xl font-medieval text-red-500 tracking-wider">Radar de Hunteds</h2>
             <p className="text-gray-400 font-sans mt-1">
-              Monitoramento em tempo real de inimigos e membros de guildas rivais com Alarme Tático.
+              Monitoramento em tempo real de inimigos e membros de guildas rivais com Alarme Tático Sonoro e Voz Sintética.
             </p>
           </div>
         </div>
 
-        {/* CONTROLE DE ALERTA SONORO (PILAR III) */}
-        <button
-          onClick={handleToggleAudio}
-          className={`flex items-center px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
-            audioEnabled 
-              ? 'bg-red-950/70 border-red-500 text-red-300 shadow-lg shadow-red-950/50 animate-pulse' 
-              : 'bg-black/60 border-tibia-border text-gray-400 hover:text-white'
-          }`}
-          title={audioEnabled ? 'Sonar tático ativo (clique para mutar)' : 'Sonar tático silenciado (clique para ativar)'}
-        >
-          {audioEnabled ? <Volume2 size={16} className="mr-2 text-red-400" /> : <VolumeX size={16} className="mr-2" />}
-          {audioEnabled ? 'Sonar Ativo (Som Ligado)' : 'Sonar Mudo (Som Desligado)'}
-        </button>
+        {/* CONTROLES DE ALERTA SONORO & VOZ SINTÉTICA (PILAR III) */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Controle de Áudio Sonar */}
+          <button
+            onClick={handleToggleAudio}
+            className={`flex items-center px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              audioEnabled 
+                ? 'bg-red-950/70 border-red-500 text-red-300 shadow-lg shadow-red-950/50' 
+                : 'bg-black/60 border-white/10 text-gray-400 hover:text-white'
+            }`}
+            title={audioEnabled ? 'Sonar tático ativo (clique para mutar)' : 'Sonar tático silenciado'}
+          >
+            {audioEnabled ? <Volume2 size={15} className="mr-1.5 text-red-400" /> : <VolumeX size={15} className="mr-1.5" />}
+            <span>{audioEnabled ? 'Sonar Ativo' : 'Sonar Mudo'}</span>
+          </button>
+
+          {/* Controle de Voz Tática */}
+          <button
+            onClick={handleToggleVoice}
+            className={`flex items-center px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              voiceEnabled && audioEnabled
+                ? 'bg-amber-500/20 border-yellow-500/50 text-yellow-300 shadow-lg shadow-yellow-500/10' 
+                : 'bg-black/60 border-white/10 text-gray-400 hover:text-white'
+            }`}
+            title="Narrar alertas com voz sintética em português"
+          >
+            {voiceEnabled && audioEnabled ? <Mic size={15} className="mr-1.5 text-yellow-400" /> : <MicOff size={15} className="mr-1.5" />}
+            <span>{voiceEnabled && audioEnabled ? 'Voz Tática ON' : 'Voz OFF'}</span>
+          </button>
+
+          {/* Testar Voz */}
+          <button
+            onClick={handleTestVoice}
+            className="flex items-center px-3 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition-all cursor-pointer"
+            title="Testar síntese de voz"
+          >
+            <Megaphone size={14} className="mr-1.5 text-yellow-400" />
+            <span>Testar Voz</span>
+          </button>
+        </div>
       </div>
 
       {/* BANNER DE INVASÃO / ALERTA AO VIVO (PILAR III) */}
@@ -223,6 +317,14 @@ export default function RadarHunters({ isAdmin }) {
             <div className="mt-4 text-sm text-gray-500">
               Total rastreados: {huntedList.length}
             </div>
+            {pinnedPlayers.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                <span className="text-gray-400 font-mono">Sua Watchlist:</span>
+                <span className="text-amber-400 font-bold font-mono">
+                  {pinnedOnlineCount} / {pinnedPlayers.length} online
+                </span>
+              </div>
+            )}
           </div>
 
           {isAdmin && (
@@ -256,7 +358,7 @@ export default function RadarHunters({ isAdmin }) {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full bg-red-900/40 hover:bg-red-800 border border-red-700 text-white font-medieval py-2 rounded transition-colors disabled:opacity-50"
+                  className="w-full bg-red-900/40 hover:bg-red-800 border border-red-700 text-white font-medieval py-2 rounded transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {submitting ? 'Adicionando...' : 'Marcar como Hunted'}
                 </button>
@@ -265,12 +367,74 @@ export default function RadarHunters({ isAdmin }) {
           )}
         </div>
 
-        {/* Painel Direito: Lista de Hunteds */}
-        <div className="lg:col-span-2">
+        {/* Painel Direito: Watchlist + Lista de Hunteds */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* Card da Watchlist Pessoal */}
+          {pinnedPlayers.length > 0 && (
+            <div className="bg-neutral-950 border border-amber-500/40 rounded-xl p-4 shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
+                <div className="flex items-center gap-2">
+                  <Star size={16} className="text-amber-400 fill-amber-400" />
+                  <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono">
+                    Sua Watchlist de Monitoramento ({pinnedOnlineCount} Online)
+                  </h3>
+                </div>
+                <span className="text-[11px] text-gray-500 font-mono">
+                  {pinnedPlayers.length} jogadores fixados
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {pinnedPlayers.map(p => {
+                  const isOnline = Boolean(pinnedOnlineMap[p.name.toLowerCase()]);
+                  return (
+                    <div
+                      key={p.name}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                        isOnline
+                          ? 'bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/10'
+                          : 'bg-black/50 border-white/5 opacity-70'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`} />
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate font-sans">
+                            {p.name}
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-mono truncate">
+                            {p.level && <span className="text-amber-400 mr-1">Lvl {p.level}</span>}
+                            {p.vocation && <span>{p.vocation}</span>}
+                            {p.world && <span className="text-gray-500 ml-1">• {p.world}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleCopyExiva(p.name)}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-bold font-mono transition-all flex items-center gap-1 shrink-0 cursor-pointer ${
+                          copiedExiva === p.name
+                            ? 'bg-green-500 text-black shadow'
+                            : 'bg-white/10 hover:bg-yellow-500 hover:text-black text-gray-300'
+                        }`}
+                        title="Copiar exiva"
+                      >
+                        {copiedExiva === p.name ? <Check size={12} /> : <Copy size={12} />}
+                        <span>{copiedExiva === p.name ? 'Copiado!' : 'Exiva'}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Tabela de Hunteds */}
           <div className="bg-tibia-card border border-tibia-border rounded-lg shadow-xl overflow-hidden">
             <div className="p-4 bg-black/40 border-b border-tibia-border flex items-center gap-3">
               <ShieldAlert className="text-red-500" />
-              <h3 className="text-xl font-medieval text-white">Lista Negra</h3>
+              <h3 className="text-xl font-medieval text-white">Lista Negra do Rubinot</h3>
             </div>
             
             <div className="overflow-x-auto">
@@ -280,8 +444,9 @@ export default function RadarHunters({ isAdmin }) {
                     <th className="p-4 border-b border-tibia-border/50">Status</th>
                     <th className="p-4 border-b border-tibia-border/50">Nome</th>
                     <th className="p-4 border-b border-tibia-border/50">Motivo</th>
-                    <th className="p-4 border-b border-tibia-border/50">Visto por Ǫltimo</th>
+                    <th className="p-4 border-b border-tibia-border/50">Visto por Último</th>
                     <th className="p-4 border-b border-tibia-border/50">Atividade (1h)</th>
+                    <th className="p-4 border-b border-tibia-border/50 text-center">Exiva</th>
                     {isAdmin && <th className="p-4 border-b border-tibia-border/50 text-right">Ações</th>}
                   </tr>
                 </thead>
@@ -329,11 +494,25 @@ export default function RadarHunters({ isAdmin }) {
                            <span className="text-gray-600 text-xs italic">Sem XP recente</span>
                         )}
                       </td>
+                      <td className="p-4 text-center">
+                        <button
+                          onClick={() => handleCopyExiva(hunted.name)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all inline-flex items-center gap-1 cursor-pointer ${
+                            copiedExiva === hunted.name
+                              ? 'bg-green-500 text-black shadow'
+                              : 'bg-white/10 hover:bg-red-500 hover:text-white text-gray-300'
+                          }`}
+                          title="Copiar comando de exiva"
+                        >
+                          {copiedExiva === hunted.name ? <Check size={12} /> : <Copy size={12} />}
+                          <span>{copiedExiva === hunted.name ? 'Copiado!' : 'Exiva'}</span>
+                        </button>
+                      </td>
                       {isAdmin && (
                         <td className="p-4 text-right opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => removeHunted(hunted.id)}
-                            className="text-gray-500 hover:text-red-400 transition-colors"
+                            className="text-gray-500 hover:text-red-400 transition-colors cursor-pointer"
                             title="Remover do Radar"
                           >
                             <Trash2 size={18} />
@@ -346,7 +525,7 @@ export default function RadarHunters({ isAdmin }) {
                   
                   {huntedList.length === 0 && (
                     <tr>
-                      <td colSpan={isAdmin ? 6 : 5} className="p-8 text-center text-gray-500 font-sans">
+                      <td colSpan={isAdmin ? 7 : 6} className="p-8 text-center text-gray-500 font-sans">
                         Nenhum inimigo cadastrado no radar.
                       </td>
                     </tr>

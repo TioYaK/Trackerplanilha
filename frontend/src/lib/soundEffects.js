@@ -1,10 +1,12 @@
-// Web Audio API Synthesizer - 0 dependências externas, áudio procedural de baixa latência
+// Web Audio API & Web Speech API Synthesizer - 0 dependências externas, baixa latência
 class SoundFX {
   constructor() {
     this.ctx = null;
     this.enabled = false;
+    this.voiceEnabled = true;
     if (typeof window !== 'undefined') {
       this.enabled = localStorage.getItem('tactical_audio_enabled') === 'true';
+      this.voiceEnabled = localStorage.getItem('tactical_voice_enabled') !== 'false';
     }
   }
 
@@ -19,6 +21,10 @@ class SoundFX {
     return this.enabled;
   }
 
+  isVoiceEnabled() {
+    return this.voiceEnabled;
+  }
+
   toggle(enable) {
     this.enabled = typeof enable === 'boolean' ? enable : !this.enabled;
     if (typeof window !== 'undefined') {
@@ -28,6 +34,42 @@ class SoundFX {
       this.playTacticalPing();
     }
     return this.enabled;
+  }
+
+  toggleVoice(enable) {
+    this.voiceEnabled = typeof enable === 'boolean' ? enable : !this.voiceEnabled;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tactical_voice_enabled', String(this.voiceEnabled));
+    }
+    if (this.voiceEnabled && this.enabled) {
+      this.speakTactical('Voz tática ativada');
+    }
+    return this.voiceEnabled;
+  }
+
+  // Síntese de Voz Tática Gamer (Web Speech API)
+  speakTactical(text) {
+    if (!this.enabled || !this.voiceEnabled || typeof window === 'undefined') return;
+    if (!('speechSynthesis' in window)) return;
+
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'pt-BR';
+      utterance.rate = 1.08;
+      utterance.pitch = 0.95;
+      utterance.volume = 1;
+
+      const voices = window.speechSynthesis.getVoices();
+      const ptVoice = voices.find(v => v.lang.startsWith('pt') || v.lang.startsWith('pt-BR'));
+      if (ptVoice) {
+        utterance.voice = ptVoice;
+      }
+
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn('Falha na síntese de voz tática:', e);
+    }
   }
 
   // Ping de radar tático (sonar)
