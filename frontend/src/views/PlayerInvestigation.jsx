@@ -5,9 +5,13 @@ import {
   Clock, Flame, Link2, ExternalLink, Activity, Award, UserPlus, 
   CheckCircle2, RefreshCw, Zap, Users, Eye, Sparkles, Filter, ChevronRight
 } from 'lucide-react';
-import { formatVocation } from '../lib/tibiaUtils';
+import { formatVocation, toTibiaTitleCase } from '../lib/tibiaUtils';
 import { soundFX } from '../lib/soundEffects';
 import AdBanner from '../components/AdBanner';
+
+// Cache em memória de investigações (TTL 60s) mantido no nível do módulo
+const investigationCache = new Map();
+const INVESTIGATION_CACHE_TTL = 60 * 1000;
 
 export default function PlayerInvestigation({ onPlayerClick, onNavigate, isAdmin }) {
   const [searchTarget, setSearchTarget] = useState('');
@@ -52,18 +56,15 @@ export default function PlayerInvestigation({ onPlayerClick, onNavigate, isAdmin
     loadSuggestions();
   }, []);
 
-// Cache em memória de investigações (TTL 60s)
-const investigationCache = new Map();
-const INVESTIGATION_CACHE_TTL = 60 * 1000;
-
   const runInvestigation = async (nameToInvestigate) => {
     const target = (nameToInvestigate || searchTarget).trim();
     if (!target) return;
 
-    const cacheKey = target.toLowerCase();
+    const targetName = toTibiaTitleCase(target);
+    const cacheKey = targetName.toLowerCase();
     const cached = investigationCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp < INVESTIGATION_CACHE_TTL)) {
-      setActiveTarget(target);
+      setActiveTarget(targetName);
       setTargetProfile(cached.targetProfile);
       setTargetDeaths(cached.targetDeaths);
       setTargetFrags(cached.targetFrags);
@@ -76,17 +77,40 @@ const INVESTIGATION_CACHE_TTL = 60 * 1000;
 
     setLoading(true);
     setError(null);
-    setActiveTarget(target);
+    setActiveTarget(targetName);
 
     try {
-      // 1. Busca perfil do alvo em várias fontes
+      // 1. Busca perfil do alvo em várias fontes otimizadas por índice B-Tree
       const [guildRes, stateRes, deathsRes, fragsRes, loginRes, allDeathsRes] = await Promise.all([
-        supabase.from('guild_members').select('*').ilike('name', target).maybeSingle(),
-        supabase.from('current_character_state').select('*').ilike('character_name', target).maybeSingle(),
-        supabase.from('recent_deaths').select('*').ilike('character_name', target).order('id', { ascending: false }).limit(30),
-        supabase.from('recent_deaths').select('*').ilike('killed_by', `%${target}%`).order('id', { ascending: false }).limit(30),
-        supabase.from('login_events').select('*').ilike('character_name', target).order('id', { ascending: false }).limit(40),
-        supabase.from('recent_deaths').select('id, character_name, level, killed_by, death_time').order('id', { ascending: false }).limit(400)
+        supabase.from('guild_members')
+          .select('name, level, vocation, rank, is_online, guild_name')
+          .or(`name.eq.${targetName},name.ilike.${target}`)
+          .limit(1)
+          .maybeSingle(),
+        supabase.from('current_character_state')
+          .select('character_name, level, vocation, last_active, updated_at')
+          .or(`character_name.eq.${targetName},character_name.ilike.${target}`)
+          .limit(1)
+          .maybeSingle(),
+        supabase.from('recent_deaths')
+          .select('id, character_name, level, killed_by, death_time, created_at')
+          .or(`character_name.eq.${targetName},character_name.ilike.${target}`)
+          .order('id', { ascending: false })
+          .limit(30),
+        supabase.from('recent_deaths')
+          .select('id, character_name, level, killed_by, death_time, created_at')
+          .ilike('killed_by', `%${target}%`)
+          .order('id', { ascending: false })
+          .limit(30),
+        supabase.from('login_events')
+          .select('event_type, event_time, level, vocation')
+          .or(`character_name.eq.${targetName},character_name.ilike.${target}`)
+          .order('event_time', { ascending: false })
+          .limit(40),
+        supabase.from('recent_deaths')
+          .select('id, character_name, level, killed_by, death_time, created_at')
+          .order('id', { ascending: false })
+          .limit(300)
       ]);
 
       const profile = {

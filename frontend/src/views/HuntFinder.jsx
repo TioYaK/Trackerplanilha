@@ -1184,14 +1184,37 @@ export default function HuntFinder({ onPlayerClick, onNavigate }) {
 
             </div>
 
-            {/* Rodapé do Modal */}
+            {/* Rodapé do Modal com Integração aos Demais Sistemas */}
             <div className="p-4 border-t border-tibia-border bg-black/95 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs shrink-0">
-              <span className="text-gray-400 text-center sm:text-left">
-                💡 Dica RubinOT: Lembre-se de verificar se o respawn possui leilão ou claim ativo no servidor.
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    handleCloseModal();
+                    onNavigate?.('respawns');
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600/25 hover:bg-emerald-600/40 border border-emerald-500/50 text-emerald-300 font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+                  title="Conferir claim e status deste respawn"
+                >
+                  <Compass size={14} />
+                  <span>Ver no Respawn Tracker</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    handleCloseModal();
+                    onNavigate?.('party_finder');
+                  }}
+                  className="px-3.5 py-2 bg-cyan-600/25 hover:bg-cyan-600/40 border border-cyan-500/50 text-cyan-300 font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+                  title="Recrutar time ou buscar grupo para esta hunt"
+                >
+                  <Users size={14} />
+                  <span>Montar PT no Party Finder</span>
+                </button>
+              </div>
+
               <button
                 onClick={handleCloseModal}
-                className="px-5 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl transition-all shadow-lg cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl transition-all shadow-lg cursor-pointer"
               >
                 Fechar Detalhes
               </button>

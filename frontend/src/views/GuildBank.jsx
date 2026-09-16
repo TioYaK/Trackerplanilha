@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Landmark, Check, X, Search, ShieldAlert, Banknote, FileText, Plus, ArrowUpRight, ArrowDownRight, Globe } from 'lucide-react';
+import { Landmark, Check, X, Search, ShieldAlert, Banknote, FileText, Plus, ArrowUpRight, ArrowDownRight, Globe, Copy, HelpCircle } from 'lucide-react';
 import { useAuth } from '../components/AuthContext';
 import { useWorld } from '../context/WorldContext';
 import { formatVocation } from '../lib/tibiaUtils';
+import { soundFX } from '../lib/soundEffects';
+
+// Cache em memória para Guild Bank (TTL 30s) mantido fora do ciclo de render do componente
+const guildBankCache = new Map();
 
 export default function GuildBank({ isAdmin }) {
   const { profile } = useAuth();
@@ -15,6 +19,7 @@ export default function GuildBank({ isAdmin }) {
   const [transactions, setTransactions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('mensalidades'); // 'mensalidades' | 'transparencia'
+  const [copiedPix, setCopiedPix] = useState(false);
   
   // Modal de transação
   const [showTxModal, setShowTxModal] = useState(false);
@@ -32,9 +37,6 @@ export default function GuildBank({ isAdmin }) {
   };
 
   const [selectedMonth, setSelectedMonth] = useState(getBillingMonth());
-
-// Cache em memória para Guild Bank (TTL 30s)
-let guildBankCache = new Map();
 
   const fetchData = async (forceRefresh = false) => {
     const cached = guildBankCache.get(selectedMonth);
@@ -129,37 +131,49 @@ let guildBankCache = new Map();
   const togglePayment = async (playerName, isPaid) => {
     if (!isAdmin) return;
     
-    if (isPaid) {
-      await supabase.from('guild_bank_payments')
-        .delete()
-        .eq('character_name', playerName)
-        .eq('payment_month', selectedMonth);
-    } else {
-      await supabase.from('guild_bank_payments')
-        .insert([{
-          character_name: playerName,
-          payment_month: selectedMonth,
-          admin_name: profile?.main_character || 'Admin'
-        }]);
+    try {
+      if (isPaid) {
+        await supabase.from('guild_bank_payments')
+          .delete()
+          .eq('character_name', playerName)
+          .eq('payment_month', selectedMonth);
+      } else {
+        await supabase.from('guild_bank_payments')
+          .insert([{
+            character_name: playerName,
+            payment_month: selectedMonth,
+            admin_name: profile?.main_character || 'Admin'
+          }]);
+      }
+      soundFX.playTacticalPing();
+      guildBankCache.delete(selectedMonth);
+      fetchData(true);
+    } catch (e) {
+      console.error('Erro ao alternar pagamento:', e);
     }
-    fetchData();
   };
 
   const handlePostTx = async (e) => {
     e.preventDefault();
     if (!txForm.title || !txForm.amount) return;
 
-    await supabase.from('guild_bank_transactions').insert([{
-      title: txForm.title,
-      amount_tc: parseInt(txForm.amount, 10),
-      type: txForm.type,
-      description: txForm.description,
-      created_by: profile?.main_character || 'Admin'
-    }]);
+    try {
+      await supabase.from('guild_bank_transactions').insert([{
+        title: txForm.title,
+        amount_tc: parseInt(txForm.amount, 10),
+        type: txForm.type,
+        description: txForm.description,
+        created_by: profile?.main_character || 'Admin'
+      }]);
 
-    setShowTxModal(false);
-    setTxForm({ title: '', amount: '', type: 'OUT', description: '' });
-    fetchData();
+      soundFX.playVictoryChord();
+      setShowTxModal(false);
+      setTxForm({ title: '', amount: '', type: 'OUT', description: '' });
+      guildBankCache.delete(selectedMonth);
+      fetchData(true);
+    } catch (e) {
+      console.error('Erro ao lançar transação:', e);
+    }
   };
 
   if (needsSetup) {
@@ -250,6 +264,36 @@ let guildBankCache = new Map();
 
       {activeTab === 'mensalidades' && (
         <>
+          {/* Banner de Instruções de Pagamento da Mensalidade */}
+          <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-yellow-950/30 via-black to-black border border-yellow-500/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
+                <Banknote size={22} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-yellow-300 font-medieval flex items-center gap-1.5">
+                  Como Pagar sua Mensalidade (250 TCs)
+                </h4>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Transfira <strong>250 Tibia Coins</strong> in-game para o Banker da Guilda ou envie o comprovante no Discord da Guilda para baixa imediata.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText("transfer 250 to Guild Banker");
+                setCopiedPix(true);
+                soundFX.playTacticalPing();
+                setTimeout(() => setCopiedPix(false), 2000);
+              }}
+              className="px-3.5 py-2 rounded-xl bg-black/60 hover:bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+              title="Copiar comando de transferência"
+            >
+              {copiedPix ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+              <span>{copiedPix ? 'Comando Copiado!' : 'Copiar Comando In-Game'}</span>
+            </button>
+          </div>
+
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-bold text-white">Controle de Pagamentos</h3>
             <div className="flex items-center space-x-4 bg-tibia-card border border-tibia-border p-2 rounded-lg">

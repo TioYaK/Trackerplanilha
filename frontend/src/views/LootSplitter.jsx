@@ -8,6 +8,7 @@ import AdBanner from '../components/AdBanner';
 export default function LootSplitter({ onNavigate }) {
   const [logText, setLogText] = useState('');
   const [guildTaxPct, setGuildTaxPct] = useState(0); // 0%, 5%, 10%
+  const [tcPriceGold, setTcPriceGold] = useState(40000); // Cotação gp por 1 TC
   const [result, setResult] = useState(null);
   const [copiedBank, setCopiedBank] = useState(false);
   const [copiedDiscord, setCopiedDiscord] = useState(false);
@@ -214,16 +215,33 @@ Mage Destruidor
 
   const copyDiscordSummary = () => {
     if (!result) return;
+    const tcRate = Number(tcPriceGold) || 40000;
+    const profitTC = Math.round(result.netBalance / tcRate);
+    const playerTC = Math.round(result.sharePerPlayer / tcRate);
+
     let msg = `💰 **DIVISÃO DE HUNT RUBINOT** 💰\n`;
     msg += `⏱️ **Duração:** ${result.sessionTime} | 💎 **Loot Total:** ${result.totalLoot.toLocaleString('pt-BR')} gp\n`;
-    msg += `🧪 **Supplies:** ${result.totalSupplies.toLocaleString('pt-BR')} gp | ✨ **Lucro Total:** ${result.netBalance.toLocaleString('pt-BR')} gp\n`;
-    msg += `👑 **Lucro por Jogador:** ${result.sharePerPlayer.toLocaleString('pt-BR')} gp\n\n`;
+    msg += `🧪 **Supplies:** ${result.totalSupplies.toLocaleString('pt-BR')} gp | ✨ **Lucro Total:** ${result.netBalance.toLocaleString('pt-BR')} gp (~${profitTC} TC)\n`;
+    msg += `👑 **Lucro por Jogador:** ${result.sharePerPlayer.toLocaleString('pt-BR')} gp (~${playerTC} TC)\n\n`;
+
+    if (result.players && result.players.length > 0) {
+      const topDmg = [...result.players].sort((a, b) => (b.damage || 0) - (a.damage || 0))[0];
+      const topHeal = [...result.players].sort((a, b) => (b.healing || 0) - (a.healing || 0))[0];
+      if (topDmg && topDmg.damage > 0) {
+        msg += `🏆 **MVP Dano:** ${topDmg.name} (${(topDmg.damage / 1000000).toFixed(1)}M)\n`;
+      }
+      if (topHeal && topHeal.healing > 0) {
+        msg += `💚 **MVP Cura:** ${topHeal.name} (${(topHeal.healing / 1000000).toFixed(1)}M)\n\n`;
+      }
+    }
+
     msg += `🏦 **TRANSFERÊNCIAS NO BANCO:**\n`;
     if (result.transfers.length === 0) {
       msg += `Nenhuma transferência necessária.\n`;
     } else {
       result.transfers.forEach(t => {
-        msg += '```' + t.bankCommand + '```\n';
+        const transferTC = Math.round(t.amount / tcRate);
+        msg += `\`${t.bankCommand}\` *(ou ~${transferTC} TC)*\n`;
       });
     }
     msg += `\n⚡ *Calculado via Rubinot Tracker - trackerplanilha.vercel.app*`;
@@ -297,25 +315,48 @@ Mage Destruidor
             </div>
           )}
 
-          {/* Opção de Caixinha da Guilda */}
-          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-tibia-border/40">
-            <span className="text-xs text-gray-400 flex items-center gap-1.5">
-              <Shield size={14} className="text-blue-400" /> Caixinha da Guilda:
-            </span>
-            <div className="flex gap-1.5">
-              {[0, 5, 10].map(pct => (
-                <button
-                  key={pct}
-                  onClick={() => setGuildTaxPct(pct)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                    guildTaxPct === pct 
-                      ? 'bg-yellow-500 text-black font-bold' 
-                      : 'bg-black/60 text-gray-400 hover:text-white border border-white/10'
-                  }`}
-                >
-                  {pct}%
-                </button>
-              ))}
+          {/* Opção de Caixinha da Guilda & Conversor Tibia Coins */}
+          <div className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-tibia-border/40">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400 flex items-center gap-1.5">
+                <Shield size={14} className="text-blue-400" /> Caixinha da Guilda:
+              </span>
+              <div className="flex gap-1.5">
+                {[0, 5, 10].map(pct => (
+                  <button
+                    key={pct}
+                    onClick={() => setGuildTaxPct(pct)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      guildTaxPct === pct 
+                        ? 'bg-yellow-500 text-black font-bold' 
+                        : 'bg-black/60 text-gray-400 hover:text-white border border-white/10'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-white/5">
+              <span className="text-xs text-gray-400 flex items-center gap-1.5">
+                <Coins size={14} className="text-yellow-400" /> Cotação 1 TC (gp):
+              </span>
+              <div className="flex items-center gap-1.5">
+                {[35000, 40000, 45000, 50000].map(rate => (
+                  <button
+                    key={rate}
+                    onClick={() => setTcPriceGold(rate)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono transition-all ${
+                      tcPriceGold === rate
+                        ? 'bg-amber-500/20 text-yellow-300 border border-yellow-500/50 font-bold'
+                        : 'bg-black/60 text-gray-400 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    {rate / 1000}k
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -333,7 +374,7 @@ Mage Destruidor
           {!result ? (
             <div className="h-full min-h-[350px] bg-black/40 border border-dashed border-tibia-border rounded-2xl flex flex-col items-center justify-center p-8 text-center text-gray-500 gap-3">
               <Coins size={48} className="text-gray-600 animate-pulse" />
-              <p className="text-sm">Cole o log e clique em <strong>"Calcular Divisão Justa"</strong> para ver os comandos de transferência bancária.</p>
+              <p className="text-sm">Cole o log e clique em <strong>"Calcular Divisão Justa"</strong> para ver os comandos de transferência bancária e conversão em Tibia Coins.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -345,12 +386,18 @@ Mage Destruidor
                   <p className="text-sm sm:text-base font-bold text-yellow-400 font-mono mt-0.5">
                     {result.totalLoot.toLocaleString('pt-BR')} gp
                   </p>
+                  <p className="text-[10px] text-gray-400 font-mono">
+                    ~{Math.round(result.totalLoot / (Number(tcPriceGold) || 40000))} TC
+                  </p>
                 </div>
 
                 <div className="bg-black/60 border border-tibia-border p-3.5 rounded-xl">
                   <p className="text-[10px] uppercase font-bold text-gray-500">Supplies Gastos</p>
                   <p className="text-sm sm:text-base font-bold text-red-400 font-mono mt-0.5">
                     {result.totalSupplies.toLocaleString('pt-BR')} gp
+                  </p>
+                  <p className="text-[10px] text-gray-400 font-mono">
+                    ~{Math.round(result.totalSupplies / (Number(tcPriceGold) || 40000))} TC
                   </p>
                 </div>
 
@@ -359,6 +406,9 @@ Mage Destruidor
                   <p className="text-sm sm:text-base font-bold text-green-400 font-mono mt-0.5">
                     {result.netBalance.toLocaleString('pt-BR')} gp
                   </p>
+                  <p className="text-[10px] text-emerald-400 font-mono font-bold">
+                    ~{Math.round(result.netBalance / (Number(tcPriceGold) || 40000))} TC
+                  </p>
                 </div>
 
                 <div className="bg-black/60 border border-yellow-500/40 p-3.5 rounded-xl bg-yellow-950/20">
@@ -366,8 +416,63 @@ Mage Destruidor
                   <p className="text-sm sm:text-base font-bold text-white font-mono mt-0.5">
                     {result.sharePerPlayer.toLocaleString('pt-BR')} gp
                   </p>
+                  <p className="text-[10px] text-yellow-300 font-mono font-bold">
+                    ~{Math.round(result.sharePerPlayer / (Number(tcPriceGold) || 40000))} TC
+                  </p>
                 </div>
               </div>
+
+              {/* Destaques & MVPs da Hunt */}
+              {result.players && result.players.length > 0 && (() => {
+                const topDmg = [...result.players].sort((a, b) => (b.damage || 0) - (a.damage || 0))[0];
+                const topHeal = [...result.players].sort((a, b) => (b.healing || 0) - (a.healing || 0))[0];
+                const topTank = [...result.players].sort((a, b) => (b.supplies || 0) - (a.supplies || 0))[0];
+                const dmgPct = result.totalDamage > 0 ? Math.round(((topDmg?.damage || 0) / result.totalDamage) * 100) : 0;
+                const healPct = result.totalHealing > 0 ? Math.round(((topHeal?.healing || 0) / result.totalHealing) * 100) : 0;
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {topDmg && topDmg.damage > 0 && (
+                      <div className="p-3 bg-gradient-to-r from-orange-950/40 to-black/60 border border-orange-500/30 rounded-xl flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400">
+                          <Flame size={18} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-orange-400">👑 MVP Dano</p>
+                          <p className="text-xs font-bold text-white truncate max-w-[140px]">{topDmg.name}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">{(topDmg.damage / 1000000).toFixed(1)}M ({dmgPct}%)</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {topHeal && topHeal.healing > 0 && (
+                      <div className="p-3 bg-gradient-to-r from-cyan-950/40 to-black/60 border border-cyan-500/30 rounded-xl flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                          <Shield size={18} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-cyan-400">💚 MVP Sio / Cura</p>
+                          <p className="text-xs font-bold text-white truncate max-w-[140px]">{topHeal.name}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">{(topHeal.healing / 1000000).toFixed(1)}M ({healPct}%)</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {topTank && topTank.supplies > 0 && (
+                      <div className="p-3 bg-gradient-to-r from-red-950/40 to-black/60 border border-red-500/30 rounded-xl flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400">
+                          <CheckCircle2 size={18} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-red-400">🛡️ MVP Blocker / Waste</p>
+                          <p className="text-xs font-bold text-white truncate max-w-[140px]">{topTank.name}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">{(topTank.supplies / 1000000).toFixed(1)}M supplies</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Tabela de Comandos de Transferência (O Ponto Mais Valioso) */}
               <div className="bg-gradient-to-b from-yellow-950/30 to-black/80 border-2 border-yellow-500/40 p-5 rounded-2xl flex flex-col gap-4 shadow-xl">
@@ -375,15 +480,15 @@ Mage Destruidor
                   <div>
                     <h3 className="text-base font-medieval text-yellow-400 flex items-center gap-2">
                       <ArrowRight size={18} className="text-yellow-400" />
-                      Comandos de Banco (Copiar & Colar)
+                      Comandos de Banco & Equivalente em Tibia Coins
                     </h3>
-                    <p className="text-xs text-gray-400">Basta copiar e colar no NPC Banker do Tibia!</p>
+                    <p className="text-xs text-gray-400">Basta copiar e colar no NPC Banker do Tibia ou transferir em Tibia Coins!</p>
                   </div>
 
                   <div className="flex gap-2 w-full sm:w-auto">
                     <button
                       onClick={copyBankCommands}
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
                     >
                       {copiedBank ? <Check size={14} /> : <Copy size={14} />}
                       <span>{copiedBank ? 'Copiado!' : 'Copiar Comandos'}</span>
@@ -391,7 +496,7 @@ Mage Destruidor
 
                     <button
                       onClick={copyDiscordSummary}
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-400 text-blue-200 text-xs font-bold rounded-xl transition-all"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-400 text-blue-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
                     >
                       {copiedDiscord ? <Check size={14} /> : <Share2 size={14} />}
                       <span>{copiedDiscord ? 'Copiado!' : 'Discord/Zap'}</span>
@@ -405,42 +510,50 @@ Mage Destruidor
                       Tudo equilibrado! Nenhuma transferência necessária.
                     </div>
                   ) : (
-                    result.transfers.map((t, idx) => (
-                      <div 
-                        key={idx}
-                        className="flex items-center justify-between p-3 bg-black/80 border border-yellow-500/20 rounded-xl font-mono text-xs hover:border-yellow-500/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 font-bold">{t.from}</span>
-                          <span className="text-yellow-500">➔</span>
-                          <span className="text-white font-bold">{t.to}</span>
+                    result.transfers.map((t, idx) => {
+                      const transferTC = Math.round(t.amount / (Number(tcPriceGold) || 40000));
+                      return (
+                        <div 
+                          key={idx}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-black/80 border border-yellow-500/20 rounded-xl font-mono text-xs hover:border-yellow-500/50 transition-colors gap-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 font-bold">{t.from}</span>
+                            <span className="text-yellow-500">➔</span>
+                            <span className="text-white font-bold">{t.to}</span>
+                          </div>
+                          <div className="flex items-center gap-3 justify-between sm:justify-end">
+                            <div className="flex items-center gap-2">
+                              <span className="text-green-400 font-bold">{t.amount.toLocaleString('pt-BR')} gp</span>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/15 text-yellow-300 border border-yellow-500/30 font-sans font-bold">
+                                💎 ~{transferTC} TC
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(t.bankCommand);
+                                setCopiedCommandIdx(idx);
+                                setTimeout(() => setCopiedCommandIdx(null), 2000);
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1 hover:bg-yellow-500/20 rounded border border-white/10 text-xs text-yellow-400 hover:border-yellow-500/40 transition-all cursor-pointer"
+                              title="Copiar comando de banco"
+                            >
+                              {copiedCommandIdx === idx ? (
+                                <>
+                                  <Check size={12} className="text-green-400" />
+                                  <span className="text-[10px] text-green-400 font-sans font-bold">Copiado!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={12} />
+                                  <span className="text-[10px] font-sans font-semibold">Copiar</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-green-400 font-bold">{t.amount.toLocaleString('pt-BR')} gp</span>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(t.bankCommand);
-                              setCopiedCommandIdx(idx);
-                              setTimeout(() => setCopiedCommandIdx(null), 2000);
-                            }}
-                            className="flex items-center gap-1 px-2 py-1 hover:bg-yellow-500/20 rounded border border-white/10 text-xs text-yellow-400 hover:border-yellow-500/40 transition-all"
-                            title="Copiar comando único de banco"
-                          >
-                            {copiedCommandIdx === idx ? (
-                              <>
-                                <Check size={12} className="text-green-400" />
-                                <span className="text-[10px] text-green-400 font-sans font-bold">Copiado!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy size={12} />
-                                <span className="text-[10px] font-sans font-semibold">Copiar</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -483,7 +596,13 @@ Mage Destruidor
                           <span>Waste: <strong className="text-red-400">{p.supplies.toLocaleString('pt-BR')}</strong></span>
                           <span>Status: <strong className={p.diff > 0 ? 'text-green-400' : p.diff < 0 ? 'text-red-400' : 'text-gray-400'}>
                             {p.diff > 0 ? `Recebe ${p.diff.toLocaleString('pt-BR')} gp` : p.diff < 0 ? `Transfere ${(-p.diff).toLocaleString('pt-BR')} gp` : 'Quites'}
-                          </strong></span>
+                          </strong>
+                          {p.diff !== 0 && (
+                            <span className="text-[10px] text-yellow-400/80 font-sans ml-1">
+                              (~{Math.round(Math.abs(p.diff) / (Number(tcPriceGold) || 40000))} TC)
+                            </span>
+                          )}
+                          </span>
                         </div>
                       </div>
                     );

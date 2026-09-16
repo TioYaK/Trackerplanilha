@@ -3,11 +3,15 @@ import { supabase } from '../lib/supabase';
 import { 
   Swords, Shield, Heart, Zap, Sparkles, Trophy, 
   ArrowRight, ArrowLeftRight, Share2, Search, Check, 
-  AlertCircle, ExternalLink, Activity, Clock, Skull, User, Star 
+  AlertCircle, ExternalLink, Activity, Clock, Skull, User, Star, Crown 
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 import { getPinnedPlayers, subscribeWatchlist } from '../lib/watchlistService';
+import { toTibiaTitleCase } from '../lib/tibiaUtils';
 import VersusCardShareModal from '../components/VersusCardShareModal';
+
+// Cache em memória para troca rápida de rivais
+const versusPlayerCache = new Map();
 
 // Cálculo clássico de experiência de Tibia
 const calculateTotalXp = (level) => {
@@ -98,17 +102,47 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
     return unsub;
   }, []);
 
-  // Busca dados de um jogador
+  // Busca dados de um jogador com cache e consultas indexadas por B-Tree
   const fetchPlayerData = async (name) => {
     if (!name || !name.trim()) return null;
     const cleanName = name.trim();
+    const targetName = toTibiaTitleCase(cleanName);
+    const cacheKey = targetName.toLowerCase();
+
+    // Cache local de 60 segundos
+    if (versusPlayerCache.has(cacheKey)) {
+      const cached = versusPlayerCache.get(cacheKey);
+      if (Date.now() - cached.timestamp < 60000) {
+        return cached.data;
+      }
+    }
 
     try {
       const [cStateRes, gMemRes, deathsRes, perkRes] = await Promise.all([
-        supabase.from('current_character_state').select('*').ilike('character_name', cleanName).maybeSingle(),
-        supabase.from('guild_members').select('*').ilike('name', cleanName).maybeSingle(),
-        supabase.from('recent_deaths').select('*').ilike('character_name', cleanName).order('death_time', { ascending: false }).limit(50),
-        supabase.from('guild_perk_members').select('world').ilike('character_name', cleanName).maybeSingle()
+        supabase
+          .from('current_character_state')
+          .select('character_name, level, vocation, updated_at')
+          .or(`character_name.eq.${targetName},character_name.ilike.${cleanName}`)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('guild_members')
+          .select('name, level, vocation, is_online, guild_name')
+          .or(`name.eq.${targetName},name.ilike.${cleanName}`)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('recent_deaths')
+          .select('level, killed_by, death_time, is_hunted')
+          .or(`character_name.eq.${targetName},character_name.ilike.${cleanName}`)
+          .order('death_time', { ascending: false })
+          .limit(30),
+        supabase
+          .from('guild_perk_members')
+          .select('world')
+          .or(`character_name.eq.${targetName},character_name.ilike.${cleanName}`)
+          .limit(1)
+          .maybeSingle()
       ]);
 
       const level = cStateRes.data?.level || gMemRes.data?.level || (deathsRes.data?.[0]?.level ? Number(deathsRes.data[0].level) : 500);
@@ -119,8 +153,8 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
       const totalXp = calculateTotalXp(level);
       const deaths = deathsRes.data || [];
 
-      return {
-        name: cleanName,
+      const playerResult = {
+        name: cStateRes.data?.character_name || gMemRes.data?.name || targetName,
         level,
         vocation,
         world,
@@ -130,6 +164,9 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
         deaths,
         totalDeaths: deaths.length
       };
+
+      versusPlayerCache.set(cacheKey, { timestamp: Date.now(), data: playerResult });
+      return playerResult;
     } catch (e) {
       console.error('Erro ao buscar dados do jogador:', e);
       return null;
@@ -398,9 +435,21 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative mb-8">
         
         {/* Slot Guerreiro 1 (Azul/Dourado) */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-tibia-card border-2 border-yellow-500/40 shadow-xl relative">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-yellow-400 font-mono mb-2">
-            Guerreiro 1 (Lado Azul)
+        <div className={`p-4 sm:p-5 rounded-2xl bg-tibia-card border-2 transition-all relative ${
+          verdict?.winner === p1Data?.name ? 'border-yellow-500 shadow-yellow-500/10 shadow-xl' : 'border-yellow-500/40 shadow-xl'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-yellow-400 font-mono flex items-center gap-1.5">
+              <span>Guerreiro 1 (Lado Dourado)</span>
+              {p1Data?.isOnline && (
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online" />
+              )}
+            </div>
+            {verdict?.winner === p1Data?.name && (
+              <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-[10px] font-bold inline-flex items-center gap-1">
+                <Crown size={12} className="text-yellow-400" /> Favorito ({verdict.advPercent}%)
+              </span>
+            )}
           </div>
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -418,7 +467,7 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
                   setP1Query('');
                   loadComparison(p1Query, player2Name);
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-yellow-500 text-black font-bold text-xs"
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-yellow-500 text-black font-bold text-xs cursor-pointer hover:bg-yellow-400 transition-colors"
               >
                 Buscar
               </button>
@@ -436,7 +485,7 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
                       setP1Suggestions([]);
                       loadComparison(s.name, player2Name);
                     }}
-                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-yellow-500/20 text-left text-xs"
+                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-yellow-500/20 text-left text-xs cursor-pointer"
                   >
                     <span className="font-medieval font-bold text-white">{s.name}</span>
                     <span className="text-gray-400 font-mono">{s.vocation} • Lvl {s.level}</span>
@@ -457,9 +506,21 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
         </button>
 
         {/* Slot Guerreiro 2 (Vermelho) */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-tibia-card border-2 border-red-500/40 shadow-xl relative">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-red-400 font-mono mb-2">
-            Guerreiro 2 (Lado Vermelho)
+        <div className={`p-4 sm:p-5 rounded-2xl bg-tibia-card border-2 transition-all relative ${
+          verdict?.winner === p2Data?.name ? 'border-red-500 shadow-red-500/10 shadow-xl' : 'border-red-500/40 shadow-xl'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-red-400 font-mono flex items-center gap-1.5">
+              <span>Guerreiro 2 (Lado Vermelho)</span>
+              {p2Data?.isOnline && (
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online" />
+              )}
+            </div>
+            {verdict?.winner === p2Data?.name && (
+              <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] font-bold inline-flex items-center gap-1">
+                <Crown size={12} className="text-red-400" /> Favorito ({verdict.advPercent}%)
+              </span>
+            )}
           </div>
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -477,7 +538,7 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
                   setP2Query('');
                   loadComparison(player1Name, p2Query);
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-red-600 text-white font-bold text-xs"
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-red-600 text-white font-bold text-xs cursor-pointer hover:bg-red-500 transition-colors"
               >
                 Buscar
               </button>
@@ -495,7 +556,7 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
                       setP2Suggestions([]);
                       loadComparison(player1Name, s.name);
                     }}
-                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-red-950/40 text-left text-xs"
+                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-red-950/40 text-left text-xs cursor-pointer"
                   >
                     <span className="font-medieval font-bold text-white">{s.name}</span>
                     <span className="text-gray-400 font-mono">{s.vocation} • Lvl {s.level}</span>
@@ -593,50 +654,98 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
             </div>
           </div>
 
-          {/* Grid de Atributos Específicos */}
+          {/* Grid de Atributos Específicos com Barras Comparativas */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-4">
             
             {/* HP Estimado */}
-            <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-center">
-              <Heart className="mx-auto text-red-400 mb-1" size={20} />
-              <div className="text-xs text-gray-400">Vida Máxima (HP)</div>
-              <div className="flex items-center justify-center gap-3 mt-1 font-mono font-bold">
-                <span className="text-yellow-400">{p1Data.vitals.hp.toLocaleString('pt-BR')}</span>
-                <span className="text-gray-600">vs</span>
-                <span className="text-red-400">{p2Data.vitals.hp.toLocaleString('pt-BR')}</span>
+            <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-center flex flex-col justify-between">
+              <div>
+                <Heart className="mx-auto text-red-400 mb-1" size={20} />
+                <div className="text-xs text-gray-400">Vida Máxima (HP)</div>
+                <div className="flex items-center justify-center gap-3 mt-1 font-mono font-bold">
+                  <span className="text-yellow-400">{p1Data.vitals.hp.toLocaleString('pt-BR')}</span>
+                  <span className="text-gray-600">vs</span>
+                  <span className="text-red-400">{p2Data.vitals.hp.toLocaleString('pt-BR')}</span>
+                </div>
+              </div>
+              <div className="w-full h-1.5 bg-black/80 rounded-full overflow-hidden flex border border-white/5 mt-3">
+                <div 
+                  className="bg-yellow-500 h-full transition-all duration-500" 
+                  style={{ width: `${Math.round((p1Data.vitals.hp / ((p1Data.vitals.hp + p2Data.vitals.hp) || 1)) * 100)}%` }}
+                />
+                <div 
+                  className="bg-red-500 h-full transition-all duration-500" 
+                  style={{ width: `${Math.round((p2Data.vitals.hp / ((p1Data.vitals.hp + p2Data.vitals.hp) || 1)) * 100)}%` }}
+                />
               </div>
             </div>
 
             {/* Mana Estimada */}
-            <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-center">
-              <Zap className="mx-auto text-blue-400 mb-1" size={20} />
-              <div className="text-xs text-gray-400">Mana Máxima (MP)</div>
-              <div className="flex items-center justify-center gap-3 mt-1 font-mono font-bold">
-                <span className="text-yellow-400">{p1Data.vitals.mana.toLocaleString('pt-BR')}</span>
-                <span className="text-gray-600">vs</span>
-                <span className="text-red-400">{p2Data.vitals.mana.toLocaleString('pt-BR')}</span>
+            <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-center flex flex-col justify-between">
+              <div>
+                <Zap className="mx-auto text-blue-400 mb-1" size={20} />
+                <div className="text-xs text-gray-400">Mana Máxima (MP)</div>
+                <div className="flex items-center justify-center gap-3 mt-1 font-mono font-bold">
+                  <span className="text-yellow-400">{p1Data.vitals.mana.toLocaleString('pt-BR')}</span>
+                  <span className="text-gray-600">vs</span>
+                  <span className="text-red-400">{p2Data.vitals.mana.toLocaleString('pt-BR')}</span>
+                </div>
+              </div>
+              <div className="w-full h-1.5 bg-black/80 rounded-full overflow-hidden flex border border-white/5 mt-3">
+                <div 
+                  className="bg-yellow-500 h-full transition-all duration-500" 
+                  style={{ width: `${Math.round((p1Data.vitals.mana / ((p1Data.vitals.mana + p2Data.vitals.mana) || 1)) * 100)}%` }}
+                />
+                <div 
+                  className="bg-red-500 h-full transition-all duration-500" 
+                  style={{ width: `${Math.round((p2Data.vitals.mana / ((p1Data.vitals.mana + p2Data.vitals.mana) || 1)) * 100)}%` }}
+                />
               </div>
             </div>
 
             {/* Velocidade Base */}
-            <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-center">
-              <Activity className="mx-auto text-green-400 mb-1" size={20} />
-              <div className="text-xs text-gray-400">Velocidade (Speed)</div>
-              <div className="flex items-center justify-center gap-3 mt-1 font-mono font-bold">
-                <span className="text-yellow-400">{p1Data.vitals.speed}</span>
-                <span className="text-gray-600">vs</span>
-                <span className="text-red-400">{p2Data.vitals.speed}</span>
+            <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-center flex flex-col justify-between">
+              <div>
+                <Activity className="mx-auto text-green-400 mb-1" size={20} />
+                <div className="text-xs text-gray-400">Velocidade (Speed)</div>
+                <div className="flex items-center justify-center gap-3 mt-1 font-mono font-bold">
+                  <span className="text-yellow-400">{p1Data.vitals.speed}</span>
+                  <span className="text-gray-600">vs</span>
+                  <span className="text-red-400">{p2Data.vitals.speed}</span>
+                </div>
+              </div>
+              <div className="w-full h-1.5 bg-black/80 rounded-full overflow-hidden flex border border-white/5 mt-3">
+                <div 
+                  className="bg-yellow-500 h-full transition-all duration-500" 
+                  style={{ width: `${Math.round((p1Data.vitals.speed / ((p1Data.vitals.speed + p2Data.vitals.speed) || 1)) * 100)}%` }}
+                />
+                <div 
+                  className="bg-red-500 h-full transition-all duration-500" 
+                  style={{ width: `${Math.round((p2Data.vitals.speed / ((p1Data.vitals.speed + p2Data.vitals.speed) || 1)) * 100)}%` }}
+                />
               </div>
             </div>
 
             {/* Total de Mortes Registradas */}
-            <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-center">
-              <Skull className="mx-auto text-purple-400 mb-1" size={20} />
-              <div className="text-xs text-gray-400">Mortes Registradas</div>
-              <div className="flex items-center justify-center gap-3 mt-1 font-mono font-bold">
-                <span className="text-yellow-400">{p1Data.totalDeaths}</span>
-                <span className="text-gray-600">vs</span>
-                <span className="text-red-400">{p2Data.totalDeaths}</span>
+            <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-center flex flex-col justify-between">
+              <div>
+                <Skull className="mx-auto text-purple-400 mb-1" size={20} />
+                <div className="text-xs text-gray-400">Mortes Registradas</div>
+                <div className="flex items-center justify-center gap-3 mt-1 font-mono font-bold">
+                  <span className="text-yellow-400">{p1Data.totalDeaths}</span>
+                  <span className="text-gray-600">vs</span>
+                  <span className="text-red-400">{p2Data.totalDeaths}</span>
+                </div>
+              </div>
+              <div className="w-full h-1.5 bg-black/80 rounded-full overflow-hidden flex border border-white/5 mt-3">
+                <div 
+                  className="bg-yellow-500 h-full transition-all duration-500" 
+                  style={{ width: `${Math.round((p1Data.totalDeaths / ((p1Data.totalDeaths + p2Data.totalDeaths) || 1)) * 100)}%` }}
+                />
+                <div 
+                  className="bg-red-500 h-full transition-all duration-500" 
+                  style={{ width: `${Math.round((p2Data.totalDeaths / ((p1Data.totalDeaths + p2Data.totalDeaths) || 1)) * 100)}%` }}
+                />
               </div>
             </div>
 
@@ -651,7 +760,7 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
               </div>
               <button
                 onClick={() => onPlayerClick && onPlayerClick(p1Data.name)}
-                className="px-3 py-1 rounded-lg bg-black/60 hover:bg-white/10 border border-white/10 text-yellow-300"
+                className="px-3 py-1 rounded-lg bg-black/60 hover:bg-white/10 border border-white/10 text-yellow-300 cursor-pointer"
               >
                 Ver Dossiê ↗
               </button>
@@ -664,7 +773,7 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
               </div>
               <button
                 onClick={() => onPlayerClick && onPlayerClick(p2Data.name)}
-                className="px-3 py-1 rounded-lg bg-black/60 hover:bg-white/10 border border-white/10 text-red-300"
+                className="px-3 py-1 rounded-lg bg-black/60 hover:bg-white/10 border border-white/10 text-red-300 cursor-pointer"
               >
                 Ver Dossiê ↗
               </button>
@@ -698,7 +807,7 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
           p1Data={p1Data}
           p2Data={p2Data}
           headToHead={headToHead}
-          diff={diff}
+          diff={verdict}
           onClose={() => setVersusShareModalOpen(false)}
         />
       )}
