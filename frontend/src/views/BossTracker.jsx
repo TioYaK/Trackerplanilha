@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Skull, Clock, CheckCircle2, Circle, Sparkles, Flame, ShieldAlert, Coins, RefreshCw, AlertCircle, Calendar } from 'lucide-react';
+import { Skull, Clock, CheckCircle2, Circle, Sparkles, Flame, ShieldAlert, Coins, RefreshCw, AlertCircle, Calendar, Search, CheckCheck } from 'lucide-react';
 import { getTodayBoosted } from '../data/boostedDailyData';
 import { supabase } from '../lib/supabase';
 
@@ -192,6 +192,125 @@ const BOSS_DATABASE = [
     element: 'Físico / Sagrado',
     weakness: 'Morte / Gelo',
     tip: 'Mate durante a rota de hunt nos Werelions sem perder tempo.'
+  },
+
+  // Rotten Blood & Soul War (Endgame Supremo RubinOT)
+  {
+    id: 'bakragore',
+    name: 'Bakragore (Rotten Blood Final)',
+    location: 'Rotten Blood (Endgame Arena)',
+    category: 'endgame',
+    cooldownHours: 20,
+    estMinutes: 25,
+    avgProfitK: 1400,
+    bisDrops: ['Grand Sanguine Bow', 'Grand Sanguine Blade', 'Grand Sanguine Rod', 'Bag You Covet', 'Sanguine Taints'],
+    element: 'Morte / Sangue / Físico',
+    weakness: 'Fogo (-10%), Energia (-10%)',
+    tip: 'O chefe supremo do RubinOT! Requer time 5x level 1000+, 4 taints e coordenação de runas/orbs de sangue.'
+  },
+  {
+    id: 'chagorz',
+    name: 'Chagorz (Crucible of Chagorz)',
+    location: 'Rotten Blood (Chagorz Sanctum)',
+    category: 'endgame',
+    cooldownHours: 20,
+    estMinutes: 15,
+    avgProfitK: 650,
+    bisDrops: ['Sanguine Blade', 'Sanguine Cudgel', 'Darklight Core'],
+    element: 'Físico / Morte / Terra',
+    weakness: 'Fogo (-10%), Gelo (-5%)',
+    tip: 'Destrua os pilares corrompidos e impeça que as poças escuras alcancem o centro da arena.'
+  },
+  {
+    id: 'murmur',
+    name: 'Murmur (Crucible of Murmur)',
+    location: 'Rotten Blood (Murmur Sanctum)',
+    category: 'endgame',
+    cooldownHours: 20,
+    estMinutes: 15,
+    avgProfitK: 650,
+    bisDrops: ['Sanguine Bow', 'Sanguine Crossbow', 'Darklight Core'],
+    element: 'Energia / Físico / Morte',
+    weakness: 'Terra (-10%), Fogo (-5%)',
+    tip: 'Foque nos murmúrios sonoros rapidamente. Não deixe o boss carregar a onda ensurdecedora.'
+  },
+  {
+    id: 'ichgahal',
+    name: 'Ichgahal (Crucible of Ichgahal)',
+    location: 'Rotten Blood (Ichgahal Sanctum)',
+    category: 'endgame',
+    cooldownHours: 20,
+    estMinutes: 15,
+    avgProfitK: 650,
+    bisDrops: ['Sanguine Rod', 'Darklight Core'],
+    element: 'Gelo / Morte',
+    weakness: 'Energia (-10%), Santo (-10%)',
+    tip: 'Coordene posicionamento contra a nevasca e derrote os adds de gelo sem sobrepor waves.'
+  },
+  {
+    id: 'vemiath',
+    name: 'Vemiath (Crucible of Vemiath)',
+    location: 'Rotten Blood (Vemiath Sanctum)',
+    category: 'endgame',
+    cooldownHours: 20,
+    estMinutes: 15,
+    avgProfitK: 650,
+    bisDrops: ['Sanguine Wand', 'Darklight Core'],
+    element: 'Fogo / Morte',
+    weakness: 'Gelo (-15%), Santo (-10%)',
+    tip: 'Apague as chamas vorazes com os frascos sagrados nos cantos da sala.'
+  },
+  {
+    id: 'megalomania',
+    name: 'Goshnar\'s Megalomania (Soul War Final)',
+    location: 'Soul War (Final Arena)',
+    category: 'endgame',
+    cooldownHours: 20,
+    estMinutes: 20,
+    avgProfitK: 950,
+    bisDrops: ['Soulshell', 'Soulshanks', 'Soulstalkers', 'Soulbleeder', 'Soultainter', 'Soulcrusher', 'Soulcutter', 'Soulhexer', 'Soulmantle', 'Soulstrider'],
+    element: 'Morte / Físico',
+    weakness: 'Energia (-10%), Santo (-10%)',
+    tip: 'Time 5x level 800+. Requer 4 taints ativos. Alterne o aggro dos avatares e neutralize os orbs de rancor.'
+  },
+  {
+    id: 'goshnar_wardens',
+    name: 'Goshnar\'s Wardens (5 Mini-Bosses Soul War)',
+    location: 'Soul War (Claustrophobic, Ebon, Crater, Mirrored, Wasteland)',
+    category: 'endgame',
+    cooldownHours: 20,
+    estMinutes: 10,
+    avgProfitK: 350,
+    bisDrops: ['Soul Bag', 'Ghost Backpack', 'Final Judgment', 'Silver Token'],
+    element: 'Morte / Físico',
+    weakness: 'Energia / Santo',
+    tip: 'Cruelty, Hatred, Spite, Malice e Greed. Execute diariamente para farm e acesso ao Megalomania.'
+  },
+  {
+    id: 'primal_menace',
+    name: 'Primal Menace (Marapur Hazard)',
+    location: 'Primal Ordeal (Marapur Hazard)',
+    category: 'endgame',
+    cooldownHours: 20,
+    estMinutes: 15,
+    avgProfitK: 500,
+    bisDrops: ['Primal Pod', 'Magma Bubble Core', 'Primal Bag'],
+    element: 'Fogo / Físico / Terra',
+    weakness: 'Gelo (-15%), Energia (-10%)',
+    tip: 'Requer nível de hazard. Use gelo pesado e controle os magma bubbles antes que detonem na party.'
+  },
+  {
+    id: 'scourge_oblivion',
+    name: 'The Scourge of Oblivion',
+    location: 'Heart of Destruction (Final)',
+    category: 'daily',
+    cooldownHours: 20,
+    estMinutes: 12,
+    avgProfitK: 300,
+    bisDrops: ['Void Boots', 'Gold Token', 'Silver Token'],
+    element: 'Físico / Energia',
+    weakness: 'Terra / Gelo',
+    tip: 'Liberador de Imbuement Crítico Tier 3. Coordene os orbs de ressonância no vórtice central.'
   }
 ];
 
@@ -206,6 +325,7 @@ export default function BossTracker() {
   });
 
   const [activeCategory, setActiveCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [now, setNow] = useState(Date.now());
   const [boostedData, setBoostedData] = useState(() => getTodayBoosted());
 
@@ -347,9 +467,17 @@ export default function BossTracker() {
   };
 
   const filteredBosses = useMemo(() => {
-    if (activeCategory === 'all') return BOSS_DATABASE;
-    return BOSS_DATABASE.filter(b => b.category === activeCategory);
-  }, [activeCategory]);
+    return BOSS_DATABASE.filter(b => {
+      const matchCat = activeCategory === 'all' || b.category === activeCategory;
+      const term = searchTerm.toLowerCase().trim();
+      if (!term) return matchCat;
+      const matchText = (b.name || '').toLowerCase().includes(term) ||
+                        (b.location || '').toLowerCase().includes(term) ||
+                        (b.tip || '').toLowerCase().includes(term) ||
+                        (b.bisDrops || []).some(d => d.toLowerCase().includes(term));
+      return matchCat && matchText;
+    });
+  }, [activeCategory, searchTerm]);
 
   // Estatísticas da Rota Selecionada
   const routeStats = useMemo(() => {
@@ -379,6 +507,18 @@ export default function BossTracker() {
     if (window.confirm('Deseja resetar o status de todos os bosses?')) {
       setTrackedBosses({});
     }
+  };
+
+  const handleMarkAllReadyDone = () => {
+    const readyBosses = filteredBosses.filter(b => getCooldownStatus(b).ready);
+    if (readyBosses.length === 0) return;
+    setTrackedBosses(prev => {
+      const updated = { ...prev };
+      readyBosses.forEach(b => {
+        updated[b.id] = { completed: true, timestamp: now };
+      });
+      return updated;
+    });
   };
 
   return (
@@ -533,43 +673,77 @@ export default function BossTracker() {
           </div>
         </div>
 
-        <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-4 flex items-center justify-between">
+        <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-4 flex items-center justify-between gap-2">
           <div>
-            <div className="text-xs text-gray-400">Ações Rápidas</div>
-            <div className="text-xs text-gray-500 mt-1">Salvo no navegador</div>
+            <div className="text-xs text-gray-400 font-semibold">Ações Rápidas</div>
+            <div className="text-[11px] text-gray-500">Salvo no navegador</div>
           </div>
-          <button
-            type="button"
-            onClick={handleClearAll}
-            className="text-xs text-gray-400 hover:text-red-400 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 transition-colors"
-          >
-            <RefreshCw size={13} /> Resetar Todos
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleMarkAllReadyDone}
+              title="Marcar todos os bosses liberados como feitos agora"
+              className="text-xs text-emerald-300 hover:text-emerald-200 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-950/60 border border-emerald-500/40 hover:bg-emerald-900/60 transition-colors font-bold"
+            >
+              <CheckCheck size={14} /> Feitos
+            </button>
+            <button
+              type="button"
+              onClick={handleClearAll}
+              title="Resetar status de todos os bosses"
+              className="text-xs text-gray-400 hover:text-red-400 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 transition-colors"
+            >
+              <RefreshCw size={13} /> Resetar
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Filtros de Categoria */}
-      <div className="flex flex-wrap gap-2 border-b border-stone-800 pb-4">
-        {[
-          { id: 'all', label: 'Todos os Bosses' },
-          { id: 'daily', label: '⭐ Circuito Rápido Diário (Oberon, Scarlett, Drume)' },
-          { id: 'grave_danger', label: '💀 Grave Danger (Zelos)' },
-          { id: 'feaster', label: '👻 Feaster of Souls (Pale Worm)' },
-          { id: 'solo', label: '🏃 Mini-Bosses Rápidos (Kroazur)' }
-        ].map(cat => (
-          <button
-            key={cat.id}
-            type="button"
-            onClick={() => setActiveCategory(cat.id)}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-              activeCategory === cat.id
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                : 'bg-stone-900/60 border border-stone-800 text-gray-400 hover:text-white hover:border-stone-700'
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
+      {/* Barra de Busca Rápida e Filtros de Categoria */}
+      <div className="space-y-3 border-b border-stone-800 pb-4">
+        <div className="relative w-full max-w-md">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar boss, local ou drop BiS (Falcon, Sanguine, Soul...)"
+            className="w-full bg-black/60 border border-stone-800 focus:border-purple-500 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none transition-colors"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: 'all', label: 'Todos os Bosses' },
+            { id: 'endgame', label: '🩸 Rotten Blood & Soul War (BiS Supremo)' },
+            { id: 'daily', label: '⭐ Circuito Rápido Diário (Oberon, Scarlett, Drume)' },
+            { id: 'grave_danger', label: '💀 Grave Danger (Zelos)' },
+            { id: 'feaster', label: '👻 Feaster of Souls (Pale Worm)' },
+            { id: 'solo', label: '🏃 Mini-Bosses Rápidos (Kroazur)' }
+          ].map(cat => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setActiveCategory(cat.id)}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                activeCategory === cat.id
+                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                  : 'bg-stone-900/60 border border-stone-800 text-gray-400 hover:text-white hover:border-stone-700'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Lista de Cards de Bosses */}

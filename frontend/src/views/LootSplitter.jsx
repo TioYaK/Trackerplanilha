@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Coins, Copy, Check, Calculator, ArrowRight, User, Users, 
-  Sparkles, RefreshCw, AlertCircle, Share2, Shield, Flame, CheckCircle2 
+  Sparkles, RefreshCw, AlertCircle, Share2, Shield, Flame, CheckCircle2, Clipboard 
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 
@@ -11,7 +11,23 @@ export default function LootSplitter({ onNavigate }) {
   const [result, setResult] = useState(null);
   const [copiedBank, setCopiedBank] = useState(false);
   const [copiedDiscord, setCopiedDiscord] = useState(false);
+  const [copiedCommandIdx, setCopiedCommandIdx] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const handlePasteClipboard = async () => {
+    setErrorMsg('');
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        setLogText(text);
+        parseLog(text);
+      } else {
+        setErrorMsg('Sua área de transferência está vazia.');
+      }
+    } catch (e) {
+      setErrorMsg('Não foi possível ler a área de transferência. Use Ctrl+V dentro do campo.');
+    }
+  };
 
   const sampleLog = `Session data: From 2026-09-12, 21:00:00 to 2026-09-12, 23:30:00
 Session: 02:30h
@@ -121,6 +137,8 @@ Mage Destruidor
 
       const sumLoot = players.reduce((acc, p) => acc + p.loot, 0) || totalLoot;
       const sumSupplies = players.reduce((acc, p) => acc + p.supplies, 0) || totalSupplies;
+      const totalDamage = players.reduce((acc, p) => acc + (p.damage || 0), 0);
+      const totalHealing = players.reduce((acc, p) => acc + (p.healing || 0), 0);
       const netBalance = sumLoot - sumSupplies;
 
       // Taxa da guilda (caixinha opcional)
@@ -171,6 +189,8 @@ Mage Destruidor
         sessionTime,
         totalLoot: sumLoot,
         totalSupplies: sumSupplies,
+        totalDamage,
+        totalHealing,
         netBalance,
         guildTaxAmount,
         distributableBalance,
@@ -253,7 +273,13 @@ Mage Destruidor
               <Calculator size={16} className="text-yellow-400" />
               Cole o Log da Hunt
             </h3>
-            <span className="text-xs text-gray-500">Party Analyzer</span>
+            <button
+              onClick={handlePasteClipboard}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-[11px] font-bold text-yellow-300 transition-all active:scale-95"
+            >
+              <Clipboard size={12} />
+              Colar do Clipboard
+            </button>
           </div>
 
           <textarea
@@ -394,11 +420,23 @@ Mage Destruidor
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(t.bankCommand);
+                              setCopiedCommandIdx(idx);
+                              setTimeout(() => setCopiedCommandIdx(null), 2000);
                             }}
-                            className="p-1.5 hover:bg-white/10 rounded text-gray-400 hover:text-white"
-                            title="Copiar comando único"
+                            className="flex items-center gap-1 px-2 py-1 hover:bg-yellow-500/20 rounded border border-white/10 text-xs text-yellow-400 hover:border-yellow-500/40 transition-all"
+                            title="Copiar comando único de banco"
                           >
-                            <Copy size={12} />
+                            {copiedCommandIdx === idx ? (
+                              <>
+                                <Check size={12} className="text-green-400" />
+                                <span className="text-[10px] text-green-400 font-sans font-bold">Copiado!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={12} />
+                                <span className="text-[10px] font-sans font-semibold">Copiar</span>
+                              </>
+                            )}
                           </button>
                         </div>
                       </div>
@@ -414,25 +452,42 @@ Mage Destruidor
                   Balanço Individual da Party
                 </h4>
                 <div className="space-y-2">
-                  {result.players.map((p, i) => (
-                    <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-black/40 rounded-xl border border-white/5 text-xs gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-yellow-200">{p.name}</span>
-                        {p.isLeader && (
-                          <span className="px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-300 text-[10px] font-bold border border-yellow-500/30">
-                            Líder
-                          </span>
-                        )}
+                  {result.players.map((p, i) => {
+                    const dmgPct = result.totalDamage > 0 ? Math.round((p.damage / result.totalDamage) * 100) : 0;
+                    const healPct = result.totalHealing > 0 ? Math.round((p.healing / result.totalHealing) * 100) : 0;
+
+                    return (
+                      <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-black/40 rounded-xl border border-white/5 text-xs gap-3">
+                        <div className="flex flex-col gap-1 min-w-[160px]">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-yellow-200">{p.name}</span>
+                            {p.isLeader && (
+                              <span className="px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-300 text-[10px] font-bold border border-yellow-500/30">
+                                Líder
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                            <span className="flex items-center gap-1 text-orange-400 font-semibold" title={`Dano: ${p.damage.toLocaleString('pt-BR')}`}>
+                              <Flame size={11} /> {dmgPct}% DMG
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1 text-cyan-400 font-semibold" title={`Cura: ${p.healing.toLocaleString('pt-BR')}`}>
+                              <Shield size={11} /> {healPct}% HEAL
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-400 font-mono text-[11px]">
+                          <span>Loot: <strong className="text-white">{p.loot.toLocaleString('pt-BR')}</strong></span>
+                          <span>Waste: <strong className="text-red-400">{p.supplies.toLocaleString('pt-BR')}</strong></span>
+                          <span>Status: <strong className={p.diff > 0 ? 'text-green-400' : p.diff < 0 ? 'text-red-400' : 'text-gray-400'}>
+                            {p.diff > 0 ? `Recebe ${p.diff.toLocaleString('pt-BR')} gp` : p.diff < 0 ? `Transfere ${(-p.diff).toLocaleString('pt-BR')} gp` : 'Quites'}
+                          </strong></span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 text-gray-400 font-mono text-[11px]">
-                        <span>Loot: <strong className="text-white">{p.loot.toLocaleString('pt-BR')}</strong></span>
-                        <span>Waste: <strong className="text-red-400">{p.supplies.toLocaleString('pt-BR')}</strong></span>
-                        <span>Status: <strong className={p.diff > 0 ? 'text-green-400' : p.diff < 0 ? 'text-red-400' : 'text-gray-400'}>
-                          {p.diff > 0 ? `Recebe ${p.diff.toLocaleString('pt-BR')} gp` : p.diff < 0 ? `Transfere ${(-p.diff).toLocaleString('pt-BR')} gp` : 'Quites'}
-                        </strong></span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

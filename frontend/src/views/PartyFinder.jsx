@@ -22,6 +22,8 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
   const [formRespawn, setFormRespawn] = useState('Cobra Bastion');
   const [formDescription, setFormDescription] = useState('Hunt 2h hoje à noite com discord');
   const [formLeader, setFormLeader] = useState(profile?.main_character || '');
+  const [copiedWorldChat, setCopiedWorldChat] = useState(null);
+  const [myLevel, setMyLevel] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Carrega posts com fallback local
@@ -47,7 +49,7 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
             {
               id: '1',
               leader_name: 'Llendarius',
-              world: 'Honbra',
+              world: 'Auroria',
               vocation_needed: 'Elder Druid',
               min_level: 450,
               target_respawn: 'Cobra Bastion',
@@ -133,6 +135,15 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
     setTimeout(() => setCopiedWhisper(null), 2500);
   };
 
+  const copyWorldChatMessage = (p) => {
+    const minLvl = Math.floor((p.min_level * 2) / 3);
+    const maxLvl = Math.ceil((p.min_level * 3) / 2);
+    const text = `LFP [${p.vocation_needed}] lvl ${p.min_level}+ ${p.target_respawn} • Share ${minLvl}-${maxLvl} • Msg ${p.leader_name}`;
+    navigator.clipboard.writeText(text);
+    setCopiedWorldChat(p.id);
+    setTimeout(() => setCopiedWorldChat(null), 2500);
+  };
+
   const filteredPosts = posts.filter(p => {
     if (selectedWorld !== 'ALL' && p.world && p.world.toLowerCase() !== selectedWorld.toLowerCase()) return false;
     if (selectedVoc !== 'ALL' && p.vocation_needed && !p.vocation_needed.toLowerCase().includes(selectedVoc.toLowerCase())) return false;
@@ -165,6 +176,40 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
             <PlusCircle size={16} />
             <span>Anunciar Vaga na Party</span>
           </button>
+        </div>
+      </div>
+
+      {/* Calculadora Interativa de Share XP */}
+      <div className="bg-gradient-to-r from-stone-950 via-yellow-950/20 to-stone-950 border border-yellow-500/30 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 shrink-0">
+            <Sparkles size={20} className="animate-pulse" />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-yellow-300 uppercase tracking-wider">Calculadora de Share XP Rápida</h3>
+            <p className="text-xs text-gray-400">Digite seu nível para destacar vagas compatíveis com sua faixa de experiência:</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 font-bold">Seu Nível:</span>
+            <input
+              type="number"
+              min="1"
+              max="2500"
+              placeholder="Ex: 500"
+              value={myLevel}
+              onChange={(e) => setMyLevel(e.target.value)}
+              className="w-24 bg-black/80 border border-yellow-500/40 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold text-center focus:outline-none focus:border-yellow-400"
+            />
+          </div>
+
+          {myLevel && parseInt(myLevel) > 0 && (
+            <div className="px-3 py-1.5 rounded-xl bg-black/80 border border-green-500/40 text-xs font-mono text-green-300">
+              Faixa de Share: <strong className="text-white">{Math.floor((parseInt(myLevel) * 2) / 3)}</strong> até <strong className="text-white">{Math.ceil((parseInt(myLevel) * 3) / 2)}</strong>
+            </div>
+          )}
         </div>
       </div>
 
@@ -208,61 +253,88 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
             Nenhuma vaga aberta com esses filtros no momento. Seja o primeiro a anunciar!
           </div>
         ) : (
-          filteredPosts.map(p => (
-            <div
-              key={p.id}
-              className="bg-black/70 border border-tibia-border hover:border-yellow-500/50 p-5 rounded-2xl flex flex-col justify-between gap-4 transition-all shadow-lg"
-            >
-              <div>
-                <div className="flex justify-between items-start gap-2 mb-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 text-[10px] font-bold uppercase">
-                        {p.world || 'Global'}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold">
-                        Busca: {p.vocation_needed}
-                      </span>
+          filteredPosts.map(p => {
+            const userLvl = parseInt(myLevel, 10);
+            const isShareCompatible = userLvl > 0 &&
+              userLvl >= Math.floor((p.min_level * 2) / 3) &&
+              userLvl <= Math.ceil((p.min_level * 3) / 2);
+
+            return (
+              <div
+                key={p.id}
+                className={`bg-black/70 border p-5 rounded-2xl flex flex-col justify-between gap-4 transition-all shadow-lg ${
+                  isShareCompatible
+                    ? 'border-emerald-500/60 ring-1 ring-emerald-500/30 shadow-emerald-950/20'
+                    : 'border-tibia-border hover:border-yellow-500/50'
+                }`}
+              >
+                <div>
+                  <div className="flex justify-between items-start gap-2 mb-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 text-[10px] font-bold uppercase">
+                          {p.world || 'Global'}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold">
+                          Busca: {p.vocation_needed}
+                        </span>
+                        {isShareCompatible && (
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                            ✨ Share Compatível
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-lg font-medieval text-white mt-1.5">{p.target_respawn}</h3>
                     </div>
-                    <h3 className="text-lg font-medieval text-white mt-1.5">{p.target_respawn}</h3>
+
+                    <span className="text-xs font-mono font-bold text-green-400 bg-green-950/40 px-2 py-1 rounded-lg border border-green-500/30">
+                      Lvl {p.min_level}+
+                    </span>
                   </div>
 
-                  <span className="text-xs font-mono font-bold text-green-400 bg-green-950/40 px-2 py-1 rounded-lg border border-green-500/30">
-                    Lvl {p.min_level}+
-                  </span>
+                  <p className="text-xs text-gray-300 leading-relaxed mb-3">
+                    {p.description}
+                  </p>
+
+                  <div className="text-[11px] text-gray-400 flex items-center gap-2">
+                    <span>Líder: <strong className="text-yellow-400">{p.leader_name}</strong></span>
+                    <span>•</span>
+                    <span>{p.schedule}</span>
+                  </div>
                 </div>
 
-                <p className="text-xs text-gray-300 leading-relaxed mb-3">
-                  {p.description}
-                </p>
+                {/* Botão de Contato Rápido */}
+                <div className="pt-3 border-t border-tibia-border/50 flex flex-wrap justify-between items-center gap-2">
+                  <button
+                    onClick={() => onPlayerClick && onPlayerClick(p.leader_name, p.world)}
+                    className="text-xs text-gray-400 hover:text-white"
+                  >
+                    Ver Perfil do Líder ➔
+                  </button>
 
-                <div className="text-[11px] text-gray-400 flex items-center gap-2">
-                  <span>Líder: <strong className="text-yellow-400">{p.leader_name}</strong></span>
-                  <span>•</span>
-                  <span>{p.schedule}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => copyWorldChatMessage(p)}
+                      title="Copiar mensagem pronta para colar no World Chat do RubinOT"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-gray-300 hover:text-white text-xs font-bold rounded-xl transition-all"
+                    >
+                      {copiedWorldChat === p.id ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                      <span>{copiedWorldChat === p.id ? 'Copiado!' : 'Anúncio Chat'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => copyWhisper(p)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-300 text-xs font-bold rounded-xl transition-all active:scale-95"
+                    >
+                      {copiedWhisper === p.id ? <Check size={14} /> : <MessageSquare size={14} />}
+                      <span>{copiedWhisper === p.id ? 'Whisper Copiado!' : 'Chamar no Chat'}</span>
+                    </button>
+                  </div>
                 </div>
+
               </div>
-
-              {/* Botão de Contato Rápido */}
-              <div className="pt-3 border-t border-tibia-border/50 flex justify-between items-center">
-                <button
-                  onClick={() => onPlayerClick && onPlayerClick(p.leader_name, p.world)}
-                  className="text-xs text-gray-400 hover:text-white"
-                >
-                  Ver Perfil do Líder ➔
-                </button>
-
-                <button
-                  onClick={() => copyWhisper(p)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-300 text-xs font-bold rounded-xl transition-all active:scale-95"
-                >
-                  {copiedWhisper === p.id ? <Check size={14} /> : <MessageSquare size={14} />}
-                  <span>{copiedWhisper === p.id ? 'Whisper Copiado!' : 'Chamar no Chat'}</span>
-                </button>
-              </div>
-
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

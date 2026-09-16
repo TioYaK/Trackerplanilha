@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Sword, Shield, Wand2, Calculator, Coins, Clock, Sparkles, 
-  CheckCircle2, Flame, ArrowRight, Zap, Target 
+  CheckCircle2, Flame, ArrowRight, Zap, Target, Copy, Check, TrendingDown 
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 
@@ -92,6 +92,10 @@ export default function ExerciseCalculator({ onNavigate }) {
     const totalSeconds = totalChargesNeeded * 2; // 2 segundos por carga
     const totalHours = (totalSeconds / 3600).toFixed(1);
 
+    const costIfBoughtWithTcInGold = totalTc * tcPriceGold;
+    const goldSavingsVsTc = costIfBoughtWithTcInGold - totalGold;
+    const isGoldCheaper = goldSavingsVsTc > 0;
+
     return {
       totalCharges: totalChargesNeeded,
       lasting: lastingCount,
@@ -99,9 +103,31 @@ export default function ExerciseCalculator({ onNavigate }) {
       regular: regularCount,
       totalGold,
       totalTc,
-      totalHours
+      totalHours,
+      costIfBoughtWithTcInGold,
+      goldSavingsVsTc,
+      isGoldCheaper
     };
-  }, [vocation, skillType, currentSkill, percentToNext, targetSkill, dummyType, isDouble, loyaltyBonus]);
+  }, [vocation, skillType, currentSkill, percentToNext, targetSkill, dummyType, isDouble, loyaltyBonus, tcPriceGold]);
+
+  const [copiedPlan, setCopiedPlan] = useState(false);
+
+  const copyTrainingPlan = () => {
+    let msg = `🎯 **PLANO DE TREINO RUBINOT** 🎯\n`;
+    msg += `🧙‍♂️ **Vocação:** ${vocation} | ⚔️ **Skill:** ${skillType}\n`;
+    msg += `📈 **Meta:** ${currentSkill} (${percentToNext}%) ➔ ${targetSkill}\n`;
+    msg += `⏱️ **Tempo Estimado:** ${calculation.totalHours} horas (~${(calculation.totalHours / 24).toFixed(1)} dias)\n`;
+    msg += `📦 **Armas:** ${calculation.lasting} Lasting (8h), ${calculation.durable} Durable (1h), ${calculation.regular} Normal (16m)\n`;
+    msg += `💰 **Custo no NPC:** ${(calculation.totalGold / 1000000).toFixed(2)} KKs (${calculation.totalGold.toLocaleString('pt-BR')} gp)\n`;
+    msg += `💎 **Custo no Store:** ${calculation.totalTc.toLocaleString('pt-BR')} Tibia Coins\n`;
+    if (calculation.isGoldCheaper) {
+      msg += `💡 **Melhor Opção:** Comprar com Gold no NPC economiza ${(calculation.goldSavingsVsTc / 1000000).toFixed(2)} KKs!\n`;
+    }
+    msg += `⚡ *Calculado via Rubinot Tracker - trackerplanilha.vercel.app*`;
+    navigator.clipboard.writeText(msg);
+    setCopiedPlan(true);
+    setTimeout(() => setCopiedPlan(false), 2500);
+  };
 
   return (
     <div className="p-4 sm:p-8 max-w-6xl mx-auto w-full animate-fade-in text-gray-100 flex flex-col gap-6">
@@ -207,6 +233,37 @@ export default function ExerciseCalculator({ onNavigate }) {
             </div>
           </div>
 
+          {/* Metas Rápidas Populares (Presets) */}
+          <div>
+            <label className="text-[11px] font-bold text-gray-400 uppercase mb-1.5 block">Metas Populares Rápidas:</label>
+            <div className="flex flex-wrap gap-1.5">
+              {(skillType === 'Magic' ? [
+                { cur: 80, tgt: 90 },
+                { cur: 90, tgt: 100 },
+                { cur: 100, tgt: 110 },
+                { cur: 110, tgt: 120 }
+              ] : [
+                { cur: 90, tgt: 100 },
+                { cur: 100, tgt: 110 },
+                { cur: 110, tgt: 120 },
+                { cur: 120, tgt: 125 }
+              ]).map(preset => (
+                <button
+                  key={`${preset.cur}-${preset.tgt}`}
+                  type="button"
+                  onClick={() => {
+                    setCurrentSkill(preset.cur);
+                    setTargetSkill(preset.tgt);
+                    setPercentToNext(0);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/25 border border-yellow-500/30 text-yellow-300 text-[11px] font-bold transition-all active:scale-95"
+                >
+                  {preset.cur} ➔ {preset.tgt}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Bônus: Dummy & Eventos */}
           <div className="space-y-3 pt-2 border-t border-tibia-border/50">
             
@@ -282,8 +339,19 @@ export default function ExerciseCalculator({ onNavigate }) {
                 </p>
               </div>
 
-              <div className="px-3.5 py-1.5 rounded-xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 font-mono text-xs font-bold">
-                {calculation.totalCharges.toLocaleString('pt-BR')} Cargas
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={copyTrainingPlan}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-300 font-bold text-xs transition-all active:scale-95"
+                >
+                  {copiedPlan ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                  <span>{copiedPlan ? 'Plano Copiado!' : 'Copiar Plano'}</span>
+                </button>
+
+                <div className="px-3.5 py-1.5 rounded-xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 font-mono text-xs font-bold">
+                  {calculation.totalCharges.toLocaleString('pt-BR')} Cargas
+                </div>
               </div>
             </div>
 
@@ -313,6 +381,35 @@ export default function ExerciseCalculator({ onNavigate }) {
                   </p>
                   <p className="text-[10px] text-gray-500">Valor oficial no Store</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Comparativo Financeiro Inteligente */}
+            <div className={`p-4 rounded-xl border flex items-center justify-between gap-4 ${
+              calculation.isGoldCheaper 
+                ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200' 
+                : 'bg-blue-950/30 border-blue-500/40 text-blue-200'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-lg shrink-0 ${calculation.isGoldCheaper ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                  {calculation.isGoldCheaper ? <Coins size={20} /> : <Sparkles size={20} />}
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider">
+                    {calculation.isGoldCheaper ? 'Comprar com Gold no NPC é mais barato!' : 'Comprar com Tibia Coins no Store é mais barato!'}
+                  </p>
+                  <p className="text-xs opacity-80 mt-0.5">
+                    {calculation.isGoldCheaper 
+                      ? `Você economiza ${(calculation.goldSavingsVsTc / 1000000).toFixed(2)} KKs comprando armas direto nos NPCs do RubinOT com Gold.`
+                      : `Você economiza ${Math.abs(calculation.goldSavingsVsTc / 1000000).toFixed(2)} KKs comprando as armas com TC no Store.`
+                    }
+                  </p>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-xs font-bold font-mono px-2 py-1 rounded bg-black/50 border border-white/10">
+                  Cotação: {(tcPriceGold / 1000).toFixed(0)}k/TC
+                </span>
               </div>
             </div>
 
