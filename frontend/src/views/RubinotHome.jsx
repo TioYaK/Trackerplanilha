@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 import BoostedDailyWidget from '../components/BoostedDailyWidget';
+import LiveWarFeed from '../components/LiveWarFeed';
 
 // Censo Oficial dos 16 Mundos do Rubinot (Base Oficial em Tempo Real)
 const WORLD_CENSUS = {
