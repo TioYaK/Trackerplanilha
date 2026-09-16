@@ -253,10 +253,21 @@ export default function BossTracker() {
     };
   }, []);
 
-  // Atualizador de tempo regressivo em tempo real
+  // Atualizador de tempo regressivo em tempo real (apenas se a aba estiver visível)
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => {
+      if (!document.hidden) setNow(Date.now());
+    }, 1000);
+
+    const handleVisibility = () => {
+      if (!document.hidden) setNow(Date.now());
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Salvar no localStorage sempre que mudar

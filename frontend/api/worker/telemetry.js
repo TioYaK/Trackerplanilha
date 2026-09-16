@@ -7,6 +7,14 @@ const MAX_REQUESTS_PER_MINUTE = 120;
 // Token padrão de contingência e leitura de variável de ambiente
 const DEFAULT_INGESTION_TOKEN = 'wk_live_rubinot_telemetry_secure_2026';
 
+let cachedSupabase = null;
+function getSupabase(url, key) {
+  if (!cachedSupabase) {
+    cachedSupabase = createClient(url, key);
+  }
+  return cachedSupabase;
+}
+
 export default async function handler(req, res) {
   // CORS defensivo
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -72,7 +80,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Configuracao do banco de dados ausente no servidor.' });
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = getSupabase(supabaseUrl, serviceRoleKey);
   const { action, payload } = req.body || {};
 
   if (!action) {

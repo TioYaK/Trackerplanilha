@@ -29,42 +29,53 @@ export const runFetchBazaar = async () => {
         }
       }
 
-      // Páginas 2 até totalPages
-      for (let p = 2; p <= totalPages; p++) {
-        try {
-          const pageRes = await fetchRubinotApi(`/api/bazaar?page=${p}&limit=25&sortBy=auction_end&sortOrder=asc`);
-          const items = pageRes?.auctions || pageRes?.data || [];
+      // Páginas 2 até totalPages em lotes concorrentes de 4 páginas
+      for (let p = 2; p <= totalPages; p += 4) {
+        const pageNumbers = [];
+        for (let offset = 0; offset < 4 && (p + offset) <= totalPages; offset++) {
+          pageNumbers.push(p + offset);
+        }
+        const batchResults = await Promise.allSettled(
+          pageNumbers.map(page => fetchRubinotApi(`/api/bazaar?page=${page}&limit=25&sortBy=auction_end&sortOrder=asc`))
+        );
+        for (const res of batchResults) {
+          if (res.status === 'fulfilled' && res.value) {
+            const items = res.value.auctions || res.value.data || [];
+            for (const auc of items) {
+              if (auc && auc.id && !seenAuctionIds.has(auc.id)) {
+                seenAuctionIds.add(auc.id);
+                allAuctions.push(auc);
+              }
+            }
+          }
+        }
+        if (p % 12 === 0 || p + 4 > totalPages) {
+          console.log(`[JOB] Progresso ativos: ${allAuctions.length}/${totalAuctions} leilões coletados (pág ${Math.min(p + 3, totalPages)}/${totalPages})...`);
+        }
+      }
+    }
+
+    // 3. Rastreio do HISTÓRICO recente em lotes concorrentes de 4 páginas (até 20 páginas = 500 leilões)
+    console.log(`[JOB] 📚 Coletando histórico recente de leilões finalizados (20 páginas)...`);
+    for (let hp = 1; hp <= 20; hp += 4) {
+      const pageNumbers = [hp, hp + 1, hp + 2, hp + 3].filter(n => n <= 20);
+      const batchResults = await Promise.allSettled(
+        pageNumbers.map(page => fetchRubinotApi(`/api/bazaar/history?page=${page}&limit=25`))
+      );
+      let hadItems = false;
+      for (const res of batchResults) {
+        if (res.status === 'fulfilled' && res.value) {
+          const items = res.value.auctions || res.value.data || [];
+          if (items.length > 0) hadItems = true;
           for (const auc of items) {
             if (auc && auc.id && !seenAuctionIds.has(auc.id)) {
               seenAuctionIds.add(auc.id);
               allAuctions.push(auc);
             }
           }
-          if (p % 10 === 0 || p === totalPages) {
-            console.log(`[JOB] Progresso ativos: ${allAuctions.length}/${totalAuctions} leilões coletados (pág ${p}/${totalPages})...`);
-          }
-        } catch (pageErr) {
-          console.warn(`[JOB] Aviso na página ${p} de ativos:`, pageErr.message);
         }
       }
-    }
-
-    // 3. Rastreio do HISTÓRICO recente (primeiras 20 páginas = 500 leilões finalizados)
-    console.log(`[JOB] 📚 Coletando histórico recente de leilões finalizados (20 páginas)...`);
-    for (let hp = 1; hp <= 20; hp++) {
-      try {
-        const histRes = await fetchRubinotApi(`/api/bazaar/history?page=${hp}&limit=25`);
-        const items = histRes?.auctions || histRes?.data || [];
-        for (const auc of items) {
-          if (auc && auc.id && !seenAuctionIds.has(auc.id)) {
-            seenAuctionIds.add(auc.id);
-            allAuctions.push(auc);
-          }
-        }
-      } catch (histErr) {
-        console.warn(`[JOB] Aviso no histórico pág ${hp}:`, histErr.message);
-        break;
-      }
+      if (!hadItems) break;
     }
 
     console.log(`[JOB] Total consolidado para processar: ${allAuctions.length} leilões (ativos + histórico recente).`);

@@ -1,6 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
 const rateLimitBuckets = new Map(); // key -> { count, resetAt }
+let cachedSupabase = null;
+let cachedApiKeys = null;
+let keysCacheTimestamp = 0;
+const KEYS_CACHE_TTL = 60000; // 60s
+
+function getSupabase(url, key) {
+  if (!cachedSupabase) {
+    cachedSupabase = createClient(url, key);
+  }
+  return cachedSupabase;
+}
 
 export async function validateApiKey(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -44,16 +55,23 @@ export async function validateApiKey(req, res) {
     return { error: true };
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = getSupabase(supabaseUrl, serviceRoleKey);
 
-  // Carrega chaves de app_settings (id: 101)
-  const { data: settings } = await supabase
-    .from('app_settings')
-    .select('visible_tabs')
-    .eq('id', 101)
-    .maybeSingle();
+  // Carrega chaves de app_settings (id: 101) com cache em memória de 60s
+  let keys = cachedApiKeys;
+  const now = Date.now();
+  if (!keys || (now - keysCacheTimestamp > KEYS_CACHE_TTL)) {
+    const { data: settings } = await supabase
+      .from('app_settings')
+      .select('visible_tabs')
+      .eq('id', 101)
+      .maybeSingle();
 
-  const keys = settings?.visible_tabs?.api_keys || [];
+    keys = settings?.visible_tabs?.api_keys || [];
+    cachedApiKeys = keys;
+    keysCacheTimestamp = now;
+  }
+
   const foundKey = keys.find(k => k.key === keyStr);
 
   if (!foundKey) {

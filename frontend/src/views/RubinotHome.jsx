@@ -55,7 +55,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
   const [lootResult, setLootResult] = useState(null);
   const [copiedLoot, setCopiedLoot] = useState(false);
 
-  const fetchHomeData = async (forceRefresh = false) => {
+  const fetchHomeData = async (forceRefresh = false, isBackground = false) => {
     // 0. Cache em memória instantâneo se dados tiverem menos de 45 segundos
     if (!forceRefresh && homeCache.data && (Date.now() - homeCache.timestamp < 45000)) {
       setRecentDeaths(homeCache.data.recentDeaths);
@@ -67,7 +67,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
       return;
     }
 
-    setLoading(true);
+    if (!isBackground) setLoading(true);
     try {
       // 1. Mortes recentes
       let deathsQuery = supabase
@@ -212,8 +212,21 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
 
   useEffect(() => {
     fetchHomeData();
-    const interval = setInterval(() => fetchHomeData(true), 45000); // 45s
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchHomeData(true, true);
+    }, 45000); // 45s
+
+    const handleVisibility = () => {
+      if (!document.hidden && (!homeCache.timestamp || Date.now() - homeCache.timestamp > 45000)) {
+        fetchHomeData(true, true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Parser de Loot Split do Client Tibia

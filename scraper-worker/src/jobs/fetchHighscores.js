@@ -57,43 +57,6 @@ export const runFetchHighscores = async (vocationStr) => {
       return;
     }
 
-    // Buscamos quem está na nossa guilda
-    let allGuildMembers = [];
-    let from = 0;
-    const step = 1000;
-    while(true) {
-      const { data } = await supabase.from('guild_members').select('name').range(from, from + step - 1);
-      if (!data || data.length === 0) break;
-      allGuildMembers.push(...data);
-      if (data.length < step) break;
-      from += step;
-    }
-
-    // Buscamos os Hunteds
-    const { data: huntedData } = await supabase.from('hunted_list').select('name');
-    if (huntedData) {
-      allGuildMembers.push(...huntedData);
-    }
-
-    // Buscamos membros de parties_planilhadas
-    const { data: partyData } = await supabase.from('parties_planilhadas').select('members, leader_name');
-    if (partyData) {
-      partyData.forEach(p => {
-        if (p.leader_name) allGuildMembers.push({ name: p.leader_name });
-        if (Array.isArray(p.members)) {
-          p.members.forEach(m => {
-            if (m && typeof m === 'string') allGuildMembers.push({ name: m.trim() });
-          });
-        } else if (typeof p.members === 'string') {
-          p.members.split(',').forEach(m => {
-            if (m && m.trim()) allGuildMembers.push({ name: m.trim() });
-          });
-        }
-      });
-    }
-
-    const memberNames = new Set(allGuildMembers.filter(m => m && m.name).map(m => m.name.toLowerCase()));
-    // RASTREAMENTO GLOBAL: Monitora todos os jogadores do servidor (não descarta mais não-membros)
     const relevantPlayers = players.filter(p => p && p.name);
     
     if (relevantPlayers.length === 0) {
@@ -119,7 +82,7 @@ export const runFetchHighscores = async (vocationStr) => {
     }
 
     const statesToUpsert = [];
-    const activeNames = [];
+    const playersWithXpGain = [];
     const now = new Date().toISOString();
 
     for (const player of relevantPlayers) {
@@ -135,9 +98,7 @@ export const runFetchHighscores = async (vocationStr) => {
           session_start_xp = existing.session_start_xp || existing.xp_total;
           session_start_time = existing.session_start_time || now;
           last_active = now; // Update last active
-          if (memberNames.has(player.name.toLowerCase())) {
-            activeNames.push(player.name);
-          }
+          playersWithXpGain.push(player.name);
         } else {
           // Não ganhou XP, manter os dados antigos (só atualizamos se mudou de level, etc)
           session_start_xp = existing.session_start_xp;
@@ -200,17 +161,25 @@ export const runFetchHighscores = async (vocationStr) => {
     }
     
     // --- ATUALIZA O LAST_XP_DATE DOS ATIVOS (Guild Members) ---
-    if (activeNames.length > 0) {
-      let updatedCount = 0;
-      for (let i = 0; i < activeNames.length; i += 100) {
-        const chunk = activeNames.slice(i, i + 100);
-        const { error: updateErr } = await supabase
-          .from('guild_members')
-          .update({ last_xp_date: now })
-          .in('name', chunk);
-        if (!updateErr) updatedCount += chunk.length;
+    if (playersWithXpGain.length > 0 && supabase) {
+      const { data: guildMatches } = await supabase
+        .from('guild_members')
+        .select('name')
+        .in('name', playersWithXpGain);
+
+      if (guildMatches && guildMatches.length > 0) {
+        const guildActiveNames = guildMatches.map(g => g.name);
+        let updatedCount = 0;
+        for (let i = 0; i < guildActiveNames.length; i += 100) {
+          const chunk = guildActiveNames.slice(i, i + 100);
+          const { error: updateErr } = await supabase
+            .from('guild_members')
+            .update({ last_xp_date: now })
+            .in('name', chunk);
+          if (!updateErr) updatedCount += chunk.length;
+        }
+        console.log(`[JOB] Carimbo de Atividade (last_xp_date) atualizado para ${updatedCount} membros.`);
       }
-      console.log(`[JOB] Carimbo de Atividade (last_xp_date) atualizado para ${updatedCount} membros.`);
     }
 
     console.log(`[JOB] Atualizados ${upsertedCount} estados de personagens (Edge Computing).`);

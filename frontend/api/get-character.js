@@ -1,5 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
+let cachedSupabase = null;
+function getSupabase(url, key) {
+  if (!cachedSupabase) {
+    cachedSupabase = createClient(url, key);
+  }
+  return cachedSupabase;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,7 +32,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Chaves do Supabase ausentes' });
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = getSupabase(supabaseUrl, serviceRoleKey);
 
   try {
     // 1. Busca dados do personagem em múltiplas bases

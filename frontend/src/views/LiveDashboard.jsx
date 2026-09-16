@@ -24,8 +24,8 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
     }
   }, [dynamicCategories, activeTab]);
 
-  const fetchParties = useCallback(async () => {
-    setLoading(true);
+  const fetchParties = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
 
     const fetchAreasP = supabase.from('respawn_areas').select('name').order('name');
     
@@ -60,11 +60,11 @@ export default function LiveDashboard({ onPlayerClick, onPartyClick, isAdmin }) 
   useEffect(() => {
     fetchParties();
     
-    // Assinatura Real-time para atualização automática sem polling
+    // Assinatura Real-time para atualização automática sem polling e sem piscar o botão
     const channel = supabase
       .channel('live_dashboard_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'parties_planilhadas' }, () => {
-        fetchParties();
+        fetchParties(true);
       })
       .subscribe();
       

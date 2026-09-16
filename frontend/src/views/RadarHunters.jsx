@@ -27,9 +27,19 @@ export default function RadarHunters({ isAdmin }) {
     fetchHunted();
     checkPinnedPlayersOnline();
     const interval = setInterval(() => {
-      fetchHunted();
-      checkPinnedPlayersOnline();
+      if (!document.hidden) {
+        fetchHunted();
+        checkPinnedPlayersOnline();
+      }
     }, 30000); // Poll a cada 30s
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        fetchHunted();
+        checkPinnedPlayersOnline();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
 
     // Assina mudanças na Watchlist
     const unsubWatchlist = subscribeWatchlist((updated) => {
@@ -60,6 +70,7 @@ export default function RadarHunters({ isAdmin }) {
 
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
       unsubWatchlist();
       supabase.removeChannel(channel);
     };

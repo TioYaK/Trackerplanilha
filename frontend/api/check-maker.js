@@ -1,5 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
+let cachedSupabase = null;
+function getSupabase(url, key) {
+  if (!cachedSupabase) {
+    cachedSupabase = createClient(url, key);
+  }
+  return cachedSupabase;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -28,14 +36,17 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Chaves do Supabase não configuradas no Vercel' });
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = getSupabase(supabaseUrl, serviceRoleKey);
 
   try {
-    // 1. Fetch Maker Rules
-    const { data: rules } = await supabase.from('maker_rules').select('*').limit(1).maybeSingle();
+    // 1 & 2. Executa a busca de regras e o fetch oficial do RubinOT em paralelo
+    const [rulesRes, rubiRes] = await Promise.all([
+      supabase.from('maker_rules').select('*').limit(1).maybeSingle(),
+      fetch(`https://rubinot.com.br/api/characters/${encodeURIComponent(makerName)}`)
+    ]);
+
+    const rules = rulesRes?.data;
     
-    // 2. Fetch Character from RubinOT
-    const rubiRes = await fetch(`https://rubinot.com.br/api/characters/${encodeURIComponent(makerName)}`);
     if (!rubiRes.ok) {
       if (rubiRes.status === 404) return res.status(400).json({ error: 'Personagem não encontrado no RubinOT' });
       return res.status(500).json({ error: 'Erro ao consultar API oficial' });

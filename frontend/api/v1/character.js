@@ -14,30 +14,34 @@ export default async function handler(req, res) {
     });
   }
 
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+
   try {
     let charData = null;
     let source = 'database';
 
-    // 1. Tenta guild_members
-    const { data: gMember } = await supabase
-      .from('guild_members')
-      .select('name, level, vocation, rank, is_online, last_xp_date')
-      .ilike('name', rawName)
-      .maybeSingle();
-
-    // 2. Tenta current_character_state para mundo, vocation e xp atualizados
-    const { data: cState } = await supabase
-      .from('current_character_state')
-      .select('character_name, level, vocation, world, last_active, xp_total')
-      .ilike('character_name', rawName)
-      .maybeSingle();
-
-    // 3. Tenta associação de guilda em guild_perk_members
-    const { data: gPerk } = await supabase
-      .from('guild_perk_members')
-      .select('guild_name, world')
-      .ilike('character_name', rawName)
-      .maybeSingle();
+    // Executa as 3 consultas em paralelo de forma concorrente
+    const [
+      { data: gMember },
+      { data: cState },
+      { data: gPerk }
+    ] = await Promise.all([
+      supabase
+        .from('guild_members')
+        .select('name, level, vocation, rank, is_online, last_xp_date')
+        .ilike('name', rawName)
+        .maybeSingle(),
+      supabase
+        .from('current_character_state')
+        .select('character_name, level, vocation, world, last_active, xp_total')
+        .ilike('character_name', rawName)
+        .maybeSingle(),
+      supabase
+        .from('guild_perk_members')
+        .select('guild_name, world')
+        .ilike('character_name', rawName)
+        .maybeSingle()
+    ]);
 
     if (gMember && gMember.level && Number(gMember.level) > 0) {
       charData = {
