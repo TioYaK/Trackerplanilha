@@ -637,7 +637,7 @@ export default function BossTracker() {
                   <span className="text-[10px] text-purple-300 font-bold uppercase">Boss Boostado</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">+Loot Roll</span>
                 </div>
-                <div className="text-sm font-bold text-white truncate">{boostedData?.boss?.name || 'Ravenous Hunger'}</div>
+                <div className="text-sm font-bold text-white truncate">{boostedData?.boss?.name || 'Magma Bubble'}</div>
                 <div className="text-[10px] text-gray-400 truncate">{boostedData?.boss?.bonusText || '+50% XP e chance extra de BiS drop'}</div>
               </div>
             </div>
@@ -664,7 +664,7 @@ export default function BossTracker() {
                   <span className="text-[10px] text-emerald-300 font-bold uppercase">Criatura Boostada</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">+XP & Respawn</span>
                 </div>
-                <div className="text-sm font-bold text-white truncate">{boostedData?.creature?.name || 'Young Goanna'}</div>
+                <div className="text-sm font-bold text-white truncate">{boostedData?.creature?.name || 'Sea Serpent'}</div>
                 <div className="text-[10px] text-gray-400 truncate">{boostedData?.creature?.bonusText || '+50% XP, +100% Loot e respawn veloz'}</div>
               </div>
             </div>

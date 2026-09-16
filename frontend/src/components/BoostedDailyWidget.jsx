@@ -2,13 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { getTodayBoosted } from '../data/boostedDailyData';
 import { supabase } from '../lib/supabase';
 import { 
-  Sparkles, Flame, Award, Zap, Target, Copy, Check, ChevronRight, Swords 
+  Sparkles, Flame, Award, Zap, Target, Copy, Check, ChevronRight, Swords,
+  Edit3, X, Save, RefreshCw 
 } from 'lucide-react';
 
 export default function BoostedDailyWidget({ onNavigate }) {
   const [override, setOverride] = useState(null);
   const [boosted, setBoosted] = useState(() => getTodayBoosted());
   const [copied, setCopied] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [inputBoss, setInputBoss] = useState('');
+  const [inputCreature, setInputCreature] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isFetchingTibia, setIsFetchingTibia] = useState(false);
 
   // Carrega configuração dinâmica de Boss & Criatura do RubinOT via Supabase
   useEffect(() => {
@@ -92,6 +98,59 @@ export default function BoostedDailyWidget({ onNavigate }) {
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const openEditModal = () => {
+    setInputBoss(boss?.name || 'Magma Bubble');
+    setInputCreature(creature?.name || 'Sea Serpent');
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveRotation = async (e) => {
+    e?.preventDefault?.();
+    if (!inputBoss.trim() || !inputCreature.trim()) return;
+    setIsSaving(true);
+    try {
+      const payload = {
+        boss_name: inputBoss.trim(),
+        creature_name: inputCreature.trim(),
+        updated_at: new Date().toISOString()
+      };
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          id: 102,
+          visible_tabs: payload
+        });
+
+      if (error) throw error;
+      setOverride(payload);
+      setBoosted(getTodayBoosted(new Date(), payload));
+      setIsEditModalOpen(false);
+    } catch (err) {
+      console.error('Falha ao salvar rotação diária:', err);
+      alert('Erro ao salvar no banco: ' + (err.message || err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSyncFromTibiaData = async () => {
+    setIsFetchingTibia(true);
+    try {
+      const [cRes, bRes] = await Promise.all([
+        fetch('https://api.tibiadata.com/v4/creatures').then(r => r.json()).catch(() => null),
+        fetch('https://api.tibiadata.com/v4/boostablebosses').then(r => r.json()).catch(() => null)
+      ]);
+      const officialCreature = cRes?.creatures?.boosted?.name;
+      const officialBoss = bRes?.boostable_bosses?.boosted?.name;
+      if (officialCreature) setInputCreature(officialCreature);
+      if (officialBoss) setInputBoss(officialBoss);
+    } catch (e) {
+      console.warn('Erro ao consultar TibiaData:', e);
+    } finally {
+      setIsFetchingTibia(false);
+    }
+  };
+
   return (
     <section className="relative overflow-hidden rounded-3xl border-2 border-amber-500/40 bg-gradient-to-b from-stone-950 via-black/95 to-stone-950 p-6 sm:p-8 shadow-2xl backdrop-blur-md">
       {/* Glow de fundo */}
@@ -139,6 +198,16 @@ export default function BoostedDailyWidget({ onNavigate }) {
           >
             {copied ? <Check size={15} className="text-green-400" /> : <Copy size={15} />}
             <span>{copied ? 'Copiado!' : 'Compartilhar'}</span>
+          </button>
+
+          {/* Botão Ajustar Rotação (Permite ao Admin/VIP atualizar com 1 clique) */}
+          <button
+            onClick={openEditModal}
+            title="Ajustar ou sincronizar o Boss e a Criatura boostados do RubinOT"
+            className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-amber-400/50 text-gray-300 hover:text-white px-3 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95"
+          >
+            <Edit3 size={14} className="text-amber-400" />
+            <span className="hidden sm:inline">Ajustar Rotação</span>
           </button>
         </div>
       </div>
@@ -303,6 +372,123 @@ export default function BoostedDailyWidget({ onNavigate }) {
         </div>
 
       </div>
+
+      {/* MODAL DE AJUSTE DA ROTAÇÃO DIÁRIA (1-CLICK REALTIME) */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-lg rounded-3xl border border-amber-500/40 bg-gradient-to-b from-stone-900 via-black to-stone-950 p-6 sm:p-7 shadow-2xl">
+            <button
+              onClick={() => setIsEditModalOpen(false)}
+              className="absolute top-5 right-5 text-gray-400 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-1">
+              <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <Edit3 size={18} />
+              </span>
+              <div>
+                <h3 className="text-xl font-medieval font-bold text-gradient-gold">
+                  Ajustar Rotação RubinOT
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Atualização em tempo real salva no banco para todos os jogadores
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveRotation} className="mt-5 space-y-4">
+              {/* Input Criatura */}
+              <div>
+                <label className="block text-xs font-bold text-amber-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <Flame size={13} /> Criatura Boostada do Dia
+                </label>
+                <input
+                  type="text"
+                  value={inputCreature}
+                  onChange={(e) => setInputCreature(e.target.value)}
+                  placeholder="Ex: Sea Serpent, Werelion, Bulltaur Brute..."
+                  list="creature-suggestions"
+                  required
+                  className="w-full rounded-xl bg-black/80 border border-white/10 focus:border-amber-400 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-amber-400 font-sans"
+                />
+                <datalist id="creature-suggestions">
+                  <option value="Sea Serpent" />
+                  <option value="Bulltaur Brute" />
+                  <option value="Young Goanna" />
+                  <option value="Werelion" />
+                  <option value="Dark Torturer" />
+                  <option value="Hellflayer" />
+                  <option value="Flimsy Lost Soul" />
+                  <option value="Naga Warrior" />
+                  <option value="Gazer Spectre" />
+                  <option value="Cobra Assassin" />
+                  <option value="Deepling Tyra" />
+                </datalist>
+              </div>
+
+              {/* Input Boss */}
+              <div>
+                <label className="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <Award size={13} /> Boss Boostado do Dia
+                </label>
+                <input
+                  type="text"
+                  value={inputBoss}
+                  onChange={(e) => setInputBoss(e.target.value)}
+                  placeholder="Ex: Magma Bubble, Mitmah Vanguard, Drume, Oberon..."
+                  list="boss-suggestions"
+                  required
+                  className="w-full rounded-xl bg-black/80 border border-white/10 focus:border-purple-400 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-400 font-sans"
+                />
+                <datalist id="boss-suggestions">
+                  <option value="Magma Bubble" />
+                  <option value="Mitmah Vanguard" />
+                  <option value="Ravenous Hunger" />
+                  <option value="Grand Master Oberon" />
+                  <option value="Scarlett Etzel" />
+                  <option value="Drume" />
+                  <option value="Timira the Many-Headed" />
+                  <option value="Bakragore" />
+                  <option value="Katex Blood Tongue" />
+                </datalist>
+              </div>
+
+              {/* Ações */}
+              <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleSyncFromTibiaData}
+                  disabled={isFetchingTibia}
+                  className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors py-1.5 px-2.5 rounded-lg hover:bg-cyan-950/40 border border-cyan-500/20"
+                >
+                  <RefreshCw size={13} className={isFetchingTibia ? 'animate-spin' : ''} />
+                  <span>{isFetchingTibia ? 'Buscando...' : 'Sugerir da Rotação Global'}</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-black bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                  >
+                    <Save size={14} />
+                    <span>{isSaving ? 'Salvando...' : 'Salvar Agora'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

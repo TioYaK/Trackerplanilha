@@ -163,6 +163,22 @@ export const RUBINOT_BOOSTED_CREATURES = [
     bonusText: 'XP Dobrada (3.4k) & Drops raros de Fiehonja'
   },
   {
+    id: 'sea-serpent',
+    name: 'Sea Serpent',
+    slug: 'sea_serpent',
+    category: 'Seacrest Grounds / Oramond / Svargrond',
+    hp: 1950,
+    baseExp: 2300,
+    boostedExp: 4600,
+    bestElement: 'Físico / Terra (Earth)',
+    bestElementMultiplier: '+15%',
+    bestDefense: 'Gelo + Drown',
+    bestCharm: 'Envenom / Wound / Zap',
+    spriteUrl: 'https://tibiopedia.pl/images/static/monsters/sea_serpent.gif',
+    huntQuery: 'sea serpent',
+    bonusText: 'XP Dobrada (4.6k) & Farm subaquático acelerado em Svargrond/Oramond'
+  },
+  {
     id: 'young-goanna',
     name: 'Young Goanna',
     slug: 'young_goanna',
@@ -181,6 +197,18 @@ export const RUBINOT_BOOSTED_CREATURES = [
 ];
 
 export const RUBINOT_BOOSTED_BOSSES = [
+  {
+    id: 'magma-bubble',
+    name: 'Magma Bubble',
+    slug: 'magma_bubble',
+    category: 'Gnomprona / Monster Graveyard',
+    location: 'Gnomprona (Monster Graveyard - Hazard Level)',
+    spriteUrl: 'https://tibiopedia.pl/images/static/monsters/magma_bubble.gif',
+    keyDrops: ['Primal Bag', 'Magma Boots', 'Magma Coat', 'Gnomish Items', 'Gold Token', 'Silver Token'],
+    bonusText: 'Drop boostado de Primal Bag, equipamentos Magma e itens BiS de Gnomprona!',
+    mechanicsTip: 'Foque todo o dano em elemento Gelo (Ice). Desvie das poças de lava e das explosões de magma no piso da arena.',
+    bossRoute: '/bosses'
+  },
   {
     id: 'ravenous-hunger',
     name: 'Ravenous Hunger',
@@ -268,8 +296,8 @@ export const RUBINOT_BOOSTED_BOSSES = [
 ];
 
 export const CURRENT_RUBINOT_BOOSTED = {
-  boss_name: 'Ravenous Hunger',
-  creature_name: 'Young Goanna'
+  boss_name: 'Magma Bubble',
+  creature_name: 'Sea Serpent'
 };
 
 export function getTodayBoosted(referenceDate = new Date(), dynamicOverride = null) {
@@ -288,13 +316,13 @@ export function getTodayBoosted(referenceDate = new Date(), dynamicOverride = nu
 
   // Active configuration (priority: dynamicOverride -> CURRENT_RUBINOT_BOOSTED)
   const activeCfg = dynamicOverride || CURRENT_RUBINOT_BOOSTED;
-  const targetCreatureName = (activeCfg?.creature_name || activeCfg?.creature || 'Young Goanna').trim().toLowerCase();
-  const targetBossName = (activeCfg?.boss_name || activeCfg?.boss || 'Ravenous Hunger').trim().toLowerCase();
+  const targetCreatureName = (activeCfg?.creature_name || activeCfg?.creature || 'Sea Serpent').trim().toLowerCase();
+  const targetBossName = (activeCfg?.boss_name || activeCfg?.boss || 'Magma Bubble').trim().toLowerCase();
 
   let creature = RUBINOT_BOOSTED_CREATURES.find(c => c.name.toLowerCase() === targetCreatureName);
   if (!creature) {
     // Dynamic fallback creature object if name is a new RubinOT monster
-    const rawName = activeCfg?.creature_name || 'Young Goanna';
+    const rawName = activeCfg?.creature_name || 'Sea Serpent';
     const slug = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
     creature = {
       id: slug,
@@ -317,7 +345,7 @@ export function getTodayBoosted(referenceDate = new Date(), dynamicOverride = nu
   let boss = RUBINOT_BOOSTED_BOSSES.find(b => b.name.toLowerCase() === targetBossName);
   if (!boss) {
     // Dynamic fallback boss object if name is a new RubinOT boss
-    const rawBoss = activeCfg?.boss_name || 'Ravenous Hunger';
+    const rawBoss = activeCfg?.boss_name || 'Magma Bubble';
     const slug = rawBoss.toLowerCase().replace(/[^a-z0-9]/g, '_');
     boss = {
       id: slug,
