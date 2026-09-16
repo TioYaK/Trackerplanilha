@@ -1,6 +1,7 @@
 node_modules/
 data/
 worker_id.txt
+worker_port.txt
 .env
 .env.*
 !.env.example

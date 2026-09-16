@@ -44,8 +44,10 @@ export default async function handler(req, res) {
   }
 
   const expectedToken = process.env.WORKER_INGESTION_TOKEN || DEFAULT_INGESTION_TOKEN;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const isAuthorized = (token === expectedToken) || (serviceKey && token === serviceKey);
 
-  if (!token || token !== expectedToken) {
+  if (!token || !isAuthorized) {
     return res.status(401).json({
       error: 'Worker token invalido ou nao fornecido.',
       code: 'UNAUTHORIZED_WORKER'

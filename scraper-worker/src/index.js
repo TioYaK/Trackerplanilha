@@ -475,6 +475,7 @@ const sendHeartbeat = async () => {
     const metadata = {
       ...WORKER_METADATA,
       is_paused: isWorkerPaused,
+      local_port: activeLocalPort || BASE_PORT,
       disk_free_gb: disk.freeGb,
       disk_total_gb: disk.totalGb,
       disk_percent_free: disk.percentFree,
@@ -643,6 +644,7 @@ app.get('/api/health', (req, res) => {
     worker_id: WORKER_ID,
     owner: process.env.WORKER_OWNER || 'Anônimo',
     location: WORKER_LOCATION,
+    port: activeLocalPort || BASE_PORT,
     uptime_seconds: Math.floor((Date.now() - WORKER_STARTED) / 1000),
     tasks_completed: totalTasksCompleted,
     is_paused: isWorkerPaused,
@@ -673,9 +675,40 @@ app.get('/api/character/:name', async (req, res) => {
   }
 });
 
-app.listen(3001, () => {
-  console.log('[API_ADMIN] Servidor local na porta 3001 (comandos admin).');
-});
+// ==========================================
+// VINCULAÇÃO DINÂMICA DE PORTA (RESILIENTE A CONFLITOS COMO 3001)
+// ==========================================
+const BASE_PORT = parseInt(process.env.WORKER_PORT || process.env.PORT || '3001', 10);
+let activeLocalPort = null;
+
+function startLocalServer(port, remainingAttempts = 10) {
+  const server = app.listen(port, () => {
+    activeLocalPort = port;
+    process.env.ACTIVE_WORKER_PORT = String(port);
+    console.log(`[API_ADMIN] 🚀 Servidor local ativo e ouvindo na porta ${port} (comandos admin).`);
+    try {
+      fs.writeFileSync(path.join(WORKER_ROOT, 'worker_port.txt'), String(port), 'utf8');
+    } catch (e) {}
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[API_ADMIN] ⚠️ Porta ${port} ocupada por outro projeto (ex: Next.js na 3001).`);
+      try { server.close(); } catch (e) {}
+      if (remainingAttempts > 0) {
+        const nextPort = port + 1;
+        console.log(`[API_ADMIN] 🔄 Tentando vincular na próxima porta disponível: ${nextPort}...`);
+        startLocalServer(nextPort, remainingAttempts - 1);
+      } else {
+        console.warn(`[API_ADMIN] ⚠️ Não foi possível vincular uma porta HTTP local após 10 tentativas. O worker continuará operando normalmente em segundo plano no Supabase.`);
+      }
+    } else {
+      console.error(`[API_ADMIN] Erro no servidor HTTP local:`, err.message);
+    }
+  });
+}
+
+startLocalServer(BASE_PORT);
 
 // ==========================================
 // GATILHO DE ATUALIZAÇÃO EM TEMPO REAL (REALTIME)

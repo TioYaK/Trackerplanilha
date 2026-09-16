@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Download, Monitor, Activity, Users, ShieldCheck, Cpu, Heart, CheckCircle2, Network, Copy, Check, Terminal, ExternalLink, Archive, Zap, MapPin, User, Award, Crown } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { detectLocalWorker } from '../lib/workerClient';
 
 export default function Contribute() {
   const [copied, setCopied] = useState(false);
@@ -27,13 +28,10 @@ export default function Contribute() {
 
   const checkLocalWorker = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/health', { signal: AbortSignal.timeout(1500) });
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.status === 'online') {
-          setLocalWorker(data);
-          return;
-        }
+      const local = await detectLocalWorker();
+      if (local && local.data?.status === 'online') {
+        setLocalWorker(local.data);
+        return;
       }
       setLocalWorker(null);
     } catch {

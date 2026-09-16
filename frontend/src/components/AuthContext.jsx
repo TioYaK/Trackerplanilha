@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { detectLocalWorker } from '../lib/workerClient';
 
 const AuthContext = createContext({});
 
@@ -104,18 +105,13 @@ export const AuthProvider = ({ children }) => {
 
     const checkWorker = async () => {
       try {
-        // 1. Detecção Local Instantânea (para quem roda o worker no próprio PC)
+        // 1. Detecção Local Instantânea (varre portas 3001 a 3005)
         if (typeof window !== 'undefined') {
           try {
-            const localRes = await fetch('http://localhost:3001/api/health', {
-              signal: AbortSignal.timeout(1500)
-            });
-            if (localRes.ok) {
-              const localData = await localRes.json();
-              if (localData && localData.status === 'online') {
-                if (isMounted) setHasActiveWorker(true);
-                return;
-              }
+            const local = await detectLocalWorker();
+            if (local && local.data?.status === 'online') {
+              if (isMounted) setHasActiveWorker(true);
+              return;
             }
           } catch (localErr) {
             // Worker não está rodando neste localhost, segue para verificação remota

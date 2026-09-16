@@ -11,6 +11,7 @@ import {
 import AdBanner from '../components/AdBanner';
 import { WORLDS_LIST } from '../context/WorldContext';
 import { useAuth } from '../components/AuthContext';
+import { fetchFromLocalWorker } from '../lib/workerClient';
 
 const RUBINOT_WORLDS = WORLDS_LIST.map(w => w.id === 'ALL' ? 'Todos os Mundos' : w.name);
 
@@ -314,10 +315,8 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
       // 6. Se ainda for <= 1, tenta consultar a API do worker local caso ativo
       if ((!charLevel || charLevel <= 1) && typeof window !== 'undefined') {
         try {
-          const wRes = await fetch(`http://localhost:3001/api/character/${encodeURIComponent(rawName)}`, {
-            signal: AbortSignal.timeout(6000)
-          });
-          if (wRes.ok) {
+          const wRes = await fetchFromLocalWorker(`/api/character/${encodeURIComponent(rawName)}`);
+          if (wRes && wRes.ok) {
             const wData = await wRes.json();
             if (wData && wData.level && !isNaN(Number(wData.level))) {
               charLevel = Number(wData.level);
@@ -628,12 +627,10 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
             freshLevel = Number(cData.level);
             freshVoc = cData.vocation || freshVoc;
           } else {
-            // 3. Tenta worker local na porta 3001
+            // 3. Tenta worker local dinâmico
             try {
-              const wRes = await fetch(`http://localhost:3001/api/character/${encodeURIComponent(rawName)}`, {
-                signal: AbortSignal.timeout(6000)
-              });
-              if (wRes.ok) {
+              const wRes = await fetchFromLocalWorker(`/api/character/${encodeURIComponent(rawName)}`);
+              if (wRes && wRes.ok) {
                 const wData = await wRes.json();
                 if (wData && wData.level && !isNaN(Number(wData.level)) && Number(wData.level) > 1) {
                   freshLevel = Number(wData.level);
