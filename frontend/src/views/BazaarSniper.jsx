@@ -513,7 +513,10 @@ let bazaarCache = {
 
   useEffect(() => {
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 2 * 60 * 1000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchAlerts(true);
+    }, 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 

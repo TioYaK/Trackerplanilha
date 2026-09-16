@@ -10,6 +10,10 @@ import { ptBR } from 'date-fns/locale';
 import { parseUtcDate, toBrtDateStr, formatVocation } from '../lib/tibiaUtils';
 import { WORLDS_LIST } from '../context/WorldContext';
 
+// Cache em memória de dados do dashboard do jogador (TTL 60s)
+const playerDashboardCache = new Map();
+const DASHBOARD_CACHE_TTL = 60 * 1000;
+
 export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, onBack, initialWorld }) {
   const [telemetry, setTelemetry] = useState([]);
   const [stats, setStats] = useState({ ghostSlots: 0, totalHours: 0 });
@@ -39,8 +43,31 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
   const [quickResults, setQuickResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
     if (!playerName) return;
+
+    const cacheKey = (playerName || '').toLowerCase().trim();
+    if (!forceRefresh) {
+      const cached = playerDashboardCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < DASHBOARD_CACHE_TTL)) {
+        setPlayerAvatar(cached.playerAvatar);
+        setPlayerInfo(cached.playerInfo);
+        setWorldRank(cached.worldRank);
+        setGlobalRank(cached.globalRank);
+        setGlobalPercentile(cached.globalPercentile);
+        setRusher24h(cached.rusher24h);
+        setDeaths(cached.deaths);
+        setLevelHistory(cached.levelHistory);
+        setHeatmap(cached.heatmap);
+        setPrediction(cached.prediction);
+        setTelemetry(cached.telemetry);
+        setFrequentSquad(cached.frequentSquad);
+        setRoutine(cached.routine);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -450,6 +477,45 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       xp: xp
     }));
     setRoutine(routineData);
+
+    // Salva no cache do dashboard (0ms para navegação posterior)
+    playerDashboardCache.set(cacheKey, {
+      timestamp: Date.now(),
+      playerAvatar: profileRes?.data?.avatar_url || null,
+      playerInfo: {
+        level: finalLevel,
+        vocation: finalVocation,
+        is_online: isOnline,
+        world: cData?.world || gPerkRes?.data?.world || 'Auroria',
+        guild: memberData ? 'Shellpatrocina / Battlestorm' : null,
+        guild_rank: memberData?.rank || null,
+        last_active: cData?.last_active || null,
+        xp_total: currentXP,
+        xp_today: currentDelta
+      },
+      worldRank: !gPerkRes?.data?.notes && finalLevel ? Math.max(1, Math.round(((higherCount || 0) + 1) / 16)) : null,
+      globalRank: finalLevel ? ((higherCount || 0) + 1) : null,
+      globalPercentile: finalLevel ? (((higherCount || 0) + 1) / 12365 * 100).toFixed(2) : null,
+      rusher24h: rushRes?.data || null,
+      deaths: deathsData,
+      levelHistory: lvlHist,
+      heatmap: hData,
+      prediction: currentLevel ? {
+        currentLevel,
+        nextMilestone,
+        avgXpPerDay,
+        daysToNext: Number.isFinite(daysToNext) ? daysToNext : null,
+        daysToMilestone: Number.isFinite(daysToMilestone) ? daysToMilestone : null
+      } : null,
+      telemetry: chartData || [],
+      frequentSquad: rankedMates || [],
+      routine: routineData
+    });
+
+    if (playerDashboardCache.size > 50) {
+      const oldestKey = playerDashboardCache.keys().next().value;
+      playerDashboardCache.delete(oldestKey);
+    }
   } catch (err) {
     console.error('Erro ao buscar dados do jogador:', err);
   } finally {
@@ -460,7 +526,10 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
   useEffect(() => {
     fetchData();
     
-    const interval = setInterval(fetchData, 5 * 60 * 1000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchData(true);
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [playerName]);
 

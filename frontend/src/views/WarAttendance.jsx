@@ -141,10 +141,11 @@ export default function WarAttendance({ onPlayerClick }) {
   useEffect(() => {
     loadAll();
 
-    // Auto-refresh a cada 20 segundos
+    // Auto-refresh a cada 30 segundos (apenas se a aba estiver visível)
     const interval = setInterval(async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       await fetchDeaths();
-    }, 20000);
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 

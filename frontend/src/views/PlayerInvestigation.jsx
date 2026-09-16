@@ -52,9 +52,27 @@ export default function PlayerInvestigation({ onPlayerClick, onNavigate, isAdmin
     loadSuggestions();
   }, []);
 
+// Cache em memória de investigações (TTL 60s)
+const investigationCache = new Map();
+const INVESTIGATION_CACHE_TTL = 60 * 1000;
+
   const runInvestigation = async (nameToInvestigate) => {
     const target = (nameToInvestigate || searchTarget).trim();
     if (!target) return;
+
+    const cacheKey = target.toLowerCase();
+    const cached = investigationCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < INVESTIGATION_CACHE_TTL)) {
+      setActiveTarget(target);
+      setTargetProfile(cached.targetProfile);
+      setTargetDeaths(cached.targetDeaths);
+      setTargetFrags(cached.targetFrags);
+      setLoginTimeline(cached.loginTimeline);
+      setSuspects(cached.suspects);
+      setError(null);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -184,7 +202,22 @@ export default function PlayerInvestigation({ onPlayerClick, onNavigate, isAdmin
 
       // Ordena pelos maiores scores de suspeita
       calculatedSuspects.sort((a, b) => b.confidenceScore - a.confidenceScore);
-      setSuspects(calculatedSuspects.slice(0, 8));
+      const topSuspects = calculatedSuspects.slice(0, 8);
+      setSuspects(topSuspects);
+
+      // Salva no cache
+      investigationCache.set(cacheKey, {
+        timestamp: Date.now(),
+        targetProfile: profile,
+        targetDeaths: deathsRes.data || [],
+        targetFrags: fragsRes.data || [],
+        loginTimeline: loginRes.data || [],
+        suspects: topSuspects
+      });
+      if (investigationCache.size > 30) {
+        const oldest = investigationCache.keys().next().value;
+        investigationCache.delete(oldest);
+      }
 
     } catch (err) {
       console.error('Erro na investigação:', err);

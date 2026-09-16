@@ -9,7 +9,6 @@ import {
   ShieldAlert, Search, Bell, FileSpreadsheet, Store, UserPlus, Award, Globe, Gem, LogIn, Cpu, Gift, Code2, BookOpen,
   Compass, Coins, Hammer, Skull
 } from 'lucide-react';
-import ProfileModal from './ProfileModal';
 import InstallPWA from './InstallPWA';
 import PushNotificationBell from './PushNotificationBell';
 
@@ -29,7 +28,6 @@ export default function TopNav({
   const { activeWorld, setActiveWorld, worlds, activeWorldObj } = useWorld();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [workerCount, setWorkerCount] = useState(0);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;

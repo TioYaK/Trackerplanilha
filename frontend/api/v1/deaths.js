@@ -4,6 +4,8 @@ export default async function handler(req, res) {
   const auth = await validateApiKey(req, res);
   if (auth.isOptions || auth.error) return;
 
+  res.setHeader('Cache-Control', 'public, s-maxage=15, stale-while-revalidate=30');
+
   const { supabase, keyData } = auth;
   const limit = Math.min(parseInt(req.query.limit) || 20, keyData.tier === 'ENTERPRISE' ? 100 : 50);
   const victimName = req.query.victim || req.query.name;

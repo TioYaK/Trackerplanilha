@@ -97,8 +97,19 @@ export default function LiveWarFeed({ onPlayerClick }) {
   useEffect(() => {
     fetchDeaths();
 
-    // Auto-polling a cada 10 segundos
-    const interval = setInterval(fetchDeaths, 10000);
+    // Backup polling a cada 45 segundos (apenas se a aba estiver visível)
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchDeaths();
+    }, 45000);
+
+    // Re-sincroniza caso o usuário volte para a aba após estar em segundo plano
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchDeaths();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Supabase Realtime channel para novas mortes instantâneas
     const channel = supabase
@@ -116,6 +127,7 @@ export default function LiveWarFeed({ onPlayerClick }) {
 
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
   }, [soundEnabled]);

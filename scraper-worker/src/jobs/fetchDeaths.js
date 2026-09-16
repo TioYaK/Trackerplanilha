@@ -2,6 +2,31 @@ import { supabase } from '../db.js';
 import { apiClient } from '../apiClient.js';
 import { fetchRubinotApi, scrapeDeaths, parseRubinotDate } from '../lib/rubinotScraper.js';
 
+// Cache em memória de guild e hunteds com TTL de 3 minutos para evitar centenas de queries repetidas
+let cachedGuildSet = new Set();
+let cachedHuntedSet = new Set();
+let lastGuildHuntedFetch = 0;
+const GUILD_HUNTED_CACHE_TTL = 3 * 60 * 1000;
+
+const getGuildAndHuntedSets = async () => {
+    const now = Date.now();
+    if (now - lastGuildHuntedFetch < GUILD_HUNTED_CACHE_TTL && (cachedGuildSet.size > 0 || cachedHuntedSet.size > 0)) {
+        return { guildSet: cachedGuildSet, huntedSet: cachedHuntedSet };
+    }
+    try {
+        if (supabase) {
+            const [{ data: guildData }, { data: huntedData }] = await Promise.all([
+                supabase.from('guild_members').select('name'),
+                supabase.from('hunted_list').select('name')
+            ]);
+            if (guildData) cachedGuildSet = new Set(guildData.filter(m => m && m.name).map(m => m.name.toLowerCase()));
+            if (huntedData) cachedHuntedSet = new Set(huntedData.filter(h => h && h.name).map(h => h.name.toLowerCase()));
+            lastGuildHuntedFetch = now;
+        }
+    } catch (e) {}
+    return { guildSet: cachedGuildSet, huntedSet: cachedHuntedSet };
+};
+
 export const runFetchDeaths = async () => {
     try {
         console.log('[JOB] Fetching Deaths (Todos os Mundos Rubinot)');
@@ -23,17 +48,8 @@ export const runFetchDeaths = async () => {
             return;
         }
 
-        // Buscar membros da guilda e hunteds para cruzar dados (se disponível)
-        let guildSet = new Set();
-        let huntedSet = new Set();
-        try {
-            if (supabase) {
-                const { data: guildData } = await supabase.from('guild_members').select('name');
-                const { data: huntedData } = await supabase.from('hunted_list').select('name');
-                if (guildData) guildSet = new Set(guildData.filter(m => m && m.name).map(m => m.name.toLowerCase()));
-                if (huntedData) huntedSet = new Set(huntedData.filter(h => h && h.name).map(h => h.name.toLowerCase()));
-            }
-        } catch (e) {}
+        // Buscar membros da guilda e hunteds do cache local
+        const { guildSet, huntedSet } = await getGuildAndHuntedSets();
 
 
         const records = [];

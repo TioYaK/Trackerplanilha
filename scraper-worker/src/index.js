@@ -124,30 +124,21 @@ const fetchTask = async () => {
 
     const orQuery = `and(status.eq.PENDING,or(locked_at.is.null,locked_at.lte.${now})),and(status.eq.IN_PROGRESS,locked_at.lte.${crashLimit.toISOString()})`;
 
-    // 1. Prioriza tarefas críticas em tempo real para evitar inanição (starvation)
+    // 1. Busca tarefas pendentes em 1 única query rápida (reduz 50% da carga de polling no Supabase)
     const priorityTypes = ['UPDATE_WORKERS', 'PROCESS_GUILD_INVITES', 'FETCH_ONLINES', 'FETCH_DEATHS'];
-    const { data: prioTasks } = await supabase
+    const { data: tasks, error } = await supabase
       .from('task_queue')
       .select('*')
-      .in('task_type', priorityTypes)
       .or(orQuery)
       .order('locked_at', { ascending: true, nullsFirst: true })
-      .limit(5);
+      .limit(10);
 
-    let candidates = (prioTasks && prioTasks.length > 0) ? prioTasks : null;
+    if (error) throw error;
+    if (!tasks || tasks.length === 0) return null;
 
-    if (!candidates) {
-      const { data: tasks, error } = await supabase
-        .from('task_queue')
-        .select('*')
-        .or(orQuery)
-        .order('locked_at', { ascending: true, nullsFirst: true })
-        .limit(5);
-
-      if (error) throw error;
-      if (!tasks || tasks.length === 0) return null;
-      candidates = tasks;
-    }
+    // Prioriza tarefas críticas em tempo real em memória para evitar inanição (starvation)
+    const prioTasks = tasks.filter(t => priorityTypes.includes(t.task_type));
+    const candidates = prioTasks.length > 0 ? prioTasks : tasks;
 
     // Anti-colisão no swarm: seleciona com jitter entre os candidatos para paralelismo real
     const pickIndex = Math.floor(Math.random() * candidates.length);
@@ -329,7 +320,7 @@ const processTask = async (task) => {
     totalTasksCompleted++;
     tasksSinceRecycle++;
 
-    if (tasksSinceRecycle >= 100) {
+    if (tasksSinceRecycle >= 40) {
       tasksSinceRecycle = 0;
       await recycleBrowserPages();
       cleanWorkerProfileCaches();

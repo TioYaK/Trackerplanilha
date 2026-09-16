@@ -9,7 +9,6 @@ import {
   BookOpen, HelpCircle, Compass, Coins, Swords, Target
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
-import LiveWarFeed from '../components/LiveWarFeed';
 import BoostedDailyWidget from '../components/BoostedDailyWidget';
 
 // Censo Oficial dos 16 Mundos do Rubinot (Base Oficial em Tempo Real)

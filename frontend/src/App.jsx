@@ -63,9 +63,11 @@ const HunterToolbelt = lazy(() => import('./views/HunterToolbelt'));
 const BiSMarketBoard = lazy(() => import('./views/BiSMarketBoard'));
 const VipPerksHub = lazy(() => import('./views/VipPerksHub'));
 import Footer from './components/Footer';
-import PlayerModal from './components/PlayerModal';
-import ProfileModal from './components/ProfileModal';
-import GlobalSearchModal from './components/GlobalSearchModal';
+
+// Lazy loaded Global Modals (carregados sob demanda)
+const PlayerModal = lazy(() => import('./components/PlayerModal'));
+const ProfileModal = lazy(() => import('./components/ProfileModal'));
+const GlobalSearchModal = lazy(() => import('./components/GlobalSearchModal'));
 
 function ModuleFallback() {
   return (
@@ -896,34 +898,38 @@ export default function App() {
       <Footer onNavigate={navigateView} />
       </div>
 
-      {/* Modal de Perfil Global */}
-      {profileModalOpen && (
-        <ProfileModal onClose={() => setProfileModalOpen(false)} />
-      )}
+      {/* Modais Globais Carregados Sob Demanda */}
+      <Suspense fallback={null}>
+        {profileModalOpen && (
+          <ProfileModal onClose={() => setProfileModalOpen(false)} />
+        )}
 
-      {inspectedPlayer && (
-        <PlayerModal
-          playerName={inspectedPlayer}
-          initialWorld={inspectedPlayerWorld}
-          onClose={() => setInspectedPlayer(null)}
-          onOpenFull={handleOpenFullInvestigation}
-          onVersus={(pName) => {
-            if (typeof window !== 'undefined') {
-              const url = new URL(window.location.href);
-              url.searchParams.set('p1', pName);
-              window.history.replaceState({}, '', url.toString());
-            }
-            navigateView('versus');
-          }}
-        />
-      )}
+        {inspectedPlayer && (
+          <PlayerModal
+            playerName={inspectedPlayer}
+            initialWorld={inspectedPlayerWorld}
+            onClose={() => setInspectedPlayer(null)}
+            onOpenFull={handleOpenFullInvestigation}
+            onVersus={(pName) => {
+              if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.set('p1', pName);
+                window.history.replaceState({}, '', url.toString());
+              }
+              navigateView('versus');
+            }}
+          />
+        )}
 
-      <GlobalSearchModal
-        isOpen={searchModalOpen}
-        onClose={() => setSearchModalOpen(false)}
-        onNavigate={navigateView}
-        onPlayerClick={handlePlayerClick}
-      />
+        {searchModalOpen && (
+          <GlobalSearchModal
+            isOpen={searchModalOpen}
+            onClose={() => setSearchModalOpen(false)}
+            onNavigate={navigateView}
+            onPlayerClick={handlePlayerClick}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

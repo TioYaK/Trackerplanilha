@@ -49,10 +49,13 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
           'vendor-supabase': ['@supabase/supabase-js'],
-          'vendor-icons': ['lucide-react']
+          'vendor-icons': ['lucide-react'],
+          'vendor-charts': ['recharts'],
+          'vendor-pdf': ['jspdf', 'html2canvas'],
+          'vendor-utils': ['date-fns', 'canvas-confetti']
         }
       }
     },
-    chunkSizeWarningLimit: 600
+    chunkSizeWarningLimit: 700
   }
 })

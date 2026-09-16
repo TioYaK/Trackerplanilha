@@ -4,6 +4,8 @@ export default async function handler(req, res) {
   const auth = await validateApiKey(req, res);
   if (auth.isOptions || auth.error) return;
 
+  res.setHeader('Cache-Control', 'public, s-maxage=15, stale-while-revalidate=30');
+
   const { supabase, keyData } = auth;
   const targetWorld = (req.query.world || 'ALL').trim();
 

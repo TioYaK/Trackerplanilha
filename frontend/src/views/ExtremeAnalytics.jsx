@@ -21,8 +21,8 @@ export default function ExtremeAnalytics() {
   const [transferFilter, setTransferFilter] = useState('all'); // 'all', 'IN', 'OUT'
   const [transferSearch, setTransferSearch] = useState('');
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const { data: deathsData } = await supabase
         .from('recent_deaths')
@@ -42,12 +42,15 @@ export default function ExtremeAnalytics() {
     } catch (e) {
       console.error('Erro ao buscar dados do radar:', e);
     }
-    setLoading(false);
+    if (!isBackground) setLoading(false);
   };
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchData(true);
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 

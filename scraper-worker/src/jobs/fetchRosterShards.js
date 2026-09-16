@@ -22,9 +22,11 @@ export const runFetchRosterShard = async (shardId) => {
     if (shardMembers.length === 0) return;
 
     // Prioriza os membros que nunca foram atualizados ou que foram atualizados há mais tempo
+    const shardNames = shardMembers.map(m => m.name).filter(Boolean);
     const { data: states } = await supabase
       .from('current_character_state')
-      .select('character_name, updated_at');
+      .select('character_name, updated_at')
+      .in('character_name', shardNames);
 
     const stateMap = new Map();
     if (states) {
