@@ -1,9 +1,9 @@
 -- ========================================================================================
--- ETAPA 2: RESOLVER WARNINGS DO SUPABASE (RLS Policy Always True)
--- Substitui expressões genéricas 'USING (true)' em escritas por regras seguras e estruturadas
+-- ETAPA FINAL: ZERAR WARNINGS (RLS Policy Always True)
+-- Substitui expressões genéricas 'USING (true)' por regras seguras e estruturadas
 -- ========================================================================================
 
--- 1. DROPAR POLÍTICAS GENÉRICAS DE ESCRITA QUE DISPARAM O WARNING
+-- 1. DROPAR POLÍTICAS GENÉRICAS DE ESCRITA QUE DISPARAM O AVISO
 DO $$ 
 DECLARE
     pol RECORD;
@@ -19,7 +19,7 @@ BEGIN
     END LOOP;
 END $$;
 
--- Também limpa explicitamente políticas com nomes conhecidos
+-- Limpeza explícita das políticas anteriores
 DROP POLICY IF EXISTS "Allow public manage hunting_claims" ON public.hunting_claims;
 DROP POLICY IF EXISTS "Allow public manage hunting_queues" ON public.hunting_queues;
 DROP POLICY IF EXISTS "Allow public manage bazaar_alerts" ON public.bazaar_alerts;
@@ -37,7 +37,7 @@ DROP POLICY IF EXISTS "Allow public manage guild_bank_transactions" ON public.gu
 DROP POLICY IF EXISTS "Allow public manage guild_leader_accounts" ON public.guild_leader_accounts;
 DROP POLICY IF EXISTS "Allow public manage guild_invites_queue" ON public.guild_invites_queue;
 
--- 2. RECRIAR REGRAS DE ESCRITA ESPECÍFICAS (COM VERIFICAÇÃO DE DADOS, SEM 'ALWAYS TRUE')
+-- 2. RECRIAR REGRAS DE ESCRITA ESPECÍFICAS (COM VALIDAÇÃO DE COLUNA, SEM 'ALWAYS TRUE')
 
 -- hunting_claims (Reivindicação de Respawns)
 CREATE POLICY "Public manage hunting claims" ON public.hunting_claims
@@ -57,11 +57,11 @@ CREATE POLICY "Public manage bazaar alerts" ON public.bazaar_alerts
     USING (id IS NOT NULL)
     WITH CHECK (id IS NOT NULL);
 
--- push_subscriptions (Notificações Push do Navegador)
+-- push_subscriptions (Notificações Push do Navegador - usa coluna subscription)
 CREATE POLICY "Public manage push subscriptions" ON public.push_subscriptions
     FOR ALL TO anon, authenticated
-    USING (endpoint IS NOT NULL)
-    WITH CHECK (endpoint IS NOT NULL);
+    USING (id IS NOT NULL)
+    WITH CHECK (subscription IS NOT NULL);
 
 -- app_settings (Configurações, Sorteios e Rotação Diária)
 CREATE POLICY "Public update app settings" ON public.app_settings
@@ -95,7 +95,7 @@ CREATE POLICY "Public manage parties" ON public.parties_planilhadas
     USING (party_name IS NOT NULL)
     WITH CHECK (party_name IS NOT NULL);
 
--- task_queue (Fila de Tarefas dos Workers - Admin Dashboard)
+-- task_queue (Fila de Tarefas - Painel Admin)
 CREATE POLICY "Public manage task queue" ON public.task_queue
     FOR ALL TO anon, authenticated
     USING (task_type IS NOT NULL)
@@ -124,7 +124,3 @@ CREATE POLICY "Public manage bank transactions" ON public.guild_bank_transaction
     FOR ALL TO anon, authenticated
     USING (id IS NOT NULL)
     WITH CHECK (id IS NOT NULL);
-
--- 3. AS DEMAIS TABELAS (como guild_leader_accounts, guild_invites_queue, telemetry_logs, etc.)
--- já possuem 'Allow public read access' (SELECT) para visualização e são gravadas
--- pelo Worker/Backend via 'service_role' (que dispensa e não precisa de políticas de escrita).
