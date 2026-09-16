@@ -6,7 +6,7 @@ import {
   Crown, Lock, AlertCircle
 } from 'lucide-react';
 import { WORLDS_LIST } from '../context/WorldContext';
-import { formatVocation, parseUtcDate } from '../lib/tibiaUtils';
+import { formatVocation, parseUtcDate, toTibiaTitleCase } from '../lib/tibiaUtils';
 import { soundFX } from '../lib/soundEffects';
 import { isPlayerPinned, togglePinPlayer, subscribeWatchlist } from '../lib/watchlistService';
 import { useAuth } from './AuthContext';
@@ -23,20 +23,21 @@ let cachedTotalTracked = {
 
 export default function PlayerModal({ playerName, initialWorld, onClose, onOpenFull, onVersus }) {
   const { isPremium } = useAuth() || {};
-  const [loading, setLoading] = useState(true);
   const [charInfo, setCharInfo] = useState(null);
   const [selectedWorld, setSelectedWorld] = useState(initialWorld || 'ALL');
   const [worldRank, setWorldRank] = useState(null);
   const [globalRank, setGlobalRank] = useState(null);
   const [totalTracked, setTotalTracked] = useState(cachedTotalTracked.value);
-  const [rusherInfo, setRusherInfo] = useState(null);
-  const [recentDeaths, setRecentDeaths] = useState([]);
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [recentDeaths, setRecentDeaths] = useState([]);
+  const [rusherInfo, setRusherInfo] = useState(null);
+  const [suspectedMakers, setSuspectedMakers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showWorldDropdown, setShowWorldDropdown] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'deaths' | 'makers'
   const [isPinned, setIsPinned] = useState(() => isPlayerPinned(playerName));
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [limitNotice, setLimitNotice] = useState(null);
-  const [suspectedMakers, setSuspectedMakers] = useState([]);
 
   useEffect(() => {
     setIsPinned(isPlayerPinned(playerName));
@@ -61,8 +62,25 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
   const fetchPlayerDetails = async (targetWorld = null) => {
     if (!playerName) return;
 
-    const cacheKey = playerName.trim().toLowerCase();
-    const cached = playerDetailsCache.get(cacheKey);
+    const rawPlayerName = playerName.trim();
+    const targetName = toTibiaTitleCase(rawPlayerName);
+    const cacheKey = rawPlayerName.toLowerCase();
+
+    // 1. Verificação instantânea em cache (In-Memory e SessionStorage SWR: 0ms)
+    let cached = playerDetailsCache.get(cacheKey);
+    if (!cached && typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const s = sessionStorage.getItem(`rubinot_modal_${cacheKey}`);
+        if (s) {
+          const parsed = JSON.parse(s);
+          if (Date.now() - parsed.timestamp < 60000) {
+            cached = parsed;
+            playerDetailsCache.set(cacheKey, parsed);
+          }
+        }
+      } catch (e) {}
+    }
+
     if (!targetWorld && cached && (Date.now() - cached.timestamp < 60000)) {
       setCharInfo(cached.charInfo);
       setSelectedWorld(cached.selectedWorld);
@@ -80,23 +98,21 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
     setLoading(true);
 
     try {
-      // 1. Consultas simultâneas de alta velocidade
+      // 2. Consultas simultâneas de alta velocidade usando B-Tree indexes (sem a view pesada view_top_rushers_24h)
       const [
         cStateRes,
         gMemRes,
         gPerkRes,
         profileRes,
         deathsRes,
-        rushRes,
         huntedRes
       ] = await Promise.all([
-        supabase.from('current_character_state').select('*').ilike('character_name', playerName).maybeSingle(),
-        supabase.from('guild_members').select('*').ilike('name', playerName).maybeSingle(),
-        supabase.from('guild_perk_members').select('world, notes').ilike('character_name', playerName).maybeSingle(),
-        supabase.from('profiles').select('avatar_url, makers, main_character').ilike('main_character', playerName).maybeSingle(),
-        supabase.from('recent_deaths').select('*').ilike('character_name', playerName).order('death_time', { ascending: false }).limit(4),
-        supabase.from('view_top_rushers_24h').select('*').ilike('name', playerName).maybeSingle(),
-        supabase.from('hunted_list').select('*').ilike('name', playerName).maybeSingle()
+        supabase.from('current_character_state').select('*').or(`character_name.eq.${targetName},character_name.ilike.${rawPlayerName}`).limit(1).maybeSingle(),
+        supabase.from('guild_members').select('*').or(`name.eq.${targetName},name.ilike.${rawPlayerName}`).limit(1).maybeSingle(),
+        supabase.from('guild_perk_members').select('world, notes').or(`character_name.eq.${targetName},character_name.ilike.${rawPlayerName}`).limit(1).maybeSingle(),
+        supabase.from('profiles').select('avatar_url, makers, main_character').or(`main_character.eq.${targetName},main_character.ilike.${rawPlayerName}`).limit(1).maybeSingle(),
+        supabase.from('recent_deaths').select('*').eq('character_name', targetName).order('death_time', { ascending: false }).limit(4),
+        supabase.from('hunted_list').select('*').or(`name.eq.${targetName},name.ilike.${rawPlayerName}`).limit(1).maybeSingle()
       ]);
 
       const cState = cStateRes?.data;
@@ -105,7 +121,7 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
       const profile = profileRes?.data;
       const hunted = huntedRes?.data;
 
-      // 2. Determinação de Level, Vocação e Status Online
+      // 3. Determinação de Level, Vocação e Status Online
       const level = cState?.level || gMem?.level || (deathsRes?.data?.[0]?.level ? Number(deathsRes.data[0].level) : null);
       const rawVoc = cState?.vocation || gMem?.vocation;
       const vocation = formatVocation(rawVoc);
@@ -113,11 +129,17 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
       const xpTotal = cState?.xp_total ? Number(cState.xp_total) : null;
       const lastActive = cState?.last_active || gMem?.last_xp_date || (deathsRes?.data?.[0]?.death_time);
 
-      // 3. Determinação do Mundo
+      // Rush 24h calculado instantaneamente sem sobrecarga de banco
+      let computedRush = null;
+      if (cState?.xp_total && cState?.session_start_xp && Number(cState.xp_total) > Number(cState.session_start_xp)) {
+        computedRush = { exp_gained: Number(cState.xp_total) - Number(cState.session_start_xp) };
+      }
+
+      // 4. Determinação do Mundo
       let detectedWorld = targetWorld || (initialWorld && initialWorld !== 'ALL' ? initialWorld : null) || gPerk?.world;
       if (!detectedWorld && profile?.makers) {
         for (const [wName, cName] of Object.entries(profile.makers)) {
-          if (cName && typeof cName === 'string' && cName.toLowerCase().includes(playerName.toLowerCase())) {
+          if (cName && typeof cName === 'string' && cName.toLowerCase().includes(targetName.toLowerCase())) {
             detectedWorld = wName;
             break;
           }
@@ -128,42 +150,17 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
       }
       setSelectedWorld(detectedWorld);
 
-      // 4. Ranking no Mundo
+      // 5. Ranking no Mundo
       let parsedWorldRank = null;
       if (gPerk?.notes && gPerk.notes.includes('rank:')) {
         parsedWorldRank = parseInt(gPerk.notes.replace('rank:', ''), 10);
       }
       setWorldRank(parsedWorldRank);
 
-      // 5. Ranking Global & Total de Jogadores (otimizado com cache de 10 min para o count global)
-      let gRank = null;
-      if (level) {
-        const needFreshTotal = Date.now() - cachedTotalTracked.timestamp > 10 * 60 * 1000;
-        const [higherRes, totalRes] = await Promise.all([
-          supabase.from('current_character_state').select('*', { count: 'exact', head: true }).gt('level', level),
-          needFreshTotal
-            ? supabase.from('current_character_state').select('*', { count: 'exact', head: true })
-            : Promise.resolve({ count: cachedTotalTracked.value })
-        ]);
-
-        gRank = (higherRes.count || 0) + 1;
-        setGlobalRank(gRank);
-
-        if (totalRes.count) {
-          cachedTotalTracked = { value: totalRes.count, timestamp: Date.now() };
-          setTotalTracked(totalRes.count);
-        }
-
-        if (!parsedWorldRank) {
-          const approxWorldRank = Math.max(1, Math.round(gRank / 16));
-          setWorldRank(approxWorldRank);
-        }
-      }
-
       const resolvedGuildName = profile?.makers?._guild || (gMem?.rank ? `${gMem.rank}` : (gMem ? 'Membro de Guilda' : null));
 
-      setCharInfo({
-        name: playerName,
+      const finalCharInfo = {
+        name: cState?.character_name || gMem?.name || targetName,
         level,
         vocation,
         xpTotal,
@@ -172,13 +169,32 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
         guildName: resolvedGuildName,
         guildRank: gMem?.rank || null,
         isHunted: Boolean(hunted || deathsRes?.data?.[0]?.is_hunted)
-      });
+      };
 
+      setCharInfo(finalCharInfo);
       setAvatarUrl(profile?.avatar_url || null);
       setRecentDeaths(deathsRes?.data || []);
-      setRusherInfo(rushRes?.data || null);
+      setRusherInfo(computedRush);
+      setLoading(false);
 
-      // 6. Investigação de Makers & Alts (Exclusivo VIP)
+      // 6. Ranking Global & Total de Jogadores (Assíncrono em segundo plano)
+      let gRank = null;
+      if (level) {
+        supabase
+          .from('current_character_state')
+          .select('*', { count: 'exact', head: true })
+          .gt('level', level)
+          .then(({ count: higherCount }) => {
+            gRank = (higherCount || 0) + 1;
+            setGlobalRank(gRank);
+            if (!parsedWorldRank) {
+              setWorldRank(Math.max(1, Math.round(gRank / 16)));
+            }
+          })
+          .catch(() => {});
+      }
+
+      // 7. Investigação de Makers & Alts (Exclusivo VIP)
       let detectedSuspects = [];
       if (isPremium) {
         // A. Contas cadastradas no perfil
@@ -232,21 +248,10 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
           }
         }
       }
-      const finalCharInfo = {
-        name: playerName,
-        level,
-        vocation,
-        xpTotal,
-        isOnline,
-        lastActive,
-        guildName: resolvedGuildName,
-        guildRank: gMem?.rank || null,
-        isHunted: Boolean(hunted || deathsRes?.data?.[0]?.is_hunted)
-      };
 
       const finalWorldRank = parsedWorldRank || (gRank ? Math.max(1, Math.round(gRank / 16)) : null);
 
-      playerDetailsCache.set(cacheKey, {
+      const snapshot = {
         timestamp: Date.now(),
         charInfo: finalCharInfo,
         selectedWorld: detectedWorld,
@@ -255,9 +260,16 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
         totalTracked: cachedTotalTracked.value,
         avatarUrl: profile?.avatar_url || null,
         recentDeaths: deathsRes?.data || [],
-        rusherInfo: rushRes?.data || null,
+        rusherInfo: computedRush,
         suspectedMakers: detectedSuspects.slice(0, 6)
-      });
+      };
+
+      playerDetailsCache.set(cacheKey, snapshot);
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          sessionStorage.setItem(`rubinot_modal_${cacheKey}`, JSON.stringify(snapshot));
+        }
+      } catch (e) {}
 
     } catch (err) {
       console.error('Erro ao buscar detalhes do jogador no modal:', err);

@@ -101,3 +101,21 @@ export const formatVocation = (voc) => {
 
   return voc;
 };
+
+/**
+ * Normaliza o nome de um personagem para o padrão Title Case oficial do Tibia/RubinOT
+ * (Ex: "aizen ingrato" -> "Aizen Ingrato", "lord'paulistinha" -> "Lord'Paulistinha")
+ */
+export const toTibiaTitleCase = (name) => {
+  if (!name || typeof name !== 'string') return '';
+  return name.trim().split(/\s+/).map(w => {
+    if (!w) return '';
+    if (w.includes("'")) {
+      return w.split("'").map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join("'");
+    }
+    if (w.includes("-")) {
+      return w.split("-").map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join("-");
+    }
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }).join(' ');
+};

@@ -7,7 +7,7 @@ import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X, Globe, Trophy, 
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { parseUtcDate, toBrtDateStr, formatVocation } from '../lib/tibiaUtils';
+import { parseUtcDate, toBrtDateStr, formatVocation, toTibiaTitleCase } from '../lib/tibiaUtils';
 import { WORLDS_LIST } from '../context/WorldContext';
 
 // Cache em memória de dados do dashboard do jogador (TTL 60s)
@@ -46,9 +46,26 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
   const fetchData = async (forceRefresh = false) => {
     if (!playerName) return;
 
-    const cacheKey = (playerName || '').toLowerCase().trim();
+    const rawPlayerName = playerName.trim();
+    const targetName = toTibiaTitleCase(rawPlayerName);
+    const cacheKey = rawPlayerName.toLowerCase();
+
+    // 1. Verificação instantânea em cache (In-Memory e SessionStorage SWR: 0ms)
     if (!forceRefresh) {
-      const cached = playerDashboardCache.get(cacheKey);
+      let cached = playerDashboardCache.get(cacheKey);
+      if (!cached && typeof window !== 'undefined' && window.sessionStorage) {
+        try {
+          const s = sessionStorage.getItem(`rubinot_player_${cacheKey}`);
+          if (s) {
+            const parsed = JSON.parse(s);
+            if (Date.now() - parsed.timestamp < DASHBOARD_CACHE_TTL) {
+              cached = parsed;
+              playerDashboardCache.set(cacheKey, parsed);
+            }
+          }
+        } catch (e) {}
+      }
+
       if (cached && (Date.now() - cached.timestamp < DASHBOARD_CACHE_TTL)) {
         setPlayerAvatar(cached.playerAvatar);
         setPlayerInfo(cached.playerInfo);
@@ -72,456 +89,457 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
 
     try {
       const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    // Execução paralela de todas as consultas para eliminar waterfalls
-    const fetchProfileP = supabase
-      .from('profiles')
-      .select('avatar_url')
-      .ilike('main_character', playerName)
-      .maybeSingle();
+      // ─── FASE 1: DADOS CRÍTICOS DE IDENTIDADE (Execução ultra-rápida ~200-300ms) ───
+      const fetchProfileP = supabase
+        .from('profiles')
+        .select('avatar_url, makers')
+        .or(`main_character.eq.${targetName},main_character.ilike.${rawPlayerName}`)
+        .limit(1)
+        .maybeSingle();
 
-    const fetchGMembersP = supabase
-      .from('guild_members')
-      .select('level, vocation, is_online')
-      .ilike('name', playerName);
+      const fetchGMembersP = supabase
+        .from('guild_members')
+        .select('name, level, vocation, is_online, rank')
+        .or(`name.eq.${targetName},name.ilike.${rawPlayerName}`)
+        .limit(1)
+        .maybeSingle();
 
-    const fetchCDataP = supabase
-      .from('current_character_state')
-      .select('xp_total, session_start_xp, level, vocation, last_active')
-      .ilike('character_name', playerName)
-      .maybeSingle();
+      const fetchCDataP = supabase
+        .from('current_character_state')
+        .select('character_name, xp_total, session_start_xp, level, vocation, last_active')
+        .or(`character_name.eq.${targetName},character_name.ilike.${rawPlayerName}`)
+        .limit(1)
+        .maybeSingle();
 
-    const fetchLoginP = supabase
-      .from('login_events')
-      .select('event_type, event_time')
-      .ilike('character_name', playerName)
-      .order('event_time', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      const fetchGPerkP = supabase
+        .from('guild_perk_members')
+        .select('world, notes')
+        .or(`character_name.eq.${targetName},character_name.ilike.${rawPlayerName}`)
+        .limit(1)
+        .maybeSingle();
 
-    // Consulta única consolidada de 14 dias para sessões
-    const fetchSessionsP = supabase
-      .from('historical_sessions')
-      .select('*')
-      .ilike('character_name', playerName)
-      .gte('session_end', fourteenDaysAgo)
-      .order('session_end', { ascending: true });
+      // ─── FASE 2: TELEMETRIA, SESSÕES & MORTES (Lançadas em paralelo, com uso estrito de .eq() para B-Tree indexes) ───
+      const fetchSessionsP = supabase
+        .from('historical_sessions')
+        .select('session_start, session_end, xp_gained, end_level, end_xp_total')
+        .eq('character_name', targetName)
+        .gte('session_end', fourteenDaysAgo)
+        .order('session_end', { ascending: true });
 
-    const fetchDeathsP = supabase
-      .from('recent_deaths')
-      .select('level, killed_by, death_time')
-      .ilike('character_name', playerName)
-      .gte('death_time', fourteenDaysAgo)
-      .order('death_time', { ascending: false });
+      const fetchDeathsP = supabase
+        .from('recent_deaths')
+        .select('level, killed_by, death_time')
+        .eq('character_name', targetName)
+        .gte('death_time', fourteenDaysAgo)
+        .order('death_time', { ascending: false });
 
-    const fetchGPerkP = supabase
-      .from('guild_perk_members')
-      .select('world, notes')
-      .ilike('character_name', playerName)
-      .maybeSingle();
+      const fetchLoginP = supabase
+        .from('login_events')
+        .select('event_type, event_time')
+        .eq('character_name', targetName)
+        .order('event_time', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const fetchRushP = supabase
-      .from('view_top_rushers_24h')
-      .select('*')
-      .ilike('name', playerName)
-      .maybeSingle();
-
-    const fetchSquadP = async () => {
-      try {
-        const { data } = await supabase
-          .from('parties_planilhadas')
-          .select('members')
-          .limit(200);
-        return data || [];
-      } catch (e) {
-        return [];
-      }
-    };
-
-    const [
-      profileRes,
-      gMembersRes,
-      cDataRes,
-      loginRes,
-      sessionsRes,
-      deathsRes,
-      gPerkRes,
-      rushRes,
-      squadData
-    ] = await Promise.all([
-      fetchProfileP,
-      fetchGMembersP,
-      fetchCDataP,
-      fetchLoginP,
-      fetchSessionsP,
-      fetchDeathsP,
-      fetchGPerkP,
-      fetchRushP,
-      fetchSquadP()
-    ]);
-
-    // Avatar customizado
-    setPlayerAvatar(profileRes?.data?.avatar_url || null);
-
-    // Dados de Membro
-    const gMembers = gMembersRes?.data;
-    let memberData = null;
-    if (gMembers && gMembers.length > 0) {
-      const validG = gMembers.find(g => g.level !== null && g.level !== undefined) || gMembers[0];
-      if (validG && validG.level) memberData = validG;
-    }
-
-    const cData = cDataRes?.data;
-    const lastLoginEvent = loginRes?.data;
-
-    let isOnline = false;
-    const nowMs = Date.now();
-    const isRecentlyActive = cData?.last_active ? (() => {
-      const activeDate = parseUtcDate(cData.last_active);
-      if (!activeDate) return false;
-      const diff = nowMs - activeDate.getTime();
-      return diff >= 0 && diff < 20 * 60 * 1000;
-    })() : false;
-
-    if (lastLoginEvent) {
-      if (lastLoginEvent.event_type === 'LOGOUT') {
-        isOnline = false;
-      } else if (lastLoginEvent.event_type === 'LOGIN') {
-        const loginDate = parseUtcDate(lastLoginEvent.event_time);
-        const loginDiff = loginDate ? (nowMs - loginDate.getTime()) : Infinity;
-        isOnline = (loginDiff >= 0 && loginDiff < 24 * 60 * 60 * 1000) && (memberData ? Boolean(memberData.is_online) : isRecentlyActive);
-      }
-    } else {
-      isOnline = memberData ? Boolean(memberData.is_online) : isRecentlyActive;
-    }
-
-    const rawVoc = cData?.vocation || memberData?.vocation;
-    const finalVocation = formatVocation(rawVoc);
-    const finalLevel = memberData?.level || cData?.level || null;
-
-    setPlayerInfo({
-      level: finalLevel,
-      vocation: finalVocation,
-      is_online: isOnline,
-      guild_rank: memberData?.rank || null
-    });
-
-    // ─── Resolução de Mundo e Rankings ───
-    let detWorld = gPerkRes?.data?.world || (initialWorld && initialWorld !== 'ALL' ? initialWorld : null);
-    if (!detWorld && profileRes?.data?.makers) {
-      for (const [wName, cName] of Object.entries(profileRes.data.makers)) {
-        if (cName && typeof cName === 'string' && cName.toLowerCase().includes(playerName.toLowerCase())) {
-          detWorld = wName;
-          break;
-        }
-      }
-    }
-    if (!detWorld || detWorld === 'ALL') detWorld = 'Auroria';
-    setSelectedWorld(detWorld);
-
-    if (gPerkRes?.data?.notes && gPerkRes.data.notes.includes('rank:')) {
-      setWorldRank(parseInt(gPerkRes.data.notes.replace('rank:', ''), 10));
-    } else {
-      setWorldRank(null);
-    }
-
-    if (finalLevel) {
-      try {
-        const { count: higherCount } = await supabase
-          .from('current_character_state')
-          .select('*', { count: 'exact', head: true })
-          .gt('level', finalLevel);
-        const gRank = (higherCount || 0) + 1;
-        setGlobalRank(gRank);
-        setGlobalPercentile(((gRank / 12365) * 100).toFixed(2));
-        if (!gPerkRes?.data?.notes) {
-          setWorldRank(Math.max(1, Math.round(gRank / 16)));
-        }
-      } catch (e) {}
-    }
-
-    setRusher24h(rushRes?.data || null);
-
-    let currentXP = cData?.xp_total ? Number(cData.xp_total) : 0;
-    let currentDelta = 0;
-    if (cData?.xp_total && cData?.session_start_xp && Number(cData.xp_total) > Number(cData.session_start_xp)) {
-      currentDelta = Number(cData.xp_total) - Number(cData.session_start_xp);
-    }
-
-    const boundsData = sessionsRes?.data || [];
-    if (currentXP === 0 && boundsData.length > 0) {
-      currentXP = Number(boundsData[boundsData.length - 1].end_xp_total || 0);
-    }
-
-    // Histórico de Mortes e Mudança de Level (com desduplicação defensiva)
-    const deathsData = deathsRes?.data || [];
-    setDeaths(deathsData);
-    let lvlHist = [];
-    const seenDeaths = new Set();
-    deathsData.forEach(d => {
-      const timeKey = d.death_time ? d.death_time.slice(0, 16) : '';
-      const dupeKey = `${(d.killed_by || '').toLowerCase()}_${timeKey}`;
-      if (seenDeaths.has(dupeKey)) return;
-      seenDeaths.add(dupeKey);
-
-      const fromLvl = Number(d.level) || 0;
-      const toLvl = Math.max(1, fromLvl - 1);
-      lvlHist.push({
-        type: 'DOWN',
-        from: fromLvl,
-        to: toLvl,
-        reason: d.killed_by || 'Desconhecido',
-        date: d.death_time
-      });
-    });
-
-    let prevLevel = null;
-    boundsData.forEach(log => {
-      if (prevLevel !== null && log.end_level && log.end_level !== prevLevel) {
-        lvlHist.push({
-          type: log.end_level > prevLevel ? 'UP' : 'DOWN',
-          from: prevLevel,
-          to: log.end_level,
-          reason: null,
-          date: log.session_end
-        });
-      }
-      if (log.end_level) prevLevel = log.end_level;
-    });
-
-    lvlHist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setLevelHistory(lvlHist);
-
-    // Heatmap (14 dias)
-    const dailyMap = {};
-    boundsData.forEach(log => {
-      const d = parseUtcDate(log.session_start || log.session_end);
-      const dayStr = toBrtDateStr(d);
-      if (!dayStr) return;
-      dailyMap[dayStr] = (dailyMap[dayStr] || 0) + (Number(log.xp_gained) || 0);
-    });
-
-    if (currentDelta > 0) {
-      const todayStr = toBrtDateStr(new Date());
-      dailyMap[todayStr] = (dailyMap[todayStr] || 0) + currentDelta;
-    }
-
-    const hData = [];
-    const now = new Date();
-    for (let i = 13; i >= 0; i--) {
-      const targetDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const dayStr = toBrtDateStr(targetDate);
-      const xpMade = dailyMap[dayStr] || 0;
-      hData.push({ date: dayStr, xp: xpMade });
-    }
-    setHeatmap(hData);
-
-    // Previsão de Up (14 dias)
-    const totalXp14d = boundsData.reduce((acc, log) => acc + (Number(log.xp_gained) || 0), 0) + currentDelta;
-    let daysSpan = 1;
-    if (boundsData.length > 0) {
-      const oldestTime = parseUtcDate(boundsData[0].session_start || boundsData[0].session_end).getTime();
-      const msPassed = Date.now() - oldestTime;
-      daysSpan = Math.min(14, Math.max(1, msPassed / (1000 * 60 * 60 * 24)));
-    }
-
-    const avgXpPerDay = totalXp14d > 0 ? Math.floor(totalXp14d / Math.max(1, daysSpan)) : 0;
-    const currentLevel = memberData?.level || cData?.level || (boundsData.length > 0 ? boundsData[boundsData.length - 1].end_level : null);
-
-    if (currentLevel) {
-      let nextMilestone = Math.ceil((currentLevel + 1) / 100) * 100;
-      if (nextMilestone <= currentLevel) nextMilestone = (Math.floor(currentLevel / 100) + 1) * 100;
-
-      const getTibiaXPForLevel = (l) => Math.floor((50 / 3) * (Math.pow(l, 3) - 6 * Math.pow(l, 2) + 17 * l - 12));
-
-      if (!currentXP || currentXP <= 0) {
-        currentXP = getTibiaXPForLevel(currentLevel);
-      }
-
-      const xpRequiredForNext = Math.max(0, getTibiaXPForLevel(currentLevel + 1) - currentXP);
-      const xpRequiredForMilestone = Math.max(0, getTibiaXPForLevel(nextMilestone) - currentXP);
-
-      const daysToNext = avgXpPerDay > 0 ? (xpRequiredForNext / avgXpPerDay) : null;
-      const daysToMilestone = avgXpPerDay > 0 ? (xpRequiredForMilestone / avgXpPerDay) : null;
-
-      setPrediction({
-        currentLevel,
-        nextMilestone,
-        avgXpPerDay,
-        daysToNext: Number.isFinite(daysToNext) ? daysToNext : null,
-        daysToMilestone: Number.isFinite(daysToMilestone) ? daysToMilestone : null
-      });
-    } else {
-      setPrediction(null);
-    }
-
-    // Telemetria 48h (Filtrada em memória a partir de boundsData)
-    const teleData = boundsData.filter(s => s.session_end && s.session_end >= fortyEightHoursAgo);
-    if (teleData.length > 0) {
-      let accumulatedXP = 0;
-      const chartData = [];
-      teleData.forEach(log => {
-        const sStart = parseUtcDate(log.session_start || log.session_end);
-        const sEnd = parseUtcDate(log.session_end);
-        const xpGained = Number(log.xp_gained || 0);
-
-        if (log.session_start && log.session_start !== log.session_end) {
-          chartData.push({
-            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(sStart),
-            xp: accumulatedXP,
-            rawDelta: 0
-          });
-        }
-
-        accumulatedXP += xpGained;
-        chartData.push({
-          time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(sEnd),
-          xp: accumulatedXP,
-          rawDelta: xpGained
-        });
-      });
-
-      if (currentDelta > 0) {
-        chartData.push({
-          time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(new Date()),
-          xp: accumulatedXP + currentDelta,
-          rawDelta: currentDelta
-        });
-      }
-      setTelemetry(chartData);
-    } else if (currentDelta > 0) {
-      const now = new Date();
-      const start = cData?.last_active ? parseUtcDate(cData.last_active) : new Date(now.getTime() - 30 * 60 * 1000);
-      setTelemetry([
-        {
-          time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(start),
-          xp: 0,
-          rawDelta: 0
-        },
-        {
-          time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(now),
-          xp: currentDelta,
-          rawDelta: currentDelta
-        }
+      // Aguarda Fase 1 para renderização imediata do cabeçalho
+      const [profileRes, gMembersRes, cDataRes, gPerkRes] = await Promise.all([
+        fetchProfileP,
+        fetchGMembersP,
+        fetchCDataP,
+        fetchGPerkP
       ]);
-    } else {
-      setTelemetry([]);
-    }
 
-    // Panelinhas (Frequent Squad)
-    if (squadData && squadData.length > 0) {
-      const mates = {};
-      const targetLower = playerName.toLowerCase().trim();
-      squadData.forEach(p => {
-        if (!p.members || !Array.isArray(p.members)) return;
-        const inParty = p.members.some(m => m && m.toLowerCase().trim() === targetLower);
-        if (inParty) {
-          p.members.forEach(m => {
-            if (m && m.toLowerCase().trim() !== targetLower) {
-              mates[m] = (mates[m] || 0) + 1;
-            }
-          });
-        }
-      });
-      const rankedMates = Object.entries(mates)
-        .sort((a,b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }))
-        .slice(0, 3);
-      setFrequentSquad(rankedMates);
-    }
+      const cData = cDataRes?.data;
+      const memberData = gMembersRes?.data;
+      const canonicalName = cData?.character_name || memberData?.name || targetName;
 
-    // Rotina horária dos últimos 7 dias (Filtrada em memória a partir de boundsData)
-    const logs7d = boundsData.filter(s => s.session_end && s.session_end >= sevenDaysAgo);
-    const hourMap = new Array(24).fill(0);
-    if (logs7d.length > 0) {
-      logs7d.forEach(l => {
-        let xp = Number(l.xp_gained || 0);
-        if (!xp || xp <= 0) return;
+      // Avatar
+      setPlayerAvatar(profileRes?.data?.avatar_url || null);
 
-        const sStart = parseUtcDate(l.session_start || l.session_end);
-        const sEnd = parseUtcDate(l.session_end);
+      // Status Online Preliminar
+      const nowMs = Date.now();
+      const isRecentlyActive = cData?.last_active ? (() => {
+        const activeDate = parseUtcDate(cData.last_active);
+        if (!activeDate) return false;
+        const diff = nowMs - activeDate.getTime();
+        return diff >= 0 && diff < 20 * 60 * 1000;
+      })() : false;
 
-        const getBrtH = (d) => {
-          const parts = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Sao_Paulo',
-            hour: 'numeric',
-            hour12: false
-          }).formatToParts(d);
-          const p = parts.find(x => x.type === 'hour');
-          return parseInt(p ? p.value : d.getHours(), 10) % 24;
-        };
+      let isOnline = memberData ? Boolean(memberData.is_online) : isRecentlyActive;
 
-        const startH = getBrtH(sStart);
-        const endH = getBrtH(sEnd);
+      const rawVoc = cData?.vocation || memberData?.vocation;
+      const finalVocation = formatVocation(rawVoc);
+      const finalLevel = memberData?.level || cData?.level || null;
 
-        const activeHours = [];
-        if (startH <= endH) {
-          for (let h = startH; h <= endH; h++) activeHours.push(h);
-        } else {
-          for (let h = startH; h < 24; h++) activeHours.push(h);
-          for (let h = 0; h <= endH; h++) activeHours.push(h);
-        }
-
-        if (activeHours.length === 0) activeHours.push(endH);
-        const perHourXp = Math.round(xp / activeHours.length);
-        activeHours.forEach(h => {
-          hourMap[h] += perHourXp;
-        });
-      });
-    }
-
-    const routineData = hourMap.map((xp, index) => ({
-      hour: `${index.toString().padStart(2, '0')}:00`,
-      xp: xp
-    }));
-    setRoutine(routineData);
-
-    // Salva no cache do dashboard (0ms para navegação posterior)
-    playerDashboardCache.set(cacheKey, {
-      timestamp: Date.now(),
-      playerAvatar: profileRes?.data?.avatar_url || null,
-      playerInfo: {
+      // Renderiza imediatamente o cabeçalho com level, vocação e online
+      setPlayerInfo({
         level: finalLevel,
         vocation: finalVocation,
         is_online: isOnline,
-        world: cData?.world || gPerkRes?.data?.world || 'Auroria',
-        guild: memberData ? 'Shellpatrocina / Battlestorm' : null,
-        guild_rank: memberData?.rank || null,
-        last_active: cData?.last_active || null,
-        xp_total: currentXP,
-        xp_today: currentDelta
-      },
-      worldRank: !gPerkRes?.data?.notes && finalLevel ? Math.max(1, Math.round(((higherCount || 0) + 1) / 16)) : null,
-      globalRank: finalLevel ? ((higherCount || 0) + 1) : null,
-      globalPercentile: finalLevel ? (((higherCount || 0) + 1) / 12365 * 100).toFixed(2) : null,
-      rusher24h: rushRes?.data || null,
-      deaths: deathsData,
-      levelHistory: lvlHist,
-      heatmap: hData,
-      prediction: currentLevel ? {
-        currentLevel,
-        nextMilestone,
-        avgXpPerDay,
-        daysToNext: Number.isFinite(daysToNext) ? daysToNext : null,
-        daysToMilestone: Number.isFinite(daysToMilestone) ? daysToMilestone : null
-      } : null,
-      telemetry: chartData || [],
-      frequentSquad: rankedMates || [],
-      routine: routineData
-    });
+        guild_rank: memberData?.rank || null
+      });
 
-    if (playerDashboardCache.size > 50) {
-      const oldestKey = playerDashboardCache.keys().next().value;
-      playerDashboardCache.delete(oldestKey);
+      // Resolução de Mundo
+      let detWorld = gPerkRes?.data?.world || (initialWorld && initialWorld !== 'ALL' ? initialWorld : null);
+      if (!detWorld && profileRes?.data?.makers) {
+        for (const [wName, cName] of Object.entries(profileRes.data.makers)) {
+          if (cName && typeof cName === 'string' && cName.toLowerCase().includes(targetName.toLowerCase())) {
+            detWorld = wName;
+            break;
+          }
+        }
+      }
+      if (!detWorld || detWorld === 'ALL') detWorld = 'Auroria';
+      setSelectedWorld(detWorld);
+
+      if (gPerkRes?.data?.notes && gPerkRes.data.notes.includes('rank:')) {
+        setWorldRank(parseInt(gPerkRes.data.notes.replace('rank:', ''), 10));
+      } else {
+        setWorldRank(null);
+      }
+
+      // ─── AGUARDA FASE 2 (Sessões e Históricos) ───
+      const [sessionsRes, deathsRes, loginRes] = await Promise.all([
+        fetchSessionsP,
+        fetchDeathsP,
+        fetchLoginP
+      ]);
+
+      // Refina status online com o evento de login mais recente se disponível
+      const lastLoginEvent = loginRes?.data;
+      if (lastLoginEvent) {
+        if (lastLoginEvent.event_type === 'LOGOUT') {
+          isOnline = false;
+        } else if (lastLoginEvent.event_type === 'LOGIN') {
+          const loginDate = parseUtcDate(lastLoginEvent.event_time);
+          const loginDiff = loginDate ? (nowMs - loginDate.getTime()) : Infinity;
+          isOnline = (loginDiff >= 0 && loginDiff < 24 * 60 * 60 * 1000) && (memberData ? Boolean(memberData.is_online) : isRecentlyActive);
+        }
+        setPlayerInfo(prev => prev ? { ...prev, is_online: isOnline } : prev);
+      }
+
+      // Delta de XP e 24h Rush calculado em 0ms no cliente (Elimina view_top_rushers_24h de 1.5s!)
+      let currentXP = cData?.xp_total ? Number(cData.xp_total) : 0;
+      let currentDelta = 0;
+      if (cData?.xp_total && cData?.session_start_xp && Number(cData.xp_total) > Number(cData.session_start_xp)) {
+        currentDelta = Number(cData.xp_total) - Number(cData.session_start_xp);
+      }
+
+      const boundsData = sessionsRes?.data || [];
+      if (currentXP === 0 && boundsData.length > 0) {
+        currentXP = Number(boundsData[boundsData.length - 1].end_xp_total || 0);
+      }
+
+      const xpGained24h = boundsData
+        .filter(s => s.session_end && s.session_end >= twentyFourHoursAgo)
+        .reduce((acc, s) => acc + (Number(s.xp_gained) || 0), 0) + currentDelta;
+
+      const rusherData = { exp_gained: xpGained24h, xp_gained: xpGained24h };
+      setRusher24h(rusherData);
+
+      // Histórico de Mortes e Mudança de Level (com desduplicação defensiva)
+      const deathsData = deathsRes?.data || [];
+      setDeaths(deathsData);
+      let lvlHist = [];
+      const seenDeaths = new Set();
+      deathsData.forEach(d => {
+        const timeKey = d.death_time ? d.death_time.slice(0, 16) : '';
+        const dupeKey = `${(d.killed_by || '').toLowerCase()}_${timeKey}`;
+        if (seenDeaths.has(dupeKey)) return;
+        seenDeaths.add(dupeKey);
+
+        const fromLvl = Number(d.level) || 0;
+        const toLvl = Math.max(1, fromLvl - 1);
+        lvlHist.push({
+          type: 'DOWN',
+          from: fromLvl,
+          to: toLvl,
+          reason: d.killed_by || 'Desconhecido',
+          date: d.death_time
+        });
+      });
+
+      let prevLevel = null;
+      boundsData.forEach(log => {
+        if (prevLevel !== null && log.end_level && log.end_level !== prevLevel) {
+          lvlHist.push({
+            type: log.end_level > prevLevel ? 'UP' : 'DOWN',
+            from: prevLevel,
+            to: log.end_level,
+            reason: null,
+            date: log.session_end
+          });
+        }
+        if (log.end_level) prevLevel = log.end_level;
+      });
+
+      lvlHist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setLevelHistory(lvlHist);
+
+      // Heatmap (14 dias)
+      const dailyMap = {};
+      boundsData.forEach(log => {
+        const d = parseUtcDate(log.session_start || log.session_end);
+        const dayStr = toBrtDateStr(d);
+        if (!dayStr) return;
+        dailyMap[dayStr] = (dailyMap[dayStr] || 0) + (Number(log.xp_gained) || 0);
+      });
+
+      if (currentDelta > 0) {
+        const todayStr = toBrtDateStr(new Date());
+        dailyMap[todayStr] = (dailyMap[todayStr] || 0) + currentDelta;
+      }
+
+      const hData = [];
+      const now = new Date();
+      for (let i = 13; i >= 0; i--) {
+        const targetDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dayStr = toBrtDateStr(targetDate);
+        const xpMade = dailyMap[dayStr] || 0;
+        hData.push({ date: dayStr, xp: xpMade });
+      }
+      setHeatmap(hData);
+
+      // Previsão de Up (14 dias)
+      const totalXp14d = boundsData.reduce((acc, log) => acc + (Number(log.xp_gained) || 0), 0) + currentDelta;
+      let daysSpan = 1;
+      if (boundsData.length > 0) {
+        const oldestTime = parseUtcDate(boundsData[0].session_start || boundsData[0].session_end).getTime();
+        const msPassed = Date.now() - oldestTime;
+        daysSpan = Math.min(14, Math.max(1, msPassed / (1000 * 60 * 60 * 24)));
+      }
+
+      const avgXpPerDay = totalXp14d > 0 ? Math.floor(totalXp14d / Math.max(1, daysSpan)) : 0;
+      const currentLevel = memberData?.level || cData?.level || (boundsData.length > 0 ? boundsData[boundsData.length - 1].end_level : null);
+
+      let predictionData = null;
+      if (currentLevel) {
+        let nextMilestone = Math.ceil((currentLevel + 1) / 100) * 100;
+        if (nextMilestone <= currentLevel) nextMilestone = (Math.floor(currentLevel / 100) + 1) * 100;
+
+        const getTibiaXPForLevel = (l) => Math.floor((50 / 3) * (Math.pow(l, 3) - 6 * Math.pow(l, 2) + 17 * l - 12));
+
+        if (!currentXP || currentXP <= 0) {
+          currentXP = getTibiaXPForLevel(currentLevel);
+        }
+
+        const xpRequiredForNext = Math.max(0, getTibiaXPForLevel(currentLevel + 1) - currentXP);
+        const xpRequiredForMilestone = Math.max(0, getTibiaXPForLevel(nextMilestone) - currentXP);
+
+        const daysToNext = avgXpPerDay > 0 ? (xpRequiredForNext / avgXpPerDay) : null;
+        const daysToMilestone = avgXpPerDay > 0 ? (xpRequiredForMilestone / avgXpPerDay) : null;
+
+        predictionData = {
+          currentLevel,
+          nextMilestone,
+          avgXpPerDay,
+          daysToNext: Number.isFinite(daysToNext) ? daysToNext : null,
+          daysToMilestone: Number.isFinite(daysToMilestone) ? daysToMilestone : null
+        };
+        setPrediction(predictionData);
+      } else {
+        setPrediction(null);
+      }
+
+      // Telemetria 48h
+      const teleData = boundsData.filter(s => s.session_end && s.session_end >= fortyEightHoursAgo);
+      let chartData = [];
+      if (teleData.length > 0) {
+        let accumulatedXP = 0;
+        teleData.forEach(log => {
+          const sStart = parseUtcDate(log.session_start || log.session_end);
+          const sEnd = parseUtcDate(log.session_end);
+          const xpGained = Number(log.xp_gained || 0);
+
+          if (log.session_start && log.session_start !== log.session_end) {
+            chartData.push({
+              time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(sStart),
+              xp: accumulatedXP,
+              rawDelta: 0
+            });
+          }
+
+          accumulatedXP += xpGained;
+          chartData.push({
+            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(sEnd),
+            xp: accumulatedXP,
+            rawDelta: xpGained
+          });
+        });
+
+        if (currentDelta > 0) {
+          chartData.push({
+            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(new Date()),
+            xp: accumulatedXP + currentDelta,
+            rawDelta: currentDelta
+          });
+        }
+        setTelemetry(chartData);
+      } else if (currentDelta > 0) {
+        const now = new Date();
+        const start = cData?.last_active ? parseUtcDate(cData.last_active) : new Date(now.getTime() - 30 * 60 * 1000);
+        chartData = [
+          {
+            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(start),
+            xp: 0,
+            rawDelta: 0
+          },
+          {
+            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(now),
+            xp: currentDelta,
+            rawDelta: currentDelta
+          }
+        ];
+        setTelemetry(chartData);
+      } else {
+        setTelemetry([]);
+      }
+
+      // Rotina horária dos últimos 7 dias
+      const logs7d = boundsData.filter(s => s.session_end && s.session_end >= sevenDaysAgo);
+      const hourMap = new Array(24).fill(0);
+      if (logs7d.length > 0) {
+        logs7d.forEach(l => {
+          let xp = Number(l.xp_gained || 0);
+          if (!xp || xp <= 0) return;
+
+          const sStart = parseUtcDate(l.session_start || l.session_end);
+          const sEnd = parseUtcDate(l.session_end);
+
+          const getBrtH = (d) => {
+            const parts = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'America/Sao_Paulo',
+              hour: 'numeric',
+              hour12: false
+            }).formatToParts(d);
+            const p = parts.find(x => x.type === 'hour');
+            return parseInt(p ? p.value : d.getHours(), 10) % 24;
+          };
+
+          const startH = getBrtH(sStart);
+          const endH = getBrtH(sEnd);
+
+          const activeHours = [];
+          if (startH <= endH) {
+            for (let h = startH; h <= endH; h++) activeHours.push(h);
+          } else {
+            for (let h = startH; h < 24; h++) activeHours.push(h);
+            for (let h = 0; h <= endH; h++) activeHours.push(h);
+          }
+
+          if (activeHours.length === 0) activeHours.push(endH);
+          const perHourXp = Math.round(xp / activeHours.length);
+          activeHours.forEach(h => {
+            hourMap[h] += perHourXp;
+          });
+        });
+      }
+
+      const routineData = hourMap.map((xp, index) => ({
+        hour: `${index.toString().padStart(2, '0')}:00`,
+        xp: xp
+      }));
+      setRoutine(routineData);
+
+      // Desbloqueia tela principal instantaneamente (~600ms total)
+      setLoading(false);
+
+      // ─── FASE 3: CONSULTAS EM SEGUNDO PLANO (Não bloqueiam a interface) ───
+      // A. Squad Frequente (Panelinhas)
+      supabase
+        .from('parties_planilhadas')
+        .select('members')
+        .limit(200)
+        .then(({ data: squadData }) => {
+          if (squadData && squadData.length > 0) {
+            const mates = {};
+            const targetLower = targetName.toLowerCase().trim();
+            squadData.forEach(p => {
+              if (!p.members || !Array.isArray(p.members)) return;
+              const inParty = p.members.some(m => m && m.toLowerCase().trim() === targetLower);
+              if (inParty) {
+                p.members.forEach(m => {
+                  if (m && m.toLowerCase().trim() !== targetLower) {
+                    mates[m] = (mates[m] || 0) + 1;
+                  }
+                });
+              }
+            });
+            const rankedMates = Object.entries(mates)
+              .sort((a,b) => b[1] - a[1])
+              .map(([name, count]) => ({ name, count }))
+              .slice(0, 3);
+            setFrequentSquad(rankedMates);
+          }
+        })
+        .catch(() => {});
+
+      // B. Ranking Global & Percentil (Assíncrono, sem travamento da tela)
+      if (finalLevel) {
+        supabase
+          .from('current_character_state')
+          .select('*', { count: 'exact', head: true })
+          .gt('level', finalLevel)
+          .then(({ count: higherCount }) => {
+            const gRank = (higherCount || 0) + 1;
+            setGlobalRank(gRank);
+            setGlobalPercentile(((gRank / 12365) * 100).toFixed(2));
+            if (!gPerkRes?.data?.notes) {
+              setWorldRank(Math.max(1, Math.round(gRank / 16)));
+            }
+          })
+          .catch(() => {});
+      }
+
+      // Salva no cache do dashboard (0ms para navegação posterior e histórico)
+      const fullSnapshot = {
+        timestamp: Date.now(),
+        playerAvatar: profileRes?.data?.avatar_url || null,
+        playerInfo: {
+          level: finalLevel,
+          vocation: finalVocation,
+          is_online: isOnline,
+          world: detWorld,
+          guild: memberData ? 'Shellpatrocina / Battlestorm' : null,
+          guild_rank: memberData?.rank || null,
+          last_active: cData?.last_active || null,
+          xp_total: currentXP,
+          xp_today: currentDelta
+        },
+        worldRank: gPerkRes?.data?.notes && gPerkRes.data.notes.includes('rank:') ? parseInt(gPerkRes.data.notes.replace('rank:', ''), 10) : null,
+        globalRank: null,
+        globalPercentile: null,
+        rusher24h: rusherData,
+        deaths: deathsData,
+        levelHistory: lvlHist,
+        heatmap: hData,
+        prediction: predictionData,
+        telemetry: chartData,
+        frequentSquad: [],
+        routine: routineData
+      };
+
+      playerDashboardCache.set(cacheKey, fullSnapshot);
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          sessionStorage.setItem(`rubinot_player_${cacheKey}`, JSON.stringify(fullSnapshot));
+        }
+      } catch (e) {}
+
+      if (playerDashboardCache.size > 50) {
+        const oldestKey = playerDashboardCache.keys().next().value;
+        playerDashboardCache.delete(oldestKey);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar dados do jogador:', err);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error('Erro ao buscar dados do jogador:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     fetchData();
