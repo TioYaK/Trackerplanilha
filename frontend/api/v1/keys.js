@@ -84,7 +84,20 @@ export default async function handler(req, res) {
     }
 
     const requestedTier = (req.body?.tier || 'STARTER').toUpperCase();
-    const isPro = requestedTier === 'PRO';
+
+    // Verifica se o usuário tem privilégio VIP no perfil para desbloquear o Tier PRO
+    let isUserVip = isSuperAdmin;
+    if (!isUserVip) {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('role, is_premium')
+        .eq('id', verifiedUser.id)
+        .maybeSingle();
+      isUserVip = Boolean(userProfile?.is_premium || userProfile?.role === 'premium');
+    }
+
+    // Apenas assinantes VIP ou Admins podem ter o tier PRO (600 req/min)
+    const isPro = requestedTier === 'PRO' && isUserVip;
     // Apenas admins podem auto-conceder ENTERPRISE
     const isEnterprise = requestedTier === 'ENTERPRISE' && isSuperAdmin;
     const finalTier = isEnterprise ? 'ENTERPRISE' : (isPro ? 'PRO' : 'STARTER');

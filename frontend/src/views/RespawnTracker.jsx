@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
+import { soundFX } from '../lib/soundEffects';
 import { 
   Swords, Map, Search, Clock, CheckCircle2, UserCheck, LogOut, 
-  ArrowRight, ShieldCheck, Copy, Check, Sparkles, TrendingUp, Users, Flame, Share2, Filter
+  ArrowRight, ShieldCheck, Copy, Check, Sparkles, TrendingUp, Users, Flame, Share2, Filter,
+  Bell, Crown, Volume2
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 
@@ -29,7 +31,7 @@ const DEFAULT_RESPAWNS = [
 ];
 
 export default function RespawnTracker({ isAdmin }) {
-  const { profile, user } = useAuth();
+  const { profile, user, isPremium } = useAuth() || {};
   const [respawns, setRespawns] = useState(DEFAULT_RESPAWNS);
   const [activeClaims, setActiveClaims] = useState({});
   const [queues, setQueues] = useState({});
@@ -39,6 +41,55 @@ export default function RespawnTracker({ isAdmin }) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [copiedClaimId, setCopiedClaimId] = useState(null);
+  const prevClaimsRef = useRef({});
+
+  // Caves monitoradas por alerta sonoro de voz (Recurso exclusivo VIP)
+  const [monitoredCaves, setMonitoredCaves] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rubinot_monitored_caves') || '[]');
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const toggleMonitorCave = (respawnId, respawnName) => {
+    if (!isPremium) {
+      alert('👑 O Alerta de Cave Livre por Voz é exclusivo para membros VIP ou Operadores de Telemetria.');
+      return;
+    }
+    setMonitoredCaves(prev => {
+      const isMonitored = prev.includes(respawnId);
+      const next = isMonitored ? prev.filter(id => id !== respawnId) : [...prev, respawnId];
+      try {
+        localStorage.setItem('rubinot_monitored_caves', JSON.stringify(next));
+      } catch (e) {}
+
+      if (!isMonitored) {
+        soundFX.playTacticalPing();
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          try {
+            const utter = new SpeechSynthesisUtterance(`Radar VIP ativado para a cave ${respawnName}. Você será alertado assim que ela desocupar.`);
+            utter.lang = 'pt-BR';
+            window.speechSynthesis.speak(utter);
+          } catch (e) {}
+        }
+      }
+      return next;
+    });
+  };
+
+  const notifyCaveFreed = (rName) => {
+    soundFX.playTacticalPing();
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(`Atenção Hunter VIP! O respawn ${rName} acaba de ser liberado!`);
+        utter.lang = 'pt-BR';
+        utter.rate = 1.05;
+        window.speechSynthesis.speak(utter);
+      } catch (e) {}
+    }
+  };
 
   const fetchRespawnsAndClaims = async () => {
     try {
@@ -48,8 +99,9 @@ export default function RespawnTracker({ isAdmin }) {
         supabase.from('hunting_queues').select('*').eq('status', 'WAITING').order('joined_at', { ascending: true })
       ]);
 
+      let curRespawns = DEFAULT_RESPAWNS;
       if (respawnsRes.data && respawnsRes.data.length > 0) {
-        const merged = respawnsRes.data.map(r => {
+        curRespawns = respawnsRes.data.map(r => {
           const def = DEFAULT_RESPAWNS.find(d => d.id === r.id || d.name.toLowerCase() === (r.name || '').toLowerCase());
           return {
             ...r,
@@ -59,7 +111,7 @@ export default function RespawnTracker({ isAdmin }) {
             profitPerHour: r.profit_per_hour || def?.profitPerHour || '500k-1M'
           };
         });
-        setRespawns(merged);
+        setRespawns(curRespawns);
       } else {
         setRespawns(DEFAULT_RESPAWNS);
       }
@@ -75,6 +127,19 @@ export default function RespawnTracker({ isAdmin }) {
           if (!claimsMap[k]) claimsMap[k] = local[k];
         });
       } catch (e) {}
+
+      // Se uma cave monitorada por VIP estava ocupada e agora foi liberada, alertar por voz!
+      if (isPremium && monitoredCaves.length > 0) {
+        monitoredCaves.forEach(rId => {
+          const wasOccupied = prevClaimsRef.current[rId];
+          const isNowFree = !claimsMap[rId];
+          if (wasOccupied && isNowFree) {
+            const respawnItem = curRespawns.find(r => r.id === rId);
+            notifyCaveFreed(respawnItem?.name || 'monitorado');
+          }
+        });
+      }
+      prevClaimsRef.current = claimsMap;
 
       setActiveClaims(claimsMap);
 
@@ -110,7 +175,7 @@ export default function RespawnTracker({ isAdmin }) {
         supabase.removeChannel(claimsChannel);
       };
     } catch (e) {}
-  }, []);
+  }, [monitoredCaves, isPremium]);
 
   const formatUptime = (startTime) => {
     if (!startTime) return '0m';
@@ -118,15 +183,20 @@ export default function RespawnTracker({ isAdmin }) {
     if (isNaN(parsed)) return '0m';
     const diff = Math.max(0, Math.floor((Date.now() - parsed) / 60000));
     if (diff < 60) return `${diff}m`;
-    const h = Math.floor(diff / 60);
-    const m = diff % 60;
-    return `${h}h ${m}m`;
+    const hours = Math.floor(diff / 60);
+    const mins = diff % 60;
+    return `${hours}h ${mins}m`;
   };
 
   const getActiveCharacter = () => {
-    if (profile?.main_character) return profile.main_character;
-    const promptName = window.prompt('Digite o nome do seu personagem para o Claim / Fila:');
-    return promptName ? promptName.trim() : null;
+    if (profile?.main_character && profile.main_character.trim().length > 0) {
+      return profile.main_character.trim();
+    }
+    const entered = window.prompt(
+      'Para registrar a cave, digite o nome do seu personagem principal no Rubinot:'
+    );
+    if (!entered || !entered.trim()) return null;
+    return entered.trim();
   };
 
   const handleClaim = async (respawnId) => {
@@ -141,6 +211,8 @@ export default function RespawnTracker({ isAdmin }) {
       character_name: charName,
       web_user_id: user?.id || null,
       status: 'ACTIVE',
+      is_vip: Boolean(isPremium),
+      duration_hours: isPremium ? 3 : 2,
       claimed_at: nowIso
     };
 
@@ -164,6 +236,7 @@ export default function RespawnTracker({ isAdmin }) {
         character_name: charName,
         web_user_id: user?.id || null,
         status: 'ACTIVE',
+        is_vip: Boolean(isPremium),
         claimed_at: nowIso
       }]);
     } catch (err) {
@@ -422,11 +495,16 @@ export default function RespawnTracker({ isAdmin }) {
                     {isOccupied ? (
                       <div className="bg-yellow-950/40 border border-yellow-600/40 rounded-xl p-3 shadow-inner">
                         <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-yellow-300 flex items-center gap-1.5">
+                          <span className="font-bold text-yellow-300 flex items-center gap-1.5 flex-wrap">
                             <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-ping"></span>
-                            {activeClaim.character_name}
+                            <span>{activeClaim.character_name}</span>
+                            {activeClaim.is_vip && (
+                              <span className="px-1.5 py-0.2 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-[9px] font-bold font-mono">
+                                👑 VIP Hunter
+                              </span>
+                            )}
                           </span>
-                          <span className="text-gray-300 font-mono text-[11px] flex items-center gap-1">
+                          <span className="text-gray-300 font-mono text-[11px] flex items-center gap-1 shrink-0">
                             <Clock size={12} className="text-yellow-400" /> {formatUptime(activeClaim.claimed_at)}
                           </span>
                         </div>
@@ -472,6 +550,20 @@ export default function RespawnTracker({ isAdmin }) {
                         <ArrowRight size={14} />
                         {isLoadingThis ? 'Aguarde...' : 'Entrar na Fila'}
                       </button>
+
+                      {!isClaimedByMe && (
+                        <button
+                          onClick={() => toggleMonitorCave(respawn.id, respawn.name)}
+                          className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1 shrink-0 ${
+                            monitoredCaves.includes(respawn.id)
+                              ? 'bg-yellow-500/20 border-yellow-500/60 text-yellow-300 shadow-sm'
+                              : 'bg-black/50 border-white/10 text-gray-400 hover:text-white hover:border-yellow-500/40'
+                          }`}
+                          title={isPremium ? (monitoredCaves.includes(respawn.id) ? 'Remover alerta sonoro' : 'Ativar alerta por voz quando esta cave for liberada 👑') : 'Exclusivo VIP: Alerta de Cave Livre 👑'}
+                        >
+                          <Bell size={14} className={monitoredCaves.includes(respawn.id) ? 'text-yellow-400 animate-bounce' : ''} />
+                        </button>
+                      )}
                     </>
                   ) : (
                     <button
@@ -479,8 +571,8 @@ export default function RespawnTracker({ isAdmin }) {
                       disabled={isLoadingThis}
                       className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-black font-bold py-2 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-95"
                     >
-                      <UserCheck size={14} />
-                      {isLoadingThis ? 'Reivindicando...' : 'Claim (Caçar Agora)'}
+                      {isPremium ? <Crown size={14} className="text-black" /> : <UserCheck size={14} />}
+                      {isLoadingThis ? 'Reivindicando...' : isPremium ? 'Claim VIP (Hunt 3h Estendida) 👑' : 'Claim (Caçar Agora 2h)'}
                     </button>
                   )}
                 </div>

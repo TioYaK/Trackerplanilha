@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 import { WORLDS_LIST } from '../context/WorldContext';
+import { useAuth } from '../components/AuthContext';
 
 const RUBINOT_WORLDS = WORLDS_LIST.map(w => w.id === 'ALL' ? 'Todos os Mundos' : w.name);
 
@@ -37,6 +38,7 @@ const DEFAULT_GIVEAWAY = {
 };
 
 export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
+  const { isPremium } = useAuth() || {};
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'history' | 'admin'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -226,6 +228,16 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
       }
     }
 
+    if (giveaway.eligibility === 'VIP') {
+      if (!isPremium) {
+        setRegStatus({ 
+          type: 'error', 
+          message: '👑 Este sorteio é EXCLUSIVO para Membros VIP ou Operadores de Telemetria ativos. Desbloqueie seu acesso na aba "VIP"!' 
+        });
+        return;
+      }
+    }
+
     // Buscar dados do personagem no banco com cascata inteligente (Guilda -> Estado -> Sessões -> Mortes -> Worker)
     let charLevel = 1;
     let charVoc = 'Desconhecido';
@@ -342,6 +354,8 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
       world: resolvedWorld,
       level: charLevel,
       vocation: charVoc,
+      is_vip: Boolean(isPremium),
+      tickets: isPremium ? 2 : 1,
       entered_at: new Date().toISOString()
     };
 
@@ -353,9 +367,10 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
     await persistStore(updatedGiveaway);
     setCharInput('');
     setIsRegistering(false);
+    const ticketsMsg = isPremium ? ' (👑 2x Tickets VIP Ativado!)' : '';
     setRegStatus({ 
       type: 'success', 
-      message: `🎉 Inscrição confirmada com sucesso para ${rawName} (Lvl ${charLevel} • ${charVoc})! Boa sorte!` 
+      message: `🎉 Inscrição confirmada com sucesso para ${rawName} (Lvl ${charLevel} • ${charVoc})${ticketsMsg}! Boa sorte!` 
     });
 
     if (soundEnabled) soundFX.playRouletteTick(800);
@@ -382,9 +397,18 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
 
     // Efeito de roleta rápida desacelerando com duração perfeita (~5s)
     const participants = [...giveaway.participants];
-    // Escolhe o vencedor aleatoriamente com alta entropia
-    const winnerIndex = Math.floor(Math.random() * participants.length);
-    const officialWinner = participants[winnerIndex];
+    // Cria pool ponderado onde membros VIP (tickets === 2) possuem o dobro de chances reais!
+    const weightedPool = [];
+    participants.forEach(p => {
+      const weight = p.tickets || (p.is_vip ? 2 : 1);
+      for (let i = 0; i < weight; i++) {
+        weightedPool.push(p);
+      }
+    });
+
+    // Escolhe o vencedor aleatoriamente com alta entropia do pool ponderado
+    const winnerIndex = Math.floor(Math.random() * weightedPool.length);
+    const officialWinner = weightedPool[winnerIndex];
 
     let currentInterval = 60; // ms
     let iterations = 0;
@@ -1024,8 +1048,13 @@ export default function GiveawayDraw({ isAdmin, user, profile, onNavigate }) {
                           #{idx + 1}
                         </span>
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-white group-hover:text-yellow-400 transition-colors truncate">
-                            {p.name}
+                          <div className="text-xs font-bold text-white group-hover:text-yellow-400 transition-colors truncate flex items-center gap-1.5">
+                            <span className="truncate">{p.name}</span>
+                            {(p.is_vip || p.tickets > 1) && (
+                              <span className="px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-[9px] font-bold shrink-0 font-mono shadow-sm" title="Membro VIP com 2x chances de vitória!">
+                                👑 2x
+                              </span>
+                            )}
                           </div>
                           <div className="text-[10px] text-gray-400 truncate">
                             Lvl {p.level || '?'} • {p.vocation || 'Player'} ({p.world || 'Auroria'})

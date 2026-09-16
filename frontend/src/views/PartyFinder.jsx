@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Users, UserPlus, Search, MapPin, Clock, MessageSquare, 
-  Send, Sparkles, PlusCircle, Check, Copy, AlertCircle, Globe 
+  Send, Sparkles, PlusCircle, Check, Copy, AlertCircle, Globe, Crown
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 import { WORLDS_LIST } from '../context/WorldContext';
+import { useAuth } from '../components/AuthContext';
 
 export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }) {
+  const { isPremium } = useAuth() || {};
   const [posts, setPosts] = useState([]);
   const [selectedWorld, setSelectedWorld] = useState('ALL');
   const [selectedVoc, setSelectedVoc] = useState('ALL');
@@ -22,6 +24,7 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
   const [formRespawn, setFormRespawn] = useState('Cobra Bastion');
   const [formDescription, setFormDescription] = useState('Hunt 2h hoje à noite com discord');
   const [formLeader, setFormLeader] = useState(profile?.main_character || '');
+  const [formIsVipHighlight, setFormIsVipHighlight] = useState(false);
   const [copiedWorldChat, setCopiedWorldChat] = useState(null);
   const [myLevel, setMyLevel] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -112,6 +115,7 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
       target_respawn: formRespawn.trim(),
       schedule: 'Agora / Hoje',
       description: formDescription.trim(),
+      is_vip: Boolean(isPremium && formIsVipHighlight),
       created_at: new Date().toISOString()
     };
 
@@ -136,19 +140,24 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
   };
 
   const copyWorldChatMessage = (p) => {
-    const minLvl = Math.floor((p.min_level * 2) / 3);
-    const maxLvl = Math.ceil((p.min_level * 3) / 2);
-    const text = `LFP [${p.vocation_needed}] lvl ${p.min_level}+ ${p.target_respawn} • Share ${minLvl}-${maxLvl} • Msg ${p.leader_name}`;
+    const text = `Party Finder: Precisa-se de [${p.vocation_needed}] Lvl ${p.min_level}+ para ${p.target_respawn} (${p.schedule}) - Msg me in-game!`;
     navigator.clipboard.writeText(text);
     setCopiedWorldChat(p.id);
     setTimeout(() => setCopiedWorldChat(null), 2500);
   };
 
-  const filteredPosts = posts.filter(p => {
-    if (selectedWorld !== 'ALL' && p.world && p.world.toLowerCase() !== selectedWorld.toLowerCase()) return false;
-    if (selectedVoc !== 'ALL' && p.vocation_needed && !p.vocation_needed.toLowerCase().includes(selectedVoc.toLowerCase())) return false;
-    return true;
-  });
+  const filteredPosts = posts
+    .filter(p => {
+      if (selectedWorld !== 'ALL' && p.world && p.world.toLowerCase() !== selectedWorld.toLowerCase()) return false;
+      if (selectedVoc !== 'ALL' && p.vocation_needed && !p.vocation_needed.toLowerCase().includes(selectedVoc.toLowerCase())) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // Vagas VIP Recruiter são fixadas no topo com prioridade absoluta
+      if (a.is_vip && !b.is_vip) return -1;
+      if (!a.is_vip && b.is_vip) return 1;
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
 
   return (
     <div className="p-4 sm:p-8 max-w-6xl mx-auto w-full animate-fade-in text-gray-100 flex flex-col gap-6">
@@ -262,16 +271,24 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
             return (
               <div
                 key={p.id}
-                className={`bg-black/70 border p-5 rounded-2xl flex flex-col justify-between gap-4 transition-all shadow-lg ${
-                  isShareCompatible
-                    ? 'border-emerald-500/60 ring-1 ring-emerald-500/30 shadow-emerald-950/20'
-                    : 'border-tibia-border hover:border-yellow-500/50'
+                className={`border p-5 rounded-2xl flex flex-col justify-between gap-4 transition-all shadow-lg ${
+                  p.is_vip
+                    ? 'bg-gradient-to-br from-yellow-950/40 via-stone-900/90 to-black border-yellow-500/70 ring-1 ring-yellow-500/40 shadow-yellow-950/30'
+                    : isShareCompatible
+                    ? 'bg-black/70 border-emerald-500/60 ring-1 ring-emerald-500/30 shadow-emerald-950/20'
+                    : 'bg-black/70 border-tibia-border hover:border-yellow-500/50'
                 }`}
               >
                 <div>
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
+                        {p.is_vip && (
+                          <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 text-[10px] font-bold flex items-center gap-1 font-mono shadow-inner">
+                            <Crown size={11} className="text-yellow-400 animate-pulse" />
+                            VIP RECRUITER
+                          </span>
+                        )}
                         <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 text-[10px] font-bold uppercase">
                           {p.world || 'Global'}
                         </span>
@@ -284,7 +301,10 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
                           </span>
                         )}
                       </div>
-                      <h3 className="text-lg font-medieval text-white mt-1.5">{p.target_respawn}</h3>
+                      <h3 className="text-lg font-medieval text-white mt-1.5 flex items-center gap-1.5">
+                        {p.is_vip && <Crown size={15} className="text-yellow-400 shrink-0" />}
+                        <span>{p.target_respawn}</span>
+                      </h3>
                     </div>
 
                     <span className="text-xs font-mono font-bold text-green-400 bg-green-950/40 px-2 py-1 rounded-lg border border-green-500/30">
@@ -342,7 +362,9 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-tibia-card border-2 border-yellow-500/50 rounded-2xl p-6 max-w-md w-full shadow-2xl flex flex-col gap-4">
-            <h3 className="text-xl font-medieval text-yellow-400">Anunciar Vaga na Party</h3>
+            <h3 className="text-xl font-medieval text-yellow-400 flex items-center gap-2">
+              <Users size={18} /> Anunciar Vaga na Party
+            </h3>
 
             <form onSubmit={handleCreatePost} className="space-y-3">
               <div>
@@ -414,11 +436,36 @@ export default function PartyFinder({ onPlayerClick, onNavigate, user, profile }
               <div>
                 <label className="text-xs font-bold text-gray-400 block mb-1">Detalhes (Horário / Discord)</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder="Ex: Hunt 2h hoje à noite. Temos discord ativo."
                   className="w-full bg-black/80 border border-tibia-border rounded-xl p-2 text-xs text-white resize-none"
+                />
+              </div>
+
+              {/* Opção Exclusiva VIP de Destaque no Topo */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-black/60 border border-yellow-500/30">
+                <div className="flex items-center gap-2">
+                  <Crown size={18} className={isPremium ? "text-yellow-400 animate-pulse" : "text-gray-500"} />
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Destaque Ouro no Topo</span>
+                      <span className="px-1.5 py-0.2 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-[9px] font-bold">VIP</span>
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      {isPremium 
+                        ? 'Fixa sua vaga no topo com moldura dourada e selo VIP RECRUITER' 
+                        : 'Exclusivo para membros VIP e operadores de telemetria'}
+                    </div>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled={!isPremium}
+                  checked={formIsVipHighlight}
+                  onChange={(e) => setFormIsVipHighlight(e.target.checked)}
+                  className="w-4 h-4 rounded text-yellow-500 focus:ring-0 cursor-pointer disabled:opacity-40"
                 />
               </div>
 

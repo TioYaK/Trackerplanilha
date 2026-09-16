@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Skull, Clock, CheckCircle2, Circle, Sparkles, Flame, ShieldAlert, Coins, RefreshCw, AlertCircle, Calendar, Search, CheckCheck } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Skull, Clock, CheckCircle2, Circle, Sparkles, Flame, ShieldAlert, Coins, RefreshCw, AlertCircle, Calendar, Search, CheckCheck, Volume2, VolumeX, Crown, Bell } from 'lucide-react';
 import { getTodayBoosted } from '../data/boostedDailyData';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../components/AuthContext';
+import { soundFX } from '../lib/soundEffects';
 
 const BOSS_DATABASE = [
   // Express Diário (Fácil & Muito Lucrativo)
@@ -328,6 +330,42 @@ export default function BossTracker() {
   const [searchTerm, setSearchTerm] = useState('');
   const [now, setNow] = useState(Date.now());
   const [boostedData, setBoostedData] = useState(() => getTodayBoosted());
+  
+  const { isPremium } = useAuth() || {};
+  const [voiceAlertsEnabled, setVoiceAlertsEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('rubinot_boss_voice_alerts') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const alertedBossesRef = useRef(new Set());
+
+  // Alerta tático por voz militar quando bosses monitorados ficam prontos (Exclusivo VIP)
+  useEffect(() => {
+    if (!isPremium || !voiceAlertsEnabled) return;
+    BOSS_DATABASE.forEach(b => {
+      const rec = trackedBosses[b.id];
+      if (rec && rec.timestamp) {
+        const elapsed = now - rec.timestamp;
+        const cooldownMs = b.cooldownHours * 3600 * 1000;
+        const isReady = elapsed >= cooldownMs;
+        if (isReady && !alertedBossesRef.current.has(b.id)) {
+          alertedBossesRef.current.add(b.id);
+          soundFX.playTacticalPing();
+          if (typeof window !== 'undefined' && window.speechSynthesis) {
+            try {
+              window.speechSynthesis.cancel();
+              const utter = new SpeechSynthesisUtterance(`Alerta Tático VIP: O Boss ${b.name} está pronto para a batalha!`);
+              utter.lang = 'pt-BR';
+              utter.rate = 1.05;
+              window.speechSynthesis.speak(utter);
+            } catch (e) {}
+          }
+        }
+      }
+    });
+  }, [now, isPremium, voiceAlertsEnabled, trackedBosses]);
 
   // Carrega configuração dinâmica do RubinOT via Supabase
   useEffect(() => {
@@ -678,7 +716,40 @@ export default function BossTracker() {
             <div className="text-xs text-gray-400 font-semibold">Ações Rápidas</div>
             <div className="text-[11px] text-gray-500">Salvo no navegador</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPremium) {
+                  alert('👑 Os Alertas por Voz de Boss Pronto são exclusivos para Membros VIP e Operadores de Telemetria.');
+                  return;
+                }
+                const next = !voiceAlertsEnabled;
+                setVoiceAlertsEnabled(next);
+                try { localStorage.setItem('rubinot_boss_voice_alerts', next.toString()); } catch(e) {}
+                if (next) {
+                  soundFX.playTacticalPing();
+                  if (typeof window !== 'undefined' && window.speechSynthesis) {
+                    try {
+                      const utter = new SpeechSynthesisUtterance('Alertas por voz militar de bosses ativados!');
+                      utter.lang = 'pt-BR';
+                      window.speechSynthesis.speak(utter);
+                    } catch (e) {}
+                  }
+                }
+              }}
+              title={isPremium ? (voiceAlertsEnabled ? 'Desativar Avisos por Voz' : 'Ativar Avisos por Voz quando Bosses ficarem prontos 👑') : 'Exclusivo VIP: Avisos por voz militar de bosses prontos 👑'}
+              className={`text-xs flex items-center gap-1.5 px-3 py-2 rounded-lg border font-bold transition-all ${
+                voiceAlertsEnabled
+                  ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300 shadow-sm shadow-yellow-500/20'
+                  : 'bg-black/60 border-white/10 text-gray-400 hover:text-white hover:border-yellow-500/40'
+              }`}
+            >
+              <Crown size={14} className={isPremium ? "text-yellow-400 animate-pulse" : "text-gray-500"} />
+              {voiceAlertsEnabled ? <Volume2 size={14} className="text-yellow-400" /> : <VolumeX size={14} />}
+              <span>{voiceAlertsEnabled ? 'Voz VIP: ON' : 'Voz VIP: OFF'}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleMarkAllReadyDone}

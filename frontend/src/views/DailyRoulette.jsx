@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, Sparkles, Trophy, Clock, Gem, AlertTriangle, ShieldCheck, Award } from 'lucide-react';
+import { Gift, Sparkles, Trophy, Clock, Gem, AlertTriangle, ShieldCheck, Award, Crown } from 'lucide-react';
+import { useAuth } from '../components/AuthContext';
 
 const PRIZES = [
   { id: 1, label: '1 Dia VIP Mega Premium 💎', type: 'vip', days: 1, color: '#f59e0b', text: '#000000' },
@@ -21,6 +22,7 @@ const RECENT_WINNERS = [
 ];
 
 export default function DailyRoulette() {
+  const { isPremium } = useAuth() || {};
   const [spinning, setSpinning] = useState(false);
   const [wonPrize, setWonPrize] = useState(null);
   const [rotationDegrees, setRotationDegrees] = useState(0);
@@ -38,7 +40,8 @@ export default function DailyRoulette() {
     return () => clearInterval(interval);
   }, []);
 
-  const cooldownHours = 24;
+  // Membros VIP têm cooldown de 12 horas (2 giros por dia) vs 24 horas no plano gratuito
+  const cooldownHours = isPremium ? 12 : 24;
   const cooldownMs = cooldownHours * 3600 * 1000;
   const elapsed = now - lastSpinTime;
   const canSpin = elapsed >= cooldownMs;
@@ -69,15 +72,30 @@ export default function DailyRoulette() {
 
     setTimeout(() => {
       setSpinning(false);
-      const prize = PRIZES[targetIndex];
-      setWonPrize(prize);
+      const rawPrize = PRIZES[targetIndex];
+      // Multiplicador 2x de Recompensas para assinantes VIP!
+      let finalPrize = { ...rawPrize };
+      if (isPremium) {
+        if (rawPrize.type === 'gold' && rawPrize.count) {
+          finalPrize.count = rawPrize.count * 2;
+          finalPrize.label = `${(finalPrize.count).toLocaleString('pt-BR')} Gold Virtual 💰 (2x Bônus VIP!)`;
+        } else if (rawPrize.type === 'tickets' && rawPrize.count) {
+          finalPrize.count = rawPrize.count * 2;
+          finalPrize.label = `+${finalPrize.count} Tickets de Sorteio 🎟️ (2x Bônus VIP!)`;
+        } else if (rawPrize.type === 'vip') {
+          finalPrize.label = `${rawPrize.label} (+2 Dias Bônus VIP!)`;
+        }
+      }
+
+      setWonPrize(finalPrize);
       const currentNow = Date.now();
       setLastSpinTime(currentNow);
       try {
         localStorage.setItem('rubinot_roulette_last_spin', currentNow.toString());
         // Se for VIP, garante ativação no navegador
-        if (prize.type === 'vip') {
-          const vipDurationMs = prize.days * 24 * 3600 * 1000;
+        if (finalPrize.type === 'vip') {
+          const daysToAdd = isPremium ? (finalPrize.days + 2) : finalPrize.days;
+          const vipDurationMs = daysToAdd * 24 * 3600 * 1000;
           localStorage.setItem('rubinot_vip_granted_until', (currentNow + vipDurationMs).toString());
         }
       } catch (e) {}
@@ -92,14 +110,28 @@ export default function DailyRoulette() {
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
-            <div className="flex items-center gap-2 text-yellow-400 text-xs sm:text-sm font-semibold uppercase tracking-wider mb-2">
-              <Gift size={16} /> Gamificação & Recompensas Diárias
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 text-yellow-400 text-xs sm:text-sm font-semibold uppercase tracking-wider">
+                <Gift size={16} /> Gamificação & Recompensas Diárias
+              </div>
+              {isPremium ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-[11px] font-bold text-yellow-300 font-mono shadow-inner">
+                  <Crown size={12} className="text-yellow-400 animate-pulse" />
+                  VIP ATIVO: Cooldown 12h (2 Giros/dia) & Recompensas 2x
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-stone-800 border border-stone-700 text-[10px] text-gray-400 font-mono">
+                  Plano Free (1 Giro/24h) • <a href="#vip" className="text-yellow-400 hover:underline">Seja VIP para 2x</a>
+                </span>
+              )}
             </div>
             <h1 className="text-3xl sm:text-4xl font-medieval font-bold text-white tracking-wide drop-shadow-md">
               Roleta da Fortuna <span className="text-yellow-400">Rubinot</span>
             </h1>
             <p className="text-gray-400 text-sm sm:text-base mt-2 max-w-2xl">
-              Gire a roleta 1 vez ao dia gratuitamente e concorra a dias de VIP Mega Premium, bilhetes de sorteio para Tibia Coins, destaques de time e cosméticos exclusivos!
+              {isPremium 
+                ? 'Como assinante VIP, você desfruta de 2 giros por dia (cooldown de 12h) e ganha prêmios de ouro e tickets em dobro (2x)!' 
+                : 'Gire a roleta 1 vez ao dia gratuitamente ou ative o VIP para liberar 2 giros diários e recompensas em dobro!'}
             </p>
           </div>
 
@@ -108,7 +140,7 @@ export default function DailyRoulette() {
               <Sparkles size={24} className="animate-spin" style={{ animationDuration: '6s' }} />
             </div>
             <div>
-              <div className="text-xs text-gray-400">Status do Giro</div>
+              <div className="text-xs text-gray-400">Status do Giro {isPremium && '👑 VIP'}</div>
               <div className="text-base sm:text-lg font-bold text-white">
                 {canSpin ? (
                   <span className="text-emerald-400 flex items-center gap-1.5">

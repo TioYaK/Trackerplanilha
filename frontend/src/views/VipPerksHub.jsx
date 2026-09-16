@@ -3,7 +3,8 @@ import {
   Crown, Gem, Cpu, Shield, Sparkles, CheckCircle2, 
   Volume2, VolumeX, ExternalLink, Zap, Crosshair, Skull, 
   Bell, Swords, ArrowRight, Copy, Check, Info, HelpCircle, 
-  ChevronDown, ChevronUp, Star, Radio, ShieldCheck, HeartPulse
+  ChevronDown, ChevronUp, Star, Radio, ShieldCheck, HeartPulse,
+  Gift, Compass, Users, Ticket, Key, Coins, MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../components/AuthContext';
 import { soundFX } from '../lib/soundEffects';
@@ -57,6 +58,90 @@ export default function VipPerksHub({ onNavigate, onPlayerClick }) {
       iconColor: 'text-emerald-400',
       description: 'Navegação ultrarrápida sem banners comerciais, anúncios do Google ou popups em todas as mais de 40 ferramentas.',
       actionLabel: null,
+      active: isPremium
+    },
+    {
+      id: 'daily_spin_vip',
+      title: 'Roleta da Fortuna: 2 Giros/dia & 2x Recompensas',
+      badge: '2X RECOMPENSAS',
+      badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
+      icon: Gift,
+      iconColor: 'text-yellow-400',
+      description: 'Cooldown reduzido de 24h para 12h (2 giros por dia) e multiplicador exclusivo de 2x em todo Gold e Tickets obtidos na roleta.',
+      actionLabel: 'Girar Roleta',
+      actionView: 'daily_spin',
+      active: isPremium
+    },
+    {
+      id: 'respawn_tracker_vip',
+      title: 'Reserva de Caves 3h & Alerta por Voz',
+      badge: '3H + RADAR',
+      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+      icon: Compass,
+      iconColor: 'text-emerald-400',
+      description: 'Tempo de claim estendido de 2h para 3h, selo VIP Hunter na tabela e monitoramento sonoro por voz quando sua cave favorita desocupar.',
+      actionLabel: 'Ver Respawns',
+      actionView: 'respawns',
+      active: isPremium
+    },
+    {
+      id: 'party_finder_vip',
+      title: 'Party Finder: Destaque VIP Recruiter',
+      badge: 'TOP FIXADO',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      icon: Users,
+      iconColor: 'text-amber-400',
+      description: 'Seus anúncios de recrutamento de team hunt e quests são fixados no topo com card dourado e selo VIP Recruiter para preenchimento imediato.',
+      actionLabel: 'Party Finder',
+      actionView: 'party_finder',
+      active: isPremium
+    },
+    {
+      id: 'giveaway_vip',
+      title: 'Sorteios Oficiais: 2x Chances & Sorteios VIP',
+      badge: '2X TICKETS',
+      badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+      icon: Ticket,
+      iconColor: 'text-purple-400',
+      description: 'Peso duplo garantido em sorteios da comunidade, além de elegibilidade exclusiva em sorteios restritos para assinantes VIP e workers.',
+      actionLabel: 'Ver Sorteios',
+      actionView: 'sorteio',
+      active: isPremium
+    },
+    {
+      id: 'boss_voice_alert',
+      title: 'Boss Tracker: Alerta Tático por Voz de Boss Pronto',
+      badge: 'VOZ TÁTICA',
+      badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+      icon: Volume2,
+      iconColor: 'text-rose-400',
+      description: 'Síntese de voz em tempo real anunciando o instante exato em que o cooldown de 20h dos principais bosses (Scarlett, Oberon, Timira) é zerado.',
+      actionLabel: 'Boss Tracker',
+      actionView: 'boss_tracker',
+      active: isPremium
+    },
+    {
+      id: 'dev_api_pro',
+      title: 'Developer Hub: Tier PRO Automático',
+      badge: '600 REQ/MIN',
+      badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+      icon: Key,
+      iconColor: 'text-cyan-400',
+      description: 'Chaves de API v1 elevadas para o tier PRO com até 600 req/min e 50.000 requisições diárias para integração com seus próprios bots e sistemas.',
+      actionLabel: 'Developer Hub',
+      actionView: 'developers',
+      active: isPremium
+    },
+    {
+      id: 'bis_market_vip',
+      title: 'BiS Market & Simulador FIPE de Equipamentos',
+      badge: 'FIPE GEAR',
+      badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+      icon: Coins,
+      iconColor: 'text-blue-400',
+      description: 'Comparativo de preços de mercado de itens Best-in-Slot, cotação FIPE com histórico de vendas reais e simulador de rentabilidade na revenda.',
+      actionLabel: 'BiS Market',
+      actionView: 'bis_market',
       active: isPremium
     },
     {
@@ -142,6 +227,18 @@ export default function VipPerksHub({ onNavigate, onPlayerClick }) {
       actionLabel: 'Abrir Streamer HUD',
       actionView: 'streamer_companion',
       active: isPremium
+    },
+    {
+      id: 'priority_support',
+      title: 'Suporte Prioritário & Cargo Dourado Discord',
+      badge: 'DISCORD VIP',
+      badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
+      icon: MessageSquare,
+      iconColor: 'text-yellow-400',
+      description: 'Cargo dourado exclusivo no Discord da comunidade, canal VIP direto com os fundadores e prioridade máxima na sugestão de novas features.',
+      actionLabel: null,
+      actionView: null,
+      active: isPremium
     }
   ];
 
@@ -161,6 +258,10 @@ export default function VipPerksHub({ onNavigate, onPlayerClick }) {
     {
       q: 'Quantos personagens posso fixar na Watchlist?',
       a: 'Usuários gratuitos podem fixar até 5 personagens. Membros VIP ou com Worker ativo podem fixar até 30 personagens com monitoramento de mortes e status online simultâneo.'
+    },
+    {
+      q: 'Quais são as vantagens do VIP na Roleta, Respawns e Sorteios?',
+      a: 'Na Roleta da Fortuna o cooldown cai de 24h para 12h (2 giros por dia) e todo Gold e Tickets são multiplicados por 2x. No Respawn Tracker você ganha 3h de reserva e alertas sonoros quando caves forem liberadas. Nos Sorteios você ganha 2x tickets e acesso aos sorteios VIP.'
     }
   ];
 

@@ -44,6 +44,7 @@ export default function DeveloperHub({ user, profile, isAdmin, onNavigate }) {
   const [adminLoading, setAdminLoading] = useState(false);
 
   const userEmail = user?.email || profile?.email || '';
+  const isVip = Boolean(isAdmin || profile?.role === 'premium' || profile?.is_premium === true);
 
   const getAuthHeaders = async () => {
     try {
@@ -661,6 +662,12 @@ print(data)`;
                   <p className="text-xs text-gray-400 font-sans">
                     Use estas credenciais no cabeçalho <code className="text-yellow-400">Authorization: Bearer &lt;KEY&gt;</code> para consumir os dados.
                   </p>
+                  {isVip && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-[11px] font-bold text-yellow-300 font-mono shadow-sm">
+                      <Crown size={13} className="text-yellow-400 animate-pulse" />
+                      <span>BENEFÍCIO VIP: Suas chaves recebem automaticamente o Plano PRO (600 req/min)!</span>
+                    </div>
+                  )}
                 </div>
 
                 {userEmail ? (
