@@ -17,6 +17,22 @@ const FORGE_DATA = {
     dustCosts: { 1: 75, 2: 180, 3: 360, 4: 750, 5: 1500 },
     sliverCosts: { 1: 4, 2: 9, 3: 18, 4: 36, 5: 75 },
     coreCosts: { 1: 1, 2: 2, 3: 3, 4: 6, 5: 12 },
+  },
+  2: {
+    name: 'Classe 2 (Equipamentos Médios)',
+    description: 'Master Archer\'s Armor, Blade of Corruption, Prismatic Armor, etc.',
+    basePrices: { 1: 1000000, 2: 3000000, 3: 7500000, 4: 15000000, 5: 30000000 },
+    dustCosts: { 1: 40, 2: 100, 3: 200, 4: 450, 5: 900 },
+    sliverCosts: { 1: 2, 2: 4, 3: 8, 4: 18, 5: 35 },
+    coreCosts: { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8 },
+  },
+  1: {
+    name: 'Classe 1 (Equipamentos Básicos)',
+    description: 'Knight Armor, Crown Helmet, Fire Sword, Demon Shield, etc.',
+    basePrices: { 1: 250000, 2: 750000, 3: 2000000, 4: 4000000, 5: 8000000 },
+    dustCosts: { 1: 20, 2: 50, 3: 100, 4: 200, 5: 400 },
+    sliverCosts: { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 },
+    coreCosts: { 1: 1, 2: 1, 3: 2, 4: 3, 5: 5 },
   }
 };
 
@@ -77,6 +93,7 @@ const TIER_BONUSES = [
 
 export default function ForgeCalculator() {
   const [selectedClass, setSelectedClass] = useState(4);
+  const [forgeMode, setForgeMode] = useState('standard'); // 'standard' ou 'convergence'
   const [targetTier, setTargetTier] = useState(1);
   const [useCore, setUseCore] = useState(true);
   const [itemBaseCostKk, setItemBaseCostKk] = useState(15);
@@ -91,32 +108,42 @@ export default function ForgeCalculator() {
   const [simAnimating, setSimAnimating] = useState(false);
   const [simLastResult, setSimLastResult] = useState(null);
 
-  const successRate = useCore ? 80 : 65;
+  const isConvergence = forgeMode === 'convergence';
+  const successRate = isConvergence ? 100 : (useCore ? 80 : 65);
   const classData = FORGE_DATA[selectedClass] || FORGE_DATA[4];
-  const feeGold = classData.basePrices[targetTier] || 8000000;
-  const sliversNeeded = classData.sliverCosts[targetTier] || 5;
-  const coresNeeded = useCore ? (classData.coreCosts[targetTier] || 1) : 0;
+  const feeGold = isConvergence 
+    ? (classData.basePrices[targetTier] || 8000000) * 2 
+    : (classData.basePrices[targetTier] || 8000000);
+  const sliversNeeded = isConvergence 
+    ? Math.max(65, (classData.sliverCosts[targetTier] || 5) * 8) 
+    : (classData.sliverCosts[targetTier] || 5);
+  const coresNeeded = isConvergence 
+    ? Math.max(3, (classData.coreCosts[targetTier] || 1) * 2) 
+    : (useCore ? (classData.coreCosts[targetTier] || 1) : 0);
 
   const evCalculations = useMemo(() => {
     const p = successRate / 100;
-    const expectedAttempts = 1 / p;
-    const expectedLostSacrifices = (1 - p) / p;
+    const expectedAttempts = isConvergence ? 1 : (1 / p);
+    const expectedLostSacrifices = isConvergence ? 0 : ((1 - p) / p);
 
     let totalGoldFeeKk = 0;
     let totalCores = 0;
     let totalSlivers = 0;
 
     for (let t = 1; t <= targetTier; t++) {
-      const stepAttempts = Math.pow(2, targetTier - t) * (1 / p);
-      const stepFeeKk = (classData.basePrices[t] / 1000000) * stepAttempts;
-      const stepCores = (useCore ? classData.coreCosts[t] : 0) * stepAttempts;
-      const stepSlivers = classData.sliverCosts[t] * stepAttempts;
+      const stepAttempts = isConvergence ? Math.pow(2, targetTier - t) : (Math.pow(2, targetTier - t) * (1 / p));
+      const stepBaseFee = isConvergence ? ((classData.basePrices[t] || 8000000) * 2) : (classData.basePrices[t] || 8000000);
+      const stepFeeKk = (stepBaseFee / 1000000) * stepAttempts;
+      const stepCores = (isConvergence ? Math.max(3, (classData.coreCosts[t] || 1) * 2) : (useCore ? classData.coreCosts[t] : 0)) * stepAttempts;
+      const stepSlivers = (isConvergence ? Math.max(65, (classData.sliverCosts[t] || 5) * 8) : classData.sliverCosts[t]) * stepAttempts;
       totalGoldFeeKk += stepFeeKk;
       totalCores += stepCores;
       totalSlivers += stepSlivers;
     }
 
-    const expectedItemsTotal = Math.pow(2, targetTier) + (expectedLostSacrifices * Math.pow(2, targetTier - 1));
+    const expectedItemsTotal = isConvergence 
+      ? Math.pow(2, targetTier) 
+      : (Math.pow(2, targetTier) + (expectedLostSacrifices * Math.pow(2, targetTier - 1)));
     const totalItemsCostKk = expectedItemsTotal * itemBaseCostKk;
     const totalMaterialsCostKk = (totalCores * corePriceKk) + ((totalSlivers * sliverPriceK) / 1000);
     const grandTotalExpectedKk = totalGoldFeeKk + totalMaterialsCostKk + totalItemsCostKk;
@@ -130,7 +157,7 @@ export default function ForgeCalculator() {
       totalSlivers: Math.ceil(totalSlivers),
       grandTotalExpectedKk: grandTotalExpectedKk.toFixed(1)
     };
-  }, [successRate, targetTier, classData, useCore, corePriceKk, sliverPriceK, itemBaseCostKk]);
+  }, [successRate, targetTier, classData, useCore, isConvergence, corePriceKk, sliverPriceK, itemBaseCostKk]);
 
   const handleSimulateFusion = () => {
     if (simAnimating) return;
@@ -212,35 +239,63 @@ export default function ForgeCalculator() {
               <Zap size={18} /> Parâmetros da Forja
             </h2>
 
+            {/* Modo de Fusão: Padrão vs Convergência */}
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Classe do Equipamento
+                Método da Bigorna
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedClass(4)}
-                  className={`px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
-                    selectedClass === 4
+                  onClick={() => setForgeMode('standard')}
+                  className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all ${
+                    forgeMode === 'standard'
                       ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md shadow-amber-500/10'
                       : 'bg-stone-800/60 border-stone-700 text-gray-400 hover:border-stone-600'
                   }`}
                 >
-                  Classe 4 (BiS / Soul / Falcon)
+                  ⚡ Fusão Tradicional (65% / 80%)
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedClass(3)}
-                  className={`px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
-                    selectedClass === 3
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md shadow-amber-500/10'
+                  onClick={() => setForgeMode('convergence')}
+                  className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all ${
+                    forgeMode === 'convergence'
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10'
                       : 'bg-stone-800/60 border-stone-700 text-gray-400 hover:border-stone-600'
                   }`}
                 >
-                  Classe 3 (Destruction / Lion)
+                  ✨ Convergência (100% Sucesso)
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-1.5">{classData.description}</p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                {forgeMode === 'convergence'
+                  ? 'Garantia de 100% de sucesso sem risco de quebrar o item de sacrifício! Exige maior custo em Cores e Slivers.'
+                  : 'Método padrão com risco de falha e perda do item secundário caso não tenha sucesso.'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Classe do Equipamento
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[4, 3, 2, 1].map((cls) => (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setSelectedClass(cls)}
+                    className={`px-2.5 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                      selectedClass === cls
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md shadow-amber-500/10'
+                        : 'bg-stone-800/60 border-stone-700 text-gray-400 hover:border-stone-600'
+                    }`}
+                  >
+                    Classe {cls}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">{classData.name}: {classData.description}</p>
             </div>
 
             <div>
@@ -264,29 +319,64 @@ export default function ForgeCalculator() {
                 ))}
               </div>
               <p className="text-xs text-amber-400/80 mt-1.5">
-                Fusão: requer 2x itens de Tier {targetTier - 1} para tentar o Tier {targetTier}.
+                {forgeMode === 'convergence'
+                  ? `Fusão Segura: 100% de chance para Tier ${targetTier}. Nenhum item será perdido!`
+                  : `Fusão: requer 2x itens de Tier ${targetTier - 1} para tentar o Tier ${targetTier}.`}
               </p>
             </div>
 
-            <div className="flex items-center justify-between p-3.5 bg-stone-800/40 rounded-xl border border-stone-700/60">
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${useCore ? 'bg-emerald-500/20 text-emerald-400' : 'bg-stone-700 text-gray-500'}`}>
-                  💎
+            {!isConvergence && (
+              <div className="flex items-center justify-between p-3.5 bg-stone-800/40 rounded-xl border border-stone-700/60">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${useCore ? 'bg-emerald-500/20 text-emerald-400' : 'bg-stone-700 text-gray-500'}`}>
+                    💎
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-200">Usar Exalted Core</div>
+                    <div className="text-xs text-gray-400">Aumenta a chance de 65% para 80%</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-semibold text-gray-200">Usar Exalted Core</div>
-                  <div className="text-xs text-gray-400">Aumenta a chance de 65% para 80%</div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setUseCore(!useCore)}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${
+                    useCore ? 'bg-amber-500 justify-end' : 'bg-stone-700 justify-start'
+                  }`}
+                >
+                  <div className="bg-stone-900 w-4 h-4 rounded-full shadow-md" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setUseCore(!useCore)}
-                className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${
-                  useCore ? 'bg-amber-500 justify-end' : 'bg-stone-700 justify-start'
-                }`}
-              >
-                <div className="bg-stone-900 w-4 h-4 rounded-full shadow-md" />
-              </button>
+            )}
+
+            <div className="space-y-2 pt-2 border-t border-stone-800">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Presets Rápidos RubinOT
+                </span>
+                <span className="text-[10px] text-amber-400">1-Clique</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { label: 'Sanguine BiS', cls: 4, cost: 180 },
+                  { label: 'Soulwar', cls: 4, cost: 35 },
+                  { label: 'Falcon/Naga', cls: 4, cost: 20 },
+                  { label: 'Lion/Destruction', cls: 3, cost: 8 },
+                  { label: 'Prismatic', cls: 2, cost: 1.5 },
+                  { label: 'Knight/Crown', cls: 1, cost: 0.3 }
+                ].map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setSelectedClass(preset.cls);
+                      setItemBaseCostKk(preset.cost);
+                    }}
+                    className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 border border-stone-700 rounded-lg text-[11px] font-bold text-amber-300 transition-all active:scale-95"
+                  >
+                    {preset.label} ({preset.cost}kk)
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-3 pt-2 border-t border-stone-800">
