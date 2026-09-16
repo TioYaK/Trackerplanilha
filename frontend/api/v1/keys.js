@@ -30,54 +30,78 @@ export default async function handler(req, res) {
   const store = settings?.visible_tabs || { api_keys: [] };
   let keys = Array.isArray(store.api_keys) ? store.api_keys : [];
 
-  // GET: Listar chaves do usuário ou todas se for admin
-  if (req.method === 'GET') {
-    const userEmail = (req.query?.email || '').toLowerCase().trim();
-    const isAdmin = userEmail === 'pifot16@gmail.com' || req.query?.admin === 'true';
+  // 1. Autenticação obrigatória do usuário via JWT
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.replace('Bearer ', '').trim();
 
-    if (isAdmin) {
+  let verifiedUser = null;
+  let isSuperAdmin = false;
+
+  if (token) {
+    const { data: { user }, error: userErr } = await supabase.auth.getUser(token);
+    if (!userErr && user) {
+      verifiedUser = user;
+      const cleanEmail = (user.email || '').toLowerCase().trim();
+      const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+      isSuperAdmin = cleanEmail === 'pifot16@gmail.com' || prof?.role === 'super_admin' || prof?.role === 'admin';
+    }
+  }
+
+  // GET: Listar chaves do usuário autenticado ou todas se for admin
+  if (req.method === 'GET') {
+    if (!verifiedUser) {
+      return res.status(401).json({ error: 'Você precisa estar logado para visualizar suas chaves de API.' });
+    }
+
+    if (req.query?.admin === 'true' && isSuperAdmin) {
       return res.json({ keys });
     }
 
-    if (!userEmail) {
-      return res.status(400).json({ error: 'Parâmetro email é obrigatório para listar suas chaves.' });
-    }
-
-    const userKeys = keys.filter(k => (k.user_email || '').toLowerCase() === userEmail);
+    const userEmail = (verifiedUser.email || '').toLowerCase().trim();
+    const userKeys = keys.filter(k => 
+      (k.user_id && k.user_id === verifiedUser.id) || 
+      (k.user_email && k.user_email.toLowerCase() === userEmail)
+    );
     return res.json({ keys: userKeys });
   }
 
-  // POST: Gerar nova chave
+  // POST: Gerar nova chave para o usuário autenticado
   if (req.method === 'POST') {
-    const { name, user_id, user_email, user_name } = req.body || {};
-
-    if (!user_email) {
-      return res.status(400).json({ error: 'Email do usuário é obrigatório.' });
+    if (!verifiedUser) {
+      return res.status(401).json({ error: 'Você precisa estar logado para gerar uma chave de API.' });
     }
 
-    // Limite de 3 chaves por usuário no plano Starter
-    const existing = keys.filter(k => (k.user_email || '').toLowerCase() === user_email.toLowerCase() && k.status === 'ACTIVE');
-    if (existing.length >= 3 && user_email.toLowerCase() !== 'pifot16@gmail.com') {
+    const userEmail = (verifiedUser.email || '').toLowerCase().trim();
+    const { name, user_name } = req.body || {};
+
+    // Limite de 3 chaves ativas por usuário (exceto admin)
+    const existing = keys.filter(k => 
+      ((k.user_id === verifiedUser.id) || (k.user_email && k.user_email.toLowerCase() === userEmail)) && 
+      k.status === 'ACTIVE'
+    );
+    if (existing.length >= 3 && !isSuperAdmin) {
       return res.status(400).json({ error: 'Limite de 3 chaves ativas atingido para sua conta.' });
     }
 
     const requestedTier = (req.body?.tier || 'STARTER').toUpperCase();
     const isPro = requestedTier === 'PRO';
-    const isEnterprise = requestedTier === 'ENTERPRISE';
+    // Apenas admins podem auto-conceder ENTERPRISE
+    const isEnterprise = requestedTier === 'ENTERPRISE' && isSuperAdmin;
+    const finalTier = isEnterprise ? 'ENTERPRISE' : (isPro ? 'PRO' : 'STARTER');
     const rateLimit = isEnterprise ? 1500 : (isPro ? 600 : 60);
 
     const randomHex = crypto.randomBytes(16).toString('hex');
-    const prefix = isPro ? 'rub_pro_' : (isEnterprise ? 'rub_ent_' : 'rub_live_');
+    const prefix = isEnterprise ? 'rub_ent_' : (isPro ? 'rub_pro_' : 'rub_live_');
     const newApiKey = `${prefix}${randomHex}`;
 
     const newKeyObj = {
       id: `key_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       key: newApiKey,
-      name: (name || 'Nova Chave de API').trim(),
-      user_id: user_id || null,
-      user_email: user_email.toLowerCase().trim(),
-      user_name: user_name || 'Desenvolvedor',
-      tier: requestedTier, // 'STARTER' (60/min), 'PRO' (600/min), 'ENTERPRISE' (1500/min)
+      name: (name || 'Nova Chave de API').slice(0, 50).trim(),
+      user_id: verifiedUser.id,
+      user_email: userEmail,
+      user_name: (user_name || 'Desenvolvedor').slice(0, 50),
+      tier: finalTier,
       rate_limit: rateLimit,
       status: 'ACTIVE',
       created_at: new Date().toISOString(),
@@ -99,23 +123,43 @@ export default async function handler(req, res) {
     });
   }
 
-  // PATCH: Atualizar plano (Tier) ou status da chave (Admin ou dono)
+  // PATCH: Atualizar plano (Tier) ou status da chave (Apenas Admin ou dono da chave)
   if (req.method === 'PATCH') {
-    const { id, tier, status, rate_limit, admin_email } = req.body || {};
+    if (!verifiedUser) {
+      return res.status(401).json({ error: 'Não autenticado.' });
+    }
+
+    const { id, tier, status, rate_limit } = req.body || {};
     if (!id) return res.status(400).json({ error: 'ID da chave obrigatório.' });
 
     const keyIndex = keys.findIndex(k => k.id === id);
     if (keyIndex === -1) return res.status(404).json({ error: 'Chave não encontrada.' });
 
-    if (tier) {
-      keys[keyIndex].tier = tier;
-      if (tier === 'ENTERPRISE') keys[keyIndex].rate_limit = rate_limit || 1200;
-      else if (tier === 'PRO') keys[keyIndex].rate_limit = rate_limit || 300;
-      else keys[keyIndex].rate_limit = rate_limit || 60;
+    const keyOwnerEmail = (keys[keyIndex].user_email || '').toLowerCase().trim();
+    const isOwner = keyOwnerEmail === (verifiedUser.email || '').toLowerCase().trim() || keys[keyIndex].user_id === verifiedUser.id;
+
+    if (!isOwner && !isSuperAdmin) {
+      return res.status(403).json({ error: 'Acesso negado. Esta chave pertence a outro usuário.' });
+    }
+
+    // Apenas admin pode alterar tier ou rate_limit
+    if (tier || rate_limit) {
+      if (!isSuperAdmin) {
+        return res.status(403).json({ error: 'Apenas administradores podem alterar o plano de uma chave.' });
+      }
+      if (tier) {
+        keys[keyIndex].tier = tier;
+        if (tier === 'ENTERPRISE') keys[keyIndex].rate_limit = rate_limit || 1500;
+        else if (tier === 'PRO') keys[keyIndex].rate_limit = rate_limit || 600;
+        else keys[keyIndex].rate_limit = rate_limit || 60;
+      }
     }
 
     if (status) {
-      keys[keyIndex].status = status; // 'ACTIVE', 'REVOKED', 'SUSPENDED'
+      if (!['ACTIVE', 'REVOKED', 'SUSPENDED'].includes(status)) {
+        return res.status(400).json({ error: 'Status inválido.' });
+      }
+      keys[keyIndex].status = status;
     }
 
     await supabase
@@ -126,13 +170,24 @@ export default async function handler(req, res) {
     return res.json({ success: true, updated: keys[keyIndex] });
   }
 
-  // DELETE: Revogar chave
+  // DELETE: Revogar chave (Apenas Admin ou dono da chave)
   if (req.method === 'DELETE') {
+    if (!verifiedUser) {
+      return res.status(401).json({ error: 'Não autenticado.' });
+    }
+
     const { id, key } = req.body || req.query || {};
     const keyIndex = keys.findIndex(k => (id && k.id === id) || (key && k.key === key));
 
     if (keyIndex === -1) {
       return res.status(404).json({ error: 'Chave não encontrada.' });
+    }
+
+    const keyOwnerEmail = (keys[keyIndex].user_email || '').toLowerCase().trim();
+    const isOwner = keyOwnerEmail === (verifiedUser.email || '').toLowerCase().trim() || keys[keyIndex].user_id === verifiedUser.id;
+
+    if (!isOwner && !isSuperAdmin) {
+      return res.status(403).json({ error: 'Acesso negado. Esta chave pertence a outro usuário.' });
     }
 
     keys[keyIndex].status = 'REVOKED';

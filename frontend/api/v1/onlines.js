@@ -8,6 +8,7 @@ export default async function handler(req, res) {
 
   const { supabase, keyData } = auth;
   const targetWorld = (req.query.world || 'ALL').trim();
+  const cleanWorld = targetWorld.replace(/[%_]/g, '').trim().slice(0, 30);
 
   try {
     // 1. Contagem mais recente
@@ -61,8 +62,8 @@ export default async function handler(req, res) {
         .select('character_name, level, vocation, last_active, world')
         .gte('last_active', threeHoursAgo);
 
-      if (targetWorld !== 'ALL') {
-        charStateQuery = charStateQuery.ilike('world', `%${targetWorld}%`);
+      if (cleanWorld && cleanWorld.toUpperCase() !== 'ALL') {
+        charStateQuery = charStateQuery.ilike('world', `%${cleanWorld}%`);
       }
 
       const { data: recentActive } = await charStateQuery
@@ -87,7 +88,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      world: targetWorld,
+      world: cleanWorld || 'ALL',
       online_count: latestHistory?.online_count || players.length,
       sample_players: players.slice(0, keyData.tier === 'ENTERPRISE' ? 200 : 50),
       total_sampled: players.length,

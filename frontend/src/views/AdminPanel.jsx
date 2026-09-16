@@ -100,10 +100,16 @@ export default function AdminPanel({ currentVisibleTabs }) {
     if (!window.confirm(`ATENÇÃO SUPER ADMIN: Deseja realmente DELETAR o usuário ${u.main_character}? Isso apagará a conta dele permanentemente.`)) return;
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
       const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/manage-user` : '/api/manage-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', targetUserId: u.id, requestorEmail: currentProfile.email })
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ action: 'delete', targetUserId: u.id })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -122,10 +128,16 @@ export default function AdminPanel({ currentVisibleTabs }) {
     if (!newEmail || newEmail === u.email) return;
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
       const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/manage-user` : '/api/manage-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_email', targetUserId: u.id, newEmail, requestorEmail: currentProfile.email })
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ action: 'update_email', targetUserId: u.id, newEmail })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -143,10 +155,15 @@ export default function AdminPanel({ currentVisibleTabs }) {
 
     setResetting(userId);
     try {
-      // Tenta bater na API do Vercel
-      const res = await fetch('/api/reset-password', {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
+      const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/reset-password` : '/api/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ userId, newPassword: newPwd })
       });
       const data = await res.json();

@@ -19,11 +19,17 @@ export default async function handler(req, res) {
       .limit(limit);
 
     if (victimName) {
-      query = query.ilike('character_name', `%${victimName.trim()}%`);
+      const cleanVictim = String(victimName).replace(/[%_]/g, '').trim().slice(0, 50);
+      if (cleanVictim.length >= 2) {
+        query = query.ilike('character_name', `%${cleanVictim}%`);
+      }
     }
 
     if (killerName) {
-      query = query.ilike('killed_by', `%${killerName.trim()}%`);
+      const cleanKiller = String(killerName).replace(/[%_]/g, '').trim().slice(0, 50);
+      if (cleanKiller.length >= 2) {
+        query = query.ilike('killed_by', `%${cleanKiller}%`);
+      }
     }
 
     const { data: deaths, error } = await query;

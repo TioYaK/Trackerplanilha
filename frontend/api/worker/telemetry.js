@@ -143,7 +143,7 @@ export default async function handler(req, res) {
           const killedBy = String(d.killed_by || 'Unknown').trim().slice(0, 150);
           
           // Validação 1: Nome válido
-          if (!name || name.length < 2 || name.length > 50) continue;
+          if (!name || name.length < 2 || name.length > 50 || !/^[a-zA-Z0-9'\s\-]+$/.test(name)) continue;
 
           // Validação 2: Level plausível (1 a 3500)
           if (isNaN(level) || level < 1 || level > 3500) continue;
@@ -220,7 +220,7 @@ export default async function handler(req, res) {
           const level = parseInt(c.level, 10);
           const exp = parseInt(c.experience || c.xp_total, 10);
 
-          if (!name || isNaN(level) || level < 1 || level > 3500) continue;
+          if (!name || name.length < 2 || name.length > 50 || isNaN(level) || level < 1 || level > 3500 || !/^[a-zA-Z0-9'\s\-]+$/.test(name)) continue;
 
           validStates.push({
             character_name: name,

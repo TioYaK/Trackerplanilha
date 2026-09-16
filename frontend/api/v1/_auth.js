@@ -13,6 +13,8 @@ function getSupabase(url, key) {
   return cachedSupabase;
 }
 
+let cachedStore = null;
+
 export async function validateApiKey(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -59,15 +61,18 @@ export async function validateApiKey(req, res) {
 
   // Carrega chaves de app_settings (id: 101) com cache em memória de 60s
   let keys = cachedApiKeys;
+  let store = cachedStore;
   const now = Date.now();
-  if (!keys || (now - keysCacheTimestamp > KEYS_CACHE_TTL)) {
+  if (!keys || !store || (now - keysCacheTimestamp > KEYS_CACHE_TTL)) {
     const { data: settings } = await supabase
       .from('app_settings')
       .select('visible_tabs')
       .eq('id', 101)
       .maybeSingle();
 
-    keys = settings?.visible_tabs?.api_keys || [];
+    store = settings?.visible_tabs || {};
+    keys = Array.isArray(store.api_keys) ? store.api_keys : [];
+    cachedStore = store;
     cachedApiKeys = keys;
     keysCacheTimestamp = now;
   }
@@ -92,7 +97,6 @@ export async function validateApiKey(req, res) {
 
   // Rate Limiting por Minuto
   const rateLimit = foundKey.rate_limit || (foundKey.tier === 'ENTERPRISE' ? 400 : foundKey.tier === 'PRO' ? 100 : 15);
-  const now = Date.now();
   const bucket = rateLimitBuckets.get(keyStr) || { count: 0, resetAt: now + 60000 };
 
   if (now > bucket.resetAt) {
@@ -118,14 +122,14 @@ export async function validateApiKey(req, res) {
     return { error: true };
   }
 
-  // Incrementa contador de uso de forma assíncrona
+  // Incrementa contador de uso de forma assíncrona não-bloqueante
   (async () => {
     try {
       foundKey.requests_count = (foundKey.requests_count || 0) + 1;
       foundKey.last_used_at = new Date().toISOString();
       await supabase
         .from('app_settings')
-        .update({ visible_tabs: { ...settings.visible_tabs, api_keys: keys } })
+        .update({ visible_tabs: { ...store, api_keys: keys } })
         .eq('id', 101);
     } catch {}
   })();

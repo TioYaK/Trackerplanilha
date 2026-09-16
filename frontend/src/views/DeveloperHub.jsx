@@ -45,12 +45,27 @@ export default function DeveloperHub({ user, profile, isAdmin, onNavigate }) {
 
   const userEmail = user?.email || profile?.email || '';
 
+  const getAuthHeaders = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        return { 'Authorization': `Bearer ${session.access_token}` };
+      }
+    } catch (e) {
+      console.warn('Erro ao obter sessão auth:', e);
+    }
+    return {};
+  };
+
   // Carregar chaves do usuário
   const fetchUserKeys = async () => {
     if (!userEmail) return;
     setLoadingKeys(true);
     try {
-      const res = await fetch(`/api/v1/keys?email=${encodeURIComponent(userEmail)}`);
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/v1/keys`, {
+        headers: authHeaders
+      });
       if (res.ok) {
         const data = await res.json();
         setKeys(data.keys || []);
@@ -70,7 +85,10 @@ export default function DeveloperHub({ user, profile, isAdmin, onNavigate }) {
     if (!isAdmin) return;
     setAdminLoading(true);
     try {
-      const res = await fetch(`/api/v1/keys?email=pifot16@gmail.com&admin=true`);
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/v1/keys?admin=true`, {
+        headers: authHeaders
+      });
       if (res.ok) {
         const data = await res.json();
         setAllKeys(data.keys || []);
@@ -96,14 +114,16 @@ export default function DeveloperHub({ user, profile, isAdmin, onNavigate }) {
     }
     setCreatingKey(true);
     try {
+      const authHeaders = await getAuthHeaders();
       const isVip = isAdmin || profile?.role === 'premium' || profile?.is_premium === true;
       const res = await fetch('/api/v1/keys', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify({
           name: newKeyName.trim() || 'Minha Aplicação',
-          user_id: user?.id,
-          user_email: userEmail,
           user_name: profile?.main_character || profile?.name || 'Dev',
           tier: isVip ? 'PRO' : 'STARTER'
         })
@@ -129,7 +149,11 @@ export default function DeveloperHub({ user, profile, isAdmin, onNavigate }) {
   const handleRevokeKey = async (keyId) => {
     if (!window.confirm('Tem certeza que deseja revogar esta chave? Ela deixará de funcionar imediatamente.')) return;
     try {
-      const res = await fetch(`/api/v1/keys?id=${keyId}`, { method: 'DELETE' });
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/v1/keys?id=${keyId}`, { 
+        method: 'DELETE',
+        headers: authHeaders
+      });
       if (res.ok) {
         setKeys(keys.map(k => k.id === keyId ? { ...k, status: 'REVOKED' } : k));
         if (isAdmin) setAllKeys(allKeys.map(k => k.id === keyId ? { ...k, status: 'REVOKED' } : k));
@@ -142,9 +166,13 @@ export default function DeveloperHub({ user, profile, isAdmin, onNavigate }) {
   // Admin: Atualizar Tier
   const handleAdminUpdateTier = async (keyId, newTier) => {
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/v1/keys', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify({ id: keyId, tier: newTier })
       });
       if (res.ok) {

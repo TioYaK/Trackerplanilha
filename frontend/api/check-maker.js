@@ -26,8 +26,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método não permitido' });
   }
 
-  const { makerName } = req.body;
-  if (!makerName) return res.status(400).json({ error: 'Nome do maker é obrigatório' });
+  const rawMakerName = req.body?.makerName || '';
+  const cleanMakerName = String(rawMakerName).replace(/[%_]/g, '').trim();
+  if (!cleanMakerName || cleanMakerName.length < 2 || cleanMakerName.length > 50 || !/^[a-zA-Z0-9'\s\-]+$/.test(cleanMakerName)) {
+    return res.status(400).json({ error: 'Nome de maker inválido. Deve conter apenas letras, números, hífen e apóstrofo (2 a 50 caracteres).' });
+  }
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -42,7 +45,7 @@ export default async function handler(req, res) {
     // 1 & 2. Executa a busca de regras e o fetch oficial do RubinOT em paralelo
     const [rulesRes, rubiRes] = await Promise.all([
       supabase.from('maker_rules').select('*').limit(1).maybeSingle(),
-      fetch(`https://rubinot.com.br/api/characters/${encodeURIComponent(makerName)}`)
+      fetch(`https://rubinot.com.br/api/characters/${encodeURIComponent(cleanMakerName)}`)
     ]);
 
     const rules = rulesRes?.data;
@@ -94,7 +97,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ 
       success: true, 
       character: { 
-        name: c.name || makerName, 
+        name: c.name || cleanMakerName, 
         level: Number(c.level) || 0, 
         vocation: c.vocationName || c.vocation || 'None' 
       } 

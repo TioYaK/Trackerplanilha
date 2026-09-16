@@ -21,8 +21,10 @@ export default async function handler(req, res) {
   }
 
   const rawName = (req.query.name || req.body?.name || '').trim();
-  if (!rawName) {
-    return res.status(400).json({ error: 'Nome do personagem é obrigatório' });
+  // Sanitização anti-wildcard SQL e validação de tamanho/caracteres
+  const cleanName = rawName.replace(/[%_]/g, '').trim();
+  if (!cleanName || cleanName.length < 2 || cleanName.length > 50 || !/^[a-zA-Z0-9'\s\-]+$/.test(cleanName)) {
+    return res.status(400).json({ error: 'Nome de personagem inválido. Deve conter apenas letras, números, hífen e apóstrofo (2 a 50 caracteres).' });
   }
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -43,7 +45,7 @@ export default async function handler(req, res) {
     const { data: gMember } = await supabase
       .from('guild_members')
       .select('name, level, vocation, rank, is_online')
-      .ilike('name', rawName)
+      .ilike('name', cleanName)
       .maybeSingle();
 
     if (gMember && gMember.level && Number(gMember.level) > 0) {
@@ -63,7 +65,7 @@ export default async function handler(req, res) {
       const { data: cData } = await supabase
         .from('current_character_state')
         .select('character_name, level, vocation, xp_total, last_active')
-        .ilike('character_name', rawName)
+        .ilike('character_name', cleanName)
         .maybeSingle();
 
       if (cData && cData.level && Number(cData.level) > 0) {
@@ -84,7 +86,7 @@ export default async function handler(req, res) {
       const { data: deathData } = await supabase
         .from('recent_deaths')
         .select('character_name, level, death_time, killed_by')
-        .ilike('character_name', rawName)
+        .ilike('character_name', cleanName)
         .order('death_time', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -109,7 +111,7 @@ export default async function handler(req, res) {
       const { data: gPerk } = await supabase
         .from('guild_perk_members')
         .select('world, notes')
-        .ilike('character_name', rawName)
+        .ilike('character_name', cleanName)
         .maybeSingle();
 
       const world = gPerk?.world || 'Auroria';
@@ -138,7 +140,7 @@ export default async function handler(req, res) {
 
     // 5. Tenta consultar a API pública do Rubinot caso acessível
     try {
-      const rubiRes = await fetch(`https://rubinot.com.br/api/characters/${encodeURIComponent(rawName)}`, {
+      const rubiRes = await fetch(`https://rubinot.com.br/api/characters/${encodeURIComponent(cleanName)}`, {
         headers: { 'Accept': 'application/json' },
         signal: AbortSignal.timeout(4000)
       });
@@ -151,14 +153,14 @@ export default async function handler(req, res) {
           const w = c.world || null;
 
           await supabase.from('current_character_state').upsert({
-            character_name: c.name || rawName,
+            character_name: c.name || cleanName,
             level: lvl,
             vocation: voc,
             world: w
           }, { onConflict: 'character_name' });
 
           return res.json({
-            name: c.name || rawName,
+            name: c.name || cleanName,
             level: lvl,
             vocation: voc,
             world: w,
@@ -169,7 +171,7 @@ export default async function handler(req, res) {
     } catch (e) {}
 
     return res.status(404).json({
-      error: `Personagem "${rawName}" não localizado nas bases ativas.`
+      error: `Personagem "${cleanName}" não localizado nas bases ativas.`
     });
 
   } catch (err) {

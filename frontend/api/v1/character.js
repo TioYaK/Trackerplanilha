@@ -6,10 +6,11 @@ export default async function handler(req, res) {
 
   const { supabase, keyData } = auth;
   const rawName = (req.query.name || req.body?.name || '').trim();
+  const cleanName = rawName.replace(/[%_]/g, '').trim();
 
-  if (!rawName) {
+  if (!cleanName || cleanName.length < 2 || cleanName.length > 50 || !/^[a-zA-Z0-9'\s\-]+$/.test(cleanName)) {
     return res.status(400).json({
-      error: 'Parâmetro "name" é obrigatório.',
+      error: 'Parâmetro "name" inválido. Deve conter apenas letras, números, hífen e apóstrofo (2 a 50 caracteres).',
       example: '/api/v1/character?name=Decayek'
     });
   }
@@ -29,17 +30,17 @@ export default async function handler(req, res) {
       supabase
         .from('guild_members')
         .select('name, level, vocation, rank, is_online, last_xp_date')
-        .ilike('name', rawName)
+        .ilike('name', cleanName)
         .maybeSingle(),
       supabase
         .from('current_character_state')
         .select('character_name, level, vocation, world, last_active, xp_total')
-        .ilike('character_name', rawName)
+        .ilike('character_name', cleanName)
         .maybeSingle(),
       supabase
         .from('guild_perk_members')
         .select('guild_name, world')
-        .ilike('character_name', rawName)
+        .ilike('character_name', cleanName)
         .maybeSingle()
     ]);
 
@@ -74,7 +75,7 @@ export default async function handler(req, res) {
         const { data: dData } = await supabase
           .from('recent_deaths')
           .select('character_name, level, death_time, killed_by')
-          .ilike('character_name', rawName)
+          .ilike('character_name', cleanName)
           .order('death_time', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -94,12 +95,11 @@ export default async function handler(req, res) {
           };
           source = 'recent_deaths';
         }
-      }
     }
 
     if (!charData) {
       return res.status(404).json({
-        error: `Personagem "${rawName}" não encontrado na base de dados ativa do Rubinot.`,
+        error: `Personagem "${cleanName}" não encontrado na base de dados ativa do Rubinot.`,
         code: 'CHARACTER_NOT_FOUND'
       });
     }
