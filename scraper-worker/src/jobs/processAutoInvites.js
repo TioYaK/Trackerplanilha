@@ -477,9 +477,9 @@ export async function runProcessAutoInvites() {
             console.log(`[AutoInvite] ✅ Sucesso: ${invite.character_name} convidado!`);
             await supabase
               .from('guild_invites_queue')
-              .update({ status: 'SUCCESS', error_message: null, updated_at: new Date().toISOString() })
+              .update({ status: 'SUCCESS', error_message: result.reason || null, updated_at: new Date().toISOString() })
               .eq('id', invite.id);
-            await updateSheetIfApplicable(invite, { statusD: 'Finalizado', statusF: 'Sucesso' });
+            await updateSheetIfApplicable(invite, { statusD: 'Finalizado', statusF: result.reason ? `Sucesso: ${result.reason}` : 'Sucesso' });
           } else {
             console.error(`[AutoInvite] ❌ Falha (${invite.character_name}): ${result.reason}`);
             
@@ -769,7 +769,7 @@ async function inviteCharacter(page, world, guildName, characterName) {
           }
         
         if (pageText.includes('already in a guild') || pageText.includes('already belongs') || pageText.includes('already a member of')) {
-            return { success: false, reason: 'Já está na guilda' };
+            return { success: true, reason: 'Já está na guilda' };
         }
         
         // Cuidado: a UI tem um título "Convites pendentes", por isso NÃO podemos buscar só pela palavra "pendente"

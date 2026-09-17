@@ -154,7 +154,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
   };
 
   const getDetailsText = (inv) => {
-    if (inv.status === 'SUCCESS') return 'Convite enviado in-game';
+    if (inv.status === 'SUCCESS') return inv.error_message || 'Convite enviado in-game';
     if (inv.status === 'IN_PROGRESS' || inv.status === 'PROCESSING') return 'Enviando convite...';
     if (inv.error_message === 'Em breve...' || (inv.world && !AUTO_INVITE_WORLDS.includes(inv.world)) || (inv.error_message && inv.error_message.includes('Nenhuma conta de líder'))) {
       return 'Em breve...';
