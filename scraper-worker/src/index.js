@@ -95,6 +95,7 @@ let isWorkerPaused = false;
 
 // Sincronização inicial do estado de pausa
 (async () => {
+  if (!supabase) return;
   try {
     const { data: hb } = await supabase
       .from('worker_heartbeats')
@@ -116,7 +117,7 @@ console.log(`${'='.repeat(60)}\n`);
 // SISTEMA DE TAREFAS
 // ==========================================
 const fetchTask = async () => {
-  if (isWorkerPaused) return null;
+  if (isWorkerPaused || !supabase) return null;
   try {
     const now = new Date().toISOString();
     const crashLimit = new Date();
@@ -197,10 +198,12 @@ const completeTask = async (task) => {
 
   console.log(`[WORKER] ✔ ${task.task_type} concluída. Próxima execução em ${cooldownSeconds}s.`);
 
-  await supabase
-    .from('task_queue')
-    .update({ status: 'PENDING', locked_at: nextRun.toISOString(), worker_id: null })
-    .eq('id', task.id);
+  if (supabase) {
+    await supabase
+      .from('task_queue')
+      .update({ status: 'PENDING', locked_at: nextRun.toISOString(), worker_id: null })
+      .eq('id', task.id);
+  }
 };
 
 const requeueTask = async (task) => {
@@ -344,15 +347,19 @@ const processTask = async (task) => {
       // removed sleep
       
       // Devolve a task para a fila imediatamente para que OUTRO worker assuma
-      await supabase
-        .from('task_queue')
-        .update({ status: 'PENDING', worker_id: null, locked_at: new Date().toISOString() })
-        .eq('id', task.id);
+      if (supabase) {
+        await supabase
+          .from('task_queue')
+          .update({ status: 'PENDING', worker_id: null, locked_at: new Date().toISOString() })
+          .eq('id', task.id);
+      }
     } else {
-      await supabase
-        .from('task_queue')
-        .update({ status: 'PENDING', worker_id: null, locked_at: null })
-        .eq('id', task.id);
+      if (supabase) {
+        await supabase
+          .from('task_queue')
+          .update({ status: 'PENDING', worker_id: null, locked_at: null })
+          .eq('id', task.id);
+      }
     }
   } finally {
     clearTimeout(timeoutId);
@@ -400,25 +407,27 @@ fetch('https://ipinfo.io/json')
 // ==========================================
 // CONTROLE DO UPDATE CHECKER
 // ==========================================
-let lastUpdateCheck = 0;
+let lastUpdateCheck = Date.now();
 let emptyCycles = 0;
 let localBanUntil = null;
 
 const loop = async () => {
   try {
     // CHECAGEM DE VERSÃO (KILL-SWITCH) DEVE VIR ANTES DO BAN DE CLOUDFLARE
-    const { data: settings } = await supabase
-      .from('worker_config')
-      .select('min_worker_version')
-      .eq('id', 1)
-      .maybeSingle();
+    if (supabase) {
+      const { data: settings } = await supabase
+        .from('worker_config')
+        .select('min_worker_version')
+        .eq('id', 1)
+        .maybeSingle();
 
-    if (settings?.min_worker_version) {
-      const minVersion = settings.min_worker_version;
-      if (WORKER_VERSION !== minVersion && WORKER_VERSION < minVersion) {
-        console.error(`[KILL-SWITCH] Versão obsoleta! Sua: ${WORKER_VERSION} | Requerida: ${minVersion}`);
-        await checkForUpdates();
-        process.exit(0);
+      if (settings?.min_worker_version) {
+        const minVersion = settings.min_worker_version;
+        if (WORKER_VERSION !== minVersion && WORKER_VERSION < minVersion) {
+          console.error(`[KILL-SWITCH] Versão obsoleta! Sua: ${WORKER_VERSION} | Requerida: ${minVersion}`);
+          await checkForUpdates();
+          process.exit(0);
+        }
       }
     }
   } catch (err) {
@@ -453,20 +462,22 @@ const loop = async () => {
 const sendHeartbeat = async () => {
   try {
     // Sincroniza estado de pausa caso tenha sido alterado via banco de dados
-    try {
-      const { data: myHb } = await supabase
-        .from('worker_heartbeats')
-        .select('metadata')
-        .eq('worker_id', WORKER_ID)
-        .maybeSingle();
-      if (myHb?.metadata?.is_paused !== undefined && isWorkerPaused !== Boolean(myHb.metadata.is_paused)) {
-        isWorkerPaused = Boolean(myHb.metadata.is_paused);
-        console.log(`[SYNC] 🔄 Estado de pausa sincronizado com o painel: ${isWorkerPaused ? 'PAUSADO (STANDBY)' : 'ATIVO (LIGADO)'}`);
-        if (isWorkerPaused) {
-          try { await closeBrowser(); } catch (e) {}
+    if (supabase) {
+      try {
+        const { data: myHb } = await supabase
+          .from('worker_heartbeats')
+          .select('metadata')
+          .eq('worker_id', WORKER_ID)
+          .maybeSingle();
+        if (myHb?.metadata?.is_paused !== undefined && isWorkerPaused !== Boolean(myHb.metadata.is_paused)) {
+          isWorkerPaused = Boolean(myHb.metadata.is_paused);
+          console.log(`[SYNC] 🔄 Estado de pausa sincronizado com o painel: ${isWorkerPaused ? 'PAUSADO (STANDBY)' : 'ATIVO (LIGADO)'}`);
+          if (isWorkerPaused) {
+            try { await closeBrowser(); } catch (e) {}
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
 
     const disk = getDiskHealth();
     const memoryMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
@@ -510,14 +521,16 @@ const sendHeartbeat = async () => {
     const statsToFlush = { ...sessionStats };
     sessionStats = {};
 
-    for (const [type, data] of Object.entries(statsToFlush)) {
-      if (data.count > 0) {
-        await supabase.from('task_history').insert({
-          worker_id: WORKER_ID,
-          task_type: type,
-          task_count: data.count,
-          duration_ms: data.duration,
-        }).catch(() => {});
+    if (supabase) {
+      for (const [type, data] of Object.entries(statsToFlush)) {
+        if (data.count > 0) {
+          await supabase.from('task_history').insert({
+            worker_id: WORKER_ID,
+            task_type: type,
+            task_count: data.count,
+            duration_ms: data.duration,
+          }).catch(() => {});
+        }
       }
     }
 
@@ -531,6 +544,7 @@ const sendHeartbeat = async () => {
 // WATCHDOG ANTI-DEADLOCK DE TAREFAS ÓRFÃS
 // ==========================================
 const runOrphanTaskWatchdog = async () => {
+  if (!supabase) return;
   try {
     const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
@@ -660,7 +674,7 @@ app.get('/api/character/:name', async (req, res) => {
     const result = await scrapePlayer(rawName);
     if (!result) return res.status(404).json({ error: 'Personagem não encontrado no Rubinot' });
 
-    if (result.level && !isNaN(Number(result.level))) {
+    if (supabase && result.level && !isNaN(Number(result.level))) {
       await supabase.from('current_character_state').upsert({
         character_name: result.name,
         level: Number(result.level),
@@ -713,33 +727,34 @@ startLocalServer(BASE_PORT);
 // ==========================================
 // GATILHO DE ATUALIZAÇÃO EM TEMPO REAL (REALTIME)
 // ==========================================
-supabase
-  .channel('worker_sync')
-  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'task_queue' }, (payload) => {
-    if (isWorkerPaused) return;
-    if (payload.new.status === 'PENDING' && payload.new.locked_at) {
-       const lockTime = new Date(payload.new.locked_at).getTime();
-       if (lockTime <= Date.now()) {
-          console.log('\n[REALTIME] ⚡ Comando de Sincronização Forçada Recebido! Fila acelerada...');
-          if (!isProcessingTask) {
-            // Invoca o worker imediatamente se não estiver ocupado
-            fetchTask().then(task => {
-               if (task) {
-                  emptyCycles = 0;
-                  processTask(task);
-               }
-            });
-          } else {
-            console.log('[REALTIME] Worker ocupado executando outra tarefa. Fila será consumida em seguida.');
-          }
-       }
-    }
-  })
-  .subscribe((status) => {
-    if (status === 'SUBSCRIBED') {
-      console.log('[REALTIME] 📡 Inscrito para receber comandos de Sincronização em Tempo Real.');
-    }
-  });
+if (supabase) {
+  supabase
+    .channel('worker_sync')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'task_queue' }, (payload) => {
+      if (isWorkerPaused) return;
+      if (payload.new.status === 'PENDING' && payload.new.locked_at) {
+         const lockTime = new Date(payload.new.locked_at).getTime();
+         if (lockTime <= Date.now()) {
+            console.log('\n[REALTIME] ⚡ Comando de Sincronização Forçada Recebido! Fila acelerada...');
+            if (!isProcessingTask) {
+              // Invoca o worker imediatamente se não estiver ocupado
+              fetchTask().then(task => {
+                 if (task) {
+                    emptyCycles = 0;
+                    processTask(task);
+                 }
+              });
+            } else {
+              console.log('[REALTIME] Worker ocupado executando outra tarefa. Fila será consumida em seguida.');
+            }
+         }
+      }
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('[REALTIME] 📡 Inscrito para receber comandos de Sincronização em Tempo Real.');
+      }
+    });
 
   supabase
     .channel('guild_invites')
@@ -758,16 +773,17 @@ supabase
 
   supabase
     .channel('maker_validation')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maker_validation_queue' }, (payload) => {
-     if (isWorkerPaused) return;
-     console.log('\n[REALTIME] Novo maker recebido para validar!');
-     if (!isProcessingTask) {
-       runValidateMakers().catch(err => console.error('[ValidateMakers] Erro no gatilho realtime:', err.message));
-     } else {
-       console.log('[REALTIME] Worker ocupado. A validação será processada pelo ciclo regular.');
-     }
-  })
-  .subscribe();
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maker_validation_queue' }, (payload) => {
+       if (isWorkerPaused) return;
+       console.log('\n[REALTIME] Novo maker recebido para validar!');
+       if (!isProcessingTask) {
+         runValidateMakers().catch(err => console.error('[ValidateMakers] Erro no gatilho realtime:', err.message));
+       } else {
+         console.log('[REALTIME] Worker ocupado. A validação será processada pelo ciclo regular.');
+       }
+    })
+    .subscribe();
+}
 
 const processC2Command = async (cmd) => {
   if (!cmd || cmd.worker_id !== WORKER_ID || cmd.executed) return;
@@ -872,6 +888,7 @@ const processC2Command = async (cmd) => {
 
 // Polling fallback a cada 15s para garantir que comandos pendentes sejam executados mesmo se o Realtime falhar
 const checkPendingCommands = async () => {
+  if (!supabase) return;
   try {
     const { data: pending } = await supabase
       .from('worker_commands')
@@ -889,17 +906,19 @@ const checkPendingCommands = async () => {
   }
 };
 
-// Inicia escuta Realtime
-supabase
-  .channel('worker_commands')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'worker_commands' }, async (payload) => {
-     await processC2Command(payload.new);
-  })
-  .subscribe();
+if (supabase) {
+  // Inicia escuta Realtime
+  supabase
+    .channel('worker_commands')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'worker_commands' }, async (payload) => {
+       await processC2Command(payload.new);
+    })
+    .subscribe();
 
   // Inicia polling backup a cada 15 segundos
   setInterval(checkPendingCommands, 15000);
   checkPendingCommands();
+}
   
   // Polling de Seguranca para Invites a cada 60s (executa somente se o worker estiver ocioso)
   setInterval(() => {
@@ -924,88 +943,90 @@ supabase
 const processedAlarms = new Set();
 import webpush from 'web-push';
 
-supabase
-  .channel('guild_alarms')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_alarms' }, async (payload) => {
-     const alarm = payload.new;
-     if (processedAlarms.has(alarm.id)) return;
-     processedAlarms.add(alarm.id);
-     
-     if (processedAlarms.size > 100) {
-       const iterator = processedAlarms.values();
-       processedAlarms.delete(iterator.next().value);
-     }
-
-     console.log(`\n[ALARME] 🚨 ${alarm.type}: ${alarm.message}`);
-     
-     // 1. Notificação Nativa (Desktop do Worker)
-     notifier.notify({
-       title: `Rubinot Tracker - ${alarm.type}`,
-       message: alarm.message,
-       icon: path.join(WORKER_ROOT, 'icon.png'),
-       appID: 'RubinotTracker',
-       sound: true, 
-       wait: false
-     });
-
-     // 2. Notificação Web Push (Navegadores/Celulares da Guilda)
-     try {
-       // --- ELEIÇÃO DE LÍDER ---
-       // Apenas 1 worker deve disparar o Web Push para não floodar os celulares!
-       const cutoffLimit = new Date(Date.now() - 12 * 60 * 1000).toISOString();
-       const { data: onlineWorkers } = await supabase
-         .from('worker_heartbeats')
-         .select('worker_id')
-         .gte('last_ping', cutoffLimit)
-         .order('started_at', { ascending: true })
-         .order('worker_id', { ascending: true })
-         .limit(1);
-         
-       const isLeader = onlineWorkers && onlineWorkers.length > 0 && onlineWorkers[0].worker_id === WORKER_ID;
-       if (!isLeader) {
-         console.log(`[WEB PUSH] Outro worker assumiu a liderança do disparo. Silenciando...`);
-         return;
+if (supabase) {
+  supabase
+    .channel('guild_alarms')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_alarms' }, async (payload) => {
+       const alarm = payload.new;
+       if (processedAlarms.has(alarm.id)) return;
+       processedAlarms.add(alarm.id);
+       
+       if (processedAlarms.size > 100) {
+         const iterator = processedAlarms.values();
+         processedAlarms.delete(iterator.next().value);
        }
 
-       // Puxa as chaves VAPID
-       const { data: config } = await supabase.from('worker_config').select('vapid_public_key, vapid_private_key').eq('id', 1).maybeSingle();
-       if (!config || !config.vapid_public_key || !config.vapid_private_key) return;
-
-       webpush.setVapidDetails(
-         'mailto:admin@rubinot.com',
-         config.vapid_public_key,
-         config.vapid_private_key
-       );
-
-       // Puxa todas as inscrições
-       const { data: subs } = await supabase.from('push_subscriptions').select('*');
-       if (!subs || subs.length === 0) return;
-
-       console.log(`[WEB PUSH] Disparando para ${subs.length} navegadores...`);
+       console.log(`\n[ALARME] 🚨 ${alarm.type}: ${alarm.message}`);
        
-       const pushPayload = JSON.stringify({
+       // 1. Notificação Nativa (Desktop do Worker)
+       notifier.notify({
          title: `Rubinot Tracker - ${alarm.type}`,
-         body: alarm.message,
-         icon: '/pwa-192x192.png',
-         badge: '/pwa-192x192.png',
-         url: '/'
+         message: alarm.message,
+         icon: path.join(WORKER_ROOT, 'icon.png'),
+         appID: 'RubinotTracker',
+         sound: true, 
+         wait: false
        });
 
-       // Dispara em paralelo para todos
-       await Promise.all(subs.map(async (sub) => {
-         try {
-           await webpush.sendNotification(sub.subscription, pushPayload);
-         } catch (err) {
-           if (err.statusCode === 410 || err.statusCode === 404) {
-             // Inscrição expirou ou foi revogada pelo usuário, removemos do banco
-             await supabase.from('push_subscriptions').delete().eq('id', sub.id);
-           }
+       // 2. Notificação Web Push (Navegadores/Celulares da Guilda)
+       try {
+         // --- ELEIÇÃO DE LÍDER ---
+         // Apenas 1 worker deve disparar o Web Push para não floodar os celulares!
+         const cutoffLimit = new Date(Date.now() - 12 * 60 * 1000).toISOString();
+         const { data: onlineWorkers } = await supabase
+           .from('worker_heartbeats')
+           .select('worker_id')
+           .gte('last_ping', cutoffLimit)
+           .order('started_at', { ascending: true })
+           .order('worker_id', { ascending: true })
+           .limit(1);
+           
+         const isLeader = onlineWorkers && onlineWorkers.length > 0 && onlineWorkers[0].worker_id === WORKER_ID;
+         if (!isLeader) {
+           console.log(`[WEB PUSH] Outro worker assumiu a liderança do disparo. Silenciando...`);
+           return;
          }
-       }));
-       console.log(`[WEB PUSH] ✅ Disparo concluído!`);
-     } catch (e) {
-       console.log(`[WEB PUSH] Erro ao disparar:`, e.message);
-     }
-  })
-  .subscribe();
+
+         // Puxa as chaves VAPID
+         const { data: config } = await supabase.from('worker_config').select('vapid_public_key, vapid_private_key').eq('id', 1).maybeSingle();
+         if (!config || !config.vapid_public_key || !config.vapid_private_key) return;
+
+         webpush.setVapidDetails(
+           'mailto:admin@rubinot.com',
+           config.vapid_public_key,
+           config.vapid_private_key
+         );
+
+         // Puxa todas as inscrições
+         const { data: subs } = await supabase.from('push_subscriptions').select('*');
+         if (!subs || subs.length === 0) return;
+
+         console.log(`[WEB PUSH] Disparando para ${subs.length} navegadores...`);
+         
+         const pushPayload = JSON.stringify({
+           title: `Rubinot Tracker - ${alarm.type}`,
+           body: alarm.message,
+           icon: '/pwa-192x192.png',
+           badge: '/pwa-192x192.png',
+           url: '/'
+         });
+
+         // Dispara em paralelo para todos
+         await Promise.all(subs.map(async (sub) => {
+           try {
+             await webpush.sendNotification(sub.subscription, pushPayload);
+           } catch (err) {
+             if (err.statusCode === 410 || err.statusCode === 404) {
+               // Inscrição expirou ou foi revogada pelo usuário, removemos do banco
+               await supabase.from('push_subscriptions').delete().eq('id', sub.id);
+             }
+           }
+         }));
+         console.log(`[WEB PUSH] ✅ Disparo concluído!`);
+       } catch (e) {
+         console.log(`[WEB PUSH] Erro ao disparar:`, e.message);
+       }
+    })
+    .subscribe();
+}
 
