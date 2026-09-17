@@ -37,6 +37,7 @@ import { closeBrowser, isInMaintenance, recycleBrowserPages } from './lib/rubino
 import { runFullStorageMaintenance, getDiskHealth, cleanWorkerProfileCaches } from './lib/storageGuardian.js';
 
 applySelfHealingPatch();
+try { cleanWorkerProfileCaches(); } catch (e) {}
 
 // ==========================================
 // ID PERSISTENTE DO WORKER
@@ -371,7 +372,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '1.9.0';
+const WORKER_VERSION = '1.9.1';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
