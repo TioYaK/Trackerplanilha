@@ -72,7 +72,7 @@ export const apiClient = {
    */
   async sendHeartbeat(metadata = {}) {
     return await postTelemetry('HEARTBEAT', {
-      version: '1.2.0',
+      version: metadata?.version || process.env.WORKER_VERSION || '1.9.0',
       owner: WORKER_OWNER,
       location: 'Brasil',
       metadata

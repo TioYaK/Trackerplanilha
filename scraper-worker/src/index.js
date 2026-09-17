@@ -498,6 +498,7 @@ const sendHeartbeat = async () => {
       uptime_seconds: uptimeSec,
       avg_task_duration_ms: avgDuration,
       last_error: lastWorkerError,
+      version: WORKER_VERSION,
       terminal_logs: currentTerminalLogs,
       terminal_logs_updated_at: currentTerminalLogsUpdatedAt,
     };
