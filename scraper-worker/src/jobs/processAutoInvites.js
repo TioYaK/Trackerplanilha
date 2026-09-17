@@ -96,7 +96,7 @@ const DEFAULT_ACCOUNTS = {
   belaria: { world: 'Belaria', account_name: 'pifot16+guizera@gmail.com', password: 'Ljajhsj@J7172', guild_name: 'Battlestorm Belaria' },
   tenebrium: { world: 'Tenebrium', account_name: 'pifot16+rubinot2@gmail.com', password: '88100267hH**', guild_name: 'Battlestorm Retro' },
   malveria: { world: 'Malveria', account_name: 'pifot16+grim@gmail.com', password: 'Kx3ngjasjd!2', guild_name: 'Battlestorm Malveria' },
-  drakaria: { world: 'Drakaria', account_name: 'pifot16+intermedio@gmail.com', password: '88100267hH**', totp_secret: 'URFXIS2DFW75OJXU', guild_name: 'Battlestorm Drakaria' }
+  drakaria: { world: 'Drakaria', account_name: 'pifot16+intermedio@gmail.com', password: '88100267hH**', totp_secret: 'URFXIS2DFW75OJXU', guild_name: 'Warfire Leidorasga' }
 };
 
 /**
@@ -312,7 +312,7 @@ export async function runProcessAutoInvites() {
       .select('*')
       .eq('status', 'PENDING')
       .order('created_at', { ascending: true })
-      .limit(50);
+      .limit(150);
 
     if (fetchErr) {
       console.error('[AutoInvite] Erro ao consultar fila de convites:', fetchErr.message);
@@ -393,8 +393,9 @@ export async function runProcessAutoInvites() {
 
         
         // Login no RubinOT
+        const totpSecret = leaderAcc.totp_secret || DEFAULT_ACCOUNTS[world.toLowerCase()]?.totp_secret;
         console.log(`[AutoInvite] 🔑 Efetuando login no RubinOT (${world}) com a conta: ${leaderAcc.account_name}...`);
-        const loggedIn = await loginRubinot(page, leaderAcc.account_name, leaderAcc.password, leaderAcc.totp_secret);
+        const loggedIn = await loginRubinot(page, leaderAcc.account_name, leaderAcc.password, totpSecret);
 
         if (loggedIn === 'MAINTENANCE') {
           console.warn('[AutoInvite] 🔧 RubinOT em manutenção. Revertendo lote e aguardando o site voltar...');
@@ -435,7 +436,7 @@ export async function runProcessAutoInvites() {
 
         // Processar cada convite deste mundo
         for (const invite of invites) {
-          let guildTarget = invite.guild_name || leaderAcc.guild_name || process.env.GUILD_NAME || 'Shellpatrocina';
+          let guildTarget = leaderAcc.guild_name || invite.guild_name || process.env.GUILD_NAME || 'Shellpatrocina';
           if (guildTarget.toLowerCase() === 'shell') guildTarget = leaderAcc.guild_name || 'Shellpatrocina';
           console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}' (${world})...`);
 
@@ -453,6 +454,16 @@ export async function runProcessAutoInvites() {
           } else {
             console.error(`[AutoInvite] ❌ Falha (${invite.character_name}): ${result.reason}`);
             
+            if (result.reason.includes('permiss')) {
+              console.warn(`[AutoInvite] ⚠️ A conta líder para ${world} não possui permissões de convite na guilda '${guildTarget}'. Pausando este mundo.`);
+              const worldIds = invites.map(i => i.id);
+              await supabase
+                .from('guild_invites_queue')
+                .update({ status: 'PENDING', error_message: 'Sem permissao de convite na guilda (verifique se e Lider/Vice)', updated_at: new Date().toISOString() })
+                .in('id', worldIds);
+              break;
+            }
+
             const isTempError = result.reason.includes('timeout') || 
                                 result.reason.includes('Formul') || 
                                 result.reason.includes('Input de convite') || 
