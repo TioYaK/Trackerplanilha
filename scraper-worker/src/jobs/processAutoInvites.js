@@ -5,10 +5,51 @@ import puppeteer from 'rebrowser-puppeteer'; // Usando fork anti-detecção
 
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import os from 'os';
 import { updateSheetRow } from '../lib/googleSheets.js';
 import { findUniversalChrome, getLeanChromeArgs, getDebugScreenshotPath, cleanStaleLocks } from '../lib/storageGuardian.js';
+
+/**
+ * Decodifica chave Base32 padrão (RFC 4648)
+ */
+function base32Decode(base32) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let cleaned = (base32 || '').toUpperCase().replace(/=+$/, '').replace(/\s+/g, '');
+  let bits = '';
+  for (let i = 0; i < cleaned.length; i++) {
+    const val = alphabet.indexOf(cleaned[i]);
+    if (val === -1) continue;
+    bits += val.toString(2).padStart(5, '0');
+  }
+  const bytes = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.substr(i, 8), 2));
+  }
+  return Buffer.from(bytes);
+}
+
+/**
+ * Gera código TOTP de 6 dígitos para Google Authenticator (RFC 6238)
+ */
+function generateTOTP(secret, timeStep = 30) {
+  if (!secret) return '';
+  const key = base32Decode(secret);
+  const epoch = Math.floor(Date.now() / 1000);
+  const time = Math.floor(epoch / timeStep);
+  const timeBuf = Buffer.alloc(8);
+  timeBuf.writeBigInt64BE(BigInt(time));
+  const hmac = crypto.createHmac('sha1', key).update(timeBuf).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const binary = ((hmac[offset] & 0x7f) << 24) |
+                 ((hmac[offset + 1] & 0xff) << 16) |
+                 ((hmac[offset + 2] & 0xff) << 8) |
+                 (hmac[offset + 3] & 0xff);
+  const otp = (binary % 1000000).toString().padStart(6, '0');
+  return otp;
+}
+
 
 
 
@@ -54,7 +95,8 @@ const DEFAULT_ACCOUNTS = {
   bellum: { world: 'BELLUM', account_name: 'pifot16+mak3r78372@gmail.com', password: 'Liusas!2asd', guild_name: 'Battlestorm Bellum' },
   belaria: { world: 'Belaria', account_name: 'pifot16+guizera@gmail.com', password: 'Ljajhsj@J7172', guild_name: 'Battlestorm Belaria' },
   tenebrium: { world: 'Tenebrium', account_name: 'pifot16+rubinot2@gmail.com', password: '88100267hH**', guild_name: 'Battlestorm Retro' },
-  malveria: { world: 'Malveria', account_name: 'pifot16+grim@gmail.com', password: 'Kx3ngjasjd!2', guild_name: 'Battlestorm Malveria' }
+  malveria: { world: 'Malveria', account_name: 'pifot16+grim@gmail.com', password: 'Kx3ngjasjd!2', guild_name: 'Battlestorm Malveria' },
+  drakaria: { world: 'Drakaria', account_name: 'pifot16+intermedio@gmail.com', password: '88100267hH**', totp_secret: 'URFXIS2DFW75OJXU', guild_name: 'Battlestorm Drakaria' }
 };
 
 /**
@@ -264,14 +306,13 @@ export async function runProcessAutoInvites() {
       .eq('status', 'IN_PROGRESS')
       .lt('updated_at', staleTime);
 
-    // 1. Buscar convites pendentes (ignorando mundos em espera como Malveria)
+    // 1. Buscar convites pendentes
     const { data: pendingInvites, error: fetchErr } = await supabase
       .from('guild_invites_queue')
       .select('*')
       .eq('status', 'PENDING')
-      .not('world', 'ilike', 'malveria')
       .order('created_at', { ascending: true })
-      .limit(30);
+      .limit(50);
 
     if (fetchErr) {
       console.error('[AutoInvite] Erro ao consultar fila de convites:', fetchErr.message);
@@ -314,15 +355,16 @@ export async function runProcessAutoInvites() {
       }
 
       if (!leaderAcc) {
-        const errMsg = `Nenhuma conta de líder cadastrada para o mundo '${world}'.`;
-        console.error(`[AutoInvite] ❌ ${errMsg}`);
+        console.log(`[AutoInvite] ⏳ Mundo '${world}' ainda não possui conta de líder cadastrada. Mantendo na fila como 'Em breve...' para processamento futuro.`);
 
         for (const inv of invites) {
-          await supabase
-            .from('guild_invites_queue')
-            .update({ status: 'FAILED', error_message: errMsg, updated_at: new Date().toISOString() })
-            .eq('id', inv.id);
-          await updateSheetIfApplicable(inv, { statusD: 'Finalizado', statusF: 'Falha: ' + errMsg });
+          if (inv.error_message !== 'Em breve...') {
+            await supabase
+              .from('guild_invites_queue')
+              .update({ status: 'PENDING', error_message: 'Em breve...', updated_at: new Date().toISOString() })
+              .eq('id', inv.id);
+            await updateSheetIfApplicable(inv, { statusD: 'Pendente', statusF: 'Em breve (Aguardando ativação)' });
+          }
         }
         continue;
       }
@@ -352,7 +394,7 @@ export async function runProcessAutoInvites() {
         
         // Login no RubinOT
         console.log(`[AutoInvite] 🔑 Efetuando login no RubinOT (${world}) com a conta: ${leaderAcc.account_name}...`);
-        const loggedIn = await loginRubinot(page, leaderAcc.account_name, leaderAcc.password);
+        const loggedIn = await loginRubinot(page, leaderAcc.account_name, leaderAcc.password, leaderAcc.totp_secret);
 
         if (loggedIn === 'MAINTENANCE') {
           console.warn('[AutoInvite] 🔧 RubinOT em manutenção. Revertendo lote e aguardando o site voltar...');
@@ -457,7 +499,7 @@ export async function runProcessAutoInvites() {
 /**
  * Função de auxílio para Login no RubinOT
  */
-async function loginRubinot(page, accountName, password) {
+async function loginRubinot(page, accountName, password, totpSecret = null) {
     try {
       await page.goto('https://rubinot.com.br/login', { waitUntil: 'networkidle2', timeout: 30000 }).catch(e =>
         console.error('[AutoInvite] Aviso de timeout no /login, prosseguindo...'));
@@ -525,6 +567,46 @@ async function loginRubinot(page, accountName, password) {
           const content = await page.content().catch(() => '');
           if (content.includes('Minha Conta') || content.includes('>Sair<') || content.includes('Logado como')) break;
           if (curUrl.includes('/maintenance') || content.includes('Maintenance Mode')) break;
+
+          // Se encontrar campo de 2FA / Autenticador
+          const has2fa = await page.$('input[name="code"], input[name="two_factor"], input[name="two_factor_code"], input[name="otp"], input[name="token"], input[placeholder*="código" i], input[placeholder*="code" i], input[inputmode="numeric"]').catch(() => null);
+          if (has2fa) break;
+        }
+
+        // Se houver desafio de Autenticação em 2 Etapas (Google Authenticator / TOTP)
+        const otpSelector = 'input[name="code"], input[name="two_factor"], input[name="two_factor_code"], input[name="otp"], input[name="token"], input[placeholder*="código" i], input[placeholder*="code" i], input[inputmode="numeric"], input[type="text"][maxlength="6"]';
+        const otpField = await page.$(otpSelector).catch(() => null);
+
+        if (otpField) {
+          if (totpSecret) {
+            const token = generateTOTP(totpSecret);
+            console.log(`[AutoInvite] 🔐 Desafio 2FA detectado para ${accountName}. Preenchendo código TOTP: ${token}...`);
+            await page.click(otpSelector, { clickCount: 3 });
+            await page.type(otpSelector, token, { delay: 40 });
+            await new Promise(r => setTimeout(r, 600));
+
+            await page.evaluate(() => {
+              const form = document.querySelector('form');
+              const submitBtn = form?.querySelector('button[type="submit"], button') || 
+                                Array.from(document.querySelectorAll('button')).find(b => 
+                                  /verificar|confirmar|entrar|validar|enviar|submit/i.test(b.innerText)
+                                );
+              if (submitBtn) submitBtn.click();
+            });
+
+            for (let i = 0; i < 15; i++) {
+              await new Promise(r => setTimeout(r, 1000));
+              await solveTurnstileIfPresent(page, 1);
+              const curUrl = page.url();
+              if (curUrl.includes('/account') || curUrl.includes('/my-account')) break;
+              const content = await page.content().catch(() => '');
+              if (content.includes('Minha Conta') || content.includes('>Sair<') || content.includes('Logado como')) break;
+            }
+          } else {
+            console.error(`[AutoInvite] ⚠️ A conta ${accountName} exige autenticação 2FA, mas nenhum secret TOTP foi configurado!`);
+            await page.screenshot({ path: getDebugScreenshotPath('debug_2fa_missing_secret.png') }).catch(() => {});
+            return false;
+          }
         }
 
         await new Promise(r => setTimeout(r, 1500));

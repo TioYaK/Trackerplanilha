@@ -34,6 +34,16 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
 
   const [customGuild, setCustomGuild] = useState('');
 
+  const AUTO_INVITE_WORLDS = [
+    'Auroria',
+    'Belaria',
+    'Bellum',
+    'Drakaria',
+    'Malveria',
+    'Tenebrium',
+    'Vesperia'
+  ];
+
   const worldGuildMap = {
     'Auroria': 'Shellpatrocina',
     'Belaria': 'Battlestorm Belaria',
@@ -95,6 +105,8 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
     setMessage('');
 
     const guildName = customGuild.trim() || worldGuildMap[world] || 'Shellpatrocina';
+    const isAutoWorld = AUTO_INVITE_WORLDS.includes(world);
+    const initialErrorMsg = isAutoWorld ? null : 'Em breve...';
 
     try {
       const { error } = await supabase
@@ -105,6 +117,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
             world: world,
             guild_name: guildName,
             status: 'PENDING',
+            error_message: initialErrorMsg,
             requested_by: isPublic ? `WebSite_${clientId}` : 'WebSite'
           }
         ]);
@@ -112,7 +125,11 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
       if (error) throw error;
 
       setStatus('success');
-      setMessage(`Convite para <strong>${characterName}</strong> (Guilda: <em>${guildName}</em>) solicitado com sucesso!<br/>O robô enviará o convite in-game no site em instantes.`);
+      if (isAutoWorld) {
+        setMessage(`Convite para <strong>${characterName}</strong> (Guilda: <em>${guildName}</em>) solicitado com sucesso!<br/>O robô enviará o convite in-game no site em instantes.`);
+      } else {
+        setMessage(`Convite para <strong>${characterName}</strong> (${world} - <em>${guildName}</em>) registrado na fila com sucesso!<br/>Este servidor está com o status <em>"Em breve"</em> e será processado assim que a automação for ativada.`);
+      }
       setCharacterName('');
       fetchRecentInvites();
     } catch (err) {
@@ -121,18 +138,28 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
     }
   };
 
-  const getStatusBadge = (status, msg) => {
+  const getStatusBadge = (status, msg, invWorld) => {
     if (status === 'SUCCESS') return <span className="px-2 py-1 bg-green-900/40 text-green-400 border border-green-500/50 rounded text-xs font-semibold">Sucesso</span>;
-    if (status === 'FAILED') return <span className="px-2 py-1 bg-red-900/40 text-red-400 border border-red-500/50 rounded text-xs font-semibold" title={msg}>Falha</span>;
+    if (status === 'FAILED') {
+      if (msg === 'Em breve...' || (invWorld && !AUTO_INVITE_WORLDS.includes(invWorld)) || (msg && msg.includes('Nenhuma conta de líder'))) {
+        return <span className="px-2 py-1 bg-amber-900/40 text-amber-300 border border-amber-500/50 rounded text-xs font-semibold">Em breve</span>;
+      }
+      return <span className="px-2 py-1 bg-red-900/40 text-red-400 border border-red-500/50 rounded text-xs font-semibold" title={msg}>Falha</span>;
+    }
     if (status === 'IN_PROGRESS' || status === 'PROCESSING') return <span className="px-2 py-1 bg-cyan-900/40 text-cyan-400 border border-cyan-500/50 rounded text-xs animate-pulse font-semibold">Processando</span>;
+    if (msg === 'Em breve...' || (invWorld && !AUTO_INVITE_WORLDS.includes(invWorld))) {
+      return <span className="px-2 py-1 bg-amber-900/40 text-amber-300 border border-amber-500/50 rounded text-xs font-semibold">Em breve</span>;
+    }
     return <span className="px-2 py-1 bg-yellow-900/40 text-yellow-400 border border-yellow-500/50 rounded text-xs font-semibold">Na Fila</span>;
   };
 
   const getDetailsText = (inv) => {
     if (inv.status === 'SUCCESS') return 'Convite enviado in-game';
     if (inv.status === 'IN_PROGRESS' || inv.status === 'PROCESSING') return 'Enviando convite...';
+    if (inv.error_message === 'Em breve...' || (inv.world && !AUTO_INVITE_WORLDS.includes(inv.world)) || (inv.error_message && inv.error_message.includes('Nenhuma conta de líder'))) {
+      return 'Em breve...';
+    }
     if (inv.status === 'PENDING') {
-      if (inv.world === 'Malveria') return 'Em breve...';
       return inv.error_message || 'Aguardando robô...';
     }
     return inv.error_message || 'Falha ao convidar';
@@ -264,19 +291,33 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                   onChange={(e) => setWorld(e.target.value)}
                   className="w-full bg-[#101010] border border-tibia-border rounded-lg py-2.5 px-3.5 focus:outline-none focus:border-tibia-highlight text-white font-sans text-sm transition-colors cursor-pointer"
                 >
-                  {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => (
-                    <option key={w.id} value={w.id}>{w.icon} {w.name} ({w.type})</option>
-                  ))}
+                  {WORLDS_LIST.filter(w => w.id !== 'ALL').map(w => {
+                    const isAuto = AUTO_INVITE_WORLDS.includes(w.name);
+                    return (
+                      <option key={w.id} value={w.id}>
+                        {w.icon} {w.name} ({w.type}) {isAuto ? '• ⚡ Automático' : '• ⏳ Em breve'}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
-              {/* AVISO IMPORTANTE */}
-              <div className="bg-yellow-950/20 border border-yellow-500/30 rounded-lg p-3 text-[11px] text-gray-300 flex items-start gap-2">
-                <Info size={16} className="text-yellow-400 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Atenção:</strong> Solicitação destinada aos membros recrutados pela liderança de sua guilda. O personagem não pode pertencer a outra guilda no servidor.
-                </span>
-              </div>
+              {!AUTO_INVITE_WORLDS.includes(world) ? (
+                <div className="bg-amber-950/30 border border-amber-500/40 rounded-lg p-3 text-[11px] text-amber-200 flex items-start gap-2 animate-fade-in">
+                  <Info size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Robô em Ativação para {world}:</strong> Sua solicitação será registrada com segurança na fila com status <em>"Em breve"</em> e processada assim que a liderança conectar este servidor!
+                  </span>
+                </div>
+              ) : (
+                /* AVISO IMPORTANTE */
+                <div className="bg-yellow-950/20 border border-yellow-500/30 rounded-lg p-3 text-[11px] text-gray-300 flex items-start gap-2">
+                  <Info size={16} className="text-yellow-400 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Atenção:</strong> Solicitação destinada aos membros recrutados pela liderança de sua guilda. O personagem não pode pertencer a outra guilda no servidor.
+                  </span>
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -495,7 +536,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                         </td>
                       )}
                       <td className="py-2.5 px-4">
-                        {getStatusBadge(inv.status, inv.error_message)}
+                        {getStatusBadge(inv.status, inv.error_message, inv.world)}
                       </td>
                       <td className="py-2.5 px-4 text-xs text-gray-300 max-w-[200px] truncate" title={inv.error_message || getDetailsText(inv)}>
                         {getDetailsText(inv)}
