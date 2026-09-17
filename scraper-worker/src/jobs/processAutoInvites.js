@@ -285,15 +285,29 @@ function releaseLock() {
 }
 
 /**
- * Executa o processamento de convites de guilda pendentes na fila
+ * Executa o processamento de convites de guilda pendentes na fila com particionamento distribuído
  */
 export async function runProcessAutoInvites() {
+  if (!supabase) return;
+
   if (!acquireLock()) {
-    console.log('[AutoInvite] Já existe um lote em processamento (lock de arquivo). Ignorando gatilho simultâneo.');
+    console.log('[AutoInvite] Já existe um lote em processamento nesta máquina. Ignorando gatilho simultâneo.');
     return;
   }
 
-  console.log('[AutoInvite] 🔍 Verificando fila de convites pendentes...');
+  // Identificação do Worker atual
+  let workerId = process.env.WORKER_ID;
+  try {
+    const idFile = path.join(process.cwd(), 'worker_id.txt');
+    if (!workerId && fs.existsSync(idFile)) workerId = fs.readFileSync(idFile, 'utf8').trim();
+  } catch {}
+  workerId = workerId || `Worker-${os.hostname()}`;
+
+  const targetWorlds = process.env.TARGET_WORLDS 
+    ? process.env.TARGET_WORLDS.split(',').map(w => w.trim().toLowerCase()) 
+    : null;
+
+  console.log(`[AutoInvite] 🔍 [${workerId}] Verificando fila de convites pendentes...`);
 
   try {
     // 0. Sincronizar planilha do Google
@@ -320,11 +334,10 @@ export async function runProcessAutoInvites() {
     }
 
     if (!pendingInvites || pendingInvites.length === 0) {
-      console.log('[AutoInvite] ✨ Nenhum convite pendente para mundos ativos.');
       return;
     }
 
-    console.log(`[AutoInvite] 📋 Encontrados ${pendingInvites.length} convites para processar.`);
+    console.log(`[AutoInvite] 📋 Encontrados ${pendingInvites.length} convites pendentes na fila global.`);
 
     // 2. Agrupar por Mundo/Servidor
     const invitesByWorld = {};
@@ -334,11 +347,35 @@ export async function runProcessAutoInvites() {
       invitesByWorld[worldKey].push(invite);
     }
 
-    // 3. Processar cada mundo isoladamente
+    // 3. Processar cada mundo isoladamente com claim atômico
     const chromeExe = findUniversalChrome();
     
     for (const [world, invites] of Object.entries(invitesByWorld)) {
-      console.log(`\n[AutoInvite] 🌐 Iniciando lote para o mundo: ${world} (${invites.length} convites)`);
+      const worldKey = world.toLowerCase();
+      if (targetWorlds && !targetWorlds.includes(worldKey)) {
+        console.log(`[AutoInvite] ⏭️ Pulando ${world} (não atribuído a TARGET_WORLDS deste worker).`);
+        continue;
+      }
+
+      // TRAVA ATÔMICA DISTRIBUÍDA: tenta reivindicar os convites pendentes deste mundo no Supabase
+      const pendingIds = invites.map(i => i.id);
+      const { data: claimedInvites, error: claimErr } = await supabase
+        .from('guild_invites_queue')
+        .update({
+          status: 'IN_PROGRESS',
+          error_message: `Assumido por ${workerId}`,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', pendingIds)
+        .eq('status', 'PENDING')
+        .select();
+
+      if (!claimedInvites || claimedInvites.length === 0) {
+        console.log(`[AutoInvite] ⏩ Mundo '${world}' já foi assumido por outro worker ativo da frota.`);
+        continue;
+      }
+
+      console.log(`\n[AutoInvite] 🌐 [${workerId}] assumiu com exclusividade o mundo: ${world} (${claimedInvites.length} convites)`);
 
       let leaderAcc = null;
       const { data: dbAcc } = await supabase
@@ -412,7 +449,7 @@ export async function runProcessAutoInvites() {
           const errMsg = `Falha ao realizar login na conta '${leaderAcc.account_name}' no RubinOT.`;
           console.error(`[AutoInvite] ❌ ${errMsg} O sistema tentará novamente no próximo ciclo.`);
 
-          for (const inv of invites) {
+          for (const inv of claimedInvites) {
             await updateSheetIfApplicable(inv, { statusD: 'Pendente', statusF: 'Site Lento (Aguardando Retentativa)' });
             await supabase.from('guild_invites_queue')
               .update({ status: 'PENDING', error_message: errMsg, updated_at: new Date().toISOString() })
@@ -422,20 +459,12 @@ export async function runProcessAutoInvites() {
           continue; // Pula para o próximo mundo
         }
 
-        // Marcar apenas os convites deste mundo como IN_PROGRESS
-        const currentWorldInviteIds = invites.map(i => i.id);
-        await supabase
-          .from('guild_invites_queue')
-          .update({ status: 'IN_PROGRESS', error_message: null, updated_at: new Date().toISOString() })
-          .in('id', currentWorldInviteIds);
-
-        for (const inv of invites) {
-          await updateSheetIfApplicable(inv, { statusD: 'Processando', workerE: `Worker-${inv.world || 'Auto'}` });
+        for (const inv of claimedInvites) {
+          await updateSheetIfApplicable(inv, { statusD: 'Processando', workerE: workerId });
         }
 
-
-        // Processar cada convite deste mundo
-        for (const invite of invites) {
+        // Processar cada convite deste mundo reivindicado com exclusividade
+        for (const invite of claimedInvites) {
           let guildTarget = leaderAcc.guild_name || invite.guild_name || process.env.GUILD_NAME || 'Shellpatrocina';
           if (guildTarget.toLowerCase() === 'shell') guildTarget = leaderAcc.guild_name || 'Shellpatrocina';
           console.log(`[AutoInvite] ✉ Enviando convite para '${invite.character_name}' na guilda '${guildTarget}' (${world})...`);
@@ -456,7 +485,7 @@ export async function runProcessAutoInvites() {
             
             if (result.reason.includes('permiss')) {
               console.warn(`[AutoInvite] ⚠️ A conta líder para ${world} não possui permissões de convite na guilda '${guildTarget}'. Pausando este mundo.`);
-              const worldIds = invites.map(i => i.id);
+              const worldIds = claimedInvites.map(i => i.id);
               await supabase
                 .from('guild_invites_queue')
                 .update({ status: 'PENDING', error_message: 'Sem permissao de convite na guilda (verifique se e Lider/Vice)', updated_at: new Date().toISOString() })
