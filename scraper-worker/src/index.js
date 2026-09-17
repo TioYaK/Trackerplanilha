@@ -502,12 +502,8 @@ const sendHeartbeat = async () => {
       terminal_logs_updated_at: currentTerminalLogsUpdatedAt,
     };
 
-    // 1. Tenta envio via ApiClient seguro (Gateway Vercel)
-    const hbRes = await apiClient.sendHeartbeat(metadata);
-    if (hbRes?.is_paused !== undefined) {
-      isWorkerPaused = Boolean(hbRes.is_paused);
-    } else if (supabase) {
-      // 2. Fallback direto se supabase estiver disponível
+    // Grava diretamente no Supabase se as credenciais estiverem configuradas
+    if (supabase) {
       await supabase.from('worker_heartbeats').upsert({
         worker_id: WORKER_ID,
         last_ping: new Date().toISOString(),
@@ -516,6 +512,12 @@ const sendHeartbeat = async () => {
         location: WORKER_LOCATION,
         metadata,
       });
+    } else {
+      // Modo Zero-Trust: Envio via ApiClient seguro (Gateway Vercel)
+      const hbRes = await apiClient.sendHeartbeat(metadata);
+      if (hbRes?.is_paused !== undefined) {
+        isWorkerPaused = Boolean(hbRes.is_paused);
+      }
     }
 
     const statsToFlush = { ...sessionStats };

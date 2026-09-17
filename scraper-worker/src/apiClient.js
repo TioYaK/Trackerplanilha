@@ -16,7 +16,8 @@ if (!WORKER_ID) {
   }
 }
 
-const API_BASE_URL = (process.env.API_BASE_URL || 'https://trackerplanilha.vercel.app').replace(/\/$/, '');
+const rawBase = (process.env.API_BASE_URL || 'https://trackerplanilha.vercel.app').trim();
+const API_BASE_URL = rawBase.replace(/\/api\/worker\/telemetry\/?$/, '').replace(/\/$/, '');
 const WORKER_TOKEN = process.env.WORKER_INGESTION_TOKEN || process.env.WORKER_TOKEN || 'wk_live_rubinot_telemetry_secure_2026';
 const WORKER_OWNER = process.env.WORKER_OWNER || 'Membro';
 
