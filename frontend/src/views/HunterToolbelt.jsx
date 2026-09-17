@@ -4,7 +4,7 @@ import {
   CheckCircle2, Copy, Check, Bell, BellOff, ArrowRight,
   TrendingUp, AlertTriangle, Info, Zap, Heart, Flame,
   Skull, Package, Search, Filter, Plus, Minus, Trash2, MapPin, Target, ExternalLink,
-  ShieldAlert
+  ShieldAlert, Swords, ArrowRightLeft
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 import { MONSTERS_VULNERABILITY_DATABASE } from '../data/monstersVulnerability';

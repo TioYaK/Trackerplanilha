@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import InstallPWA from './InstallPWA';
 import PushNotificationBell from './PushNotificationBell';
+import ProfileModal from './ProfileModal';
 
 export default function TopNav({ 
   currentView, 
@@ -27,6 +28,7 @@ export default function TopNav({
   const { logout } = useAuth();
   const { activeWorld, setActiveWorld, worlds, activeWorldObj } = useWorld();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [workerCount, setWorkerCount] = useState(0);
 
   useEffect(() => {

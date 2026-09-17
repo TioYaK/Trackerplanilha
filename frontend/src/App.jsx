@@ -1,5 +1,4 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import TopNav from './components/TopNav';
 import SidebarNav from './components/SidebarNav';
 import TopHeader from './components/TopHeader';
 import ErrorBoundary from './components/ErrorBoundary';

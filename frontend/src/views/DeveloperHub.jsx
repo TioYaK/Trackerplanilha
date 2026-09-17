@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { 
   Code2, Terminal, Key, Copy, Check, ExternalLink, ShieldCheck, 
   Zap, Server, RefreshCw, Cpu, Layers, DollarSign, CheckCircle2, 
-  AlertCircle, Trash2, Eye, EyeOff, Play, Send, ChevronRight, Lock, Sparkles, Gem, HelpCircle, X
+  AlertCircle, Trash2, Eye, EyeOff, Play, Send, ChevronRight, Lock, Sparkles, Gem, HelpCircle, X, Crown
 } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
 import { WORLDS_LIST } from '../context/WorldContext';
