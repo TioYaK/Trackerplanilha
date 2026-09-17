@@ -144,7 +144,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
       if (msg === 'Em breve...' || (invWorld && !AUTO_INVITE_WORLDS.includes(invWorld)) || (msg && msg.includes('Nenhuma conta de líder'))) {
         return <span className="px-2 py-1 bg-amber-900/40 text-amber-300 border border-amber-500/50 rounded text-xs font-semibold">Em breve</span>;
       }
-      return <span className="px-2 py-1 bg-red-900/40 text-red-400 border border-red-500/50 rounded text-xs font-semibold" title={msg}>Falha</span>;
+      return <span className="px-2 py-1 bg-red-900/40 text-red-400 border border-red-500/50 rounded text-xs font-semibold" title={msg}>ERRO</span>;
     }
     if (status === 'IN_PROGRESS' || status === 'PROCESSING') return <span className="px-2 py-1 bg-cyan-900/40 text-cyan-400 border border-cyan-500/50 rounded text-xs animate-pulse font-semibold">Processando</span>;
     if (msg === 'Em breve...' || (invWorld && !AUTO_INVITE_WORLDS.includes(invWorld))) {
@@ -162,7 +162,16 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
     if (inv.status === 'PENDING') {
       return inv.error_message || 'Aguardando robô...';
     }
-    return inv.error_message || 'Falha ao convidar';
+    return inv.error_message || 'Erro ao convidar';
+  };
+
+  const canRetry = (inv) => {
+    if (inv.status === 'SUCCESS') return false;
+    if (inv.status === 'IN_PROGRESS' || inv.status === 'PROCESSING') return false;
+    const msg = (inv.error_message || '').toLowerCase();
+    if (msg.includes('não existe') || msg.includes('nao existe') || msg.includes('char não existe')) return false;
+    if (msg.includes('já está na guilda') || msg.includes('ja esta na guilda')) return false;
+    return true;
   };
 
   const pendingCount = recentInvites.filter(i => i.status === 'PENDING').length;
@@ -408,7 +417,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                   <option value="PROCESSING">⚡ Processando ({processingCount})</option>
                   <option value="PENDING">⏳ Na Fila ({pendingCount})</option>
                   <option value="SUCCESS">✅ Sucesso ({successCount})</option>
-                  <option value="FAILED">❌ Falhas ({failedCount})</option>
+                  <option value="FAILED">❌ Erros ({failedCount})</option>
                 </select>
               </div>
             </div>
@@ -456,7 +465,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                 className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                   statusFilter === 'SUCCESS'
                     ? 'bg-green-600 text-black shadow'
-                    : 'bg-green-950/40 text-green-400 hover:bg-green-900/60 border border-green-500/40'
+                    : 'bg-green-950/40 text-green-400 hover:bg-green-900/60 border border-green-500/50'
                 }`}
               >
                 Sucesso ({successCount})
@@ -470,7 +479,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                     : 'bg-red-950/40 text-red-400 hover:bg-red-900/60 border border-red-500/40'
                 }`}
               >
-                Falhas ({failedCount})
+                Erros ({failedCount})
               </button>
 
               {(worldFilter !== 'ALL' || statusFilter !== 'ALL' || searchTerm) && (
@@ -543,7 +552,7 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                       </td>
                       {!isPublic && (
                         <td className="py-2.5 px-4 text-center">
-                          {inv.status !== 'SUCCESS' && (
+                          {canRetry(inv) ? (
                             <button
                               onClick={() => handleRetry(inv.id)}
                               className="bg-black/60 hover:bg-yellow-600 hover:text-black border border-yellow-500/40 rounded px-2 py-1 text-xs transition-colors"
@@ -551,6 +560,8 @@ export default function InviteRequest({ isPublic = false, defaultCharacter = '' 
                             >
                               🔄 Reprocessar
                             </button>
+                          ) : (
+                            <span className="text-gray-600 text-xs">-</span>
                           )}
                         </td>
                       )}

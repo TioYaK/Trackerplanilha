@@ -514,7 +514,7 @@ export async function runProcessAutoInvites() {
                  .from('guild_invites_queue')
                  .update({ status: 'FAILED', error_message: result.reason, updated_at: new Date().toISOString() })
                  .eq('id', invite.id);
-               await updateSheetIfApplicable(invite, { statusD: 'Finalizado', statusF: 'Falha: ' + result.reason });
+               await updateSheetIfApplicable(invite, { statusD: 'Finalizado', statusF: 'Erro: ' + result.reason });
             }
           }
         }
@@ -765,7 +765,7 @@ async function inviteCharacter(page, world, guildName, characterName) {
                       return { success: false, reason: `Personagem está no mundo ${charData.character.world}.` };
                   }
               } catch (e) {}
-              return { success: false, reason: 'Personagem não encontrado no RubinOT (ou está em outro mundo).' };
+              return { success: false, reason: 'Char não existe' };
           }
         
         if (pageText.includes('already in a guild') || pageText.includes('already belongs') || pageText.includes('already a member of')) {
