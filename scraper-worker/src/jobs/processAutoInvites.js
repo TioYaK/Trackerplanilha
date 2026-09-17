@@ -769,7 +769,7 @@ async function inviteCharacter(page, world, guildName, characterName) {
           }
         
         if (pageText.includes('already in a guild') || pageText.includes('already belongs') || pageText.includes('already a member of')) {
-            return { success: false, reason: 'Personagem já pertence a uma guilda.' };
+            return { success: false, reason: 'Já está na guilda' };
         }
         
         // Cuidado: a UI tem um título "Convites pendentes", por isso NÃO podemos buscar só pela palavra "pendente"
