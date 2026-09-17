@@ -194,6 +194,7 @@ export function cleanWorkerProfileCaches() {
       'GrShaderCache',
       'ShaderCache',
       'BrowserMetrics',
+      'DeferredBrowserMetrics',
       'OptimizationHints',
       'SafetyTips',
       'Subresource Filter',
@@ -257,6 +258,26 @@ export function cleanWorkerProfileCaches() {
           // Limpa stale locks primeiro
           cleanStaleLocks(fullPDir);
           cleanStaleLocks(path.join(fullPDir, 'Default'));
+
+          // Varredura recursiva de emergência para qualquer pasta de métricas ou arquivo .pma residual
+          const purgePmaRecursively = (dir) => {
+            try {
+              const dirEntries = fs.readdirSync(dir, { withFileTypes: true });
+              for (const entry of dirEntries) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                  if (entry.name === 'DeferredBrowserMetrics' || entry.name === 'BrowserMetrics' || entry.name === 'Crashpad') {
+                    try { fs.rmSync(full, { recursive: true, force: true }); pruned++; } catch {}
+                  } else {
+                    purgePmaRecursively(full);
+                  }
+                } else if (entry.isFile() && (entry.name.toLowerCase().endsWith('.pma') || entry.name.toLowerCase().startsWith('browsermetrics-'))) {
+                  try { fs.unlinkSync(full); pruned++; } catch {}
+                }
+              }
+            } catch {}
+          };
+          purgePmaRecursively(fullPDir);
 
           const checkBases = [fullPDir, path.join(fullPDir, 'Default')];
           for (const base of checkBases) {
@@ -425,12 +446,18 @@ export function getLeanChromeArgs(extraArgs = []) {
     '--disable-background-networking',
     '--disable-default-apps',
     '--disable-domain-reliability',
-    '--disable-features=OptimizationHints,Translate,MediaRouter,EdgeEntityExtraction,EdgeSmartScreen,AutofillServerCommunication,CalculateNativeWinOcclusion,EdgeCoupons,EdgeSidebar,EdgeShopping,EdgeWallet,EdgeLanguageDetection,EdgeCollections,EdgeHub,EdgeDiscover,EdgeNtp,EdgeSignalTriggers,SegmentationPlatform',
+    '--disable-metrics',
+    '--disable-metrics-repo',
+    '--disable-breakpad',
+    '--disable-crash-reporter',
+    '--disable-ipc-flooding-protection',
+    '--disable-features=DeferredBrowserMetrics,OptimizationHints,Translate,MediaRouter,MetricsReporting,ChromeLabs,EdgeEntityExtraction,EdgeSmartScreen,AutofillServerCommunication,CalculateNativeWinOcclusion,EdgeCoupons,EdgeSidebar,EdgeShopping,EdgeWallet,EdgeLanguageDetection,EdgeCollections,EdgeHub,EdgeDiscover,EdgeNtp,EdgeSignalTriggers,SegmentationPlatform',
     '--disable-history-quick-provider',
     '--disable-history-url-provider',
     '--disable-sync',
     '--metrics-recording-only=false',
     '--no-report-upload',
+    '--no-pings',
     '--aggressive-cache-discard',
     '--no-default-browser-check',
     '--no-first-run',

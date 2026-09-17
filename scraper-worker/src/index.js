@@ -620,7 +620,7 @@ setInterval(async () => {
 setTimeout(() => runFullStorageMaintenance(), 5000);
 setInterval(() => {
   runFullStorageMaintenance();
-}, 30 * 60 * 1000); // Checa a cada 30 minutos
+}, 10 * 60 * 1000); // Checa a cada 10 minutos
 
 // Reciclagem preventiva de memória e abas a cada 2 horas
 setInterval(async () => {
