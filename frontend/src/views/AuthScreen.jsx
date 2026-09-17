@@ -58,7 +58,7 @@ export default function AuthScreen({ onBack }) {
         
         {/* Decorative elements */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-tibia-highlight to-transparent"></div>
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('/stone-texture.png')] opacity-20 pointer-events-none mix-blend-overlay"></div>
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/5 to-transparent opacity-20 pointer-events-none mix-blend-overlay"></div>
 
         <div className="text-center mb-8 relative z-10">
           <Shield className="w-16 h-16 text-tibia-highlight mx-auto mb-4" />
