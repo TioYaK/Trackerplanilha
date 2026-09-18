@@ -112,6 +112,7 @@ export function cleanStalePuppeteerProfiles(maxAgeMinutes = 10) {
       const isDirMatch = dirPrefixes.some(p => lower.startsWith(p));
       const isFileMatch = lower.startsWith('~dfcache_') || 
                           (lower.startsWith('wct') && lower.endsWith('.tmp')) ||
+                          lower.startsWith('worker_update_') ||
                           lower.startsWith('.org.chromium.');
 
       if (isDirMatch || isFileMatch) {

@@ -103,6 +103,17 @@ export const runArchiveSessions = async () => {
 
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       await supabase.from('guild_strikes').delete().lt('expires_at', thirtyDaysAgo);
+
+      // Limpeza de leilões do Bazaar já encerrados
+      const nowIso = new Date().toISOString();
+      await supabase.from('bazaar_alerts').delete().lt('auction_end', nowIso);
+
+      // Limpeza de comandos remotos antigos já executados (> 48h)
+      const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+      await supabase.from('worker_commands').delete().eq('executed', true).lt('created_at', twoDaysAgo);
+
+      // Limpeza preventiva de sessões históricas com mais de 30 dias
+      await supabase.from('historical_sessions').delete().lt('session_start', thirtyDaysAgo);
     } catch (cleanErr) {
       console.warn('[ARCHIVE] Aviso na limpeza de retenção:', cleanErr.message);
     }
