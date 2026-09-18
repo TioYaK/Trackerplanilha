@@ -177,8 +177,10 @@ export const DEFAULT_ASCENSION_ITEMS = [
     category: 'Demon Damage / Fire Damage',
     quantityPerMember: 5,
     quantityTotal: 2500,
+    calcMode: 'per_member', // 'per_member' | 'total_fixed'
     priceKk: 0.05, // 50.000 Gold cada (0.05 KK)
     serverOrigin: 'Belaria',
+    status: 'comprando', // 'planejado' | 'comprando' | 'em_transito' | 'estoque'
     notes: 'Mercado de Belaria com melhor oferta'
   },
   {
@@ -187,8 +189,10 @@ export const DEFAULT_ASCENSION_ITEMS = [
     category: 'Life Leech (General Bonus)',
     quantityPerMember: 8,
     quantityTotal: 4000,
+    calcMode: 'per_member',
     priceKk: 0.04, // 40.000 Gold cada (0.04 KK)
     serverOrigin: 'Infernum I',
+    status: 'comprando',
     notes: 'Comprar no Market de Infernum I'
   },
   {
@@ -197,8 +201,10 @@ export const DEFAULT_ASCENSION_ITEMS = [
     category: 'Dragon Damage / Energy Damage',
     quantityPerMember: 10,
     quantityTotal: 5000,
+    calcMode: 'per_member',
     priceKk: 0.02, // 20.000 Gold cada (0.02 KK)
     serverOrigin: 'Drakaria',
+    status: 'comprando',
     notes: 'Grande oferta no Drakaria'
   },
   {
@@ -207,8 +213,10 @@ export const DEFAULT_ASCENSION_ITEMS = [
     category: 'Mana Leech (General Bonus)',
     quantityPerMember: 6,
     quantityTotal: 3000,
+    calcMode: 'per_member',
     priceKk: 0.06, // 60.000 Gold cada (0.06 KK)
     serverOrigin: 'Bellum',
+    status: 'planejado',
     notes: 'Importar de Bellum'
   },
   {
@@ -217,8 +225,10 @@ export const DEFAULT_ASCENSION_ITEMS = [
     category: 'Construct Damage / Earth',
     quantityPerMember: 15,
     quantityTotal: 7500,
+    calcMode: 'per_member',
     priceKk: 0.015, // 15.000 Gold cada
     serverOrigin: 'Auroria',
+    status: 'estoque',
     notes: 'Estoque local em Auroria'
   },
   {
@@ -227,8 +237,10 @@ export const DEFAULT_ASCENSION_ITEMS = [
     category: 'Critical / Humanoid',
     quantityPerMember: 12,
     quantityTotal: 6000,
+    calcMode: 'per_member',
     priceKk: 0.025, // 25.000 Gold cada
     serverOrigin: 'Solarian',
+    status: 'planejado',
     notes: 'Comprar de hunts em Solarian'
   },
   {
@@ -237,8 +249,10 @@ export const DEFAULT_ASCENSION_ITEMS = [
     category: 'Dragon Damage / Fire Defense',
     quantityPerMember: 8,
     quantityTotal: 4000,
+    calcMode: 'per_member',
     priceKk: 0.03, // 30.000 Gold cada
     serverOrigin: 'Malveria',
+    status: 'planejado',
     notes: 'Comprar no Market de Malveria'
   },
   {
@@ -247,9 +261,54 @@ export const DEFAULT_ASCENSION_ITEMS = [
     category: 'Demon Damage / Fire Defense',
     quantityPerMember: 4,
     quantityTotal: 2000,
+    calcMode: 'per_member',
     priceKk: 0.07, // 70.000 Gold cada
     serverOrigin: 'Vesperia',
+    status: 'em_transito',
     notes: 'Lote fechado via World Transfer'
+  }
+];
+
+/**
+ * Catálogo Rápido com Itens Típicos do RubinOT para Adição Imediata
+ */
+export const CATALOG_SUGGESTED_ITEMS = [
+  { name: 'Bloody Pincers', category: 'Life Leech Tier 3', defaultPerMember: 5, defaultKk: 0.08, defaultOrigin: 'Infernum I' },
+  { name: 'Sabreteeth', category: 'Critical Damage Bonus', defaultPerMember: 8, defaultKk: 0.045, defaultOrigin: 'Belaria' },
+  { name: 'Protective Charm', category: 'Damage Reduction / Energy', defaultPerMember: 10, defaultKk: 0.035, defaultOrigin: 'Drakaria' },
+  { name: 'Elvish Scouting Glass', category: 'Distance Bonus / Movement', defaultPerMember: 6, defaultKk: 0.05, defaultOrigin: 'Solarian' },
+  { name: 'Spider Silk', category: 'Armor / Physical Defense', defaultPerMember: 15, defaultKk: 0.02, defaultOrigin: 'Auroria' },
+  { name: 'Goosebump Leather', category: 'Ice Damage / Magic Shield', defaultPerMember: 4, defaultKk: 0.09, defaultOrigin: 'Malveria' },
+  { name: 'Peppercorn', category: 'Food Buff / Stamina Bonus', defaultPerMember: 20, defaultKk: 0.01, defaultOrigin: 'Auroria' },
+  { name: 'Ogre Tooth', category: 'Club Damage / Knockback', defaultPerMember: 10, defaultKk: 0.03, defaultOrigin: 'Vesperia' },
+  { name: 'Brimstone Shell', category: 'Earth / Poison Resistance', defaultPerMember: 8, defaultKk: 0.04, defaultOrigin: 'Bellum' },
+  { name: 'Snake Skin', category: 'Earth Damage Bonus', defaultPerMember: 12, defaultKk: 0.015, defaultOrigin: 'Auroria' }
+];
+
+/**
+ * Presets de Cenários de Ascensão
+ */
+export const PROJECTION_PRESETS = [
+  {
+    id: 'full_ascension',
+    name: 'Full Ascension (Todos os 8 Perks)',
+    description: 'Cobre todos os buffs canônicos com frete cross-server planejado.',
+    itemsCount: 8,
+    wtCount: 3
+  },
+  {
+    id: 'essential_leech',
+    name: 'Essencial (Life & Mana Leech + Crit)',
+    description: 'Apenas os 4 perks essenciais para hunts eficientes.',
+    itemsCount: 4,
+    wtCount: 2
+  },
+  {
+    id: 'local_zero_wt',
+    name: 'Econômico Local (Zero World Transfer)',
+    description: 'Utiliza apenas itens estocados e comprados no mercado local de Auroria.',
+    itemsCount: 5,
+    wtCount: 0
   }
 ];
 
@@ -281,43 +340,71 @@ export function calculateDetailedPerkProjection({
   const safeRateKk = Math.max(0.01, Number(rateKk) || 2.0);
   const rateKkPerRc = safeRateKk / safeRateRc; // ex: 2.0 / 25 = 0.08 KK por RC
 
-  // 1. Cálculo Item por Item
+  // 1. Cálculo Item por Item com total clareza matemática
   let totalItemsCount = 0;
   let totalItemsCostKk = 0;
+  let totalItemsCostRc = 0;
   const serverBreakdown = {};
 
   const itemsCalculated = items.map(item => {
-    const qty = usePerMemberQty 
-      ? Math.round((Number(item.quantityPerMember) || 0) * safeMembers)
-      : Math.round(Number(item.quantityTotal) || (Number(item.quantityPerMember) || 0) * safeMembers);
-    const unitPriceKk = Number(item.priceKk) || 0;
-    const subtotalKk = Number((qty * unitPriceKk).toFixed(2));
-    const subtotalRc = Math.ceil(subtotalKk / rateKkPerRc);
+    // Modo de cálculo do item: respeita o modo individual do item ou a flag global
+    const isPerMember = item.calcMode ? item.calcMode === 'per_member' : usePerMemberQty;
+    
+    let effectiveQty = 0;
+    let effectiveQtyPerMember = 0;
 
-    totalItemsCount += qty;
+    if (isPerMember) {
+      effectiveQtyPerMember = Math.max(0, Number(item.quantityPerMember) || 0);
+      effectiveQty = Math.round(effectiveQtyPerMember * safeMembers);
+    } else {
+      effectiveQty = Math.max(0, Math.round(Number(item.quantityTotal) || 0));
+      effectiveQtyPerMember = Number((effectiveQty / safeMembers).toFixed(2));
+    }
+
+    const unitPriceKk = Number(item.priceKk) || 0;
+    const unitPriceGp = Math.round(unitPriceKk * 1000000);
+    const unitPriceRc = rateKkPerRc > 0 ? Number((unitPriceKk / rateKkPerRc).toFixed(4)) : 0;
+
+    const subtotalKk = Number((effectiveQty * unitPriceKk).toFixed(2));
+    const subtotalRc = rateKkPerRc > 0 ? Math.ceil(subtotalKk / rateKkPerRc) : 0;
+    const subtotalGp = Math.round(subtotalKk * 1000000);
+
+    // Custo individual deste item para 1 jogador
+    const costPerMemberKk = Number((subtotalKk / safeMembers).toFixed(3));
+    const costPerMemberRc = Number((subtotalRc / safeMembers).toFixed(2));
+    const costPerMemberGp = Math.round(subtotalGp / safeMembers);
+
+    totalItemsCount += effectiveQty;
     totalItemsCostKk += subtotalKk;
+    totalItemsCostRc += subtotalRc;
 
     const server = item.serverOrigin || 'Local';
     if (!serverBreakdown[server]) {
       serverBreakdown[server] = { server, totalQty: 0, totalCostKk: 0, totalCostRc: 0, itemsCount: 0 };
     }
-    serverBreakdown[server].totalQty += qty;
+    serverBreakdown[server].totalQty += effectiveQty;
     serverBreakdown[server].totalCostKk += subtotalKk;
     serverBreakdown[server].totalCostRc += subtotalRc;
     serverBreakdown[server].itemsCount += 1;
 
     return {
       ...item,
-      effectiveQty: qty,
+      isPerMember,
+      effectiveQty,
+      effectiveQtyPerMember,
+      unitPriceKk,
+      unitPriceGp,
+      unitPriceRc,
       subtotalKk,
       subtotalRc,
-      costPerMemberKk: Number((subtotalKk / safeMembers).toFixed(4)),
-      costPerMemberRc: Number((subtotalRc / safeMembers).toFixed(2))
+      subtotalGp,
+      costPerMemberKk,
+      costPerMemberRc,
+      costPerMemberGp
     };
   });
 
   totalItemsCostKk = Number(totalItemsCostKk.toFixed(2));
-  const totalItemsCostRc = Math.ceil(totalItemsCostKk / rateKkPerRc);
 
   // 2. Cálculo dos Custos de Transferência de Mundos (World Transfer)
   let totalWtTransfersCount = 0;
@@ -339,7 +426,8 @@ export function calculateDetailedPerkProjection({
     return {
       ...wt,
       subtotalRc,
-      subtotalKk
+      subtotalKk,
+      costPerMemberRc: Number((subtotalRc / safeMembers).toFixed(2))
     };
   });
 
@@ -353,9 +441,14 @@ export function calculateDetailedPerkProjection({
   const grandTotalCostKk = Number((totalItemsCostKk + totalWtCostKk + activationCostKk).toFixed(2));
   const grandTotalCostRc = totalItemsCostRc + totalWtCostRc + activationCostRc;
 
-  // 5. Custo Unitário por Membro (Break-Even Puro)
+  // 5. Decomposição exata por Membro (Break-Even Puro)
+  const itemsCostPerMemberRc = Number((totalItemsCostRc / safeMembers).toFixed(2));
+  const wtCostPerMemberRc = Number((totalWtCostRc / safeMembers).toFixed(2));
+  const activationCostPerMemberRc = Number((activationCostRc / safeMembers).toFixed(2));
+
   const costPerMemberKk = Number((grandTotalCostKk / safeMembers).toFixed(2));
-  const breakEvenFeeRc = Math.ceil(grandTotalCostRc / safeMembers);
+  const breakEvenExactRc = Number((grandTotalCostRc / safeMembers).toFixed(2));
+  const breakEvenFeeRc = Math.ceil(breakEvenExactRc);
 
   // 6. Cota Recomendada com Margem de Segurança / Reserva
   const marginMultiplier = 1 + (Math.max(0, Number(safetyMarginPct) || 0) / 100);
@@ -363,6 +456,7 @@ export function calculateDetailedPerkProjection({
     ? Number(customFeeRc)
     : Math.ceil(breakEvenFeeRc * marginMultiplier);
   const recommendedFeeKk = Number((recommendedFeeRc * rateKkPerRc).toFixed(2));
+  const marginRcPerMember = Math.max(0, recommendedFeeRc - breakEvenFeeRc);
 
   // 7. Arrecadação Global & Balanço Financeiro
   const grossRevenueRc = Math.round(safeMembers * recommendedFeeRc);
@@ -376,6 +470,9 @@ export function calculateDetailedPerkProjection({
   const itemsSharePct = grandTotalCostRc > 0 ? Math.round((totalItemsCostRc / grandTotalCostRc) * 100) : 0;
   const wtSharePct = grandTotalCostRc > 0 ? Math.round((totalWtCostRc / grandTotalCostRc) * 100) : 0;
   const activationSharePct = grandTotalCostRc > 0 ? Math.round((activationCostRc / grandTotalCostRc) * 100) : 0;
+
+  // 9. Cota Híbrida: Taxa fixa em RC para quem entregar 100% dos seus itens
+  const hybridFixedLogisticsRc = Math.ceil(wtCostPerMemberRc + activationCostPerMemberRc);
 
   return {
     members: safeMembers,
@@ -395,6 +492,16 @@ export function calculateDetailedPerkProjection({
     activationCostRc,
     grandTotalCostKk,
     grandTotalCostRc,
+    breakdownPerMember: {
+      itemsCostRc: itemsCostPerMemberRc,
+      wtCostRc: wtCostPerMemberRc,
+      activationCostRc: activationCostPerMemberRc,
+      marginRc: marginRcPerMember,
+      breakEvenExactRc,
+      breakEvenFeeRc,
+      recommendedFeeRc,
+      recommendedFeeKk
+    },
     costPerMemberKk,
     breakEvenFeeRc,
     safetyMarginPct,
@@ -405,6 +512,14 @@ export function calculateDetailedPerkProjection({
     surplusRc,
     surplusKk,
     surplusMarginPct,
+    hybridContribution: {
+      logisticsFeeRc: hybridFixedLogisticsRc,
+      itemsRequired: itemsCalculated.map(it => ({
+        name: it.name,
+        category: it.category,
+        qty: it.effectiveQtyPerMember
+      }))
+    },
     shares: {
       itemsSharePct,
       wtSharePct,
@@ -412,4 +527,5 @@ export function calculateDetailedPerkProjection({
     }
   };
 }
+
 
