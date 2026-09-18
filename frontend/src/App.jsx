@@ -191,10 +191,12 @@ const ROUTE_TO_VIEW = {
   '/banco': 'home',
   '/market': 'home',
   '/mercado': 'home',
-  '/perks': 'home',
-  '/guild-perks': 'home',
-  '/guild_perks': 'home',
-  '/pearks': 'home',
+  '/perks': 'guild_perks',
+  '/guild-perks': 'guild_perks',
+  '/guild_perks': 'guild_perks',
+  '/pearks': 'guild_perks',
+  '/guild_pearks': 'guild_perks',
+  '/guild-pearks': 'guild_perks',
   '/vip': 'vip_hub',
   '/vip-hub': 'vip_hub',
   '/central-vip': 'vip_hub',
@@ -266,8 +268,9 @@ const VIEW_TO_ROUTE = {
   roster: '/roster',
   bank: '/bank',
   market: '/market',
-  guild_perks: '/perks',
-  pearks: '/perks',
+  guild_perks: '/guild_pearks',
+  pearks: '/guild_pearks',
+  guild_pearks: '/guild_pearks',
   invite: '/invite',
   admin: '/admin',
   workers: '/workers',
@@ -327,6 +330,8 @@ const VIEW_TITLES = {
   bank: 'Rubinot Tracker | Tesouraria da Guilda',
   market: 'Rubinot Tracker | Mercado Interno',
   guild_perks: 'Rubinot Tracker | Perks da Guilda',
+  guild_pearks: 'Rubinot Tracker | Perks da Guilda',
+  pearks: 'Rubinot Tracker | Perks da Guilda',
   invite: 'Rubinot Tracker | Solicitar Convite In-Game',
   admin: 'Rubinot Tracker | Painel de Controle Admin',
   workers: 'Rubinot Tracker | Comando & Controle (C2)',
@@ -706,13 +711,11 @@ export default function App() {
     if (currentView === 'invite') {
       return <InviteRequest defaultCharacter={profile?.main_character || ''} isPublic={!user} />;
     }
-    if (currentView === 'guild_perks' || currentView === 'pearks') {
+    if (currentView === 'guild_perks' || currentView === 'pearks' || currentView === 'guild_pearks') {
       return (
-        <RubinotHome 
-          onNavigate={navigateView} 
-          onPlayerClick={handlePlayerClick} 
-          isPremium={isPremium} 
-          user={user} 
+        <GuildPerks 
+          isPublic={!user} 
+          isAdmin={isAdmin} 
         />
       );
     }

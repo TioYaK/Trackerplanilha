@@ -166,3 +166,250 @@ export function calculatePerkSimulation({
     breakEvenFeeRc
   };
 }
+
+/**
+ * Catálogo Canônico de Itens / Creature Products da Guild Ascension (RubinOT)
+ */
+export const DEFAULT_ASCENSION_ITEMS = [
+  {
+    id: 'item-1',
+    name: 'Demon Horn',
+    category: 'Demon Damage / Fire Damage',
+    quantityPerMember: 5,
+    quantityTotal: 2500,
+    priceKk: 0.05, // 50.000 Gold cada (0.05 KK)
+    serverOrigin: 'Belaria',
+    notes: 'Mercado de Belaria com melhor oferta'
+  },
+  {
+    id: 'item-2',
+    name: 'Vampire Teeth',
+    category: 'Life Leech (General Bonus)',
+    quantityPerMember: 8,
+    quantityTotal: 4000,
+    priceKk: 0.04, // 40.000 Gold cada (0.04 KK)
+    serverOrigin: 'Infernum I',
+    notes: 'Comprar no Market de Infernum I'
+  },
+  {
+    id: 'item-3',
+    name: 'Wyrm Scale',
+    category: 'Dragon Damage / Energy Damage',
+    quantityPerMember: 10,
+    quantityTotal: 5000,
+    priceKk: 0.02, // 20.000 Gold cada (0.02 KK)
+    serverOrigin: 'Drakaria',
+    notes: 'Grande oferta no Drakaria'
+  },
+  {
+    id: 'item-4',
+    name: 'Silencer Claws',
+    category: 'Mana Leech (General Bonus)',
+    quantityPerMember: 6,
+    quantityTotal: 3000,
+    priceKk: 0.06, // 60.000 Gold cada (0.06 KK)
+    serverOrigin: 'Bellum',
+    notes: 'Importar de Bellum'
+  },
+  {
+    id: 'item-5',
+    name: 'Glooth Capsule',
+    category: 'Construct Damage / Earth',
+    quantityPerMember: 15,
+    quantityTotal: 7500,
+    priceKk: 0.015, // 15.000 Gold cada
+    serverOrigin: 'Auroria',
+    notes: 'Estoque local em Auroria'
+  },
+  {
+    id: 'item-6',
+    name: 'Cultish Robe',
+    category: 'Critical / Humanoid',
+    quantityPerMember: 12,
+    quantityTotal: 6000,
+    priceKk: 0.025, // 25.000 Gold cada
+    serverOrigin: 'Solarian',
+    notes: 'Comprar de hunts em Solarian'
+  },
+  {
+    id: 'item-7',
+    name: 'Dragon Hide',
+    category: 'Dragon Damage / Fire Defense',
+    quantityPerMember: 8,
+    quantityTotal: 4000,
+    priceKk: 0.03, // 30.000 Gold cada
+    serverOrigin: 'Malveria',
+    notes: 'Comprar no Market de Malveria'
+  },
+  {
+    id: 'item-8',
+    name: 'Hellspawn Tail',
+    category: 'Demon Damage / Fire Defense',
+    quantityPerMember: 4,
+    quantityTotal: 2000,
+    priceKk: 0.07, // 70.000 Gold cada
+    serverOrigin: 'Vesperia',
+    notes: 'Lote fechado via World Transfer'
+  }
+];
+
+/**
+ * Padrões de World Transfer (RubinOT Oficial: 1490 RC por char)
+ */
+export const DEFAULT_WORLD_TRANSFERS = [
+  { id: 'wt-1', fromWorld: 'Belaria', toWorld: 'Auroria', charactersCount: 1, costRcPerChar: 1490, extraGoldKk: 0, notes: 'Traz Demon Horns e supplies' },
+  { id: 'wt-2', fromWorld: 'Infernum I', toWorld: 'Auroria', charactersCount: 1, costRcPerChar: 1490, extraGoldKk: 0, notes: 'Traz Vampire Teeth e creature products' },
+  { id: 'wt-3', fromWorld: 'Drakaria', toWorld: 'Auroria', charactersCount: 1, costRcPerChar: 1490, extraGoldKk: 0, notes: 'Traz Wyrm Scales e Dragon Hides' },
+];
+
+/**
+ * Calculadora Avançada de Projeção Item por Item, World Transfers e Cota em RC
+ */
+export function calculateDetailedPerkProjection({
+  items = DEFAULT_ASCENSION_ITEMS,
+  members = 500,
+  rateRc = 25,
+  rateKk = 2.0,
+  activationCostPerMemberKk = 0.8,
+  worldTransfers = DEFAULT_WORLD_TRANSFERS,
+  safetyMarginPct = 10,
+  usePerMemberQty = false,
+  customFeeRc = null
+}) {
+  const safeMembers = Math.max(1, Number(members) || 1);
+  const safeRateRc = Math.max(0.01, Number(rateRc) || 25);
+  const safeRateKk = Math.max(0.01, Number(rateKk) || 2.0);
+  const rateKkPerRc = safeRateKk / safeRateRc; // ex: 2.0 / 25 = 0.08 KK por RC
+
+  // 1. Cálculo Item por Item
+  let totalItemsCount = 0;
+  let totalItemsCostKk = 0;
+  const serverBreakdown = {};
+
+  const itemsCalculated = items.map(item => {
+    const qty = usePerMemberQty 
+      ? Math.round((Number(item.quantityPerMember) || 0) * safeMembers)
+      : Math.round(Number(item.quantityTotal) || (Number(item.quantityPerMember) || 0) * safeMembers);
+    const unitPriceKk = Number(item.priceKk) || 0;
+    const subtotalKk = Number((qty * unitPriceKk).toFixed(2));
+    const subtotalRc = Math.ceil(subtotalKk / rateKkPerRc);
+
+    totalItemsCount += qty;
+    totalItemsCostKk += subtotalKk;
+
+    const server = item.serverOrigin || 'Local';
+    if (!serverBreakdown[server]) {
+      serverBreakdown[server] = { server, totalQty: 0, totalCostKk: 0, totalCostRc: 0, itemsCount: 0 };
+    }
+    serverBreakdown[server].totalQty += qty;
+    serverBreakdown[server].totalCostKk += subtotalKk;
+    serverBreakdown[server].totalCostRc += subtotalRc;
+    serverBreakdown[server].itemsCount += 1;
+
+    return {
+      ...item,
+      effectiveQty: qty,
+      subtotalKk,
+      subtotalRc,
+      costPerMemberKk: Number((subtotalKk / safeMembers).toFixed(4)),
+      costPerMemberRc: Number((subtotalRc / safeMembers).toFixed(2))
+    };
+  });
+
+  totalItemsCostKk = Number(totalItemsCostKk.toFixed(2));
+  const totalItemsCostRc = Math.ceil(totalItemsCostKk / rateKkPerRc);
+
+  // 2. Cálculo dos Custos de Transferência de Mundos (World Transfer)
+  let totalWtTransfersCount = 0;
+  let totalWtCostRc = 0;
+  let totalWtExtraGoldKk = 0;
+
+  const transfersCalculated = worldTransfers.map(wt => {
+    const chars = Math.max(0, Number(wt.charactersCount) || 0);
+    const costRc = Math.max(0, Number(wt.costRcPerChar) || 1490);
+    const extraKk = Math.max(0, Number(wt.extraGoldKk) || 0);
+
+    const subtotalRc = chars * costRc;
+    const subtotalKk = Number((subtotalRc * rateKkPerRc + extraKk).toFixed(2));
+
+    totalWtTransfersCount += chars;
+    totalWtCostRc += subtotalRc;
+    totalWtExtraGoldKk += extraKk;
+
+    return {
+      ...wt,
+      subtotalRc,
+      subtotalKk
+    };
+  });
+
+  const totalWtCostKk = Number((totalWtCostRc * rateKkPerRc + totalWtExtraGoldKk).toFixed(2));
+
+  // 3. Taxas de Ativação do Sistema (Gold da Guild Ascension)
+  const activationCostKk = Number((safeMembers * (Number(activationCostPerMemberKk) || 0)).toFixed(2));
+  const activationCostRc = Math.ceil(activationCostKk / rateKkPerRc);
+
+  // 4. CUSTO TOTAL COMBINADO
+  const grandTotalCostKk = Number((totalItemsCostKk + totalWtCostKk + activationCostKk).toFixed(2));
+  const grandTotalCostRc = totalItemsCostRc + totalWtCostRc + activationCostRc;
+
+  // 5. Custo Unitário por Membro (Break-Even Puro)
+  const costPerMemberKk = Number((grandTotalCostKk / safeMembers).toFixed(2));
+  const breakEvenFeeRc = Math.ceil(grandTotalCostRc / safeMembers);
+
+  // 6. Cota Recomendada com Margem de Segurança / Reserva
+  const marginMultiplier = 1 + (Math.max(0, Number(safetyMarginPct) || 0) / 100);
+  const recommendedFeeRc = customFeeRc !== null && customFeeRc !== undefined && customFeeRc > 0
+    ? Number(customFeeRc)
+    : Math.ceil(breakEvenFeeRc * marginMultiplier);
+  const recommendedFeeKk = Number((recommendedFeeRc * rateKkPerRc).toFixed(2));
+
+  // 7. Arrecadação Global & Balanço Financeiro
+  const grossRevenueRc = Math.round(safeMembers * recommendedFeeRc);
+  const grossRevenueKk = Number((grossRevenueRc * rateKkPerRc).toFixed(2));
+
+  const surplusRc = Math.max(0, grossRevenueRc - grandTotalCostRc);
+  const surplusKk = Number((surplusRc * rateKkPerRc).toFixed(2));
+  const surplusMarginPct = grossRevenueRc > 0 ? Math.round((surplusRc / grossRevenueRc) * 100) : 0;
+
+  // 8. Percentual de cada componente no custo
+  const itemsSharePct = grandTotalCostRc > 0 ? Math.round((totalItemsCostRc / grandTotalCostRc) * 100) : 0;
+  const wtSharePct = grandTotalCostRc > 0 ? Math.round((totalWtCostRc / grandTotalCostRc) * 100) : 0;
+  const activationSharePct = grandTotalCostRc > 0 ? Math.round((activationCostRc / grandTotalCostRc) * 100) : 0;
+
+  return {
+    members: safeMembers,
+    rateKkPerRc,
+    rateRc: safeRateRc,
+    rateKk: safeRateKk,
+    items: itemsCalculated,
+    totalItemsCount,
+    totalItemsCostKk,
+    totalItemsCostRc,
+    serverBreakdown: Object.values(serverBreakdown),
+    worldTransfers: transfersCalculated,
+    totalWtTransfersCount,
+    totalWtCostRc,
+    totalWtCostKk,
+    activationCostKk,
+    activationCostRc,
+    grandTotalCostKk,
+    grandTotalCostRc,
+    costPerMemberKk,
+    breakEvenFeeRc,
+    safetyMarginPct,
+    recommendedFeeRc,
+    recommendedFeeKk,
+    grossRevenueRc,
+    grossRevenueKk,
+    surplusRc,
+    surplusKk,
+    surplusMarginPct,
+    shares: {
+      itemsSharePct,
+      wtSharePct,
+      activationSharePct
+    }
+  };
+}
+

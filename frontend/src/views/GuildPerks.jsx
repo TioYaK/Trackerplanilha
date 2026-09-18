@@ -6,7 +6,7 @@ import {
   XCircle, Coins, Users, Search, Copy, Check, FileText, 
   RefreshCw, Sliders, Calendar, Skull, UserCheck, UserX, AlertCircle, ArrowRight,
   Landmark, CheckSquare, Plus, Trash2, PieChart, Vote, DollarSign, TrendingUp, TrendingDown,
-  CheckCircle, Globe, Zap, BookOpen, Calculator
+  CheckCircle, Globe, Zap, BookOpen, Calculator, Package, Share2, ArrowRightLeft
 } from 'lucide-react';
 
 import { 
@@ -20,9 +20,13 @@ import {
   ASCENSION_BESTIARY_RACES,
   ASCENSION_ELEMENTS,
   calculatePerkSimulation,
-  SIMULATOR_PRESET_SCENARIOS
+  SIMULATOR_PRESET_SCENARIOS,
+  DEFAULT_ASCENSION_ITEMS,
+  DEFAULT_WORLD_TRANSFERS,
+  calculateDetailedPerkProjection
 } from '../lib/guildPerksConfig';
-export { WORLDS_CONFIG, WORLD_GUILD_MAP, MARKET_EXCHANGE_RATE };
+export { WORLDS_CONFIG, WORLD_GUILD_MAP, MARKET_EXCHANGE_RATE, DEFAULT_ASCENSION_ITEMS, DEFAULT_WORLD_TRANSFERS };
+import GuildPerksProjectionTab from '../components/GuildPerksProjectionTab';
 
 
 
@@ -53,7 +57,14 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copiedBank, setCopiedBank] = useState(false);
-  const [activeTab, setActiveTab] = useState('members'); // 'members', 'request', 'status', 'admin_requests', 'admin_inactivity', 'admin_payments', 'admin_settings', 'audit'
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const t = params.get('tab');
+      if (t) return t;
+    }
+    return 'projection';
+  }); // 'projection', 'members', 'request', 'status', 'transparency', 'polls', 'audit', 'admin_requests', 'admin_inactivity', 'admin_settings', 'admin_simulator'
 
   // Formulário de Solicitação
   const [charName, setCharName] = useState('');
@@ -401,6 +412,39 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       fetchAllData();
     } catch (err) {
       alert(`Erro ao aplicar cota: ${err.message}`);
+    } finally {
+      setAdminActionLoading(false);
+    }
+  };
+
+  const handleApplyOfficialFeeFromProjection = async (newFee) => {
+    if (!isAdmin) {
+      alert('Apenas administradores podem atualizar a cota oficial no banco de dados do servidor.');
+      return false;
+    }
+    try {
+      setAdminActionLoading(true);
+      const targetWorld = selectedWorld !== 'ALL' ? selectedWorld : 'Auroria';
+      const cfg = allSettings[targetWorld.toLowerCase()] || settings;
+      
+      const { error } = await supabase
+        .from('guild_perk_settings')
+        .upsert({
+          ...cfg,
+          world: targetWorld,
+          fee_amount: Number(newFee),
+          fee_currency: 'RC',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'world' });
+
+      if (error) throw error;
+      
+      setSettings(prev => ({ ...prev, fee_amount: Number(newFee), fee_currency: 'RC' }));
+      fetchAllData();
+      return true;
+    } catch (err) {
+      alert(`Erro ao aplicar cota oficial: ${err.message}`);
+      return false;
     } finally {
       setAdminActionLoading(false);
     }
@@ -1414,6 +1458,21 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       {/* Navegação por Abas */}
       <div className="flex flex-wrap gap-2 border-b border-tibia-border/60 pb-3 mb-6">
         <button
+          onClick={() => setActiveTab('projection')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === 'projection'
+              ? 'bg-gradient-to-r from-emerald-500 to-amber-500 text-black font-black shadow-lg'
+              : 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 border border-emerald-500/50'
+          }`}
+        >
+          <Calculator size={14} />
+          <span>Projeção & Custos (RC)</span>
+          <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-black/60 text-emerald-300 border border-emerald-400/40">
+            NOVO
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('members')}
           className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
             activeTab === 'members'
@@ -1553,6 +1612,17 @@ export default function GuildPerks({ isPublic = false, isAdmin = false }) {
       </div>
 
       {/* CONTEÚDO DAS ABAS */}
+
+      {/* ABA 0: Projeção de Itens, World Transfers e Rateio em RC */}
+      {activeTab === 'projection' && (
+        <GuildPerksProjectionTab
+          selectedWorld={selectedWorld}
+          activeMembersCount={activeMembers.length}
+          bankRecipient={selectedWorld !== 'ALL' ? getWorldBank(selectedWorld) : (settings.bank_recipient || getWorldBank(world))}
+          isAdmin={isAdmin}
+          onApplyOfficialFee={handleApplyOfficialFeeFromProjection}
+        />
+      )}
 
       {/* ABA 1: Membros Ativos */}
       {activeTab === 'members' && (
