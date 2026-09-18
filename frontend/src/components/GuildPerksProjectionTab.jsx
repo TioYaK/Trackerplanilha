@@ -4,7 +4,7 @@ import {
   ArrowRight, Globe, Sparkles, TrendingUp, TrendingDown, DollarSign, 
   Package, Share2, Layers, AlertCircle, Zap, Shield, FileText, Sliders,
   Search, HelpCircle, CheckCircle2, ChevronDown, ChevronUp, ShoppingCart,
-  Truck, ArrowUpRight, Filter, Info
+  Truck, ArrowUpRight, Filter, Info, BookmarkCheck
 } from 'lucide-react';
 import { 
   WORLDS_CONFIG, 
