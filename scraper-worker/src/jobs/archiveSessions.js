@@ -79,6 +79,7 @@ export const runArchiveSessions = async () => {
     // ── 3. Limpeza de Retenção (Guardian do Banco Supabase - 500MB Limit) ────
     try {
       const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+      // Limpeza de logins anteriores a 14 dias
       const { error: purgeErr } = await supabase
         .from('login_events')
         .delete()
@@ -86,6 +87,19 @@ export const runArchiveSessions = async () => {
       if (!purgeErr) {
         console.log('[ARCHIVE] 🧹 Limpeza de login_events anteriores a 14 dias concluída.');
       }
+
+      // Limpeza de mortes anteriores a 14 dias (economia de disco e queries leves)
+      await supabase
+        .from('recent_deaths')
+        .delete()
+        .lt('death_time', fourteenDaysAgo);
+
+      // Limpeza de histórico online anterior a 14 dias
+      await supabase
+        .from('online_history')
+        .delete()
+        .lt('timestamp', fourteenDaysAgo);
+
 
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       await supabase.from('guild_strikes').delete().lt('expires_at', thirtyDaysAgo);

@@ -15,7 +15,7 @@ export default function LiveWarFeed({ onPlayerClick, onNavigate }) {
     try {
       const { data, error } = await supabase
         .from('recent_deaths')
-        .select('*')
+        .select('id, character_name, level, killed_by, death_time, world')
         .order('death_time', { ascending: false })
         .limit(8);
 
@@ -31,7 +31,10 @@ export default function LiveWarFeed({ onPlayerClick, onNavigate }) {
 
   useEffect(() => {
     fetchFrags();
-    const interval = setInterval(fetchFrags, 30 * 1000); // 30s
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchFrags();
+    }, 60 * 1000); // 60s
     return () => clearInterval(interval);
   }, []);
 

@@ -69,9 +69,9 @@ export default function BazaarMarketIndex({ onNavigate, onPlayerClick }) {
       try {
         const { data, error } = await supabase
           .from('bazaar_alerts')
-          .select('*')
+          .select('id, auction_id, character_name, world_name, level, vocation, current_bid, auction_end, skills_data, items_data, mag_level, charm_points')
           .order('level', { ascending: false })
-          .limit(150);
+          .limit(50);
 
         if (!error && data) {
           setLiveAuctions(data);

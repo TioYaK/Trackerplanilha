@@ -73,7 +73,7 @@ export const runFetchHighscores = async (vocationStr) => {
       const chunk = names.slice(i, i + chunkSize);
       const { data: states } = await supabase
         .from('current_character_state')
-        .select('*')
+        .select('character_name, xp_total, session_start_xp, session_start_time, last_active')
         .in('character_name', chunk);
         
       if (states) {

@@ -126,11 +126,11 @@ const fetchTask = async () => {
 
     const orQuery = `and(status.eq.PENDING,or(locked_at.is.null,locked_at.lte.${now})),and(status.eq.IN_PROGRESS,locked_at.lte.${crashLimit.toISOString()})`;
 
-    // 1. Busca tarefas pendentes em 1 única query rápida (reduz 50% da carga de polling no Supabase)
+    // 1. Busca tarefas pendentes em 1 única query rápida (colunas selecionadas para economia de banda)
     const priorityTypes = ['UPDATE_WORKERS', 'PROCESS_GUILD_INVITES', 'FETCH_ONLINES', 'FETCH_DEATHS'];
     const { data: tasks, error } = await supabase
       .from('task_queue')
-      .select('*')
+      .select('id, task_type, status, page_number, locked_at')
       .or(orQuery)
       .order('locked_at', { ascending: true, nullsFirst: true })
       .limit(10);
@@ -412,29 +412,27 @@ let lastUpdateCheck = Date.now();
 let emptyCycles = 0;
 let localBanUntil = null;
 
-const loop = async () => {
+const checkMinVersion = async () => {
+  if (!supabase) return;
   try {
-    // CHECAGEM DE VERSÃO (KILL-SWITCH) DEVE VIR ANTES DO BAN DE CLOUDFLARE
-    if (supabase) {
-      const { data: settings } = await supabase
-        .from('worker_config')
-        .select('min_worker_version')
-        .eq('id', 1)
-        .maybeSingle();
+    const { data: settings } = await supabase
+      .from('worker_config')
+      .select('min_worker_version')
+      .eq('id', 1)
+      .maybeSingle();
 
-      if (settings?.min_worker_version) {
-        const minVersion = settings.min_worker_version;
-        if (WORKER_VERSION !== minVersion && WORKER_VERSION < minVersion) {
-          console.error(`[KILL-SWITCH] Versão obsoleta! Sua: ${WORKER_VERSION} | Requerida: ${minVersion}`);
-          await checkForUpdates();
-          process.exit(0);
-        }
+    if (settings?.min_worker_version) {
+      const minVersion = settings.min_worker_version;
+      if (WORKER_VERSION !== minVersion && WORKER_VERSION < minVersion) {
+        console.error(`[KILL-SWITCH] Versão obsoleta! Sua: ${WORKER_VERSION} | Requerida: ${minVersion}`);
+        await checkForUpdates();
+        process.exit(0);
       }
     }
-  } catch (err) {
-    // ignorar
-  }
+  } catch (err) {}
+};
 
+const loop = async () => {
   // Se o worker foi desligado/pausado temporariamente pelo painel
   if (isWorkerPaused) {
     setTimeout(loop, 4000);
@@ -449,14 +447,18 @@ const loop = async () => {
   } else {
     emptyCycles++;
 
-    // FIX: Checa updates no máximo 1x a cada 10 minutos (não a cada 15 segundos)
+    // Checa updates e versão mínima a cada 10 minutos (não a cada ciclo)
     const now = Date.now();
     if (now - lastUpdateCheck > UPDATE_CHECK_INTERVAL) {
       lastUpdateCheck = now;
+      await checkMinVersion();
       await checkForUpdates();
     }
 
-    setTimeout(loop, POLL_INTERVAL);
+    // Backoff adaptativo inteligente para economia de banda (Supabase Egress Guard)
+    // 3s no primeiro ciclo vazio, 5s no 2º-4º, 8s quando em repouso prolongado
+    const delay = emptyCycles <= 1 ? 3000 : (emptyCycles < 5 ? 5000 : 8000);
+    setTimeout(loop, delay);
   }
 };
 

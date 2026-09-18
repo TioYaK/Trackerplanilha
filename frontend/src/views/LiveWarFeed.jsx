@@ -81,9 +81,9 @@ export default function LiveWarFeed({ onPlayerClick }) {
     try {
       const { data, error } = await supabase
         .from('recent_deaths')
-        .select('*')
+        .select('id, character_name, level, killed_by, death_time, is_hunted, is_guild_member, world, created_at')
         .order('id', { ascending: false })
-        .limit(300);
+        .limit(60);
 
       if (error) throw error;
       setDeaths(data || []);
@@ -97,11 +97,11 @@ export default function LiveWarFeed({ onPlayerClick }) {
   useEffect(() => {
     fetchDeaths();
 
-    // Backup polling a cada 45 segundos (apenas se a aba estiver visível)
+    // Backup polling a cada 90 segundos (apenas se a aba estiver visível)
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       fetchDeaths();
-    }, 45000);
+    }, 90000);
 
     // Re-sincroniza caso o usuário volte para a aba após estar em segundo plano
     const handleVisibilityChange = () => {

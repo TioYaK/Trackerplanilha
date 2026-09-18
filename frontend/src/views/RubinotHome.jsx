@@ -57,8 +57,8 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
   const [copiedLoot, setCopiedLoot] = useState(false);
 
   const fetchHomeData = async (forceRefresh = false, isBackground = false) => {
-    // 0. Cache em memória instantâneo se dados tiverem menos de 45 segundos
-    if (!forceRefresh && homeCache.data && (Date.now() - homeCache.timestamp < 45000)) {
+    // 0. Cache em memória instantâneo se dados tiverem menos de 90 segundos (Egress Guard)
+    if (!forceRefresh && homeCache.data && (Date.now() - homeCache.timestamp < 90000)) {
       setRecentDeaths(homeCache.data.recentDeaths);
       setDeathsCount24h(homeCache.data.deathsCount24h);
       setTopRushers(homeCache.data.topRushers);
@@ -70,12 +70,12 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
 
     if (!isBackground) setLoading(true);
     try {
-      // 1. Mortes recentes
+      // 1. Mortes recentes (apenas colunas necessárias)
       let deathsQuery = supabase
         .from('recent_deaths')
-        .select('*')
+        .select('id, character_name, level, killed_by, death_time, is_hunted, is_guild_member, world')
         .order('death_time', { ascending: false })
-        .limit(10);
+        .limit(8);
 
       // 2. Contagem real de baixas nas últimas 24h
       const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -84,13 +84,13 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         .select('*', { count: 'exact', head: true })
         .gte('death_time', since24h);
       
-      // 3. Top Rushers (24h) - Busca 150 para cobrir com folga todos os servidores
+      // 3. Top Rushers (24h) - Reduzido de 150 para 30 com colunas selecionadas (-80% payload)
       let rushersQuery = supabase
         .from('view_top_rushers_24h')
-        .select('*')
+        .select('name, exp_gained, world')
         .gt('exp_gained', 0)
         .order('exp_gained', { ascending: false })
-        .limit(150);
+        .limit(30);
 
       // 4. Contagem de Onlines mais recente (ordenada pelo campo real 'timestamp')
       let onlineQuery = supabase
@@ -215,10 +215,10 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
     fetchHomeData();
     const interval = setInterval(() => {
       if (!document.hidden) fetchHomeData(true, true);
-    }, 45000); // 45s
+    }, 90000); // 90s para economia de tráfego Supabase Egress
 
     const handleVisibility = () => {
-      if (!document.hidden && (!homeCache.timestamp || Date.now() - homeCache.timestamp > 45000)) {
+      if (!document.hidden && (!homeCache.timestamp || Date.now() - homeCache.timestamp > 90000)) {
         fetchHomeData(true, true);
       }
     };

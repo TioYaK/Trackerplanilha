@@ -412,7 +412,7 @@ let bazaarCache = {
 };
 
   const fetchAlerts = async (forceRefresh = false) => {
-    if (!forceRefresh && bazaarCache.data && (Date.now() - bazaarCache.timestamp < 60000)) {
+    if (!forceRefresh && bazaarCache.data && (Date.now() - bazaarCache.timestamp < 3 * 60 * 1000)) {
       setAlerts(bazaarCache.data);
       setLoading(false);
       return;
@@ -422,32 +422,25 @@ let bazaarCache = {
     try {
       const nowIso = new Date().toISOString();
 
-      // Busca abrangente: 100% dos leilões ativos (range 0..999 e 1000..1999) + 1.000 do histórico recente
-      const [active1, active2, history] = await Promise.all([
+      // Busca inteligente com economia de banda: 300 leilões ativos prioritários + 50 finalizados recentes (reduz de 3.000 para 350 rows = -88% egress)
+      const [activeData, historyData] = await Promise.all([
         supabase
           .from('bazaar_alerts')
           .select('*')
           .gt('auction_end', nowIso)
           .order('auction_end', { ascending: true })
-          .range(0, 999),
-        supabase
-          .from('bazaar_alerts')
-          .select('*')
-          .gt('auction_end', nowIso)
-          .order('auction_end', { ascending: true })
-          .range(1000, 1999),
+          .limit(300),
         supabase
           .from('bazaar_alerts')
           .select('*')
           .lte('auction_end', nowIso)
           .order('auction_end', { ascending: false })
-          .limit(1000)
+          .limit(50)
       ]);
 
       const allRows = [
-        ...(active1.data || []),
-        ...(active2.data || []),
-        ...(history.data || [])
+        ...(activeData.data || []),
+        ...(historyData.data || [])
       ];
 
       // Deduplicação por auction_id
@@ -516,7 +509,7 @@ let bazaarCache = {
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       fetchAlerts(true);
-    }, 2 * 60 * 1000);
+    }, 4 * 60 * 1000); // 4 minutos para economia de banda
     return () => clearInterval(interval);
   }, []);
 

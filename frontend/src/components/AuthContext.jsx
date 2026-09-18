@@ -118,18 +118,23 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        // 2. Detecção Remota via Supabase (para quem roda em outro computador / VPS)
+        // 2. Detecção Remota via Supabase (apenas se o usuário tiver identificação cadastrada)
+        const charName = (profile?.main_character || '').toLowerCase();
+        const pName = (profile?.name || '').toLowerCase();
+        const pEmail = (profile?.email || user?.email || '').toLowerCase();
+
+        if (!charName && !pName && !pEmail) {
+          if (isMounted) setHasActiveWorker(false);
+          return;
+        }
+
         const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
         const { data } = await supabase
           .from('worker_heartbeats')
-          .select('metadata')
+          .select('worker_id, metadata')
           .gte('last_ping', fifteenMinsAgo);
 
         if (data && isMounted) {
-          const charName = (profile?.main_character || '').toLowerCase();
-          const pName = (profile?.name || '').toLowerCase();
-          const pEmail = (profile?.email || user?.email || '').toLowerCase();
-
           const match = data.some(w => {
             const owner = (w.metadata?.owner || '').toLowerCase();
             return (
@@ -145,7 +150,10 @@ export const AuthProvider = ({ children }) => {
     };
 
     checkWorker();
-    const interval = setInterval(checkWorker, 45000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      checkWorker();
+    }, 3 * 60 * 1000); // 3 minutos para economia de banda (Supabase Egress Guard)
     return () => {
       isMounted = false;
       clearInterval(interval);

@@ -26,16 +26,16 @@ export default function ExtremeAnalytics() {
     try {
       const { data: deathsData } = await supabase
         .from('recent_deaths')
-        .select('*')
+        .select('id, character_name, level, killed_by, death_time, is_hunted, is_guild_member, world')
         .order('death_time', { ascending: false })
-        .limit(60);
+        .limit(40);
       if (deathsData) setDeaths(deathsData);
 
       const { data: transfersData } = await supabase
         .from('server_transfers')
-        .select('*')
+        .select('id, character_name, from_world, to_world, transfer_date, transfer_type, other_world')
         .order('transfer_date', { ascending: false })
-        .limit(60);
+        .limit(40);
       if (transfersData) setTransfers(transfersData);
       
       setLastUpdate(new Date());
@@ -50,7 +50,7 @@ export default function ExtremeAnalytics() {
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       fetchData(true);
-    }, 60000);
+    }, 120000); // 2 minutos para economia de banda
     return () => clearInterval(interval);
   }, []);
 
