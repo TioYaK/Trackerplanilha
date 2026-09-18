@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Calculator, Coins, Users, RefreshCw, Plus, Trash2, Copy, Check, 
+  Calculator, Coins, Users, RefreshCw, Plus, Minus, Trash2, Copy, Check, 
   ArrowRight, Globe, Sparkles, TrendingUp, TrendingDown, DollarSign, 
   Package, Share2, Layers, AlertCircle, Zap, Shield, FileText, Sliders,
   Search, HelpCircle, CheckCircle2, ChevronDown, ChevronUp, ShoppingCart,
-  Truck, ArrowUpRight, Filter, Info, BookmarkCheck
+  Truck, ArrowUpRight, Filter, Info, BookmarkCheck, Eye, UserCheck, CheckSquare
 } from 'lucide-react';
 import { 
   WORLDS_CONFIG, 
@@ -59,17 +59,37 @@ export default function GuildPerksProjectionTab({
   const [rateKk, setRateKk] = useState(2.0);
   const [activationKk, setActivationKk] = useState(0.8);
   const [safetyMargin, setSafetyMargin] = useState(10);
-  const [usePerMemberQty, setUsePerMemberQty] = useState(true); // Padrão: por jogador para máxima clareza
+  const [usePerMemberQty, setUsePerMemberQty] = useState(true);
   const [customFeeRc, setCustomFeeRc] = useState('');
   
-  // UI & Filtros
+  // UI & Modos de Visualização
+  const [activeViewMode, setActiveViewMode] = useState('leadership'); // 'leadership' | 'member_receipt'
   const [searchFilter, setSearchFilter] = useState('');
   const [serverFilter, setServerFilter] = useState('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [showMathExplainer, setShowMathExplainer] = useState(true);
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
   const [copiedShoppingList, setCopiedShoppingList] = useState(false);
+  const [copiedMemberReceipt, setCopiedMemberReceipt] = useState(false);
   const [applySuccess, setApplySuccess] = useState(false);
+
+  // Tooltip Interativo Flutuante Universal (Não corta nas bordas nem em scroll)
+  const [hoveredTip, setHoveredTip] = useState(null);
+
+  const withTip = (title, text, tip = '') => ({
+    onMouseEnter: (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setHoveredTip({
+        title,
+        text,
+        tip,
+        x: Math.min(window.innerWidth - 180, Math.max(160, rect.left + rect.width / 2)),
+        y: rect.top
+      });
+    },
+    onMouseLeave: () => setHoveredTip(null)
+  });
 
   // Modais
   const [itemModalOpen, setItemModalOpen] = useState(false);
@@ -152,9 +172,14 @@ export default function GuildPerksProjectionTab({
       
       const matchesServer = serverFilter === 'ALL' || item.serverOrigin === serverFilter;
 
-      return matchesSearch && matchesServer;
+      const matchesCategory = categoryFilter === 'ALL' || 
+        (categoryFilter === 'leech' && (item.category.toLowerCase().includes('leech') || item.name.toLowerCase().includes('vampire') || item.name.toLowerCase().includes('silencer') || item.name.toLowerCase().includes('pincers'))) ||
+        (categoryFilter === 'damage' && (item.category.toLowerCase().includes('damage') || item.category.toLowerCase().includes('crit') || item.name.toLowerCase().includes('wyrm') || item.name.toLowerCase().includes('demon'))) ||
+        (categoryFilter === 'defense' && (item.category.toLowerCase().includes('defense') || item.category.toLowerCase().includes('protect') || item.category.toLowerCase().includes('construct') || item.name.toLowerCase().includes('glooth') || item.name.toLowerCase().includes('hide')));
+
+      return matchesSearch && matchesServer && matchesCategory;
     });
-  }, [result.items, searchFilter, serverFilter]);
+  }, [result.items, searchFilter, serverFilter, categoryFilter]);
 
   // Ações de Itens
   const handleAddItem = (e) => {
@@ -363,6 +388,26 @@ export default function GuildPerksProjectionTab({
     setTimeout(() => setCopiedShoppingList(false), 3000);
   };
 
+  // Copiar Recibo Simplificado do Membro
+  const handleCopyMemberReceipt = () => {
+    const targetW = selectedWorld !== 'ALL' ? selectedWorld : 'Auroria';
+    const bank = bankRecipient || `Bank Rubin ${targetW}`;
+
+    let text = `🧾 **MEU EXTRATO GUILD PERKS - ${targetW.toUpperCase()}**\n`;
+    text += `💎 **Minha Cota:** ${result.recommendedFeeRc} RC (ou ${result.recommendedFeeKk.toLocaleString('pt-BR')} KK Gold)\n\n`;
+    text += `🔍 **Para onde vai o meu pagamento:**\n`;
+    text += `• Creature Products: ${result.breakdownPerMember.itemsCostRc} RC\n`;
+    text += `• Frete World Transfers: ${result.breakdownPerMember.wtCostRc} RC\n`;
+    text += `• Ativação NPC: ${result.breakdownPerMember.activationCostRc} RC\n`;
+    text += `• Reserva Guilda (+${result.safetyMarginPct}%): +${result.breakdownPerMember.marginRc} RC\n\n`;
+    text += `🏦 **Destinatário RubinBank:** \`${bank}\`\n`;
+    text += `📦 **Se preferir entregar em itens:** Depositar os creature products no depot da guilda + taxa de frete de ${result.hybridContribution.logisticsFeeRc} RC.`;
+
+    navigator.clipboard.writeText(text);
+    setCopiedMemberReceipt(true);
+    setTimeout(() => setCopiedMemberReceipt(false), 3000);
+  };
+
   // Ação de Aplicar no Servidor
   const handleApplyFee = async () => {
     if (onApplyOfficialFee) {
@@ -376,7 +421,7 @@ export default function GuildPerksProjectionTab({
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* 1. TOP HEADER & BARRA DE PRESETS */}
+      {/* 1. TOP HEADER COM SELETOR DE VISÃO (MEMBRO vs LIDERANÇA) */}
       <div className="bg-black/50 border border-tibia-border/60 rounded-xl p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-tibia-border/40 pb-5">
           <div>
@@ -385,12 +430,15 @@ export default function GuildPerksProjectionTab({
                 <Calculator className="text-emerald-400" size={24} />
                 Projeção & Gestão de Cota: Guild Perks
               </h3>
-              <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                RubinOT Oficial
+              <span 
+                {...withTip('Padrão RubinOT', 'Sistema oficial de cálculo proporcional à quantidade de membros ativos, itens de ascensão e transferências de mundo.', 'Taxa oficial de WT: 1.490 RC')}
+                className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-help"
+              >
+                RubinOT Oficial ℹ️
               </span>
             </div>
             <p className="text-xs text-gray-300 mt-1 max-w-3xl">
-              Sistema completo para definir a <strong>quantidade exata por jogador</strong>, controlar os <strong>valores dos itens em Gold e RC</strong>, planejar o <strong>frete de World Transfers</strong> e ratear de forma 100% transparente para toda a guilda.
+              Passe o mouse sobre qualquer elemento para entender a conta. Alterne entre a <strong>Visão do Membro</strong> (extrato pessoal simplificado) e o <strong>Painel da Liderança</strong> (edição de custos e logística).
             </p>
           </div>
 
@@ -399,8 +447,8 @@ export default function GuildPerksProjectionTab({
             <button
               type="button"
               onClick={handleCopyDiscord}
+              {...withTip('Copiar para Discord', 'Copia um extrato completo com emojis e divisão de custos para colar no canal de avisos da guilda.')}
               className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white shadow-md cursor-pointer"
-              title="Copiar comunicado completo formatado para colar no Discord"
             >
               {copiedSummary ? <Check size={14} className="text-green-300" /> : <Copy size={14} />}
               <span>{copiedSummary ? 'Discord Copiado!' : 'Copiar Discord'}</span>
@@ -409,8 +457,8 @@ export default function GuildPerksProjectionTab({
             <button
               type="button"
               onClick={handleCopyWhatsApp}
+              {...withTip('Copiar para WhatsApp', 'Copia um resumo compacto formatado com negrito e marcadores para grupos de WhatsApp.')}
               className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 text-white shadow-md cursor-pointer"
-              title="Copiar resumo direto para WhatsApp"
             >
               {copiedWhatsApp ? <Check size={14} className="text-green-300" /> : <Share2 size={14} />}
               <span>{copiedWhatsApp ? 'WhatsApp Copiado!' : 'WhatsApp'}</span>
@@ -419,8 +467,8 @@ export default function GuildPerksProjectionTab({
             <button
               type="button"
               onClick={handleCopyShoppingList}
+              {...withTip('Lista de Compras', 'Gera a lista de compras discriminada por servidor para entregar às mulas que irão viajar no World Transfer.')}
               className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500 text-white shadow-md cursor-pointer"
-              title="Copiar lista de compras separada por servidor para as mulas"
             >
               {copiedShoppingList ? <Check size={14} className="text-green-300" /> : <ShoppingCart size={14} />}
               <span>{copiedShoppingList ? 'Lista Copiada!' : 'Lista de Compras'}</span>
@@ -430,8 +478,8 @@ export default function GuildPerksProjectionTab({
               <button
                 type="button"
                 onClick={handleApplyFee}
+                {...withTip('Definir como Oficial', 'Salva este valor calculado no banco de dados do Supabase como a cota oficial exigida de todos os membros do servidor.', 'Apenas Administradores')}
                 className="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-black shadow-md cursor-pointer"
-                title="Salvar cota no Supabase do servidor como a cota oficial exigida dos membros"
               >
                 {applySuccess ? <Check size={14} /> : <Zap size={14} />}
                 <span>{applySuccess ? 'Cota Salva!' : `Aplicar ${result.recommendedFeeRc} RC`}</span>
@@ -440,39 +488,59 @@ export default function GuildPerksProjectionTab({
           </div>
         </div>
 
-        {/* Barra de Presets Rápidos */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-b border-tibia-border/30 pb-4 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400 font-bold uppercase text-[10px] flex items-center gap-1">
-              <Layers size={12} className="text-amber-400" />
-              Cenários Pré-Configurados:
-            </span>
-            {PROJECTION_PRESETS.map(pr => (
-              <button
-                key={pr.id}
-                type="button"
-                onClick={() => handleApplyPreset(pr.id)}
-                className="px-2.5 py-1 rounded bg-black/60 hover:bg-white/10 text-gray-300 hover:text-white border border-tibia-border/50 transition-colors font-medium cursor-pointer"
-                title={pr.description}
-              >
-                {pr.name}
-              </button>
-            ))}
+        {/* Alternador de Modo de Visualização: Membro vs Liderança */}
+        <div className="mt-4 pt-3 border-t border-tibia-border/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 bg-black/70 p-1 rounded-xl border border-tibia-border/60">
+            <button
+              type="button"
+              onClick={() => setActiveViewMode('leadership')}
+              {...withTip('Painel de Gestão Completo', 'Visualização avançada com tabela de edição de preços, rotas de World Transfer e simulação de cota.')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeViewMode === 'leadership'
+                  ? 'bg-amber-500 text-black shadow-md'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Sliders size={14} />
+              <span>Painel de Gestão (Liderança)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveViewMode('member_receipt')}
+              {...withTip('Recibo Pessoal do Membro', 'Visualização simplificada e transparente feita especificamente para o jogador ver sua cota e para onde vai o dinheiro.')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeViewMode === 'member_receipt'
+                  ? 'bg-emerald-500 text-black shadow-md'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Eye size={14} />
+              <span>Extrato Simples (Visão do Membro)</span>
+              <span className="px-1 py-0.2 rounded text-[9px] bg-black/40 text-emerald-300 font-bold border border-emerald-400/30">
+                Fácil
+              </span>
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleResetItems}
-            className="text-[11px] text-gray-400 hover:text-amber-400 underline cursor-pointer"
-          >
-            Restaurar Valores Padrão do Sistema
-          </button>
+          {/* Dica de usabilidade */}
+          <div className="flex items-center gap-1.5 text-xs text-amber-300/80 bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20">
+            <Info size={14} className="shrink-0 text-amber-400" />
+            <span>Passe o cursor sobre qualquer campo ou cabeçalho para ver a explicação em detalhes.</span>
+          </div>
         </div>
 
-        {/* 4 GRANDES KPI CARDS DE IMPACTO VISUAL */}
+        {/* 4 GRANDES KPI CARDS DE IMPACTO VISUAL COM TOOLTIPS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
           {/* Card 1: Cota Recomendada por Jogador */}
-          <div className="bg-gradient-to-br from-emerald-950/70 via-black/80 to-black/80 border-2 border-emerald-500/70 p-4 rounded-xl shadow-lg relative overflow-hidden">
+          <div 
+            {...withTip(
+              'Cota Recomendada por Membro', 
+              `Valor final sugerido para ratear 100% das despesas da season entre os ${result.members} jogadores pagantes, já incluindo +${result.safetyMarginPct}% de reserva para cobrir inadimplências ou alta no mercado.`,
+              `Break-even puro: ${result.breakEvenFeeRc} RC (sem reserva)`
+            )}
+            className="bg-gradient-to-br from-emerald-950/70 via-black/80 to-black/80 border-2 border-emerald-500/70 p-4 rounded-xl shadow-lg relative overflow-hidden cursor-help hover:border-emerald-400 transition-colors"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Coins size={14} className="text-amber-400" />
@@ -492,12 +560,19 @@ export default function GuildPerksProjectionTab({
               ≈ {result.recommendedFeeKk.toLocaleString('pt-BR')} KK Gold ({(result.recommendedFeeKk * 1000).toLocaleString('pt-BR')}k)
             </div>
             <p className="text-[10px] text-gray-400 mt-1">
-              Custo real mínimo: <strong className="text-gray-200 font-mono">{result.breakEvenFeeRc} RC</strong> (break-even zero lucro)
+              Custo real mínimo: <strong className="text-gray-200 font-mono">{result.breakEvenFeeRc} RC</strong> (break-even)
             </p>
           </div>
 
           {/* Card 2: Creature Products (Itens) */}
-          <div className="bg-black/60 border border-tibia-border/60 p-4 rounded-xl shadow-lg">
+          <div 
+            {...withTip(
+              'Creature Products da Guild Ascension',
+              `Soma de todos os itens de caça necessários para ativar as etapas de buffs da guilda.`,
+              `Custo por membro: ${result.breakdownPerMember.itemsCostRc} RC (${result.shares.itemsSharePct}% do orçamento)`
+            )}
+            className="bg-black/60 border border-tibia-border/60 p-4 rounded-xl shadow-lg cursor-help hover:border-blue-400 transition-colors"
+          >
             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <Package size={14} className="text-blue-400" />
               Itens da Ascension ({items.length} tipos)
@@ -518,7 +593,14 @@ export default function GuildPerksProjectionTab({
           </div>
 
           {/* Card 3: Logística de World Transfers */}
-          <div className="bg-black/60 border border-tibia-border/60 p-4 rounded-xl shadow-lg">
+          <div 
+            {...withTip(
+              'Logística de World Transfers',
+              `Custo para transferir personagens mulas de servidores secundários (1.490 RC cada) carregando suprimentos mais baratos.`,
+              `Total: ${result.totalWtCostRc} RC (${result.totalWtTransfersCount} transfers planejados)`
+            )}
+            className="bg-black/60 border border-tibia-border/60 p-4 rounded-xl shadow-lg cursor-help hover:border-purple-400 transition-colors"
+          >
             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <Globe size={14} className="text-purple-400" />
               World Transfers ({result.totalWtTransfersCount} Chars)
@@ -538,7 +620,14 @@ export default function GuildPerksProjectionTab({
           </div>
 
           {/* Card 4: Fundo de Reserva & Caixa */}
-          <div className="bg-black/60 border border-tibia-border/60 p-4 rounded-xl shadow-lg">
+          <div 
+            {...withTip(
+              'Balanço Global do Ciclo',
+              `Total de recursos que a guilda arrecada cobrando a cota recomendada de todos os membros, menos todas as despesas de compra e frete.`,
+              `Sobra líquida para o RubinBank: +${result.surplusRc} RC`
+            )}
+            className="bg-black/60 border border-tibia-border/60 p-4 rounded-xl shadow-lg cursor-help hover:border-amber-400 transition-colors"
+          >
             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <Shield size={14} className="text-amber-400" />
               Custo Total & Caixa Guilda
@@ -562,33 +651,183 @@ export default function GuildPerksProjectionTab({
         {/* Barra de Distribuição Visual do Orçamento */}
         <div className="mt-5 bg-black/60 border border-tibia-border/40 rounded-lg p-3 space-y-2">
           <div className="flex flex-wrap items-center justify-between text-xs font-bold gap-2">
-            <span className="text-blue-400 flex items-center gap-1.5">
+            <span 
+              {...withTip('Creature Products', `Representa ${result.shares.itemsSharePct}% de todo o dinheiro gasto para os perks.`)}
+              className="text-blue-400 flex items-center gap-1.5 cursor-help"
+            >
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
               Creature Products: {result.shares.itemsSharePct}% ({result.totalItemsCostRc.toLocaleString('pt-BR')} RC)
             </span>
-            <span className="text-purple-400 flex items-center gap-1.5">
+            <span 
+              {...withTip('World Transfers', `Representa ${result.shares.wtSharePct}% do dinheiro gasto para trazer itens via frete de 1.490 RC.`)}
+              className="text-purple-400 flex items-center gap-1.5 cursor-help"
+            >
               <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
               World Transfers (1.490 RC/char): {result.shares.wtSharePct}% ({result.totalWtCostRc.toLocaleString('pt-BR')} RC)
             </span>
-            <span className="text-yellow-400 flex items-center gap-1.5">
+            <span 
+              {...withTip('Ativação no NPC', `Representa ${result.shares.activationSharePct}% do dinheiro para pagar o gold exigido no NPC.`)}
+              className="text-yellow-400 flex items-center gap-1.5 cursor-help"
+            >
               <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" />
               Taxa de Ativação: {result.shares.activationSharePct}% ({result.activationCostRc.toLocaleString('pt-BR')} RC)
             </span>
-            <span className="text-emerald-400 flex items-center gap-1.5">
+            <span 
+              {...withTip('Fundo de Reserva', `Representa ${result.surplusMarginPct}% guardado no banco para proteger a guilda.`)}
+              className="text-emerald-400 flex items-center gap-1.5 cursor-help"
+            >
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
               Fundo de Reserva: {result.surplusMarginPct}% (+{result.surplusRc.toLocaleString('pt-BR')} RC)
             </span>
           </div>
           <div className="w-full h-3 bg-black/80 rounded-full overflow-hidden border border-tibia-border/60 flex">
-            <div style={{ width: `${result.shares.itemsSharePct}%` }} className="bg-blue-500 transition-all duration-500" title="Itens" />
-            <div style={{ width: `${result.shares.wtSharePct}%` }} className="bg-purple-500 transition-all duration-500" title="World Transfers" />
-            <div style={{ width: `${result.shares.activationSharePct}%` }} className="bg-yellow-500 transition-all duration-500" title="Ativação" />
-            <div style={{ width: `${result.surplusMarginPct}%` }} className="bg-emerald-500 transition-all duration-500" title="Reserva" />
+            <div style={{ width: `${result.shares.itemsSharePct}%` }} className="bg-blue-500 transition-all duration-500" />
+            <div style={{ width: `${result.shares.wtSharePct}%` }} className="bg-purple-500 transition-all duration-500" />
+            <div style={{ width: `${result.shares.activationSharePct}%` }} className="bg-yellow-500 transition-all duration-500" />
+            <div style={{ width: `${result.surplusMarginPct}%` }} className="bg-emerald-500 transition-all duration-500" />
           </div>
         </div>
       </div>
 
-      {/* 2. DEMONSTRAÇÃO DIDÁTICA: COMO A MATEMÁTICA DA COTA É CALCULADA (CLAREZA TOTAL) */}
+      {/* 2. MODO 1: EXTRATO DO MEMBRO (VISÃO SIMPLIFICADA PARA O JOGADOR) */}
+      {activeViewMode === 'member_receipt' && (
+        <div className="bg-zinc-950 border border-emerald-500/50 rounded-xl p-6 shadow-2xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-tibia-border/60 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xl font-medieval text-emerald-400 flex items-center gap-2">
+                  <Eye className="text-emerald-400" size={22} />
+                  Extrato do Jogador: O Que Você Está Pagando?
+                </h4>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  Transparência 100%
+                </span>
+              </div>
+              <p className="text-xs text-gray-300 mt-1">
+                Aqui você confere o valor exato da sua contribuição e para onde vai cada moeda da sua cota.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyMemberReceipt}
+              className="px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 transition-all cursor-pointer shadow"
+            >
+              {copiedMemberReceipt ? <Check size={14} /> : <Copy size={14} />}
+              <span>{copiedMemberReceipt ? 'Comprovante Copiado!' : 'Copiar Meu Comprovante'}</span>
+            </button>
+          </div>
+
+          {/* Destaque da Cota */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-black/70 border-2 border-emerald-500/60 rounded-xl p-5 text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Sua Cota por Ciclo</span>
+              <div className="text-4xl font-black font-mono text-white mt-2">
+                {result.recommendedFeeRc} <span className="text-lg font-bold text-emerald-400">RC</span>
+              </div>
+              <div className="text-xs text-amber-300 font-mono mt-1">
+                ou {result.recommendedFeeKk.toLocaleString('pt-BR')} KK Gold
+              </div>
+              <p className="text-[11px] text-gray-400 mt-3 pt-3 border-t border-white/10">
+                Garante o cargo de Membro Ativo e todos os buffs da guilda.
+              </p>
+            </div>
+
+            <div className="bg-black/70 border border-tibia-border/60 rounded-xl p-5 space-y-2.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
+                <CheckSquare size={14} className="text-blue-400" />
+                Como Pagar em Coins (Opção A)
+              </span>
+              <p className="text-xs text-gray-300 leading-relaxed">
+                Envie o valor exato de <strong>{result.recommendedFeeRc} RC</strong> via RubinBank para:
+              </p>
+              <div className="bg-black/90 p-2.5 rounded-lg border border-amber-500/40 text-center font-mono font-bold text-amber-400 text-sm">
+                {bankRecipient || `Bank Rubin ${selectedWorld}`}
+              </div>
+              <span className="text-[10px] text-gray-400 block text-center">
+                A liderança cuidará de comprar todos os creature products e pagar o frete.
+              </span>
+            </div>
+
+            <div className="bg-black/70 border border-tibia-border/60 rounded-xl p-5 space-y-2.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
+                <Package size={14} className="text-purple-400" />
+                Entregar Itens em Hunt (Opção B)
+              </span>
+              <p className="text-xs text-gray-300 leading-relaxed">
+                Prefere caçar os monstros e economizar coins? Deposite seus itens no guild depot e pague apenas o frete:
+              </p>
+              <div className="bg-black/90 p-2 rounded-lg border border-purple-500/40 text-xs flex justify-between items-center font-mono">
+                <span className="text-gray-300">Frete WT residual:</span>
+                <strong className="text-purple-400">{result.hybridContribution.logisticsFeeRc} RC</strong>
+              </div>
+              <span className="text-[10px] text-gray-400 block text-center">
+                (Veja a lista exata dos seus itens na tabela abaixo)
+              </span>
+            </div>
+          </div>
+
+          {/* Recibo Discriminado */}
+          <div className="bg-black/60 border border-tibia-border/60 rounded-xl p-4">
+            <h5 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <FileText size={14} className="text-amber-400" />
+              Detalhamento Centavo por Centavo da sua Cota de {result.recommendedFeeRc} RC
+            </h5>
+            <div className="divide-y divide-white/5 text-xs">
+              <div className="py-2.5 flex items-center justify-between">
+                <div>
+                  <strong className="text-white">1. Creature Products da Ascension:</strong>
+                  <p className="text-[11px] text-gray-400">Sua parte na compra dos {result.items.length} tipos de itens de monstros.</p>
+                </div>
+                <div className="text-right font-mono font-bold text-blue-400">
+                  {result.breakdownPerMember.itemsCostRc} RC
+                  <span className="text-[10px] text-gray-500 block">({((result.breakdownPerMember.itemsCostRc * result.rateKkPerRc) * 1000).toFixed(0)}k gp)</span>
+                </div>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between">
+                <div>
+                  <strong className="text-white">2. Frete de World Transfers:</strong>
+                  <p className="text-[11px] text-gray-400">Sua parte no transporte de mulas entre servidores a 1.490 RC cada.</p>
+                </div>
+                <div className="text-right font-mono font-bold text-purple-400">
+                  {result.breakdownPerMember.wtCostRc} RC
+                  <span className="text-[10px] text-gray-500 block">({((result.breakdownPerMember.wtCostRc * result.rateKkPerRc) * 1000).toFixed(0)}k gp)</span>
+                </div>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between">
+                <div>
+                  <strong className="text-white">3. Ativação no NPC do Jogo:</strong>
+                  <p className="text-[11px] text-gray-400">Taxa em Gold cobrada diretamente pelo NPC para habilitar as perks.</p>
+                </div>
+                <div className="text-right font-mono font-bold text-yellow-400">
+                  {result.breakdownPerMember.activationCostRc} RC
+                  <span className="text-[10px] text-gray-500 block">({((result.breakdownPerMember.activationCostRc * result.rateKkPerRc) * 1000).toFixed(0)}k gp)</span>
+                </div>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between">
+                <div>
+                  <strong className="text-white">4. Fundo de Reserva & Segurança (+{result.safetyMarginPct}%):</strong>
+                  <p className="text-[11px] text-gray-400">Fundo retido no caixa para cobrir inadimplências e flutuação cambial.</p>
+                </div>
+                <div className="text-right font-mono font-bold text-emerald-400">
+                  +{result.breakdownPerMember.marginRc} RC
+                  <span className="text-[10px] text-gray-500 block">Reserva de Emergência</span>
+                </div>
+              </div>
+
+              <div className="py-3 flex items-center justify-between text-sm font-black border-t-2 border-emerald-500/50 bg-emerald-950/20 px-3 rounded-lg mt-2">
+                <span className="text-emerald-300 uppercase">Total Final por Jogador:</span>
+                <span className="font-mono text-emerald-400 text-lg">{result.recommendedFeeRc} RC</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. DEMONSTRAÇÃO DIDÁTICA DA MATEMÁTICA (EXPANSÍVEL) */}
       <div className="bg-gradient-to-b from-black/80 to-zinc-950/80 border border-tibia-border/70 rounded-xl p-5 shadow-lg space-y-4">
         <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowMathExplainer(!showMathExplainer)}>
           <div className="flex items-center gap-2.5">
@@ -609,13 +848,16 @@ export default function GuildPerksProjectionTab({
 
         {showMathExplainer && (
           <div className="space-y-4 pt-3 border-t border-tibia-border/40 text-xs">
-            {/* 5 Passos Visuais */}
+            {/* 5 Passos Visuais com Tooltips */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               {/* Passo 1 */}
-              <div className="bg-black/60 border border-blue-500/30 rounded-lg p-3">
+              <div 
+                {...withTip('Passo 1: Custo dos Itens', 'Soma do valor de mercado de todos os creature products necessários para os buffs.')}
+                className="bg-black/60 border border-blue-500/30 rounded-lg p-3 cursor-help hover:border-blue-400 transition-colors"
+              >
                 <span className="text-[10px] font-black uppercase text-blue-400 block mb-1">Passo 1: Itens</span>
                 <p className="text-gray-300 text-[11px] leading-relaxed">
-                  Soma de todos os creature products necessários:
+                  Soma de todos os creature products:
                 </p>
                 <div className="mt-2 font-mono font-bold text-blue-300">
                   {result.totalItemsCostKk.toLocaleString('pt-BR')} KK Gold
@@ -626,10 +868,13 @@ export default function GuildPerksProjectionTab({
               </div>
 
               {/* Passo 2 */}
-              <div className="bg-black/60 border border-purple-500/30 rounded-lg p-3">
+              <div 
+                {...withTip('Passo 2: Frete World Transfer', 'Custo total em coins para transferir os personagens de outros mundos com os itens comprados.')}
+                className="bg-black/60 border border-purple-500/30 rounded-lg p-3 cursor-help hover:border-purple-400 transition-colors"
+              >
                 <span className="text-[10px] font-black uppercase text-purple-400 block mb-1">Passo 2: Frete WT</span>
                 <p className="text-gray-300 text-[11px] leading-relaxed">
-                  {result.totalWtTransfersCount} viagens de World Transfer a 1.490 RC:
+                  {result.totalWtTransfersCount} viagens a 1.490 RC:
                 </p>
                 <div className="mt-2 font-mono font-bold text-purple-300">
                   {result.totalWtCostRc.toLocaleString('pt-BR')} RC
@@ -640,10 +885,13 @@ export default function GuildPerksProjectionTab({
               </div>
 
               {/* Passo 3 */}
-              <div className="bg-black/60 border border-yellow-500/30 rounded-lg p-3">
+              <div 
+                {...withTip('Passo 3: Taxa de Ativação', 'Ouro que o jogo cobra para subir cada etapa da Ascension.')}
+                className="bg-black/60 border border-yellow-500/30 rounded-lg p-3 cursor-help hover:border-yellow-400 transition-colors"
+              >
                 <span className="text-[10px] font-black uppercase text-yellow-400 block mb-1">Passo 3: Ativação</span>
                 <p className="text-gray-300 text-[11px] leading-relaxed">
-                  Taxa em Gold cobrada pelo NPC para a guilda:
+                  Taxa em Gold no NPC:
                 </p>
                 <div className="mt-2 font-mono font-bold text-yellow-300">
                   {result.activationCostRc.toLocaleString('pt-BR')} RC
@@ -654,10 +902,13 @@ export default function GuildPerksProjectionTab({
               </div>
 
               {/* Passo 4 */}
-              <div className="bg-black/60 border border-amber-500/30 rounded-lg p-3">
+              <div 
+                {...withTip('Passo 4: Rateio Líquido', 'Custo total combinado dividido pela quantidade de membros elegíveis.')}
+                className="bg-black/60 border border-amber-500/30 rounded-lg p-3 cursor-help hover:border-amber-400 transition-colors"
+              >
                 <span className="text-[10px] font-black uppercase text-amber-400 block mb-1">Passo 4: Rateio</span>
                 <p className="text-gray-300 text-[11px] leading-relaxed">
-                  Custo total dividido por {result.members} membros:
+                  Dividido por {result.members} membros:
                 </p>
                 <div className="mt-2 font-mono font-bold text-amber-300">
                   {result.breakdownPerMember.breakEvenExactRc} RC / player
@@ -668,10 +919,13 @@ export default function GuildPerksProjectionTab({
               </div>
 
               {/* Passo 5 */}
-              <div className="bg-black/60 border border-emerald-500/30 rounded-lg p-3">
+              <div 
+                {...withTip('Passo 5: Cota Final Recomendada', 'Adiciona a margem de segurança para garantir que a guilda não tome prejuízo.')}
+                className="bg-black/60 border border-emerald-500/30 rounded-lg p-3 cursor-help hover:border-emerald-400 transition-colors"
+              >
                 <span className="text-[10px] font-black uppercase text-emerald-400 block mb-1">Passo 5: Cota Final</span>
                 <p className="text-gray-300 text-[11px] leading-relaxed">
-                  Adiciona +{result.safetyMarginPct}% de reserva para imprevistos:
+                  +{result.safetyMarginPct}% de reserva:
                 </p>
                 <div className="mt-2 font-mono font-black text-emerald-300 text-sm">
                   {result.recommendedFeeRc} RC / player
@@ -681,45 +935,11 @@ export default function GuildPerksProjectionTab({
                 </div>
               </div>
             </div>
-
-            {/* Tabela de Decomposição de 1 Cota Individual */}
-            <div className="bg-black/60 border border-tibia-border/50 rounded-lg p-3.5 mt-2">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-gray-200">
-                  O que cada membro está pagando exatamente dentro dos seus {result.recommendedFeeRc} RC:
-                </span>
-                <span className="text-[11px] text-gray-400 font-mono">
-                  Base: {result.members} jogadores pagantes
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                <div className="bg-black/70 p-2 rounded border border-blue-500/20">
-                  <span className="text-gray-400 text-[10px] block">Creature Products:</span>
-                  <span className="text-sm font-mono font-black text-blue-400">{result.breakdownPerMember.itemsCostRc} RC</span>
-                  <span className="text-[10px] text-gray-400 block">≈ {((result.breakdownPerMember.itemsCostRc * result.rateKkPerRc) * 1000).toFixed(0)}k gp</span>
-                </div>
-                <div className="bg-black/70 p-2 rounded border border-purple-500/20">
-                  <span className="text-gray-400 text-[10px] block">Frete World Transfers:</span>
-                  <span className="text-sm font-mono font-black text-purple-400">{result.breakdownPerMember.wtCostRc} RC</span>
-                  <span className="text-[10px] text-gray-400 block">≈ {((result.breakdownPerMember.wtCostRc * result.rateKkPerRc) * 1000).toFixed(0)}k gp</span>
-                </div>
-                <div className="bg-black/70 p-2 rounded border border-yellow-500/20">
-                  <span className="text-gray-400 text-[10px] block">Taxa de Ativação NPC:</span>
-                  <span className="text-sm font-mono font-black text-yellow-400">{result.breakdownPerMember.activationCostRc} RC</span>
-                  <span className="text-[10px] text-gray-400 block">≈ {((result.breakdownPerMember.activationCostRc * result.rateKkPerRc) * 1000).toFixed(0)}k gp</span>
-                </div>
-                <div className="bg-black/70 p-2 rounded border border-emerald-500/20">
-                  <span className="text-gray-400 text-[10px] block">Fundo de Reserva ({result.safetyMarginPct}%):</span>
-                  <span className="text-sm font-mono font-black text-emerald-400">+{result.breakdownPerMember.marginRc} RC</span>
-                  <span className="text-[10px] text-emerald-400 block">Segurança de Mercado</span>
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>
 
-      {/* 3. PAINEL DE CONTROLE DINÂMICO DOS PARÂMETROS */}
+      {/* 4. PAINEL DE CONTROLE DINÂMICO DOS PARÂMETROS COM STEPPERS E PRESETS */}
       <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-5 shadow-inner space-y-4">
         <div className="flex items-center justify-between border-b border-tibia-border/40 pb-3">
           <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
@@ -727,7 +947,7 @@ export default function GuildPerksProjectionTab({
             Parâmetros Globais da Simulação
           </h4>
           <span className="text-xs text-gray-400">
-            Altere os sliders e veja o recálculo instantâneo
+            Ajuste os valores e veja o recálculo em tempo real
           </span>
         </div>
 
@@ -735,9 +955,12 @@ export default function GuildPerksProjectionTab({
           {/* Parâmetro 1: Membros Contribuintes */}
           <div className="bg-black/50 border border-tibia-border/50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-bold text-gray-300 uppercase flex items-center gap-1">
+              <label 
+                {...withTip('Membros Pagantes', 'Quantidade de membros elegíveis que pagarão a cota para ter o cargo e os benefícios das perks.', 'Quanto mais membros, menor o valor da cota individual')}
+                className="text-xs font-bold text-gray-300 uppercase flex items-center gap-1 cursor-help"
+              >
                 <Users size={13} className="text-blue-400" />
-                Membros Pagantes
+                Membros Pagantes ℹ️
               </label>
               <span className="text-xs font-mono font-black text-blue-400">{members} jogadores</span>
             </div>
@@ -750,33 +973,70 @@ export default function GuildPerksProjectionTab({
               onChange={(e) => setMembers(Number(e.target.value))}
               className="w-full accent-blue-500 h-1.5 bg-black/80 rounded-lg cursor-pointer"
             />
+            {/* Stepper e Roster */}
             <div className="flex items-center gap-1.5 mt-2">
+              <button
+                type="button"
+                onClick={() => setMembers(Math.max(1, members - 10))}
+                className="w-7 h-6 rounded bg-black/80 hover:bg-white/10 text-gray-300 border border-tibia-border/60 flex items-center justify-center text-xs font-bold cursor-pointer"
+                title="Menos 10 membros"
+              >
+                -10
+              </button>
               <input
                 type="number"
                 min="1"
                 max="5000"
                 value={members}
                 onChange={(e) => setMembers(Math.max(1, Number(e.target.value)))}
-                className="w-full bg-black/80 border border-tibia-border/60 rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-400 focus:outline-none"
+                className="w-full bg-black/80 border border-tibia-border/60 rounded px-2 py-0.5 text-xs text-white font-mono text-center focus:border-blue-400 focus:outline-none"
               />
+              <button
+                type="button"
+                onClick={() => setMembers(members + 10)}
+                className="w-7 h-6 rounded bg-black/80 hover:bg-white/10 text-gray-300 border border-tibia-border/60 flex items-center justify-center text-xs font-bold cursor-pointer"
+                title="Mais 10 membros"
+              >
+                +10
+              </button>
               {activeMembersCount > 0 && (
                 <button
                   type="button"
                   onClick={() => setMembers(activeMembersCount)}
+                  {...withTip('Puxar do Roster', `Sincroniza imediatamente com os ${activeMembersCount} membros ativos cadastrados no sistema deste mundo.`)}
                   className="px-2 py-1 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 whitespace-nowrap cursor-pointer"
-                  title="Usar contagem real de membros ativos cadastrados"
                 >
                   Roster ({activeMembersCount})
                 </button>
               )}
             </div>
+            {/* Quick Pills */}
+            <div className="flex items-center gap-1 mt-2">
+              {[50, 100, 250, 500, 1000].map(cnt => (
+                <button
+                  key={cnt}
+                  type="button"
+                  onClick={() => setMembers(cnt)}
+                  className={`flex-1 py-0.5 text-[9px] font-bold rounded border cursor-pointer ${
+                    members === cnt 
+                      ? 'bg-blue-600 text-white border-blue-400' 
+                      : 'bg-black/60 text-gray-400 border-tibia-border/40 hover:text-white'
+                  }`}
+                >
+                  {cnt}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Parâmetro 2: Cotação de Mercado */}
           <div className="bg-black/50 border border-tibia-border/50 rounded-lg p-3">
-            <label className="block text-xs font-bold text-gray-300 uppercase mb-1 flex items-center gap-1">
+            <label 
+              {...withTip('Cotação RubinOT (Market)', 'Relação de troca entre Rubin Coins e Gold no mercado do jogo.', 'Padrão Oficial: 25 RC = 2.0 KK Gold (0.08 KK / 80k gold por 1 RC)')}
+              className="block text-xs font-bold text-gray-300 uppercase mb-1 flex items-center gap-1 cursor-help"
+            >
               <RefreshCw size={13} className="text-yellow-400" />
-              Cotação RubinOT (Market)
+              Cotação RubinOT ℹ️
             </label>
             <div className="flex items-center gap-1.5 mt-1">
               <div className="flex-1">
@@ -810,9 +1070,12 @@ export default function GuildPerksProjectionTab({
           {/* Parâmetro 3: Margem de Reserva / Segurança */}
           <div className="bg-black/50 border border-tibia-border/50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-bold text-gray-300 uppercase flex items-center gap-1">
+              <label 
+                {...withTip('Margem de Segurança', 'Percentual de sobra retido no banco para garantir que imprevistos e altas de preços não causem déficit na guilda.', 'Recomendado: 10% a 15%')}
+                className="text-xs font-bold text-gray-300 uppercase flex items-center gap-1 cursor-help"
+              >
                 <Shield size={13} className="text-emerald-400" />
-                Margem de Segurança
+                Margem de Segurança ℹ️
               </label>
               <span className="text-xs font-mono font-black text-emerald-400">+{safetyMargin}%</span>
             </div>
@@ -833,7 +1096,7 @@ export default function GuildPerksProjectionTab({
                   onClick={() => setSafetyMargin(m)}
                   className={`flex-1 py-0.5 text-[10px] font-bold rounded border cursor-pointer ${
                     safetyMargin === m 
-                      ? 'bg-emerald-500 text-black border-emerald-400' 
+                      ? 'bg-emerald-500 text-black border-emerald-400 font-black' 
                       : 'bg-black/60 text-gray-400 border-tibia-border/40 hover:text-white'
                   }`}
                 >
@@ -845,9 +1108,12 @@ export default function GuildPerksProjectionTab({
 
           {/* Parâmetro 4: Taxa de Ativação no NPC */}
           <div className="bg-black/50 border border-tibia-border/50 rounded-lg p-3">
-            <label className="block text-xs font-bold text-gray-300 uppercase mb-1 flex items-center gap-1">
+            <label 
+              {...withTip('Taxa de Ativação no NPC', 'Gold exigido pelo sistema de Guild Ascension do servidor para desbloquear as perks.', 'Multiplicado pelo número de membros')}
+              className="block text-xs font-bold text-gray-300 uppercase mb-1 flex items-center gap-1 cursor-help"
+            >
               <DollarSign size={13} className="text-yellow-400" />
-              Ativação NPC (Gold)
+              Ativação NPC (Gold) ℹ️
             </label>
             <div className="flex items-center gap-2 mt-1">
               <input
@@ -869,8 +1135,11 @@ export default function GuildPerksProjectionTab({
         {/* Linha de Configurações Extras */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-tibia-border/30 text-xs">
           <div className="flex items-center gap-4">
-            <span className="text-gray-400 font-bold">Modo de Quantidade Padrão:</span>
-            <label className="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white">
+            <span className="text-gray-400 font-bold">Modo Padrão:</span>
+            <label 
+              {...withTip('Por Jogador (Multiplicativo)', 'Ao alterar a quantidade de membros pagantes, o total de itens necessários aumenta ou diminui automaticamente.')}
+              className="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white"
+            >
               <input
                 type="radio"
                 name="globalQtyMode"
@@ -880,7 +1149,10 @@ export default function GuildPerksProjectionTab({
               />
               <span className="font-bold text-emerald-400">Por Jogador (Multiplica por {members})</span>
             </label>
-            <label className="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white">
+            <label 
+              {...withTip('Qtd. Total Fechada', 'A quantidade de itens permanece fixa mesmo que você altere o número de membros pagantes.')}
+              className="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white"
+            >
               <input
                 type="radio"
                 name="globalQtyMode"
@@ -893,7 +1165,12 @@ export default function GuildPerksProjectionTab({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-gray-400">Fixar Cota Manual (RC):</span>
+            <span 
+              {...withTip('Fixar Cota Manual', 'Permite que você defina manualmente um valor arbitrário de cota (ex: 50 RC) para ver a sobra/déficit resultante.')}
+              className="text-gray-400 cursor-help"
+            >
+              Fixar Cota Manual (RC) ℹ️:
+            </span>
             <input
               type="number"
               placeholder={`Ex: ${result.recommendedFeeRc}`}
@@ -914,14 +1191,14 @@ export default function GuildPerksProjectionTab({
         </div>
       </div>
 
-      {/* 4. BARRA DE ADIÇÃO RÁPIDA DE ITENS DO CATÁLOGO RUBINOT */}
+      {/* 5. BARRA DE ADIÇÃO RÁPIDA DE ITENS DO CATÁLOGO RUBINOT */}
       <div className="bg-black/50 border border-tibia-border/50 rounded-xl p-4 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles size={14} className="text-amber-400" />
-            Adição Rápida: Creature Products Canônicos do RubinOT
+            Adição Rápida com 1 Clique (Catálogo RubinOT)
           </span>
-          <span className="text-[10px] text-gray-400">Clique para incluir instantaneamente na sua lista</span>
+          <span className="text-[10px] text-gray-400">Clique para adicionar o item com preço e quantidade sugeridos</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {CATALOG_SUGGESTED_ITEMS.map(s => {
@@ -932,6 +1209,7 @@ export default function GuildPerksProjectionTab({
                 type="button"
                 disabled={isAdded}
                 onClick={() => handleQuickAddSuggested(s)}
+                {...withTip(`Adicionar ${s.name}`, `Bônus: ${s.category} | Origem padrão: ${s.defaultOrigin} | Qtd sugerida: ${s.defaultPerMember} un/player`)}
                 className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                   isAdded 
                     ? 'bg-zinc-800 text-gray-500 border border-transparent cursor-not-allowed'
@@ -947,21 +1225,53 @@ export default function GuildPerksProjectionTab({
         </div>
       </div>
 
-      {/* 5. MATRIZ DE ITENS: DEFINIÇÃO DE QTD POR JOGADOR, VALORES EM KK/GP E CONVERSÃO EM RC */}
+      {/* 6. MATRIZ DE ITENS: DEFINIÇÃO DE QTD POR JOGADOR, PREÇOS E CONVERSÃO EM RC */}
       <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-5 shadow-inner space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-tibia-border/40 pb-3">
           <div>
             <h4 className="text-base font-medieval text-blue-400 flex items-center gap-2">
               <Package size={18} className="text-blue-400" />
-              Matriz de Creature Products (Preços, Qtd. por Jogador e Subtotais)
+              Matriz de Creature Products (Preços, Quantidades por Jogador e Subtotais)
             </h4>
             <p className="text-xs text-gray-400 mt-0.5">
-              Edite a <strong>quantidade por jogador</strong> ou o <strong>total necessário</strong> e o <strong>preço unitário</strong>. O subtotal e o impacto na cota são calculados em tempo real.
+              Utilize os botões <strong>[-]</strong> e <strong>[+]</strong> ou digite diretamente nos campos. Passe o mouse sobre qualquer cabeçalho para ver sua função.
             </p>
           </div>
 
-          {/* Ações e Filtros */}
+          {/* Filtros e Ações */}
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Filtro Categoria */}
+            <div className="flex items-center gap-1 bg-black/60 p-1 rounded-lg border border-tibia-border/50 text-xs">
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('ALL')}
+                className={`px-2 py-0.5 rounded cursor-pointer ${categoryFilter === 'ALL' ? 'bg-blue-600 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('leech')}
+                className={`px-2 py-0.5 rounded cursor-pointer ${categoryFilter === 'leech' ? 'bg-blue-600 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+              >
+                Leech
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('damage')}
+                className={`px-2 py-0.5 rounded cursor-pointer ${categoryFilter === 'damage' ? 'bg-blue-600 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+              >
+                Dano/Crit
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('defense')}
+                className={`px-2 py-0.5 rounded cursor-pointer ${categoryFilter === 'defense' ? 'bg-blue-600 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+              >
+                Defesa
+              </button>
+            </div>
+
             {/* Busca */}
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-2.5 text-gray-400" />
@@ -970,22 +1280,9 @@ export default function GuildPerksProjectionTab({
                 placeholder="Buscar item..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                className="bg-black/80 border border-tibia-border/50 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-400 w-36 sm:w-44"
+                className="bg-black/80 border border-tibia-border/50 rounded-lg pl-8 pr-3 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-400 w-32 sm:w-40"
               />
             </div>
-
-            {/* Filtro Servidor */}
-            <select
-              value={serverFilter}
-              onChange={(e) => setServerFilter(e.target.value)}
-              className="bg-black/80 border border-tibia-border/50 rounded-lg px-2.5 py-1.5 text-xs text-yellow-400 focus:outline-none"
-            >
-              <option value="ALL">Todos Servidores</option>
-              {WORLDS_CONFIG.map(w => (
-                <option key={w.world} value={w.world}>{w.world}</option>
-              ))}
-              <option value="Local">Local ({selectedWorld})</option>
-            </select>
 
             <button
               type="button"
@@ -998,46 +1295,77 @@ export default function GuildPerksProjectionTab({
           </div>
         </div>
 
-        {/* Resumo Rápido dos Servidores de Origem */}
-        <div className="flex flex-wrap items-center gap-2 bg-black/60 p-3 rounded-lg border border-tibia-border/40 text-xs">
-          <span className="text-gray-400 font-bold uppercase text-[10px] flex items-center gap-1">
-            <Filter size={11} />
-            Origem dos Recursos:
-          </span>
-          {result.serverBreakdown.map(sb => (
-            <button 
-              key={sb.server}
-              type="button"
-              onClick={() => setServerFilter(serverFilter === sb.server ? 'ALL' : sb.server)}
-              className={`px-2.5 py-1 rounded border text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
-                serverFilter === sb.server
-                  ? 'bg-amber-500 text-black border-amber-400 font-black'
-                  : 'bg-black/80 border-tibia-border/60 text-gray-200 hover:border-amber-400/50'
-              }`}
-            >
-              <span className="font-bold">{sb.server}:</span>
-              <span>{sb.totalQty.toLocaleString('pt-BR')} un</span>
-              <span className="text-[10px] opacity-80 font-mono">({sb.totalCostRc} RC)</span>
-            </button>
-          ))}
-        </div>
-
         {/* Tabela Principal de Itens */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-tibia-border/60 text-gray-400 uppercase tracking-wider font-bold bg-black/60">
-                <th className="py-2.5 px-3">Item / Bônus</th>
-                <th className="py-2.5 px-3 text-center">Modo</th>
-                <th className="py-2.5 px-3 text-right">Qtd / Jogador</th>
-                <th className="py-2.5 px-3 text-right">Qtd. Total</th>
-                <th className="py-2.5 px-3 text-right">Preço Unit. (Gold)</th>
-                <th className="py-2.5 px-3 text-right text-gray-300">Unit. (RC)</th>
-                <th className="py-2.5 px-3 text-right">Subtotal (KK)</th>
-                <th className="py-2.5 px-3 text-right text-amber-400">Subtotal (RC)</th>
-                <th className="py-2.5 px-3 text-right text-emerald-300">Cota / Membro</th>
-                <th className="py-2.5 px-3">Servidor</th>
-                <th className="py-2.5 px-3 text-center">Status</th>
+                <th 
+                  {...withTip('Item / Bônus', 'Nome do creature product e os efeitos de buff ou elemento que ele adiciona à Guild Ascension.')}
+                  className="py-2.5 px-3 cursor-help"
+                >
+                  Item / Bônus ℹ️
+                </th>
+                <th 
+                  {...withTip('Modo de Cálculo', 'Alterne entre cálculo multiplicado pelos membros pagantes ou quantidade total fixa de compra.')}
+                  className="py-2.5 px-3 text-center cursor-help"
+                >
+                  Modo ℹ️
+                </th>
+                <th 
+                  {...withTip('Quantidade por Jogador', 'Quantos itens deste tipo 1 jogador deve entregar ou bancar na sua cota individual.', 'Ex: 8 Vampire Teeth')}
+                  className="py-2.5 px-3 text-right cursor-help"
+                >
+                  Qtd / Jogador ℹ️
+                </th>
+                <th 
+                  {...withTip('Quantidade Total', 'Volume total de itens que a liderança precisa ter em estoque para a season.', 'Fórmula: Qtd/Jogador × Total de Membros')}
+                  className="py-2.5 px-3 text-right cursor-help"
+                >
+                  Qtd. Total ℹ️
+                </th>
+                <th 
+                  {...withTip('Preço Unitário (Gold)', 'Valor médio de compra de 1 unidade deste item no Market do servidor de origem em KK e GP.', '0.04 KK = 40.000 gp')}
+                  className="py-2.5 px-3 text-right cursor-help"
+                >
+                  Preço (Gold) ℹ️
+                </th>
+                <th 
+                  {...withTip('Preço Unitário em RC', 'Conversão direta do preço unitário de 1 item em Rubin Coins.')}
+                  className="py-2.5 px-3 text-right text-gray-300 cursor-help"
+                >
+                  Unit. (RC) ℹ️
+                </th>
+                <th 
+                  {...withTip('Subtotal em Gold', 'Custo total deste item para toda a guilda em KK de Gold.')}
+                  className="py-2.5 px-3 text-right cursor-help"
+                >
+                  Subtotal (KK) ℹ️
+                </th>
+                <th 
+                  {...withTip('Subtotal em RC', 'Custo total deste item convertido em Rubin Coins na cotação oficial.')}
+                  className="py-2.5 px-3 text-right text-amber-400 cursor-help"
+                >
+                  Subtotal (RC) ℹ️
+                </th>
+                <th 
+                  {...withTip('Impacto na Cota Individual', 'Exatamente quanto este item individual pesa no bolso de cada membro da guilda.', 'Ex: 4.0 RC por player')}
+                  className="py-2.5 px-3 text-right text-emerald-300 cursor-help"
+                >
+                  Cota / Player ℹ️
+                </th>
+                <th 
+                  {...withTip('Servidor de Origem', 'Mundo onde o lote do item será adquirido com melhor preço antes de ser transferido via World Transfer.')}
+                  className="py-2.5 px-3 cursor-help"
+                >
+                  Servidor ℹ️
+                </th>
+                <th 
+                  {...withTip('Status da Compra', 'Etapa logística atual do item: Planejado, Comprando, Em Trânsito WT ou Em Estoque.')}
+                  className="py-2.5 px-3 text-center cursor-help"
+                >
+                  Status ℹ️
+                </th>
                 <th className="py-2.5 px-3 text-center">Ações</th>
               </tr>
             </thead>
@@ -1062,33 +1390,51 @@ export default function GuildPerksProjectionTab({
                       </span>
                     </td>
 
-                    {/* Modo de Cálculo: Por Membro vs Total Fixo */}
+                    {/* Modo de Cálculo */}
                     <td className="py-2 px-3 text-center">
                       <button
                         type="button"
                         onClick={() => handleUpdateItem(item.id, 'calcMode', item.calcMode === 'per_member' ? 'total_fixed' : 'per_member')}
+                        {...withTip('Alternar Modo de Cálculo', item.calcMode === 'per_member' ? 'Atualmente: Multiplica por jogador. Clique para travar a quantidade total.' : 'Atualmente: Quantidade total fixa. Clique para calcular por jogador.')}
                         className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border cursor-pointer ${
                           item.calcMode === 'per_member'
                             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                             : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                         }`}
-                        title="Clique para alternar entre quantidade por membro ou quantidade total fixa"
                       >
-                        {item.calcMode === 'per_member' ? 'Por Membro' : 'Fixo Total'}
+                        {item.calcMode === 'per_member' ? 'Por Player' : 'Fixo Total'}
                       </button>
                     </td>
 
-                    {/* Qtd por Jogador */}
+                    {/* Qtd por Jogador com Steppers */}
                     <td className="py-2 px-3 text-right font-mono">
-                      <input
-                        type="number"
-                        min="0.1"
-                        step="1"
-                        value={item.quantityPerMember || ''}
-                        onChange={(e) => handleUpdateItem(item.id, 'quantityPerMember', Math.max(0.1, Number(e.target.value)))}
-                        className="w-20 bg-black/80 border border-tibia-border/50 rounded px-2 py-0.5 text-right text-xs font-mono text-white focus:border-blue-400 focus:outline-none"
-                      />
-                      <span className="text-[10px] text-gray-500 block">un / player</span>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateItem(item.id, 'quantityPerMember', Math.max(0.1, Number((item.quantityPerMember - 1).toFixed(1))))}
+                          className="w-5 h-5 rounded bg-black/80 hover:bg-white/10 text-gray-300 border border-tibia-border/60 flex items-center justify-center text-xs font-bold cursor-pointer"
+                          title="Diminuir 1 unidade por jogador"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="1"
+                          value={item.quantityPerMember || ''}
+                          onChange={(e) => handleUpdateItem(item.id, 'quantityPerMember', Math.max(0.1, Number(e.target.value)))}
+                          className="w-14 bg-black/80 border border-tibia-border/50 rounded px-1 py-0.5 text-right text-xs font-mono text-white focus:border-blue-400 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateItem(item.id, 'quantityPerMember', Number((item.quantityPerMember + 1).toFixed(1)))}
+                          className="w-5 h-5 rounded bg-black/80 hover:bg-white/10 text-gray-300 border border-tibia-border/60 flex items-center justify-center text-xs font-bold cursor-pointer"
+                          title="Aumentar 1 unidade por jogador"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span className="text-[10px] text-gray-500 block text-right mt-0.5">un / player</span>
                     </td>
 
                     {/* Qtd Total Necessária */}
@@ -1099,24 +1445,42 @@ export default function GuildPerksProjectionTab({
                           min="1"
                           value={item.quantityTotal || ''}
                           onChange={(e) => handleUpdateItem(item.id, 'quantityTotal', Math.max(1, Number(e.target.value)))}
-                          className="w-24 bg-black/80 border border-tibia-border/50 rounded px-2 py-0.5 text-right text-xs font-mono text-amber-300 focus:border-amber-400 focus:outline-none"
+                          className="w-20 bg-black/80 border border-tibia-border/50 rounded px-1.5 py-0.5 text-right text-xs font-mono text-amber-300 focus:border-amber-400 focus:outline-none"
                         />
                       ) : (
                         <span>{item.effectiveQty.toLocaleString('pt-BR')} un</span>
                       )}
                     </td>
 
-                    {/* Preço Unitário (KK) */}
+                    {/* Preço Unitário (KK) com Steppers */}
                     <td className="py-2 px-3 text-right font-mono">
-                      <input
-                        type="number"
-                        step="0.005"
-                        min="0"
-                        value={item.priceKk}
-                        onChange={(e) => handleUpdateItem(item.id, 'priceKk', Math.max(0, Number(e.target.value)))}
-                        className="w-20 bg-black/80 border border-tibia-border/50 rounded px-2 py-0.5 text-right text-xs font-mono text-white focus:border-amber-400 focus:outline-none"
-                      />
-                      <span className="text-[10px] text-gray-400 block font-sans">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateItem(item.id, 'priceKk', Math.max(0, Number((item.priceKk - 0.005).toFixed(3))))}
+                          className="w-5 h-5 rounded bg-black/80 hover:bg-white/10 text-gray-300 border border-tibia-border/60 flex items-center justify-center text-xs font-bold cursor-pointer"
+                          title="Diminuir 5k gp"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          step="0.005"
+                          min="0"
+                          value={item.priceKk}
+                          onChange={(e) => handleUpdateItem(item.id, 'priceKk', Math.max(0, Number(e.target.value)))}
+                          className="w-16 bg-black/80 border border-tibia-border/50 rounded px-1 py-0.5 text-right text-xs font-mono text-white focus:border-amber-400 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateItem(item.id, 'priceKk', Number((item.priceKk + 0.005).toFixed(3)))}
+                          className="w-5 h-5 rounded bg-black/80 hover:bg-white/10 text-gray-300 border border-tibia-border/60 flex items-center justify-center text-xs font-bold cursor-pointer"
+                          title="Aumentar 5k gp"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span className="text-[10px] text-gray-400 block font-sans text-right mt-0.5">
                         {item.unitPriceGp.toLocaleString('pt-BR')} gp
                       </span>
                     </td>
@@ -1199,13 +1563,13 @@ export default function GuildPerksProjectionTab({
         </div>
       </div>
 
-      {/* 6. SEÇÃO DE WORLD TRANSFERS (TRANSFERÊNCIAS ENTRE MUNDOS) */}
+      {/* 7. SEÇÃO DE WORLD TRANSFERS (TRANSFERÊNCIAS ENTRE MUNDOS) */}
       <div className="bg-black/40 border border-tibia-border/60 rounded-xl p-5 shadow-inner space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-tibia-border/40 pb-3">
           <div>
             <h4 className="text-base font-medieval text-purple-400 flex items-center gap-2">
               <Globe size={18} className="text-purple-400" />
-              Logística de World Transfers (Custo Padrão RubinOT: 1.490 RC por Char)
+              Logística de World Transfers (Custo Oficial RubinOT: 1.490 RC por Char)
             </h4>
             <p className="text-xs text-gray-400 mt-0.5">
               Defina quantos personagens "mula" serão transferidos para transportar os creature products comprados em outros servidores.
@@ -1258,14 +1622,23 @@ export default function GuildPerksProjectionTab({
                       {wt.toWorld}
                     </td>
                     <td className="py-2 px-3 text-center">
-                      <input
-                        type="number"
-                        min="1"
-                        max="10"
-                        value={wt.charactersCount}
-                        onChange={(e) => handleUpdateWt(wt.id, 'charactersCount', Math.max(1, Number(e.target.value)))}
-                        className="w-14 bg-black/80 border border-tibia-border/50 rounded px-2 py-0.5 text-center text-xs font-mono text-white focus:border-purple-400 focus:outline-none"
-                      />
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateWt(wt.id, 'charactersCount', Math.max(1, wt.charactersCount - 1))}
+                          className="w-5 h-5 rounded bg-black/80 hover:bg-white/10 text-gray-300 border border-tibia-border/60 flex items-center justify-center text-xs font-bold cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <span className="font-mono font-bold text-white w-6 text-center">{wt.charactersCount}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateWt(wt.id, 'charactersCount', wt.charactersCount + 1)}
+                          className="w-5 h-5 rounded bg-black/80 hover:bg-white/10 text-gray-300 border border-tibia-border/60 flex items-center justify-center text-xs font-bold cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
                     </td>
                     <td className="py-2 px-3 text-right font-mono">
                       <input
@@ -1310,56 +1683,7 @@ export default function GuildPerksProjectionTab({
         </div>
       </div>
 
-      {/* 7. OPÇÃO DE CONTRIBUIÇÃO HÍBRIDA: PAGAR EM RC vs. ENTREGAR OS ITENS EM HUNT */}
-      <div className="bg-gradient-to-r from-amber-950/30 via-black/60 to-black/60 border border-amber-500/40 rounded-xl p-5 shadow-lg space-y-3">
-        <div className="flex items-center gap-2 text-amber-400 font-bold">
-          <BookmarkCheck size={18} />
-          <h4 className="text-sm uppercase tracking-wider font-medieval">
-            Modelo de Cobrança Híbrido: Pagar a Cota em RC ou Entregar os Itens em Hunt
-          </h4>
-        </div>
-        <p className="text-xs text-gray-300 leading-relaxed">
-          Muitos jogadores preferem caçar seus próprios creature products para economizar coins. Se um membro optar por entregar seus itens, quanto ele deve entregar?
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-          {/* Opção 1: Cota Padrão em RC */}
-          <div className="bg-black/60 border border-emerald-500/40 rounded-lg p-3.5 space-y-2">
-            <span className="text-xs font-black uppercase text-emerald-400 flex items-center gap-1.5">
-              <Coins size={14} />
-              Opção 1: Pagamento Direto em Rubin Coins
-            </span>
-            <div className="text-2xl font-black font-mono text-white">
-              {result.recommendedFeeRc} RC <span className="text-xs font-normal text-gray-400">/ membro</span>
-            </div>
-            <p className="text-[11px] text-gray-400">
-              O jogador envia o valor para o char <code className="text-amber-300">{bankRecipient || `Bank Rubin ${selectedWorld}`}</code> e a liderança adquire todos os itens e cuida do frete.
-            </p>
-          </div>
-
-          {/* Opção 2: Entrega de Itens em Hunt */}
-          <div className="bg-black/60 border border-blue-500/40 rounded-lg p-3.5 space-y-2">
-            <span className="text-xs font-black uppercase text-blue-400 flex items-center gap-1.5">
-              <Package size={14} />
-              Opção 2: Entregar Cota de Itens + Taxa de Frete WT
-            </span>
-            <div className="text-xs text-gray-300 space-y-1 max-h-28 overflow-y-auto pr-1">
-              {result.items.map(it => (
-                <div key={it.id} className="flex justify-between border-b border-white/5 py-0.5">
-                  <span>{it.name}:</span>
-                  <strong className="font-mono text-amber-300">{it.effectiveQtyPerMember} un</strong>
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
-              <span className="text-gray-400">Taxa residual de frete WT + ativação:</span>
-              <span className="font-mono font-black text-purple-400">{result.hybridContribution.logisticsFeeRc} RC</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 8. MODAL: ADICIONAR ITEM MANUAL */}
+      {/* 8. MODAIS */}
       {itemModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-tibia-border rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -1469,7 +1793,6 @@ export default function GuildPerksProjectionTab({
         </div>
       )}
 
-      {/* 9. MODAL: ADICIONAR ROTA DE WORLD TRANSFER */}
       {wtModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-tibia-border rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -1557,6 +1880,29 @@ export default function GuildPerksProjectionTab({
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* 9. TOOLTIP FLUTUANTE UNIVERSAL FIXO (NÃO CORTA EM OVERFLOW) */}
+      {hoveredTip && (
+        <div 
+          className="fixed z-50 -translate-x-1/2 -translate-y-full mb-2 pointer-events-none p-3 bg-zinc-950/95 border border-amber-500/70 rounded-xl shadow-2xl backdrop-blur-md max-w-xs text-xs animate-fadeIn"
+          style={{ left: `${hoveredTip.x}px`, top: `${hoveredTip.y - 8}px` }}
+        >
+          {hoveredTip.title && (
+            <div className="font-bold text-amber-400 flex items-center gap-1.5 mb-1 text-[11px] uppercase tracking-wider">
+              <Info size={13} className="text-amber-400 shrink-0" />
+              <span>{hoveredTip.title}</span>
+            </div>
+          )}
+          <div className="text-gray-200 leading-relaxed text-[11px]">{hoveredTip.text}</div>
+          {hoveredTip.tip && (
+            <div className="mt-1.5 pt-1.5 border-t border-white/10 text-[10px] text-amber-300/90 font-mono">
+              💡 {hoveredTip.tip}
+            </div>
+          )}
+          {/* Seta indicadora */}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-zinc-950" />
         </div>
       )}
     </div>
