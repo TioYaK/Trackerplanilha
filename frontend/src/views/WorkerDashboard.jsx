@@ -209,6 +209,24 @@ export default function WorkerDashboard() {
     setTimeout(() => setCopiedLogs(false), 2000);
   };
 
+  const handleCleanStorageAll = async () => {
+    if (!window.confirm('Deseja disparar limpeza profunda de armazenamento e caches em TODOS os workers online?')) return;
+    try {
+      const activeWorkers = workers.filter(w => new Date(w.last_ping).getTime() > Date.now() - 5 * 60 * 1000);
+      for (const w of activeWorkers) {
+        await supabase.from('worker_commands').insert({
+          worker_id: w.worker_id,
+          command: 'CLEAN_STORAGE',
+          payload: { reason: 'manual_fleet_clean', timestamp: new Date().toISOString() },
+          executed: false
+        });
+      }
+      alert(`Comando de Limpeza de Armazenamento disparado para ${activeWorkers.length} workers ativos!`);
+    } catch (err) {
+      alert(`Erro: ${err.message}`);
+    }
+  };
+
   const handleForceUpdateAll = async () => {
     if (!window.confirm('Deseja forçar atualização e limpeza preventiva em TODOS os workers online?')) return;
     try {
@@ -305,6 +323,14 @@ export default function WorkerDashboard() {
           <p className="text-gray-400">Painel de Comando, Controle e Diagnóstico Remoto da Rede Neural</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleCleanStorageAll}
+            className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg shadow-lg shadow-purple-500/20 border border-purple-400 text-sm transition-all"
+            title="Limpa telemetria, arquivos .pma, caches do Chromium e dumps temporários em todos os PCs"
+          >
+            <Trash2 size={16} className="mr-2" />
+            🧹 Limpar Disco de Todos
+          </button>
           <button
             onClick={handleForceUpdateAll}
             className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 border border-blue-400 text-sm transition-all"
