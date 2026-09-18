@@ -321,8 +321,8 @@ export default function GuildPerksProjectionTab({
     text += `📊 **DECOMPOSIÇÃO DE CADA 1 COTA (${result.recommendedFeeRc} RC):**\n`;
     text += `• 📦 Creature Products (${result.items.length} itens): **${result.breakdownPerMember.itemsCostRc} RC**\n`;
     text += `• 🚀 Frete World Transfers (${result.totalWtTransfersCount} transfers): **${result.breakdownPerMember.wtCostRc} RC**\n`;
-    text += `• 🏛️ Taxa de Ativação do Sistema: **${result.breakdownPerMember.activationCostRc} RC**\n`;
-    text += `• 🛡️ Fundo de Segurança / Caixa da Guilda: **+${result.breakdownPerMember.marginRc} RC**\n\n`;
+    text += `• 🏛️ Taxa de ativação da perk: **${result.breakdownPerMember.activationCostRc} RC**\n`;
+    text += `• 🛡️ Reserva emergencial (+${result.safetyMarginPct}%): **+${result.breakdownPerMember.marginRc} RC** *(cobre a inflação no preço dos itens que vai acontecer no mercado e imprevistos)*\n\n`;
 
     text += `📦 **ITENS NECESSÁRIOS (Total: ${result.totalItemsCount.toLocaleString('pt-BR')} un):**\n`;
     result.items.forEach(it => {
@@ -340,7 +340,7 @@ export default function GuildPerksProjectionTab({
 
     text += `══════════════════════════════════════\n`;
     text += `🏛️ **CUSTO TOTAL DA OPERAÇÃO:** **${result.grandTotalCostRc.toLocaleString('pt-BR')} RC** (${result.grandTotalCostKk.toLocaleString('pt-BR')} KK)\n`;
-    text += `💰 **Arrecadação Prevista:** ${result.grossRevenueRc.toLocaleString('pt-BR')} RC | 🛡️ **Sobra Caixa:** +${result.surplusRc.toLocaleString('pt-BR')} RC\n`;
+    text += `💰 **Arrecadação Prevista:** ${result.grossRevenueRc.toLocaleString('pt-BR')} RC | 🛡️ **Reserva Emergencial:** +${result.surplusRc.toLocaleString('pt-BR')} RC\n`;
     text += `🏦 **Destinatário RubinBank:** \`${bank}\`\n`;
     text += `⏱️ *Cotação considerada: 1 RC = ${result.rateKkPerRc.toFixed(3)} KK (${Math.round(result.rateKkPerRc * 1000)}k)*`;
 
@@ -362,8 +362,8 @@ export default function GuildPerksProjectionTab({
     text += `*Detalhamento da cota de ${result.recommendedFeeRc} RC:*\n`;
     text += `- Itens: ${result.breakdownPerMember.itemsCostRc} RC\n`;
     text += `- Frete WT: ${result.breakdownPerMember.wtCostRc} RC\n`;
-    text += `- Ativação NPC: ${result.breakdownPerMember.activationCostRc} RC\n`;
-    text += `- Margem de Segurança: +${result.breakdownPerMember.marginRc} RC\n\n`;
+    text += `- Taxa de ativação da perk: ${result.breakdownPerMember.activationCostRc} RC\n`;
+    text += `- Reserva emergencial (+${result.safetyMarginPct}%): +${result.breakdownPerMember.marginRc} RC (cobre a inflação dos itens e imprevistos)\n\n`;
     text += `*Char para pagamento no RubinBank:* ${bank}`;
 
     navigator.clipboard.writeText(text);
@@ -398,8 +398,8 @@ export default function GuildPerksProjectionTab({
     text += `🔍 **Para onde vai o meu pagamento:**\n`;
     text += `• Creature Products: ${result.breakdownPerMember.itemsCostRc} RC\n`;
     text += `• Frete World Transfers: ${result.breakdownPerMember.wtCostRc} RC\n`;
-    text += `• Ativação NPC: ${result.breakdownPerMember.activationCostRc} RC\n`;
-    text += `• Reserva Guilda (+${result.safetyMarginPct}%): +${result.breakdownPerMember.marginRc} RC\n\n`;
+    text += `• Taxa de ativação da perk: ${result.breakdownPerMember.activationCostRc} RC\n`;
+    text += `• Reserva emergencial (+${result.safetyMarginPct}%): +${result.breakdownPerMember.marginRc} RC (cobre a inflação dos itens no mercado e imprevistos)\n\n`;
     text += `🏦 **Destinatário RubinBank:** \`${bank}\`\n`;
     text += `📦 **Se preferir entregar em itens:** Depositar os creature products no depot da guilda + taxa de frete de ${result.hybridContribution.logisticsFeeRc} RC.`;
 
@@ -666,18 +666,18 @@ export default function GuildPerksProjectionTab({
               World Transfers (1.490 RC/char): {result.shares.wtSharePct}% ({result.totalWtCostRc.toLocaleString('pt-BR')} RC)
             </span>
             <span 
-              {...withTip('Ativação no NPC', `Representa ${result.shares.activationSharePct}% do dinheiro para pagar o gold exigido no NPC.`)}
+              {...withTip('Taxa de ativação da perk', `Representa ${result.shares.activationSharePct}% do dinheiro para ativar os perks da guilda no sistema.`)}
               className="text-yellow-400 flex items-center gap-1.5 cursor-help"
             >
               <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" />
-              Taxa de Ativação: {result.shares.activationSharePct}% ({result.activationCostRc.toLocaleString('pt-BR')} RC)
+              Taxa de ativação da perk: {result.shares.activationSharePct}% ({result.activationCostRc.toLocaleString('pt-BR')} RC)
             </span>
             <span 
-              {...withTip('Fundo de Reserva', `Representa ${result.surplusMarginPct}% guardado no banco para proteger a guilda.`)}
+              {...withTip('Reserva emergencial', `Representa ${result.surplusMarginPct}% guardado no banco para cobrir a inflação dos itens (que inevitavelmente acontece com a alta procura no mercado) e imprevistos.`)}
               className="text-emerald-400 flex items-center gap-1.5 cursor-help"
             >
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-              Fundo de Reserva: {result.surplusMarginPct}% (+{result.surplusRc.toLocaleString('pt-BR')} RC)
+              Reserva emergencial: {result.surplusMarginPct}% (+{result.surplusRc.toLocaleString('pt-BR')} RC)
             </span>
           </div>
           <div className="w-full h-3 bg-black/80 rounded-full overflow-hidden border border-tibia-border/60 flex">
@@ -798,8 +798,8 @@ export default function GuildPerksProjectionTab({
 
               <div className="py-2.5 flex items-center justify-between">
                 <div>
-                  <strong className="text-white">3. Ativação no NPC do Jogo:</strong>
-                  <p className="text-[11px] text-gray-400">Taxa em Gold cobrada diretamente pelo NPC para habilitar as perks.</p>
+                  <strong className="text-white">3. Taxa de ativação da perk:</strong>
+                  <p className="text-[11px] text-gray-400">Taxa em Gold cobrada diretamente para habilitar as perks.</p>
                 </div>
                 <div className="text-right font-mono font-bold text-yellow-400">
                   {result.breakdownPerMember.activationCostRc} RC
@@ -809,12 +809,12 @@ export default function GuildPerksProjectionTab({
 
               <div className="py-2.5 flex items-center justify-between">
                 <div>
-                  <strong className="text-white">4. Fundo de Reserva & Segurança (+{result.safetyMarginPct}%):</strong>
-                  <p className="text-[11px] text-gray-400">Fundo retido no caixa para cobrir inadimplências e flutuação cambial.</p>
+                  <strong className="text-white">4. Reserva emergencial (+{result.safetyMarginPct}%):</strong>
+                  <p className="text-[11px] text-gray-400">Fundo retido no caixa para cobrir a inflação e alta no preço dos itens no mercado (que inevitavelmente vai acontecer pela alta procura), além de flutuação cambial e eventuais inadimplências.</p>
                 </div>
                 <div className="text-right font-mono font-bold text-emerald-400">
                   +{result.breakdownPerMember.marginRc} RC
-                  <span className="text-[10px] text-gray-500 block">Reserva de Emergência</span>
+                  <span className="text-[10px] text-gray-500 block">Reserva Emergencial</span>
                 </div>
               </div>
 
@@ -886,12 +886,12 @@ export default function GuildPerksProjectionTab({
 
               {/* Passo 3 */}
               <div 
-                {...withTip('Passo 3: Taxa de Ativação', 'Ouro que o jogo cobra para subir cada etapa da Ascension.')}
+                {...withTip('Passo 3: Taxa de ativação da perk', 'Taxa em Gold necessária para habilitar as etapas da Ascension.')}
                 className="bg-black/60 border border-yellow-500/30 rounded-lg p-3 cursor-help hover:border-yellow-400 transition-colors"
               >
-                <span className="text-[10px] font-black uppercase text-yellow-400 block mb-1">Passo 3: Ativação</span>
+                <span className="text-[10px] font-black uppercase text-yellow-400 block mb-1">Passo 3: Taxa de ativação da perk</span>
                 <p className="text-gray-300 text-[11px] leading-relaxed">
-                  Taxa em Gold no NPC:
+                  Taxa de ativação da perk:
                 </p>
                 <div className="mt-2 font-mono font-bold text-yellow-300">
                   {result.activationCostRc.toLocaleString('pt-BR')} RC
@@ -920,12 +920,12 @@ export default function GuildPerksProjectionTab({
 
               {/* Passo 5 */}
               <div 
-                {...withTip('Passo 5: Cota Final Recomendada', 'Adiciona a margem de segurança para garantir que a guilda não tome prejuízo.')}
+                {...withTip('Passo 5: Cota Final com Reserva Emergencial', 'Adiciona a reserva emergencial (+X%) para cobrir a inflação nos preços dos itens no mercado (que inevitavelmente acontece pela alta procura), variações cambiais e inadimplências.')}
                 className="bg-black/60 border border-emerald-500/30 rounded-lg p-3 cursor-help hover:border-emerald-400 transition-colors"
               >
                 <span className="text-[10px] font-black uppercase text-emerald-400 block mb-1">Passo 5: Cota Final</span>
                 <p className="text-gray-300 text-[11px] leading-relaxed">
-                  +{result.safetyMarginPct}% de reserva:
+                  +{result.safetyMarginPct}% Reserva Emergencial:
                 </p>
                 <div className="mt-2 font-mono font-black text-emerald-300 text-sm">
                   {result.recommendedFeeRc} RC / player
@@ -1067,15 +1067,15 @@ export default function GuildPerksProjectionTab({
             </span>
           </div>
 
-          {/* Parâmetro 3: Margem de Reserva / Segurança */}
+          {/* Parâmetro 3: Reserva Emergencial */}
           <div className="bg-black/50 border border-tibia-border/50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-1">
               <label 
-                {...withTip('Margem de Segurança', 'Percentual de sobra retido no banco para garantir que imprevistos e altas de preços não causem déficit na guilda.', 'Recomendado: 10% a 15%')}
+                {...withTip('Reserva Emergencial', 'Fundo retido no caixa para cobrir a inflação e aumento no preço dos itens no market (que inevitavelmente vai acontecer pela alta procura da guilda), além de variações cambiais e eventuais inadimplências.', 'Recomendado: 10% a 30%')}
                 className="text-xs font-bold text-gray-300 uppercase flex items-center gap-1 cursor-help"
               >
                 <Shield size={13} className="text-emerald-400" />
-                Margem de Segurança ℹ️
+                Reserva Emergencial ℹ️
               </label>
               <span className="text-xs font-mono font-black text-emerald-400">+{safetyMargin}%</span>
             </div>
@@ -1106,14 +1106,14 @@ export default function GuildPerksProjectionTab({
             </div>
           </div>
 
-          {/* Parâmetro 4: Taxa de Ativação no NPC */}
+          {/* Parâmetro 4: Taxa de Ativação da Perk */}
           <div className="bg-black/50 border border-tibia-border/50 rounded-lg p-3">
             <label 
-              {...withTip('Taxa de Ativação no NPC', 'Gold exigido pelo sistema de Guild Ascension do servidor para desbloquear as perks.', 'Multiplicado pelo número de membros')}
+              {...withTip('Taxa de ativação da perk', 'Taxa em Gold exigida para habilitar as etapas da Ascension no servidor. Multiplicado pelo número de membros.', 'Gold para o NPC')}
               className="block text-xs font-bold text-gray-300 uppercase mb-1 flex items-center gap-1 cursor-help"
             >
               <DollarSign size={13} className="text-yellow-400" />
-              Ativação NPC (Gold) ℹ️
+              Taxa de Ativação da Perk ℹ️
             </label>
             <div className="flex items-center gap-2 mt-1">
               <input
