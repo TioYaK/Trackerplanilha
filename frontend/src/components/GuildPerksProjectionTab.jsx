@@ -4,7 +4,7 @@ import {
   ArrowRight, Globe, Sparkles, TrendingUp, TrendingDown, DollarSign, 
   Package, Share2, Layers, AlertCircle, Zap, Shield, FileText, Sliders,
   Search, HelpCircle, CheckCircle2, ChevronDown, ChevronUp, ShoppingCart,
-  Truck, ArrowUpRight, Filter, Info, BookmarkCheck, Eye, UserCheck, CheckSquare
+  Truck, ArrowUpRight, Filter, Info, BookmarkCheck, Eye, UserCheck, CheckSquare, Pencil
 } from 'lucide-react';
 import { 
   WORLDS_CONFIG, 
@@ -91,9 +91,16 @@ export default function GuildPerksProjectionTab({
     onMouseLeave: () => setHoveredTip(null)
   });
 
-  // Modais
+  // Modais de Criação
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [wtModalOpen, setWtModalOpen] = useState(false);
+
+  // Modais de Edição de Itens e World Transfers já definidos
+  const [editItemModalOpen, setEditItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+
+  const [editWtModalOpen, setEditWtModalOpen] = useState(false);
+  const [editingWt, setEditingWt] = useState(null);
 
   // Formulário Novo Item
   const [newItem, setNewItem] = useState({
@@ -237,6 +244,33 @@ export default function GuildPerksProjectionTab({
     setItems(prev => prev.filter(i => i.id !== id));
   };
 
+  const handleOpenEditItem = (item) => {
+    setEditingItem({ ...item });
+    setEditItemModalOpen(true);
+  };
+
+  const handleSaveEditItem = (e) => {
+    e.preventDefault();
+    if (!editingItem || !editingItem.name.trim()) return;
+    const perMember = Math.max(0.1, Number(editingItem.quantityPerMember) || 1);
+    const total = Math.max(1, Number(editingItem.quantityTotal) || Math.round(perMember * members));
+    setItems(prev => prev.map(i => i.id === editingItem.id ? {
+      ...i,
+      ...editingItem,
+      name: editingItem.name.trim(),
+      category: editingItem.category.trim() || 'Creature Product',
+      quantityPerMember: perMember,
+      quantityTotal: total,
+      calcMode: editingItem.calcMode || 'per_member',
+      priceKk: Math.max(0, Number(editingItem.priceKk) || 0),
+      serverOrigin: editingItem.serverOrigin || 'Local',
+      status: editingItem.status || 'planejado',
+      notes: (editingItem.notes || '').trim()
+    } : i));
+    setEditItemModalOpen(false);
+    setEditingItem(null);
+  };
+
   const handleUpdateItem = (id, field, value) => {
     setItems(prev => prev.map(i => {
       if (i.id !== id) return i;
@@ -302,6 +336,26 @@ export default function GuildPerksProjectionTab({
 
   const handleRemoveWt = (id) => {
     setWorldTransfers(prev => prev.filter(w => w.id !== id));
+  };
+
+  const handleOpenEditWt = (wt) => {
+    setEditingWt({ ...wt });
+    setEditWtModalOpen(true);
+  };
+
+  const handleSaveEditWt = (e) => {
+    e.preventDefault();
+    if (!editingWt) return;
+    setWorldTransfers(prev => prev.map(w => w.id === editingWt.id ? {
+      ...w,
+      ...editingWt,
+      charactersCount: Math.max(1, Number(editingWt.charactersCount) || 1),
+      costRcPerChar: Math.max(0, Number(editingWt.costRcPerChar) || 0),
+      extraGoldKk: Math.max(0, Number(editingWt.extraGoldKk) || 0),
+      notes: (editingWt.notes || '').trim()
+    } : w));
+    setEditWtModalOpen(false);
+    setEditingWt(null);
   };
 
   const handleUpdateWt = (id, field, value) => {
@@ -1381,9 +1435,14 @@ export default function GuildPerksProjectionTab({
                   <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
                     {/* Item / Nome / Categoria */}
                     <td className="py-2 px-3">
-                      <div className="font-bold text-white flex items-center gap-1.5">
+                      <div 
+                        onClick={() => handleOpenEditItem(item)}
+                        className="font-bold text-white flex items-center gap-1.5 cursor-pointer hover:text-amber-400 group transition-colors"
+                        title="Clique para editar este item"
+                      >
                         <Sparkles size={13} className="text-amber-400 shrink-0" />
                         <span>{item.name}</span>
+                        <Pencil size={11} className="text-amber-400/60 group-hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" />
                       </div>
                       <span className="text-[10px] text-gray-400 block mt-0.5">
                         {item.category}
@@ -1546,14 +1605,24 @@ export default function GuildPerksProjectionTab({
 
                     {/* Ações */}
                     <td className="py-2 px-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItem(item.id)}
-                        className="text-gray-500 hover:text-red-400 p-1 transition-colors cursor-pointer"
-                        title="Remover este item da projeção"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditItem(item)}
+                          className="text-gray-400 hover:text-amber-400 p-1 transition-colors cursor-pointer"
+                          title="Editar dados completos deste item"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="text-gray-500 hover:text-red-400 p-1 transition-colors cursor-pointer"
+                          title="Remover este item da projeção"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1666,14 +1735,24 @@ export default function GuildPerksProjectionTab({
                       {wt.notes || 'Transporte de suprimentos'}
                     </td>
                     <td className="py-2 px-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveWt(wt.id)}
-                        className="text-gray-500 hover:text-red-400 p-1 transition-colors cursor-pointer"
-                        title="Remover rota de transfer"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditWt(wt)}
+                          className="text-gray-400 hover:text-purple-400 p-1 transition-colors cursor-pointer"
+                          title="Editar rota de transfer"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveWt(wt.id)}
+                          className="text-gray-500 hover:text-red-400 p-1 transition-colors cursor-pointer"
+                          title="Remover rota de transfer"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1877,6 +1956,348 @@ export default function GuildPerksProjectionTab({
                 >
                   Adicionar Rota
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE EDIÇÃO DE ITEM EXISTENTE */}
+      {editItemModalOpen && editingItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-amber-500/50 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-tibia-border/50 pb-3">
+              <h4 className="text-lg font-medieval text-amber-400 flex items-center gap-2">
+                <Pencil size={18} className="text-amber-400" />
+                Editar Creature Product / Item
+              </h4>
+              <span className="text-[11px] text-gray-400 font-mono bg-black/50 px-2 py-0.5 rounded border border-tibia-border/40">
+                {editingItem.name}
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveEditItem} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Nome do Item:</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingItem.name}
+                    onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white focus:border-amber-400 focus:outline-none font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Bônus / Categoria:</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Life Leech, Crit, Defesa..."
+                    value={editingItem.category || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Servidor de Origem / Compra:</label>
+                  <select
+                    value={editingItem.serverOrigin}
+                    onChange={(e) => setEditingItem({ ...editingItem, serverOrigin: e.target.value })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-yellow-300 focus:border-amber-400 focus:outline-none"
+                  >
+                    {WORLDS_CONFIG.map(w => (
+                      <option key={w.world} value={w.world}>{w.world}</option>
+                    ))}
+                    <option value="Local">Local ({selectedWorld})</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Status da Compra / Logística:</label>
+                  <select
+                    value={editingItem.status || 'planejado'}
+                    onChange={(e) => setEditingItem({ ...editingItem, status: e.target.value })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white focus:border-amber-400 focus:outline-none"
+                  >
+                    <option value="planejado">📋 Planejado</option>
+                    <option value="comprando">🛒 Comprando no Market</option>
+                    <option value="em_transito">🚚 Em Trânsito WT</option>
+                    <option value="estoque">📦 Em Estoque</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Modo de Cálculo */}
+              <div className="bg-black/50 p-2.5 rounded-lg border border-tibia-border/40 space-y-2">
+                <label className="block text-gray-300 font-bold">Modo de Quantidade:</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-gray-200">
+                    <input
+                      type="radio"
+                      name="editCalcMode"
+                      checked={editingItem.calcMode !== 'total_fixed'}
+                      onChange={() => setEditingItem({ ...editingItem, calcMode: 'per_member' })}
+                      className="accent-emerald-500"
+                    />
+                    <span>Por Jogador (Multiplica por {members})</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-gray-200">
+                    <input
+                      type="radio"
+                      name="editCalcMode"
+                      checked={editingItem.calcMode === 'total_fixed'}
+                      onChange={() => setEditingItem({ ...editingItem, calcMode: 'total_fixed' })}
+                      className="accent-amber-500"
+                    />
+                    <span>Qtd. Total Fechada</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Qtd. por Jogador:</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={editingItem.quantityPerMember ?? ''}
+                    onChange={(e) => {
+                      const val = Math.max(0.1, Number(e.target.value));
+                      setEditingItem({
+                        ...editingItem,
+                        quantityPerMember: val,
+                        quantityTotal: Math.round(val * members)
+                      });
+                    }}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white font-mono focus:border-amber-400 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-gray-400 block mt-1">
+                    Multiplicado por {members} membros = {Math.round((Number(editingItem.quantityPerMember) || 0) * members)} un
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Qtd. Total Necessária:</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={editingItem.quantityTotal ?? ''}
+                    onChange={(e) => {
+                      const val = Math.max(1, Number(e.target.value));
+                      setEditingItem({
+                        ...editingItem,
+                        quantityTotal: val,
+                        quantityPerMember: Number((val / members).toFixed(2))
+                      });
+                    }}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white font-mono focus:border-amber-400 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-gray-400 block mt-1">
+                    Equivale a {((Number(editingItem.quantityTotal) || 0) / members).toFixed(1)} un por jogador
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">Preço Unitário (KK de Gold):</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={editingItem.priceKk ?? ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, priceKk: Math.max(0, Number(e.target.value)) })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white font-mono focus:border-amber-400 focus:outline-none"
+                  />
+                  <div className="shrink-0 text-right">
+                    <span className="text-amber-400 font-mono font-bold block text-xs">
+                      {Math.round((Number(editingItem.priceKk) || 0) * 1000000).toLocaleString('pt-BR')} gp
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      ~{(((Number(editingItem.priceKk) || 0) * 1000000) / (rateRc > 0 ? (rateKk * 1000000 / rateRc) : 1)).toFixed(2)} RC
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">Observações da Operação (opcional):</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Compra agendada para sexta-feira no market de Belaria"
+                  value={editingItem.notes || ''}
+                  onChange={(e) => setEditingItem({ ...editingItem, notes: e.target.value })}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-tibia-border/40">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleRemoveItem(editingItem.id);
+                    setEditItemModalOpen(false);
+                    setEditingItem(null);
+                  }}
+                  className="px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 size={13} />
+                  <span>Excluir Item</span>
+                </button>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditItemModalOpen(false);
+                      setEditingItem(null);
+                    }}
+                    className="px-4 py-2 bg-black/60 text-gray-300 hover:text-white rounded border border-tibia-border cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded cursor-pointer shadow flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 size={14} />
+                    <span>Salvar Alterações</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE EDIÇÃO DE WORLD TRANSFER EXISTENTE */}
+      {editWtModalOpen && editingWt && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-purple-500/50 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-tibia-border/50 pb-3">
+              <h4 className="text-lg font-medieval text-purple-400 flex items-center gap-2">
+                <Pencil size={18} className="text-purple-400" />
+                Editar Rota de World Transfer
+              </h4>
+              <span className="text-[11px] text-gray-400 font-mono bg-black/50 px-2 py-0.5 rounded border border-tibia-border/40">
+                {editingWt.fromWorld} ➔ {editingWt.toWorld}
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveEditWt} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Servidor Origem:</label>
+                  <select
+                    value={editingWt.fromWorld}
+                    onChange={(e) => setEditingWt({ ...editingWt, fromWorld: e.target.value })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white focus:border-purple-400 focus:outline-none"
+                  >
+                    {WORLDS_CONFIG.map(w => (
+                      <option key={w.world} value={w.world}>{w.world}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Servidor Destino:</label>
+                  <select
+                    value={editingWt.toWorld}
+                    onChange={(e) => setEditingWt({ ...editingWt, toWorld: e.target.value })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white focus:border-purple-400 focus:outline-none"
+                  >
+                    {WORLDS_CONFIG.map(w => (
+                      <option key={w.world} value={w.world}>{w.world}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Qtd. de Personagens (Mulas):</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={editingWt.charactersCount}
+                    onChange={(e) => setEditingWt({ ...editingWt, charactersCount: Math.max(1, Number(e.target.value)) })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white font-mono focus:border-purple-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">Custo Oficial (RC / char):</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingWt.costRcPerChar}
+                    onChange={(e) => setEditingWt({ ...editingWt, costRcPerChar: Math.max(0, Number(e.target.value)) })}
+                    className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white font-mono focus:border-purple-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">Taxa Gold Extra (KK):</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={editingWt.extraGoldKk ?? 0}
+                  onChange={(e) => setEditingWt({ ...editingWt, extraGoldKk: Math.max(0, Number(e.target.value)) })}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white font-mono focus:border-purple-400 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">Observações da Carga:</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Traz 5.000 Wyrm Scales e 4.000 Vampire Teeth"
+                  value={editingWt.notes || ''}
+                  onChange={(e) => setEditingWt({ ...editingWt, notes: e.target.value })}
+                  className="w-full bg-black/80 border border-tibia-border/60 rounded p-2 text-white focus:border-purple-400 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-tibia-border/40">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleRemoveWt(editingWt.id);
+                    setEditWtModalOpen(false);
+                    setEditingWt(null);
+                  }}
+                  className="px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 size={13} />
+                  <span>Excluir Rota</span>
+                </button>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditWtModalOpen(false);
+                      setEditingWt(null);
+                    }}
+                    className="px-4 py-2 bg-black/60 text-gray-300 hover:text-white rounded border border-tibia-border cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded cursor-pointer shadow flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 size={14} />
+                    <span>Salvar Alterações</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
