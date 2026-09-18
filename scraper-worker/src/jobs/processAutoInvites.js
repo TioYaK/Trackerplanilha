@@ -9,7 +9,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import os from 'os';
 import { updateSheetRow } from '../lib/googleSheets.js';
-import { findUniversalChrome, getLeanChromeArgs, getDebugScreenshotPath, cleanStaleLocks } from '../lib/storageGuardian.js';
+import { findUniversalChrome, getLeanChromeArgs, getDebugScreenshotPath, cleanStaleLocks, cleanWorkerProfileCaches } from '../lib/storageGuardian.js';
 
 /**
  * Decodifica chave Base32 padrão (RFC 4648)
@@ -527,6 +527,7 @@ export async function runProcessAutoInvites() {
           }
         } catch {}
         cleanStaleLocks(profilePath);
+        cleanWorkerProfileCaches();
       }
     }
   } catch (err) {

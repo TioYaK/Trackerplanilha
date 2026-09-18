@@ -167,6 +167,13 @@ export function cleanWorkerProfileCaches() {
       }
     } catch {}
 
+    if (process.env.APPDATA) {
+      const appDataProfiles = path.join(process.env.APPDATA, 'AuroriaWorker', 'scraper-worker', 'worker_profiles');
+      if (fs.existsSync(appDataProfiles) && !candidateDirs.includes(appDataProfiles)) {
+        candidateDirs.push(appDataProfiles);
+      }
+    }
+
     if (candidateDirs.length === 0) return 0;
 
     const bloatDirNames = [
@@ -174,10 +181,20 @@ export function cleanWorkerProfileCaches() {
       'Code Cache',
       'GPUCache',
       'Crashpad',
+      'DawnCache',
       'DawnGraphiteCache',
       'DawnWebGPUCache',
       'Shared Dictionary',
       'component_crx_cache',
+      'blob_storage',
+      'commerce_subscription_db',
+      'coupon_db',
+      'discounts_db',
+      'chrome_cart_db',
+      'parcel_tracking_db',
+      'Feature Engagement Tracker',
+      'Site Characteristics Database',
+      'power_bookmarks',
       'ProvenanceData',
       'ProvenanceDataTensors',
       'Edge Entity Extraction',
@@ -259,20 +276,28 @@ export function cleanWorkerProfileCaches() {
           cleanStaleLocks(fullPDir);
           cleanStaleLocks(path.join(fullPDir, 'Default'));
 
-          // Varredura recursiva de emergência para qualquer pasta de métricas ou arquivo .pma residual
+          // Varredura recursiva arquivo a arquivo para métricas (.pma), dumps (.dmp) e temporários (.tmp)
           const purgePmaRecursively = (dir) => {
             try {
               const dirEntries = fs.readdirSync(dir, { withFileTypes: true });
               for (const entry of dirEntries) {
                 const full = path.join(dir, entry.name);
                 if (entry.isDirectory()) {
-                  if (entry.name === 'DeferredBrowserMetrics' || entry.name === 'BrowserMetrics' || entry.name === 'Crashpad') {
-                    try { fs.rmSync(full, { recursive: true, force: true }); pruned++; } catch {}
-                  } else {
-                    purgePmaRecursively(full);
+                  purgePmaRecursively(full);
+                  const lowerDir = entry.name.toLowerCase();
+                  if (lowerDir === 'deferredbrowsermetrics' || lowerDir === 'browsermetrics' || lowerDir === 'crashpad' || lowerDir === 'dawncache') {
+                    try { fs.rmdirSync(full); pruned++; } catch {}
                   }
-                } else if (entry.isFile() && (entry.name.toLowerCase().endsWith('.pma') || entry.name.toLowerCase().startsWith('browsermetrics-'))) {
-                  try { fs.unlinkSync(full); pruned++; } catch {}
+                } else if (entry.isFile()) {
+                  const lowerName = entry.name.toLowerCase();
+                  if (
+                    lowerName.endsWith('.pma') ||
+                    lowerName.startsWith('browsermetrics-') ||
+                    lowerName.endsWith('.dmp') ||
+                    lowerName.endsWith('.tmp')
+                  ) {
+                    try { fs.unlinkSync(full); pruned++; } catch {}
+                  }
                 }
               }
             } catch {}
@@ -290,7 +315,15 @@ export function cleanWorkerProfileCaches() {
                 try {
                   fs.rmSync(target, { recursive: true, force: true, maxRetries: 1 });
                   pruned++;
-                } catch {}
+                } catch {
+                  // Se o diretório contiver algum arquivo travado, remove individualmente os destravados
+                  try {
+                    const subEntries = fs.readdirSync(target);
+                    for (const sub of subEntries) {
+                      try { fs.unlinkSync(path.join(target, sub)); pruned++; } catch {}
+                    }
+                  } catch {}
+                }
               }
             }
 
@@ -302,6 +335,7 @@ export function cleanWorkerProfileCaches() {
                 const isBloatFile = bloatFileNames.includes(item) ||
                                     lowerItem.endsWith('.pma') ||
                                     lowerItem.endsWith('.tmp') ||
+                                    lowerItem.endsWith('.dmp') ||
                                     lowerItem.startsWith('browsermetrics-');
 
                 if (isBloatFile) {
@@ -450,8 +484,9 @@ export function getLeanChromeArgs(extraArgs = []) {
     '--disable-metrics-repo',
     '--disable-breakpad',
     '--disable-crash-reporter',
-    '--disable-ipc-flooding-protection',
-    '--disable-features=DeferredBrowserMetrics,OptimizationHints,Translate,MediaRouter,MetricsReporting,ChromeLabs,EdgeEntityExtraction,EdgeSmartScreen,AutofillServerCommunication,CalculateNativeWinOcclusion,EdgeCoupons,EdgeSidebar,EdgeShopping,EdgeWallet,EdgeLanguageDetection,EdgeCollections,EdgeHub,EdgeDiscover,EdgeNtp,EdgeSignalTriggers,SegmentationPlatform',
+    '--disable-features=DeferredBrowserMetrics,OptimizationHints,Translate,MediaRouter,MetricsReporting,ChromeLabs,EdgeEntityExtraction,EdgeSmartScreen,AutofillServerCommunication,CalculateNativeWinOcclusion,EdgeCoupons,EdgeSidebar,EdgeShopping,EdgeWallet,EdgeLanguageDetection,EdgeCollections,EdgeHub,EdgeDiscover,EdgeNtp,EdgeSignalTriggers,SegmentationPlatform,DawnCache',
+    '--history-retention-days=0',
+    '--disable-extensions',
     '--disable-history-quick-provider',
     '--disable-history-url-provider',
     '--disable-sync',

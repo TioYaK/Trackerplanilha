@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import puppeteer from 'rebrowser-puppeteer';
 import * as cheerio from 'cheerio';
-import { findUniversalChrome, getLeanChromeArgs, cleanStaleLocks } from './storageGuardian.js';
+import { findUniversalChrome, getLeanChromeArgs, cleanStaleLocks, cleanWorkerProfileCaches } from './storageGuardian.js';
 
 
 
@@ -90,6 +90,7 @@ async function closeBrowser() {
         if (highscoresPage) { await highscoresPage.close().catch(() => {}); highscoresPage = null; }
         if (globalBrowser)  { await globalBrowser.close().catch(() => {}); globalBrowser = null; }
         _apiCache.clear();
+        try { cleanWorkerProfileCaches(); } catch {}
     } catch (e) {
         console.error('[Scraper] Erro ao fechar browser:', e.message);
     }
@@ -97,14 +98,11 @@ async function closeBrowser() {
 
 async function recycleBrowserPages() {
     try {
-        console.log('[Scraper] 🧹 Reciclando abas do browser para liberar memória...');
-        if (apiPage)        { await apiPage.close().catch(() => {}); apiPage = null; }
-        if (guildPage)      { await guildPage.close().catch(() => {}); guildPage = null; }
-        if (highscoresPage) { await highscoresPage.close().catch(() => {}); highscoresPage = null; }
-        _apiCache.clear();
-        console.log('[Scraper] ✅ Abas recicladas com sucesso.');
+        console.log('[Scraper] 🧹 Reciclando browser e abas para liberar memória e disco...');
+        await closeBrowser();
+        console.log('[Scraper] ✅ Browser reciclado e armazenamento limpo.');
     } catch (e) {
-        console.warn('[Scraper] Erro ao reciclar abas:', e.message);
+        console.warn('[Scraper] Erro ao reciclar browser:', e.message);
     }
 }
 
