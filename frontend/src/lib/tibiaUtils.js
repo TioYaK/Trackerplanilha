@@ -119,3 +119,27 @@ export const toTibiaTitleCase = (name) => {
     return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
   }).join(' ');
 };
+
+export const toBrtHourNum = (dateObj) => {
+  if (!dateObj) return 0;
+  const d = parseUtcDate(dateObj);
+  if (!d || isNaN(d.getTime())) return 0;
+  const h = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    hour: 'numeric',
+    hour12: false
+  }).format(d);
+  return parseInt(h, 10) % 24;
+};
+
+export const formatBrtDateWithWeekday = (dateStr) => {
+  if (!dateStr) return '';
+  // dateStr can be YYYY-MM-DD
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dateObj = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const rawDay = dateObj.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
+  const weekday = rawDay.charAt(0).toUpperCase() + rawDay.slice(1);
+  return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} (${weekday})`;
+};
+

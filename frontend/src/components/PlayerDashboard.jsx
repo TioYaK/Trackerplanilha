@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, Cell
 } from 'recharts';
-import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X, Globe, Trophy, ExternalLink, ArrowLeft, ChevronDown, Flame, Shield, Sparkles, Skull, Zap } from 'lucide-react';
+import { 
+  Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X, Globe, Trophy, 
+  ExternalLink, ArrowLeft, ChevronDown, Flame, Shield, Sparkles, Skull, Zap,
+  Calendar, TrendingUp, Filter, BarChart2, CheckCircle2, ChevronRight
+} from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { parseUtcDate, toBrtDateStr, formatVocation, toTibiaTitleCase } from '../lib/tibiaUtils';
+import { parseUtcDate, toBrtDateStr, toBrtTimeStr, toBrtHourNum, formatBrtDateWithWeekday, formatVocation, toTibiaTitleCase } from '../lib/tibiaUtils';
 import { WORLDS_LIST } from '../context/WorldContext';
 
 // Cache em memória de dados do dashboard do jogador (TTL 60s)
@@ -43,6 +47,11 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
   const [showMakerModal, setShowMakerModal] = useState(false);
   const [makersData, setMakersData] = useState([]);
   const [makersLoading, setMakersLoading] = useState(false);
+
+  // Diário de Caça & Inspetor Horário
+  const [huntDays, setHuntDays] = useState([]);
+  const [selectedHuntDate, setSelectedHuntDate] = useState(null);
+  const [huntFilterPeriod, setHuntFilterPeriod] = useState('14d'); // '7d' | '14d' | '30d' | 'all'
   
   // Informações de Mundo e Rankings
   const [selectedWorld, setSelectedWorld] = useState(initialWorld || 'ALL');
@@ -93,6 +102,8 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       setTelemetry(cached.telemetry);
       setFrequentSquad(cached.frequentSquad);
       setRoutine(cached.routine);
+      setHuntDays(cached.huntDays || []);
+      setSelectedHuntDate(prev => prev || cached.selectedHuntDate || (cached.huntDays?.[0]?.date || null));
       setLoading(false);
 
       // Se o cache for recente (<45s) e não for atualização forçada, evita re-fetch
@@ -124,8 +135,8 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         supabase.from('guild_members').select('name, level, vocation, is_online, rank').eq('name', targetName).limit(1).maybeSingle(),
         supabase.from('current_character_state').select('character_name, xp_total, session_start_xp, level, vocation, last_active').eq('character_name', targetName).limit(1).maybeSingle(),
         supabase.from('guild_perk_members').select('world, notes').eq('character_name', targetName).limit(1).maybeSingle(),
-        supabase.from('historical_sessions').select('id, session_start, session_end, xp_gained, end_level, end_xp_total').eq('character_name', targetName).order('id', { ascending: false }).limit(100),
-        supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').eq('character_name', targetName).order('recorded_at', { ascending: false }).limit(100),
+        supabase.from('historical_sessions').select('id, session_start, session_end, duration_minutes, xp_gained, end_level, end_xp_total').eq('character_name', targetName).order('session_start', { ascending: false }).limit(200),
+        supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').eq('character_name', targetName).order('recorded_at', { ascending: false }).limit(300),
         supabase.from('recent_deaths').select('level, killed_by, death_time').eq('character_name', targetName).order('death_time', { ascending: false }).limit(50)
       ]);
 
@@ -321,6 +332,134 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         hData.push({ date: dayStr, xp: xpMade });
       }
       setHeatmap(hData);
+
+      // ─── DIÁRIO DE CAÇA & ANÁLISE HORÁRIA ───
+      const huntDaysMap = {};
+
+      // 1. Processa logs de telemetria com fuso horário de Brasília
+      rawTelemetry.forEach(l => {
+        const day = toBrtDateStr(l.recorded_at);
+        const delta = Number(l.delta_xp || 0);
+        if (!day || delta <= 0) return;
+        const h = toBrtHourNum(l.recorded_at);
+
+        if (!huntDaysMap[day]) {
+          huntDaysMap[day] = {
+            date: day,
+            totalXp: 0,
+            hours: {},
+            sessions: [],
+            logCount: 0
+          };
+        }
+        huntDaysMap[day].totalXp += delta;
+        huntDaysMap[day].logCount++;
+        huntDaysMap[day].hours[h] = (huntDaysMap[day].hours[h] || 0) + delta;
+      });
+
+      // 2. Desduplicação inteligente de sessões e associação aos dias
+      const uniqueSessions = [];
+      const seenSessionKeys = new Set();
+      rawSessions.forEach(s => {
+        const key = `${s.session_start}_${s.session_end}_${s.xp_gained}`;
+        if (!seenSessionKeys.has(key)) {
+          seenSessionKeys.add(key);
+          uniqueSessions.push(s);
+        }
+      });
+
+      uniqueSessions.forEach(s => {
+        const day = toBrtDateStr(s.session_start || s.session_end);
+        if (!day) return;
+        if (!huntDaysMap[day]) {
+          huntDaysMap[day] = {
+            date: day,
+            totalXp: 0,
+            hours: {},
+            sessions: [],
+            logCount: 0
+          };
+        }
+        huntDaysMap[day].sessions.push(s);
+
+        // Se o dia não tem logs granulares de telemetria, distribui a XP da sessão nas horas abrangidas
+        const xpGained = Number(s.xp_gained || 0);
+        if (xpGained > 0 && Object.keys(huntDaysMap[day].hours).length === 0) {
+          const sStart = parseUtcDate(s.session_start || s.session_end);
+          const sEnd = parseUtcDate(s.session_end);
+          const hStart = toBrtHourNum(sStart);
+          const hEnd = toBrtHourNum(sEnd);
+          const hoursSpan = [];
+          if (hStart <= hEnd) {
+            for (let i = hStart; i <= hEnd; i++) hoursSpan.push(i);
+          } else {
+            for (let i = hStart; i <= 23; i++) hoursSpan.push(i);
+            for (let i = 0; i <= hEnd; i++) hoursSpan.push(i);
+          }
+          const perHour = Math.round(xpGained / Math.max(1, hoursSpan.length));
+          hoursSpan.forEach(h => {
+            huntDaysMap[day].hours[h] = (huntDaysMap[day].hours[h] || 0) + perHour;
+          });
+        }
+      });
+
+      // Se a soma de XP das sessões for maior que a soma de logs (ex: dias antigos), prevalece a sessão
+      Object.keys(huntDaysMap).forEach(day => {
+        const dObj = huntDaysMap[day];
+        const sessionSum = dObj.sessions.reduce((acc, s) => acc + (Number(s.xp_gained) || 0), 0);
+        if (sessionSum > dObj.totalXp) {
+          dObj.totalXp = sessionSum;
+        }
+      });
+
+      // Inclui delta ao vivo do dia atual caso esteja ativo
+      if (currentDelta > 0) {
+        const todayStr = toBrtDateStr(new Date());
+        const curH = toBrtHourNum(new Date());
+        if (!huntDaysMap[todayStr]) {
+          huntDaysMap[todayStr] = {
+            date: todayStr,
+            totalXp: 0,
+            hours: {},
+            sessions: [],
+            logCount: 0
+          };
+        }
+        huntDaysMap[todayStr].totalXp += currentDelta;
+        huntDaysMap[todayStr].hours[curH] = (huntDaysMap[todayStr].hours[curH] || 0) + currentDelta;
+      }
+
+      const processedHuntDays = Object.keys(huntDaysMap)
+        .sort((a, b) => b.localeCompare(a))
+        .map(dayStr => {
+          const dObj = huntDaysMap[dayStr];
+          let peakH = null;
+          let peakXp = 0;
+          Object.entries(dObj.hours).forEach(([h, xp]) => {
+            if (xp > peakXp) {
+              peakXp = xp;
+              peakH = parseInt(h, 10);
+            }
+          });
+
+          const totalDuration = dObj.sessions.reduce((acc, s) => acc + (Number(s.duration_minutes) || 0), 0);
+
+          return {
+            date: dayStr,
+            displayDate: formatBrtDateWithWeekday(dayStr),
+            totalXp: dObj.totalXp,
+            formattedXp: formatCompactXp(dObj.totalXp),
+            hours: dObj.hours,
+            sessions: dObj.sessions.sort((a, b) => new Date(b.session_start || b.session_end) - new Date(a.session_start || a.session_end)),
+            sessionsCount: dObj.sessions.length,
+            durationMinutes: totalDuration,
+            peakHour: peakH !== null ? `${String(peakH).padStart(2, '0')}:00` : null,
+            peakHourXp: peakXp
+          };
+        });
+
+      setHuntDays(processedHuntDays);
+      setSelectedHuntDate(prev => prev && processedHuntDays.some(d => d.date === prev) ? prev : (processedHuntDays[0]?.date || null));
 
       // Previsão de Up (14 dias)
       const totalXp14d = Object.values(dailyMap).reduce((acc, xp) => acc + (Number(xp) || 0), 0);
@@ -609,7 +748,9 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         prediction: predictionData,
         telemetry: chartData,
         frequentSquad: [],
-        routine: routineData
+        routine: routineData,
+        huntDays: processedHuntDays,
+        selectedHuntDate: processedHuntDays[0]?.date || null
       };
 
       setPlayerInfo(fullSnapshot.playerInfo);
@@ -839,6 +980,52 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       </div>
     );
   }
+
+  // ─── MEMOS PARA O DIÁRIO DE CAÇA E DETALHAMENTO HORÁRIO ───
+  const filteredHuntDays = useMemo(() => {
+    if (!huntDays || huntDays.length === 0) return [];
+    if (huntFilterPeriod === 'all') return huntDays;
+
+    const daysLimit = huntFilterPeriod === '7d' ? 7 : (huntFilterPeriod === '30d' ? 30 : 14);
+    const cutoffDate = new Date(Date.now() - daysLimit * 24 * 60 * 60 * 1000);
+    const cutoffStr = toBrtDateStr(cutoffDate);
+
+    return huntDays.filter(d => d.date >= cutoffStr);
+  }, [huntDays, huntFilterPeriod]);
+
+  const activeSelectedDay = useMemo(() => {
+    if (!huntDays || huntDays.length === 0) return null;
+    return huntDays.find(d => d.date === selectedHuntDate) || huntDays[0];
+  }, [huntDays, selectedHuntDate]);
+
+  const hourlyChartData = useMemo(() => {
+    if (!activeSelectedDay) return [];
+    return Array.from({ length: 24 }, (_, h) => {
+      const xp = activeSelectedDay.hours[h] || 0;
+      return {
+        hour: `${String(h).padStart(2, '0')}:00`,
+        hourNum: h,
+        xp: xp,
+        formattedXp: xp > 0 ? `+${formatCompactXp(xp)}` : '0 XP'
+      };
+    });
+  }, [activeSelectedDay]);
+
+  const periodStats = useMemo(() => {
+    if (!filteredHuntDays || filteredHuntDays.length === 0) return null;
+    const totalXp = filteredHuntDays.reduce((acc, d) => acc + (d.totalXp || 0), 0);
+    const totalSessions = filteredHuntDays.reduce((acc, d) => acc + d.sessionsCount, 0);
+    const avgXpPerDay = Math.round(totalXp / filteredHuntDays.length);
+    const bestDay = [...filteredHuntDays].sort((a, b) => b.totalXp - a.totalXp)[0];
+
+    return {
+      daysCount: filteredHuntDays.length,
+      totalXp,
+      totalSessions,
+      avgXpPerDay,
+      bestDay
+    };
+  }, [filteredHuntDays]);
 
   const activeWorldObj = WORLDS_LIST.find(w => w.id.toLowerCase() === selectedWorld.toLowerCase()) || WORLDS_LIST[1];
 
@@ -1164,18 +1351,24 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
 
       {/* Calendário do Vício (Heatmap) */}
       {heatmap.length > 0 && (
-        <div className="bg-tibia-card p-6 rounded-lg border border-green-900/50 shadow-xl mt-8">
-          <h3 className="text-xl font-bold text-green-400 mb-2 flex items-center">
-            <Activity className="mr-2" size={24} />
-            Calendário do Vício (Últimos 14 dias)
-          </h3>
-          <p className="text-xs text-gray-400 mb-6">Dias com maior intensidade de caça ganham cores mais vivas.</p>
+        <div className="bg-tibia-card p-6 rounded-2xl border border-green-900/50 shadow-xl mt-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+            <h3 className="text-xl font-bold text-green-400 flex items-center">
+              <Activity className="mr-2" size={24} />
+              Calendário do Vício (Últimos 14 dias)
+            </h3>
+            <span className="text-[11px] text-gray-400 italic">
+              Dica: Clique em qualquer dia para ver a análise hora a hora abaixo
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mb-6">Dias com maior intensidade de caça ganham cores mais vivas. Clique em um dia para focar a análise.</p>
           
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2.5">
             {heatmap.map((day) => {
               const d = new Date(day.date + 'T12:00:00Z');
               const rawDay = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'short' }).replace('.', '');
               const dayName = rawDay.charAt(0).toUpperCase() + rawDay.slice(1);
+              const isSelected = selectedHuntDate === day.date;
               
               let bgColor = 'bg-gray-800 border-gray-700';
               if (day.xp > 100000000) bgColor = 'bg-green-400 border-green-300 shadow-[0_0_10px_rgba(74,222,128,0.5)]'; // > 100M
@@ -1184,29 +1377,306 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
               else if (day.xp > 0) bgColor = 'bg-green-900 border-green-800'; // > 0
               
               return (
-                <div key={day.date} className="flex flex-col items-center group relative cursor-help">
-                  <div className={`w-8 h-8 rounded border ${bgColor} transition-transform transform hover:scale-110 mb-1`}></div>
-                  <span className="text-[10px] text-gray-500">{dayName}</span>
+                <button 
+                  key={day.date} 
+                  onClick={() => setSelectedHuntDate(day.date)}
+                  className={`flex flex-col items-center group relative cursor-pointer p-1 rounded-lg transition-all ${
+                    isSelected ? 'bg-yellow-500/15 ring-2 ring-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.6)] scale-110' : 'hover:scale-105'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded border ${bgColor} mb-1 ${isSelected ? 'border-yellow-300' : ''}`}></div>
+                  <span className={`text-[10px] ${isSelected ? 'text-yellow-300 font-bold' : 'text-gray-400'}`}>{dayName}</span>
                   
                   {/* Tooltip */}
-                  <div className="absolute bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-black border border-white/10 text-white text-xs py-1 px-2 rounded whitespace-nowrap z-10 pointer-events-none shadow-lg">
-                    {day.date}: {day.xp > 0 ? `+${(day.xp / 1000000).toFixed(1)}M XP` : '0 XP'}
+                  <div className="absolute bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-black border border-yellow-500/40 text-white text-xs py-1.5 px-2.5 rounded-lg whitespace-nowrap z-20 pointer-events-none shadow-2xl">
+                    <span className="font-bold text-yellow-300">{day.date}</span>: {day.xp > 0 ? `+${(day.xp / 1000000).toFixed(1)}M XP` : '0 XP'}
+                    <span className="block text-[10px] text-gray-400 mt-0.5 font-normal">Clique para detalhar</span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* Radar de Rotina (Horários Ativos) */}
+      {/* ========================================================================= */}
+      {/* DIÁRIO DE CAÇA & DETALHAMENTO HORÁRIO DE XP                               */}
+      {/* ========================================================================= */}
+      <div className="bg-tibia-card p-6 rounded-2xl border border-yellow-500/30 shadow-2xl space-y-6 mt-8">
+        {/* Cabeçalho do Diário */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/40 bg-yellow-500/10 px-3 py-1 text-[11px] font-bold text-yellow-300 uppercase tracking-wider mb-2">
+              <Calendar size={13} className="text-yellow-400" />
+              Telemetria Tática de Grind
+            </div>
+            <h3 className="text-2xl font-black text-white flex items-center gap-2 font-medieval">
+              <Flame className="text-amber-400" size={24} />
+              Diário de Caça & Detalhamento Horário
+            </h3>
+            <p className="text-xs text-gray-400 mt-1">
+              Monitore os dias em que <strong className="text-yellow-300">{playerName}</strong> caçou, quanto de XP produziu por dia e inspecione o desempenho hora a hora.
+            </p>
+          </div>
+
+          {/* Filtro de Período */}
+          <div className="flex items-center gap-1.5 bg-black/60 p-1.5 rounded-xl border border-white/10 self-start lg:self-auto">
+            <span className="text-[11px] text-gray-400 px-2 font-bold flex items-center gap-1">
+              <Filter size={12} /> Período:
+            </span>
+            {[
+              { id: '7d', label: '7 Dias' },
+              { id: '14d', label: '14 Dias' },
+              { id: '30d', label: '30 Dias' },
+              { id: 'all', label: 'Todos' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setHuntFilterPeriod(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  huntFilterPeriod === tab.id
+                    ? 'bg-gradient-to-r from-yellow-500 to-amber-600 text-black shadow-md font-black'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Resumo do Período */}
+        {periodStats && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-black/50 border border-white/10 rounded-xl p-3">
+              <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Dias Caçados</p>
+              <p className="text-xl font-black text-white mt-1">
+                {periodStats.daysCount} <span className="text-xs text-gray-500 font-normal">dias ativos</span>
+              </p>
+            </div>
+            <div className="bg-black/50 border border-white/10 rounded-xl p-3">
+              <p className="text-[11px] text-green-400/90 font-bold uppercase tracking-wider flex items-center gap-1">
+                <TrendingUp size={12} /> XP no Período
+              </p>
+              <p className="text-xl font-black text-green-400 mt-1">
+                +{formatCompactXp(periodStats.totalXp)}
+              </p>
+            </div>
+            <div className="bg-black/50 border border-white/10 rounded-xl p-3">
+              <p className="text-[11px] text-blue-400/90 font-bold uppercase tracking-wider flex items-center gap-1">
+                <Clock size={12} /> Média por Dia Ativo
+              </p>
+              <p className="text-xl font-black text-blue-300 mt-1">
+                +{formatCompactXp(periodStats.avgXpPerDay)}
+              </p>
+            </div>
+            <div className="bg-black/50 border border-amber-500/20 rounded-xl p-3">
+              <p className="text-[11px] text-amber-400/90 font-bold uppercase tracking-wider flex items-center gap-1">
+                <Flame size={12} /> Melhor Grind
+              </p>
+              <p className="text-xl font-black text-amber-300 mt-1 truncate" title={periodStats.bestDay?.displayDate}>
+                {periodStats.bestDay ? `+${formatCompactXp(periodStats.bestDay.totalXp)}` : '---'}
+              </p>
+              <p className="text-[10px] text-gray-400 truncate">{periodStats.bestDay ? periodStats.bestDay.date : ''}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Lista Horizontal de Dias com XP (Scrollável) */}
+        {filteredHuntDays.length === 0 ? (
+          <div className="bg-black/40 border border-dashed border-white/10 rounded-xl p-8 text-center text-gray-400">
+            <p className="text-sm font-bold">Nenhuma caçada registrada no período ({huntFilterPeriod}).</p>
+            <p className="text-xs text-gray-500 mt-1">Alterne o filtro para "30 Dias" ou "Todos" para verificar registros mais antigos.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={13} className="text-yellow-400" />
+                Selecione um dia para inspecionar hora a hora:
+              </span>
+              <span className="text-[11px] text-gray-500 font-mono">
+                {filteredHuntDays.length} {filteredHuntDays.length === 1 ? 'dia encontrado' : 'dias encontrados'}
+              </span>
+            </div>
+
+            <div className="flex gap-2.5 overflow-x-auto pb-2 custom-scrollbar">
+              {filteredHuntDays.map((d) => {
+                const isSelected = activeSelectedDay?.date === d.date;
+                const [y, m, dayNum] = d.date.split('-');
+                const dObj = new Date(d.date + 'T12:00:00Z');
+                const rawWeek = dObj.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'short' }).replace('.', '');
+                const weekShort = rawWeek.charAt(0).toUpperCase() + rawWeek.slice(1);
+
+                return (
+                  <button
+                    key={d.date}
+                    onClick={() => setSelectedHuntDate(d.date)}
+                    className={`shrink-0 flex flex-col items-center justify-center p-3 px-4 rounded-xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-gradient-to-b from-yellow-950/90 to-black border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.35)] scale-105'
+                        : 'bg-black/50 border-white/10 hover:border-white/20 hover:bg-white/5 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <span className="text-[10px] text-gray-400 uppercase font-mono">{weekShort}</span>
+                    <span className={`text-base font-black ${isSelected ? 'text-yellow-300' : 'text-white'}`}>
+                      {dayNum}/{m}
+                    </span>
+                    <span className="text-xs font-bold font-mono text-green-400 mt-1">
+                      +{d.formattedXp}
+                    </span>
+                    {d.sessionsCount > 0 && (
+                      <span className="text-[9px] text-gray-400 mt-0.5 font-mono">
+                        {d.sessionsCount} {d.sessionsCount === 1 ? 'hunt' : 'hunts'}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Painel de Análise Horária do Dia Ativo */}
+            {activeSelectedDay && (
+              <div className="bg-gradient-to-b from-stone-900/90 to-black p-5 rounded-2xl border-2 border-yellow-500/40 shadow-xl space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-black text-yellow-300 font-medieval flex items-center gap-1.5">
+                        <Clock size={18} className="text-yellow-400" />
+                        {activeSelectedDay.displayDate}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-green-950/80 text-green-400 border border-green-500/40">
+                        +{activeSelectedDay.formattedXp} XP no dia
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Detalhamento da curva de XP por faixa de 1 hora (00h às 23h) no fuso horário de Brasília.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    {activeSelectedDay.peakHour && (
+                      <div className="bg-amber-950/40 border border-amber-500/30 px-3 py-1 rounded-lg text-right">
+                        <span className="text-[10px] text-amber-400 block font-bold uppercase tracking-wider">Hora de Pico</span>
+                        <span className="text-sm font-black text-amber-300">
+                          {activeSelectedDay.peakHour} (+{formatCompactXp(activeSelectedDay.peakHourXp)})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Gráfico de Barras Horárias (24 horas) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span className="font-bold flex items-center gap-1">
+                      <BarChart2 size={14} className="text-yellow-400" />
+                      XP Gerada por Hora do Dia
+                    </span>
+                    <span className="text-[11px] text-gray-500">
+                      Passe o mouse sobre as colunas para inspecionar
+                    </span>
+                  </div>
+
+                  <div className="h-56 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={hourlyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
+                        <XAxis 
+                          dataKey="hour" 
+                          stroke="#555" 
+                          tick={{ fill: '#888', fontSize: 10 }}
+                          interval={1}
+                        />
+                        <YAxis 
+                          stroke="#555" 
+                          tick={{ fill: '#888', fontSize: 10 }} 
+                          tickFormatter={(val) => val >= 1000000 ? (val/1000000).toFixed(0)+'M' : (val >= 1000 ? (val/1000).toFixed(0)+'k' : val)} 
+                        />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#111', borderColor: '#eab308', borderRadius: '8px', color: '#fff' }}
+                          formatter={(value) => [`+${formatCompactXp(value)} XP`, 'XP na Hora']}
+                          labelFormatter={(label) => `Horário: ${label} às ${label.split(':')[0]}:59`}
+                        />
+                        <Bar dataKey="xp" radius={[4, 4, 0, 0]}>
+                          {hourlyChartData.map((entry, index) => {
+                            const isPeak = activeSelectedDay.peakHour === entry.hour;
+                            const hasXp = entry.xp > 0;
+                            let fill = '#1c1917';
+                            if (isPeak) fill = '#f59e0b';
+                            else if (hasXp && entry.xp > 100000000) fill = '#10b981';
+                            else if (hasXp && entry.xp > 50000000) fill = '#059669';
+                            else if (hasXp) fill = '#047857';
+                            return <Cell key={`cell-${index}`} fill={fill} />;
+                          })}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Sessões e Caçadas do Dia */}
+                {activeSelectedDay.sessions && activeSelectedDay.sessions.length > 0 && (
+                  <div className="space-y-2 border-t border-white/10 pt-4">
+                    <p className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Activity size={13} className="text-yellow-400" />
+                      Sessões de Caça Fechadas neste Dia ({activeSelectedDay.sessions.length})
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {activeSelectedDay.sessions.map((s, sIdx) => {
+                        const sStart = toBrtTimeStr(s.session_start || s.session_end);
+                        const sEnd = toBrtTimeStr(s.session_end);
+                        const dur = s.duration_minutes || (s.session_start && s.session_end ? Math.round((new Date(s.session_end) - new Date(s.session_start)) / 60000) : 0);
+                        const xpNum = Number(s.xp_gained || 0);
+                        const xpHour = dur > 0 ? Math.round((xpNum / dur) * 60) : 0;
+
+                        return (
+                          <div key={s.id || sIdx} className="bg-black/60 border border-white/10 rounded-xl p-3 flex flex-col justify-between">
+                            <div className="flex items-center justify-between text-xs text-gray-400 border-b border-white/5 pb-1.5 mb-1.5">
+                              <span className="font-mono text-gray-300">
+                                🕒 {sStart} → {sEnd}
+                              </span>
+                              <span className="text-[10px] text-yellow-400/80 font-mono">
+                                {dur > 0 ? `${dur} min` : 'Sessão curta'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-sm font-black text-green-400 font-mono">
+                                  +{formatCompactXp(xpNum)} XP
+                                </span>
+                                {xpHour > 0 && (
+                                  <span className="text-[10px] text-gray-400 block font-mono">
+                                    ~{formatCompactXp(xpHour)} XP/h
+                                  </span>
+                                )}
+                              </div>
+                              {s.end_level && (
+                                <span className="text-[11px] font-bold text-purple-300 bg-purple-950/60 border border-purple-500/30 px-2 py-0.5 rounded-lg">
+                                  Lvl {s.end_level}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Radar de Rotina (Horários Ativos Gerais) */}
       {routine.length > 0 && (
-        <div className="bg-tibia-card p-6 rounded-lg border border-blue-900/50 shadow-xl mt-8">
+        <div className="bg-tibia-card p-6 rounded-2xl border border-blue-900/50 shadow-xl mt-8">
           <h3 className="text-xl font-bold text-blue-400 mb-2 flex items-center">
             <Clock className="mr-2" size={24} />
-            Radar de Rotina (Horário Ativo)
+            Radar de Rotina Geral (Horário Ativo)
           </h3>
-          <p className="text-xs text-gray-400 mb-6">Distribuição da XP gerada por horário do dia (Últimos 7 dias).</p>
+          <p className="text-xs text-gray-400 mb-6">Distribuição consolidada da XP gerada por horário do dia (Últimos 7 dias).</p>
           
           <div className="h-48 w-full">
             <ResponsiveContainer width="100%" height="100%">
