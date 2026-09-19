@@ -113,7 +113,6 @@ export const runFetchOnlines = async () => {
       }
       console.log(`[JOB] Rastreador de Makers: ${relevantLoggedIn.length} Logins, ${relevantLoggedOut.length} Logouts de membros/hunteds registrados.`);
     }
-    const onlineSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
 
     if (huntedList && huntedList.length > 0) {
       // Detecta novos logins de alvos (estavam offline e acabaram de logar)
