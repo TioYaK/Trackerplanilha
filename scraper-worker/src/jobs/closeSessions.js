@@ -45,6 +45,15 @@ export const runCloseSessions = async () => {
     const statesToReset = [];
 
     for (const player of allInactive) {
+      if (player.session_start_xp === null || player.session_start_xp === undefined) {
+        statesToReset.push({
+          character_name: player.character_name,
+          session_start_xp: player.xp_total,
+          session_start_time: player.last_active || new Date().toISOString()
+        });
+        continue;
+      }
+
       const xpGained = Number(player.xp_total || 0) - Number(player.session_start_xp || player.xp_total || 0);
 
       // Só cria uma historical session se o jogador realmente caçou (ganhou XP)

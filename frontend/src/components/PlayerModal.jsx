@@ -98,6 +98,8 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
     setLoading(true);
 
     try {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
       // 2. Consultas simultâneas de alta velocidade usando B-Tree indexes (sem a view pesada view_top_rushers_24h)
       const [
         cStateRes,
@@ -105,14 +107,16 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
         gPerkRes,
         profileRes,
         deathsRes,
-        huntedRes
+        huntedRes,
+        sessionsRes
       ] = await Promise.all([
-        supabase.from('current_character_state').select('*').or(`character_name.eq.${targetName},character_name.ilike.${rawPlayerName}`).limit(1).maybeSingle(),
-        supabase.from('guild_members').select('*').or(`name.eq.${targetName},name.ilike.${rawPlayerName}`).limit(1).maybeSingle(),
-        supabase.from('guild_perk_members').select('world, notes').or(`character_name.eq.${targetName},character_name.ilike.${rawPlayerName}`).limit(1).maybeSingle(),
-        supabase.from('profiles').select('avatar_url, makers, main_character').or(`main_character.eq.${targetName},main_character.ilike.${rawPlayerName}`).limit(1).maybeSingle(),
+        supabase.from('current_character_state').select('*').or(`character_name.eq."${targetName}",character_name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
+        supabase.from('guild_members').select('*').or(`name.eq."${targetName}",name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
+        supabase.from('guild_perk_members').select('world, notes').or(`character_name.eq."${targetName}",character_name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
+        supabase.from('profiles').select('avatar_url, makers, main_character').or(`main_character.eq."${targetName}",main_character.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
         supabase.from('recent_deaths').select('*').eq('character_name', targetName).order('death_time', { ascending: false }).limit(4),
-        supabase.from('hunted_list').select('*').or(`name.eq.${targetName},name.ilike.${rawPlayerName}`).limit(1).maybeSingle()
+        supabase.from('hunted_list').select('*').or(`name.eq."${targetName}",name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
+        supabase.from('historical_sessions').select('xp_gained, session_end, end_xp_total').eq('character_name', targetName).order('session_end', { ascending: false }).limit(20)
       ]);
 
       const cState = cStateRes?.data;
@@ -129,11 +133,26 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
       const xpTotal = cState?.xp_total ? Number(cState.xp_total) : null;
       const lastActive = cState?.last_active || gMem?.last_xp_date || (deathsRes?.data?.[0]?.death_time);
 
-      // Rush 24h calculado instantaneamente sem sobrecarga de banco
-      let computedRush = null;
+      // Rush 24h calculado instantaneamente com precisão
+      const past24hSessions = (sessionsRes?.data || [])
+        .filter(s => s.session_end && s.session_end >= twentyFourHoursAgo)
+        .reduce((acc, s) => acc + (Number(s.xp_gained) || 0), 0);
+
+      let currentDelta = 0;
       if (cState?.xp_total && cState?.session_start_xp && Number(cState.xp_total) > Number(cState.session_start_xp)) {
-        computedRush = { exp_gained: Number(cState.xp_total) - Number(cState.session_start_xp) };
+        currentDelta = Number(cState.xp_total) - Number(cState.session_start_xp);
       }
+
+      const latestArchivedXp = sessionsRes?.data?.[0]?.end_xp_total ? Number(sessionsRes.data[0].end_xp_total) : 0;
+      let unarchivedDelta = 0;
+      if (xpTotal && latestArchivedXp > 0 && xpTotal > latestArchivedXp) {
+        unarchivedDelta = xpTotal - latestArchivedXp;
+      } else if (latestArchivedXp === 0) {
+        unarchivedDelta = currentDelta;
+      }
+
+      const total24hGain = Math.max(past24hSessions + unarchivedDelta, currentDelta);
+      const computedRush = total24hGain > 0 ? { exp_gained: total24hGain } : null;
 
       // 4. Determinação do Mundo
       let detectedWorld = targetWorld || (initialWorld && initialWorld !== 'ALL' ? initialWorld : null) || gPerk?.world;

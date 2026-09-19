@@ -218,19 +218,25 @@ export default async function handler(req, res) {
         const validWorldRanks = [];
 
         for (const c of characters.slice(0, 150)) { // 150 por chunk
-          const name = String(c.character_name || '').trim();
+          const name = String(c.character_name || c.name || '').trim();
           const level = parseInt(c.level, 10);
           const exp = parseInt(c.experience || c.xp_total, 10);
 
           if (!name || name.length < 2 || name.length > 50 || isNaN(level) || level < 1 || level > 3500 || !/^[a-zA-Z0-9'\s\-]+$/.test(name)) continue;
 
-          validStates.push({
+          const stateObj = {
             character_name: name,
             level: level,
             vocation: String(c.vocation || 'Unknown').slice(0, 30),
             xp_total: isNaN(exp) ? null : exp,
             last_active: new Date().toISOString()
-          });
+          };
+
+          if (c.session_start_xp) {
+            stateObj.session_start_xp = parseInt(c.session_start_xp, 10);
+          }
+
+          validStates.push(stateObj);
 
           if (c.world) {
             const cleanRank = parseInt(String(c.rank || '').replace(/\D/g, ''), 10) || null;

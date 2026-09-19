@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
 } from 'recharts';
-import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X, Globe, Trophy, ExternalLink, ArrowLeft, ChevronDown, Flame, Shield, Sparkles, Skull } from 'lucide-react';
+import { Gavel, AlertOctagon, Ghost, Activity, Clock, Search, X, Globe, Trophy, ExternalLink, ArrowLeft, ChevronDown, Flame, Shield, Sparkles, Skull, Zap } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -13,6 +13,20 @@ import { WORLDS_LIST } from '../context/WorldContext';
 // Cache em memória de dados do dashboard do jogador (TTL 60s)
 const playerDashboardCache = new Map();
 const DASHBOARD_CACHE_TTL = 60 * 1000;
+
+export function formatCompactXp(val) {
+  const n = Number(val) || 0;
+  if (n >= 1_000_000_000) {
+    return (n / 1_000_000_000).toFixed(2) + 'B';
+  }
+  if (n >= 1_000_000) {
+    return (n / 1_000_000).toFixed(1) + 'M';
+  }
+  if (n >= 1_000) {
+    return (n / 1_000).toFixed(1) + 'k';
+  }
+  return n.toLocaleString('pt-BR');
+}
 
 export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, onBack, initialWorld }) {
   const [telemetry, setTelemetry] = useState([]);
@@ -97,55 +111,32 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       const fetchProfileP = supabase
         .from('profiles')
         .select('avatar_url, makers')
-        .or(`main_character.eq.${targetName},main_character.ilike.${rawPlayerName}`)
+        .or(`main_character.eq."${targetName}",main_character.ilike."${rawPlayerName}"`)
         .limit(1)
         .maybeSingle();
 
       const fetchGMembersP = supabase
         .from('guild_members')
         .select('name, level, vocation, is_online, rank')
-        .or(`name.eq.${targetName},name.ilike.${rawPlayerName}`)
+        .or(`name.eq."${targetName}",name.ilike."${rawPlayerName}"`)
         .limit(1)
         .maybeSingle();
 
       const fetchCDataP = supabase
         .from('current_character_state')
         .select('character_name, xp_total, session_start_xp, level, vocation, last_active')
-        .or(`character_name.eq.${targetName},character_name.ilike.${rawPlayerName}`)
+        .or(`character_name.eq."${targetName}",character_name.ilike."${rawPlayerName}"`)
         .limit(1)
         .maybeSingle();
 
       const fetchGPerkP = supabase
         .from('guild_perk_members')
         .select('world, notes')
-        .or(`character_name.eq.${targetName},character_name.ilike.${rawPlayerName}`)
+        .or(`character_name.eq."${targetName}",character_name.ilike."${rawPlayerName}"`)
         .limit(1)
         .maybeSingle();
 
-      // ─── FASE 2: TELEMETRIA, SESSÕES & MORTES (Lançadas em paralelo, com uso estrito de .eq() para B-Tree indexes) ───
-      const fetchSessionsP = supabase
-        .from('historical_sessions')
-        .select('session_start, session_end, xp_gained, end_level, end_xp_total')
-        .eq('character_name', targetName)
-        .gte('session_end', fourteenDaysAgo)
-        .order('session_end', { ascending: true });
-
-      const fetchDeathsP = supabase
-        .from('recent_deaths')
-        .select('level, killed_by, death_time')
-        .eq('character_name', targetName)
-        .gte('death_time', fourteenDaysAgo)
-        .order('death_time', { ascending: false });
-
-      const fetchLoginP = supabase
-        .from('login_events')
-        .select('event_type, event_time')
-        .eq('character_name', targetName)
-        .order('event_time', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // Aguarda Fase 1 para renderização imediata do cabeçalho
+      // Aguarda Fase 1 para resolver identidade exata e canonicalName
       const [profileRes, gMembersRes, cDataRes, gPerkRes] = await Promise.all([
         fetchProfileP,
         fetchGMembersP,
@@ -157,10 +148,33 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       const memberData = gMembersRes?.data;
       const canonicalName = cData?.character_name || memberData?.name || targetName;
 
+      // ─── FASE 2: TELEMETRIA, SESSÕES & MORTES (Executadas com canonicalName e B-Tree indexes limitados) ───
+      const [sessionsRes, deathsRes, loginRes] = await Promise.all([
+        supabase
+          .from('historical_sessions')
+          .select('session_start, session_end, xp_gained, end_level, end_xp_total')
+          .eq('character_name', canonicalName)
+          .order('session_end', { ascending: false })
+          .limit(100),
+        supabase
+          .from('recent_deaths')
+          .select('level, killed_by, death_time')
+          .eq('character_name', canonicalName)
+          .order('death_time', { ascending: false })
+          .limit(50),
+        supabase
+          .from('login_events')
+          .select('event_type, event_time')
+          .eq('character_name', canonicalName)
+          .order('event_time', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ]);
+
       // Avatar
       setPlayerAvatar(profileRes?.data?.avatar_url || null);
 
-      // Status Online Preliminar
+      // Status Online Preliminar e refinado com login_events
       const nowMs = Date.now();
       const isRecentlyActive = cData?.last_active ? (() => {
         const activeDate = parseUtcDate(cData.last_active);
@@ -170,18 +184,20 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       })() : false;
 
       let isOnline = memberData ? Boolean(memberData.is_online) : isRecentlyActive;
+      const lastLoginEvent = loginRes?.data;
+      if (lastLoginEvent) {
+        if (lastLoginEvent.event_type === 'LOGOUT') {
+          isOnline = false;
+        } else if (lastLoginEvent.event_type === 'LOGIN') {
+          const loginDate = parseUtcDate(lastLoginEvent.event_time);
+          const loginDiff = loginDate ? (nowMs - loginDate.getTime()) : Infinity;
+          isOnline = (loginDiff >= 0 && loginDiff < 24 * 60 * 60 * 1000) && (memberData ? Boolean(memberData.is_online) : isRecentlyActive);
+        }
+      }
 
       const rawVoc = cData?.vocation || memberData?.vocation;
       const finalVocation = formatVocation(rawVoc);
       const finalLevel = memberData?.level || cData?.level || null;
-
-      // Renderiza imediatamente o cabeçalho com level, vocação e online
-      setPlayerInfo({
-        level: finalLevel,
-        vocation: finalVocation,
-        is_online: isOnline,
-        guild_rank: memberData?.rank || null
-      });
 
       // Resolução de Mundo
       let detWorld = gPerkRes?.data?.world || (initialWorld && initialWorld !== 'ALL' ? initialWorld : null);
@@ -202,44 +218,48 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         setWorldRank(null);
       }
 
-      // ─── AGUARDA FASE 2 (Sessões e Históricos) ───
-      const [sessionsRes, deathsRes, loginRes] = await Promise.all([
-        fetchSessionsP,
-        fetchDeathsP,
-        fetchLoginP
-      ]);
+      // Delta de XP e 24h Rush calculado com precisão sem sobrecarga
+      const rawSessions = sessionsRes?.data || [];
+      const boundsData = rawSessions
+        .filter(s => s.session_end && s.session_end >= fourteenDaysAgo)
+        .reverse();
 
-      // Refina status online com o evento de login mais recente se disponível
-      const lastLoginEvent = loginRes?.data;
-      if (lastLoginEvent) {
-        if (lastLoginEvent.event_type === 'LOGOUT') {
-          isOnline = false;
-        } else if (lastLoginEvent.event_type === 'LOGIN') {
-          const loginDate = parseUtcDate(lastLoginEvent.event_time);
-          const loginDiff = loginDate ? (nowMs - loginDate.getTime()) : Infinity;
-          isOnline = (loginDiff >= 0 && loginDiff < 24 * 60 * 60 * 1000) && (memberData ? Boolean(memberData.is_online) : isRecentlyActive);
-        }
-        setPlayerInfo(prev => prev ? { ...prev, is_online: isOnline } : prev);
-      }
-
-      // Delta de XP e 24h Rush calculado em 0ms no cliente (Elimina view_top_rushers_24h de 1.5s!)
       let currentXP = cData?.xp_total ? Number(cData.xp_total) : 0;
       let currentDelta = 0;
       if (cData?.xp_total && cData?.session_start_xp && Number(cData.xp_total) > Number(cData.session_start_xp)) {
         currentDelta = Number(cData.xp_total) - Number(cData.session_start_xp);
       }
 
-      const boundsData = sessionsRes?.data || [];
       if (currentXP === 0 && boundsData.length > 0) {
         currentXP = Number(boundsData[boundsData.length - 1].end_xp_total || 0);
       }
 
-      const xpGained24h = boundsData
+      const past24hDelta = boundsData
         .filter(s => s.session_end && s.session_end >= twentyFourHoursAgo)
-        .reduce((acc, s) => acc + (Number(s.xp_gained) || 0), 0) + currentDelta;
+        .reduce((acc, s) => acc + (Number(s.xp_gained) || 0), 0);
 
+      const latestArchivedXp = boundsData.length > 0 ? Number(boundsData[boundsData.length - 1].end_xp_total || 0) : 0;
+      let unarchivedDelta = 0;
+      if (currentXP > latestArchivedXp && latestArchivedXp > 0) {
+        unarchivedDelta = currentXP - latestArchivedXp;
+      } else if (latestArchivedXp === 0) {
+        unarchivedDelta = currentDelta;
+      }
+
+      const xpGained24h = Math.max(past24hDelta + unarchivedDelta, currentDelta);
       const rusherData = { exp_gained: xpGained24h, xp_gained: xpGained24h };
       setRusher24h(rusherData);
+
+      // Renderiza imediatamente o cabeçalho com level, vocação, xp total e status online
+      setPlayerInfo({
+        level: finalLevel,
+        vocation: finalVocation,
+        is_online: isOnline,
+        guild_rank: memberData?.rank || null,
+        world: detWorld,
+        xp_total: currentXP,
+        xp_today: xpGained24h
+      });
 
       // Histórico de Mortes e Mudança de Level (com desduplicação defensiva)
       const deathsData = deathsRes?.data || [];
@@ -508,7 +528,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
           guild_rank: memberData?.rank || null,
           last_active: cData?.last_active || null,
           xp_total: currentXP,
-          xp_today: currentDelta
+          xp_today: xpGained24h
         },
         worldRank: gPerkRes?.data?.notes && gPerkRes.data.notes.includes('rank:') ? parseInt(gPerkRes.data.notes.replace('rank:', ''), 10) : null,
         globalRank: null,
@@ -523,6 +543,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         routine: routineData
       };
 
+      setPlayerInfo(fullSnapshot.playerInfo);
       playerDashboardCache.set(cacheKey, fullSnapshot);
       try {
         if (typeof window !== 'undefined' && window.sessionStorage) {
@@ -843,6 +864,12 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
                 <span className="bg-gray-800 text-gray-300 px-3 py-1 rounded text-sm border border-gray-600 font-medium">
                   {playerInfo.vocation}
                 </span>
+                {playerInfo.xp_total > 0 && (
+                  <span className="bg-amber-950/60 text-amber-300 px-3 py-1 rounded text-sm font-bold border border-amber-500/40 flex items-center gap-1.5 shadow-sm" title={`XP Total: ${Number(playerInfo.xp_total).toLocaleString('pt-BR')} XP`}>
+                    <Zap size={14} className="text-amber-400" />
+                    {formatCompactXp(playerInfo.xp_total)} XP Total
+                  </span>
+                )}
                 {playerInfo.is_online ? (
                   <span className="flex items-center text-green-400 font-bold text-sm bg-green-900/20 px-3 py-1 rounded border border-green-500/30">
                     <span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span> Online
@@ -912,47 +939,67 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       </div>
 
       {/* Cards de Rankings e Telemetria do Mundo */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Ranking no Mundo */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* XP Acumulada Total */}
         <div className="bg-gradient-to-b from-stone-900 to-black p-4 rounded-xl border border-yellow-500/30 flex items-center justify-between shadow-lg">
           <div>
-            <p className="text-xs font-bold text-yellow-400/90 uppercase tracking-wider">Ranking no Mundo</p>
-            <p className="text-3xl font-black text-white mt-1">
-              {worldRank ? `#${worldRank}` : 'Top 100'}
+            <p className="text-xs font-bold text-yellow-400/90 uppercase tracking-wider flex items-center gap-1">
+              <Zap size={13} className="text-yellow-400" /> XP Acumulada
             </p>
-            <p className="text-[11px] text-gray-400 mt-0.5">Servidor {activeWorldObj?.name}</p>
+            <p className="text-2xl font-black text-white mt-1">
+              {playerInfo?.xp_total ? formatCompactXp(playerInfo.xp_total) : '---'}
+            </p>
+            <p className="text-[11px] text-gray-400 mt-0.5 font-mono truncate max-w-[140px]" title={playerInfo?.xp_total ? `${Number(playerInfo.xp_total).toLocaleString('pt-BR')} XP` : ''}>
+              {playerInfo?.xp_total ? `${Number(playerInfo.xp_total).toLocaleString('pt-BR')} XP` : 'Total no Rubinot'}
+            </p>
           </div>
-          <Shield className="text-yellow-400 opacity-60" size={36} />
+          <Zap className="text-yellow-400 opacity-60" size={36} />
+        </div>
+
+        {/* Top Rusher 24h */}
+        <div className="bg-gradient-to-b from-amber-950/30 to-black p-4 rounded-xl border border-amber-500/40 flex items-center justify-between shadow-lg shadow-amber-500/5">
+          <div>
+            <p className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+              <Flame size={13} className="text-amber-400" /> Rush 24 Horas
+            </p>
+            <p className="text-2xl font-black text-amber-300 mt-1">
+              {rusher24h?.exp_gained ? `+${formatCompactXp(rusher24h.exp_gained)} XP` : '0 XP'}
+            </p>
+            <p className="text-[11px] text-amber-400/70 mt-0.5 font-mono truncate max-w-[140px]" title={rusher24h?.exp_gained ? `+${Number(rusher24h.exp_gained).toLocaleString('pt-BR')} XP` : ''}>
+              {rusher24h?.exp_gained ? `+${Number(rusher24h.exp_gained).toLocaleString('pt-BR')} XP` : 'Sem rush recente'}
+            </p>
+          </div>
+          <Flame className="text-amber-400 opacity-80" size={36} />
         </div>
 
         {/* Ranking Global */}
-        <div className="bg-gradient-to-b from-yellow-950/30 to-black p-4 rounded-xl border-2 border-yellow-500/50 flex items-center justify-between shadow-xl shadow-yellow-500/5">
+        <div className="bg-gradient-to-b from-stone-900 to-black p-4 rounded-xl border-2 border-yellow-500/40 flex items-center justify-between shadow-xl shadow-yellow-500/5">
           <div>
             <p className="text-xs font-black text-yellow-400 uppercase tracking-wider flex items-center gap-1">
-              <Sparkles size={12} /> Ranking Global
+              <Trophy size={13} className="text-yellow-400" /> Ranking Global
             </p>
-            <p className="text-3xl font-black text-yellow-300 mt-1">
+            <p className="text-2xl font-black text-yellow-300 mt-1">
               {globalRank ? `#${globalRank}` : 'Top Geral'}
             </p>
             <p className="text-[11px] text-yellow-400/70 mt-0.5 font-mono">
               {globalPercentile ? `Top ${globalPercentile}% no Rubinot` : 'Entre 12.365+ players'}
             </p>
           </div>
-          <Trophy className="text-yellow-400 opacity-80" size={36} />
+          <Trophy className="text-yellow-400 opacity-70" size={36} />
         </div>
 
-        {/* Top Rusher 24h */}
-        <div className="bg-gradient-to-b from-stone-900 to-black p-4 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-lg">
+        {/* Ranking no Mundo */}
+        <div className="bg-gradient-to-b from-stone-900 to-black p-4 rounded-xl border border-yellow-500/30 flex items-center justify-between shadow-lg">
           <div>
-            <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Rush 24 Horas</p>
-            <p className="text-2xl font-black text-amber-300 mt-1">
-              {rusher24h ? `+${(rusher24h.exp_gained / 1000000).toFixed(1)}M XP` : '0 XP'}
+            <p className="text-xs font-bold text-yellow-400/90 uppercase tracking-wider flex items-center gap-1">
+              <Shield size={13} className="text-yellow-400" /> Ranking no Mundo
             </p>
-            <p className="text-[11px] text-gray-400 mt-0.5">
-              {rusher24h ? 'Top Rusher ativo hoje' : 'Sem rush recente'}
+            <p className="text-2xl font-black text-white mt-1">
+              {worldRank ? `#${worldRank}` : 'Top 100'}
             </p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Servidor {activeWorldObj?.name}</p>
           </div>
-          <Flame className="text-amber-400 opacity-70" size={36} />
+          <Shield className="text-yellow-400 opacity-60" size={36} />
         </div>
       </div>
 
