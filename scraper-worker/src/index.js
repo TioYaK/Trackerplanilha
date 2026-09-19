@@ -117,16 +117,121 @@ console.log(`${'='.repeat(60)}\n`);
 // ==========================================
 // SISTEMA DE TAREFAS
 // ==========================================
+// ==========================================
+// TELEMETRIA DA FROTA E COOLDOWNS ADAPTATIVOS
+// ==========================================
+let cachedFleetSize = 1;
+let lastFleetCheck = 0;
+
+const getActiveFleetSize = async () => {
+  const now = Date.now();
+  if (now - lastFleetCheck < 60000) { // Cache de 60s para economizar banda
+    return cachedFleetSize;
+  }
+  if (!supabase) return 1;
+  try {
+    const cutoff = new Date(now - 2 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from('worker_heartbeats')
+      .select('*', { count: 'exact', head: true })
+      .gte('last_ping', cutoff);
+
+    if (!error && typeof count === 'number') {
+      cachedFleetSize = Math.max(1, count);
+      lastFleetCheck = now;
+    }
+  } catch (e) {}
+  return cachedFleetSize;
+};
+
+const getAdaptiveCooldown = (taskType, fleetSize) => {
+  // 1-2 Workers: Modo Eco/Padrão (Preserva recursos e conexão)
+  // 3-4 Workers: Modo Turbo (2x mais rápido em mortes e onlines)
+  // 5+ Workers:  Modo Ultra (Alertas instantâneos em 4s e rotação simultânea)
+
+  if (fleetSize >= 5) {
+    const ultraCooldowns = {
+      FETCH_DEATHS: 4,           // 4s (Alerta instantâneo de frags de war)
+      FETCH_ONLINES: 10,         // 10s (Radar ao vivo contínuo)
+      PROCESS_GUILD_INVITES: 10, // 10s
+      FETCH_RIVALS: 20,          // 20s
+      FETCH_ROSTER_SHARD: 30,    // 30s (Todos os shards rodam praticamente em paralelo)
+      FETCH_KILLSTATS: 60,       // 1m
+      AUDIT_SLOTS: 60,           // 1m
+      CLOSE_SESSIONS: 300,       // 5m
+      FETCH_BAZAAR: 300,         // 5m
+      FETCH_TRANSFERS: 600,      // 10m
+      AUDIT_GUILD_PERKS: 600,    // 10m
+      FETCH_GUILD: 1800          // 30m
+    };
+    if (taskType.startsWith('FETCH_HIGHSCORE')) return 60; // 1m para cada vocação
+    return ultraCooldowns[taskType] ?? 30;
+  }
+
+  if (fleetSize >= 3) {
+    const turboCooldowns = {
+      FETCH_DEATHS: 8,           // 8s (2x mais veloz)
+      FETCH_ONLINES: 15,         // 15s (2x mais veloz)
+      PROCESS_GUILD_INVITES: 15, // 15s
+      FETCH_RIVALS: 30,          // 30s
+      FETCH_ROSTER_SHARD: 90,    // 1.5m (4 shards em 6 min vs 20 min)
+      FETCH_KILLSTATS: 120,      // 2m
+      AUDIT_SLOTS: 120,          // 2m
+      CLOSE_SESSIONS: 600,       // 10m
+      FETCH_BAZAAR: 600,         // 10m
+      FETCH_TRANSFERS: 1200,     // 20m
+      AUDIT_GUILD_PERKS: 1200,   // 20m
+      FETCH_GUILD: 2400          // 40m
+    };
+    if (taskType.startsWith('FETCH_HIGHSCORE')) return 120; // 2m para cada vocação
+    return turboCooldowns[taskType] ?? 60;
+  }
+
+  // Modo Eco Padrão (1 a 2 workers)
+  const defaultCooldowns = {
+    FETCH_DEATHS: 15,          // 15s
+    FETCH_ONLINES: 30,         // 30s
+    PROCESS_GUILD_INVITES: 30, // 30s
+    FETCH_RIVALS: 60,          // 1m
+    FETCH_ROSTER_SHARD: 300,   // 5m
+    FETCH_KILLSTATS: 300,      // 5m
+    AUDIT_SLOTS: 300,          // 5m
+    CLOSE_SESSIONS: 900,       // 15m
+    FETCH_BAZAAR: 900,         // 15m
+    FETCH_TRANSFERS: 1800,     // 30m
+    AUDIT_GUILD_PERKS: 1800,   // 30m
+    FETCH_GUILD: 3600,         // 1h
+  };
+  if (taskType.startsWith('FETCH_HIGHSCORE')) return 300;
+  return defaultCooldowns[taskType] ?? 60;
+};
+
+// ==========================================
+// SISTEMA DE TAREFAS (COM ATOMIC SKIP LOCKED)
+// ==========================================
 const fetchTask = async () => {
   if (isWorkerPaused || !supabase) return null;
   try {
+    // 1. Tenta RPC atômica claim_next_task (Zero lock collision com 10+ workers)
+    try {
+      const { data: rpcTasks, error: rpcErr } = await supabase.rpc('claim_next_task', {
+        p_worker_id: WORKER_ID,
+        p_preferred_lane: 'ANY'
+      });
+      if (!rpcErr && rpcTasks && rpcTasks.length > 0) {
+        return rpcTasks[0];
+      }
+    } catch (rpcEx) {
+      // Se a RPC não existir ainda no banco, prossegue suavemente com o fallback
+    }
+
+    // 2. Fallback: Concorrência otimista com jitter anti-colisão
     const now = new Date().toISOString();
     const crashLimit = new Date();
     crashLimit.setMinutes(crashLimit.getMinutes() - LOCK_TIMEOUT_MINUTES);
 
     const orQuery = `and(status.eq.PENDING,or(locked_at.is.null,locked_at.lte.${now})),and(status.eq.IN_PROGRESS,locked_at.lte.${crashLimit.toISOString()})`;
 
-    // 1. Busca tarefas pendentes em 1 única query rápida (colunas selecionadas para economia de banda)
     const priorityTypes = ['UPDATE_WORKERS', 'PROCESS_GUILD_INVITES', 'FETCH_ONLINES', 'FETCH_DEATHS'];
     const { data: tasks, error } = await supabase
       .from('task_queue')
@@ -138,15 +243,12 @@ const fetchTask = async () => {
     if (error) throw error;
     if (!tasks || tasks.length === 0) return null;
 
-    // Prioriza tarefas críticas em tempo real em memória para evitar inanição (starvation)
     const prioTasks = tasks.filter(t => priorityTypes.includes(t.task_type));
     const candidates = prioTasks.length > 0 ? prioTasks : tasks;
 
-    // Anti-colisão no swarm: seleciona com jitter entre os candidatos para paralelismo real
     const pickIndex = Math.floor(Math.random() * candidates.length);
     const task = candidates[pickIndex];
 
-    // Tenta aplicar o lock (concorrência otimista)
     let query = supabase
       .from('task_queue')
       .update({
@@ -162,7 +264,6 @@ const fetchTask = async () => {
     }
 
     const { data: updatedTask, error: updateError } = await query.select().maybeSingle();
-
     if (updateError || !updatedTask) {
       return null; // Outro worker pegou
     }
@@ -175,29 +276,13 @@ const fetchTask = async () => {
 };
 
 const completeTask = async (task) => {
-  // Cooldown em SEGUNDOS por tipo de tarefa (Ajuste de Alta Performance)
-  const cooldowns = {
-    FETCH_DEATHS: 15,          // 15s (Alerta instantâneo de mortes/frags)
-    FETCH_ONLINES: 30,         // 30s (Heatmap, Makers e Radar Tático)
-    PROCESS_GUILD_INVITES: 30, // 30s (Convites de novos membros)
-    FETCH_RIVALS: 60,          // 1m (Espionagem da Guilda Rival)
-    FETCH_ROSTER_SHARD: 300,   // 5m (Rotação completa de 4 shards em 20 min vs 1h)
-    FETCH_KILLSTATS: 300,      // 5m (Micro-cache rápido de estatísticas)
-    AUDIT_SLOTS: 300,          // 5m (Auditoria de Slots de Respawn e Discord)
-    CLOSE_SESSIONS: 900,       // 15m (Encerramento de hunts inativas)
-    FETCH_BAZAAR: 900,         // 15m (Sniper de Bazaar 4x mais frequente)
-    FETCH_TRANSFERS: 1800,     // 30m (Detecção de jogadores transferidos)
-    AUDIT_GUILD_PERKS: 1800,   // 30m (Auditoria de 7d XP e fila de cargos de Perks)
-    FETCH_GUILD: 3600,         // 1h (Membros e cargos oficiais)
-  };
-
-  let cooldownSeconds = cooldowns[task.task_type] ?? 60;
-  if (task.task_type.startsWith('FETCH_HIGHSCORE')) cooldownSeconds = 300; // 5m para cada vocação
+  const fleetSize = await getActiveFleetSize();
+  const cooldownSeconds = getAdaptiveCooldown(task.task_type, fleetSize);
 
   const nextRun = new Date();
   nextRun.setSeconds(nextRun.getSeconds() + cooldownSeconds);
 
-  console.log(`[WORKER] ✔ ${task.task_type} concluída. Próxima execução em ${cooldownSeconds}s.`);
+  console.log(`[WORKER] ✔ ${task.task_type} concluída. (Frota ativa: ${fleetSize} | Próx: ${cooldownSeconds}s)`);
 
   if (supabase) {
     await supabase
@@ -375,7 +460,7 @@ const processTask = async (task) => {
 // ==========================================
 // HEARTBEAT DO WORKER
 // ==========================================
-const WORKER_VERSION = '2.0.2';
+const WORKER_VERSION = '2.1.0';
 const WORKER_STARTED = new Date().toISOString();
 let WORKER_LOCATION = 'Desconhecida';
 
@@ -458,9 +543,12 @@ const loop = async () => {
       await checkForUpdates();
     }
 
-    // Backoff adaptativo inteligente para economia de banda (Supabase Egress Guard)
-    // 3s no primeiro ciclo vazio, 5s no 2º-4º, 8s quando em repouso prolongado
-    const delay = emptyCycles <= 1 ? 3000 : (emptyCycles < 5 ? 5000 : 8000);
+    // Backoff adaptativo inteligente com Jitter Estocástico (Anti-Manada para 10+ workers)
+    // 3s no primeiro ciclo vazio, 5s no 2º-4º, 8s quando em repouso prolongado + jitter aleatório
+    const fleetSize = await getActiveFleetSize();
+    const baseDelay = emptyCycles <= 1 ? 3000 : (emptyCycles < 5 ? 5000 : 8000);
+    const jitter = Math.floor(Math.random() * (fleetSize >= 5 ? 3000 : 1500));
+    const delay = baseDelay + jitter;
     setTimeout(loop, delay);
   }
 };
