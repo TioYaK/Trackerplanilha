@@ -57,18 +57,34 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
   const [copiedLoot, setCopiedLoot] = useState(false);
 
   const fetchHomeData = async (forceRefresh = false, isBackground = false) => {
-    // 0. Cache em memória instantâneo se dados tiverem menos de 90 segundos (Egress Guard)
-    if (!forceRefresh && homeCache.data && (Date.now() - homeCache.timestamp < 90000)) {
+    // 0. Cache em memória ou sessionStorage instantâneo (SWR 0ms de pintura)
+    if (!homeCache.data && typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const s = sessionStorage.getItem('rubinot_home_cache');
+        if (s) {
+          const parsed = JSON.parse(s);
+          if (Date.now() - parsed.timestamp < 10 * 60 * 1000) {
+            homeCache = parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (homeCache.data) {
       setRecentDeaths(homeCache.data.recentDeaths);
       setDeathsCount24h(homeCache.data.deathsCount24h);
       setTopRushers(homeCache.data.topRushers);
       if (homeCache.data.onlineCount > 0) setOnlineCount(homeCache.data.onlineCount);
       setActiveWorkers(homeCache.data.activeWorkers);
       setLoading(false);
-      return;
-    }
 
-    if (!isBackground) setLoading(true);
+      if (!forceRefresh && (Date.now() - homeCache.timestamp < 60000)) {
+        return;
+      }
+      isBackground = true; // Continua em segundo plano sem spinner
+    } else {
+      if (!isBackground) setLoading(true);
+    }
     try {
       // 1. Mortes recentes (apenas colunas necessárias)
       let deathsQuery = supabase
@@ -177,7 +193,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         setActiveWorkers(currentWorkers);
       }
 
-      // Salva no cache de 45s
+      // Salva no cache de 60s em memória e sessionStorage
       homeCache = {
         timestamp: Date.now(),
         data: {
@@ -188,6 +204,12 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           activeWorkers: currentWorkers
         }
       };
+
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          sessionStorage.setItem('rubinot_home_cache', JSON.stringify(homeCache));
+        }
+      } catch (e) {}
 
     } catch (err) {
       console.error('Erro ao carregar dados do Rubinot Hub:', err);
@@ -517,7 +539,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
       <AdBanner />
 
       {/* ⚔️ LIVE WAR FEED: MURAL DE FRAGS EM TEMPO REAL & FEED DE TRETA */}
-      <LiveWarFeed onPlayerClick={onPlayerClick} onNavigate={onNavigate} />
+      <LiveWarFeed onPlayerClick={onPlayerClick} onNavigate={onNavigate} initialFrags={recentDeaths} />
 
       {/* 3. VITRINE DE SUPER RECURSOS (OS 3 PILARES DE CONVERSÃO & UTILIDADE) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

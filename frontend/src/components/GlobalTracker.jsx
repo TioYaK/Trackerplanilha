@@ -14,6 +14,11 @@ let cachedAffiliations = null;
 let affiliationsTimestamp = 0;
 const AFFILIATIONS_TTL = 5 * 60 * 1000;
 
+// Cache em memória para membros de mundos e mundos de personagens (TTL 5 min)
+const worldMembersCache = new Map();
+const characterWorldCache = new Map();
+const WORLD_CACHE_TTL = 5 * 60 * 1000;
+
 export default function GlobalTracker({ onPlayerClick }) {
   const { selectedWorld, setSelectedWorld, worldConfig } = useWorld();
 
@@ -492,16 +497,26 @@ export default function GlobalTracker({ onPlayerClick }) {
       if (cleanSearch) {
         query = query.ilike('character_name', `%${cleanSearch}%`);
       } else if (selectedWorld && selectedWorld !== 'ALL') {
-        // Sem busca por nome: carrega membros cadastrados daquele mundo
-        const { data: worldMembers } = await supabase
-          .from('guild_perk_members')
-          .select('character_name')
-          .eq('world', selectedWorld)
-          .limit(1000)
-          .abortSignal(controller.signal);
+        // Sem busca por nome: carrega membros cadastrados daquele mundo com cache
+        let memberNames = null;
+        const cachedWorld = worldMembersCache.get(selectedWorld);
+        if (cachedWorld && (Date.now() - cachedWorld.timestamp < WORLD_CACHE_TTL)) {
+          memberNames = cachedWorld.names;
+        } else {
+          const { data: worldMembers } = await supabase
+            .from('guild_perk_members')
+            .select('character_name')
+            .eq('world', selectedWorld)
+            .limit(1000)
+            .abortSignal(controller.signal);
 
-        if (worldMembers && worldMembers.length > 0) {
-          const memberNames = worldMembers.map(m => m.character_name);
+          if (worldMembers && worldMembers.length > 0) {
+            memberNames = worldMembers.map(m => m.character_name);
+            worldMembersCache.set(selectedWorld, { timestamp: Date.now(), names: memberNames });
+          }
+        }
+
+        if (memberNames && memberNames.length > 0) {
           query = query.in('character_name', memberNames);
         }
       }
@@ -533,29 +548,31 @@ export default function GlobalTracker({ onPlayerClick }) {
       if (data && data.length > 0) {
         const names = data.map(d => d.character_name);
 
-        // Identificação rápida de mundo apenas para os jogadores da página atual (<50ms)
-        const { data: perkData } = await supabase
-          .from('guild_perk_members')
-          .select('character_name, world')
-          .in('character_name', names)
-          .abortSignal(controller.signal);
+        // Identificação rápida de mundo apenas para nomes ainda não em cache (<50ms)
+        const unknownNames = names.filter(n => n && !characterWorldCache.has(n.toLowerCase()));
+        if (unknownNames.length > 0) {
+          const { data: perkData } = await supabase
+            .from('guild_perk_members')
+            .select('character_name, world')
+            .in('character_name', unknownNames)
+            .abortSignal(controller.signal);
 
-        if (requestId !== activeRequestRef.current) return;
+          if (requestId !== activeRequestRef.current) return;
 
-        const worldMap = new Map();
-        if (perkData) {
-          perkData.forEach(pk => {
-            if (pk.character_name) {
-              worldMap.set(pk.character_name.toLowerCase(), pk.world);
-            }
-          });
+          if (perkData) {
+            perkData.forEach(pk => {
+              if (pk.character_name) {
+                characterWorldCache.set(pk.character_name.toLowerCase(), pk.world);
+              }
+            });
+          }
         }
 
         let merged = data.map(p => {
           const nameLower = (p.character_name || '').toLowerCase();
           // Delta de XP calculado instantaneamente em 0ms (elimina views e joins pesados de 30s)
           const activeDelta = Math.max(0, Number(p.xp_total || 0) - Number(p.session_start_xp || p.xp_total || 0));
-          const characterWorld = worldMap.get(nameLower) || (selectedWorld !== 'ALL' ? selectedWorld : null);
+          const characterWorld = characterWorldCache.get(nameLower) || (selectedWorld !== 'ALL' ? selectedWorld : null);
 
           return {
             ...p,

@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Clock, TrendingUp, AlertTriangle, Users, Info, CheckCircle, RotateCcw, Shield, Zap, Skull, Calendar, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { parseUtcDate, isSlotActiveNow } from '../lib/tibiaUtils';
+import { parseUtcDate, isSlotActiveNow, toTibiaTitleCase } from '../lib/tibiaUtils';
+
+// Cache em memória de auditoria de parties (TTL 60s)
+const partyDashboardCache = new Map();
+const PARTY_CACHE_TTL = 60 * 1000;
 
 const toMinutes = (timeStr) => {
   if (!timeStr || typeof timeStr !== 'string') return 0;
@@ -133,35 +137,68 @@ export default function PartyDashboard({ party, onPlayerClick }) {
         return;
       }
 
+      const cacheKey = `${party.id || party.respawn_name}_${historyRange}`;
+      const cached = partyDashboardCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < PARTY_CACHE_TTL)) {
+        if (!isCancelled) {
+          setRawDataset(cached.data);
+          setLoading(false);
+        }
+        if (!isBackground && (Date.now() - cached.timestamp < 30000)) {
+          return; // Retorno instantâneo do cache (<30s)
+        }
+        isBackground = true;
+      }
+
+      if (!isBackground) {
+        setLoading(true);
+      }
+
       const daysToFetch = historyRange === 'week' ? 7 : 30;
       const historyStartDate = new Date(Date.now() - daysToFetch * 24 * 60 * 60 * 1000).toISOString();
-      const orFilterName = validMembers.map(m => `name.ilike."${m.trim().replace(/[",]/g, '')}"`).join(',');
-      const orFilterChar = validMembers.map(m => `character_name.ilike."${m.trim().replace(/[",]/g, '')}"`).join(',');
+      const titleMembers = validMembers.map(toTibiaTitleCase);
 
       try {
         const [
-          { data: logs },
+          sessionsResList,
           { data: currentStates },
           { data: guildData },
           { data: recentDeaths },
           { data: loginEvents }
         ] = await Promise.all([
-          supabase.from('historical_sessions').select('*').or(orFilterChar).gte('session_end', historyStartDate).order('session_end', { ascending: true }),
-          supabase.from('current_character_state').select('*').or(orFilterChar),
-          supabase.from('guild_members').select('name, level, is_online').or(orFilterName),
-          supabase.from('recent_deaths').select('character_name, level, killed_by, death_time').or(orFilterChar).gte('death_time', historyStartDate).order('death_time', { ascending: true }),
-          supabase.from('login_events').select('character_name, event_type, event_time').or(orFilterChar).gte('event_time', historyStartDate).order('event_time', { ascending: true })
+          Promise.all(
+            titleMembers.map(m =>
+              supabase
+                .from('historical_sessions')
+                .select('id, character_name, session_start, session_end, xp_gained, duration_minutes, end_level, end_xp_total')
+                .eq('character_name', m)
+                .gte('session_end', historyStartDate)
+                .order('session_end', { ascending: true })
+                .limit(100)
+                .then(r => r.data || [])
+            )
+          ),
+          supabase.from('current_character_state').select('character_name, level, vocation, last_active').in('character_name', titleMembers),
+          supabase.from('guild_members').select('name, level, is_online').in('name', titleMembers),
+          supabase.from('recent_deaths').select('character_name, level, killed_by, death_time').in('character_name', titleMembers).gte('death_time', historyStartDate).order('death_time', { ascending: true }),
+          supabase.from('login_events').select('character_name, event_type, event_time').in('character_name', titleMembers).gte('event_time', historyStartDate).order('event_time', { ascending: true })
         ]);
 
+        const flatLogs = sessionsResList.flat();
+
+        const dataset = {
+          logs: flatLogs,
+          currentStates: currentStates || [],
+          guildData: guildData || [],
+          recentDeaths: recentDeaths || [],
+          loginEvents: loginEvents || [],
+          lastFetch: Date.now()
+        };
+
+        partyDashboardCache.set(cacheKey, { timestamp: Date.now(), data: dataset });
+
         if (!isCancelled) {
-          setRawDataset({
-            logs: logs || [],
-            currentStates: currentStates || [],
-            guildData: guildData || [],
-            recentDeaths: recentDeaths || [],
-            loginEvents: loginEvents || [],
-            lastFetch: Date.now()
-          });
+          setRawDataset(dataset);
           setLoading(false);
         }
       } catch (err) {

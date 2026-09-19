@@ -69,16 +69,20 @@ export default function BoostedDailyWidget({ onNavigate }) {
     };
   }, []);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const data = getTodayBoosted(new Date(), override);
-      setBoosted(data);
-    }, 1000);
+  const [countdown, setCountdown] = useState(() => boosted.formattedCountdown);
 
+  useEffect(() => {
+    const updateCountdown = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const data = getTodayBoosted(new Date(), override);
+      setCountdown(data.formattedCountdown);
+    };
+
+    const timer = setInterval(updateCountdown, 1000);
     return () => clearInterval(timer);
   }, [override]);
 
-  const { creature, boss, formattedCountdown } = boosted;
+  const { creature, boss } = boosted;
 
   const handleCopy = () => {
     const text = [
@@ -89,7 +93,7 @@ export default function BoostedDailyWidget({ onNavigate }) {
       `   • Charm Recomendado: ${creature.bestCharm}`,
       `👑 Boss: ${boss.name} (${boss.location})`,
       `   • Drops Raros: ${boss.keyDrops.join(', ')}`,
-      `⏳ Próxima rotação em: ${formattedCountdown} (Server Save 07:00 BRT)`,
+      `⏳ Próxima rotação em: ${countdown} (Server Save 07:00 BRT)`,
       'Acesse: https://trackerplanilha.vercel.app'
     ].join('\n');
 
@@ -185,7 +189,7 @@ export default function BoostedDailyWidget({ onNavigate }) {
                 Troca em (Server Save 07:00)
               </div>
               <div className="text-sm sm:text-base font-mono font-bold text-amber-300">
-                ⏳ {formattedCountdown}
+                ⏳ {countdown}
               </div>
             </div>
           </div>

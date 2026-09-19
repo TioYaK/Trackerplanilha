@@ -6,10 +6,17 @@ import {
 } from 'lucide-react';
 import { parseUtcDate, toBrtTimeStr } from '../lib/tibiaUtils';
 
-export default function LiveWarFeed({ onPlayerClick, onNavigate }) {
-  const [frags, setFrags] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function LiveWarFeed({ onPlayerClick, onNavigate, initialFrags = [] }) {
+  const [frags, setFrags] = useState(() => (initialFrags && initialFrags.length > 0 ? initialFrags : []));
+  const [loading, setLoading] = useState(() => !(initialFrags && initialFrags.length > 0));
   const [copiedId, setCopiedId] = useState(null);
+
+  useEffect(() => {
+    if (initialFrags && initialFrags.length > 0) {
+      setFrags(initialFrags);
+      setLoading(false);
+    }
+  }, [initialFrags]);
 
   const fetchFrags = async () => {
     try {
@@ -30,7 +37,9 @@ export default function LiveWarFeed({ onPlayerClick, onNavigate }) {
   };
 
   useEffect(() => {
-    fetchFrags();
+    if (!initialFrags || initialFrags.length === 0) {
+      fetchFrags();
+    }
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       fetchFrags();
