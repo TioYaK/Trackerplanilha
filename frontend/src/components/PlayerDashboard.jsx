@@ -148,33 +148,32 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       const memberData = gMembersRes?.data;
       const canonicalName = cData?.character_name || memberData?.name || targetName;
 
-      // ─── FASE 2: TELEMETRIA, SESSÕES & MORTES (Executadas com canonicalName e B-Tree indexes limitados) ───
-      const [sessionsRes, deathsRes, loginRes] = await Promise.all([
+      // ─── FASE 2: TELEMETRIA, SESSÕES & MORTES (Executadas em paralelo de alta velocidade) ───
+      const [sessionsRes, telemetryRes, deathsRes] = await Promise.all([
         supabase
           .from('historical_sessions')
-          .select('session_start, session_end, xp_gained, end_level, end_xp_total')
+          .select('id, session_start, session_end, xp_gained, end_level, end_xp_total')
           .eq('character_name', canonicalName)
-          .order('session_end', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(100),
+        supabase
+          .from('telemetry_logs')
+          .select('xp_total, delta_xp, recorded_at')
+          .eq('character_name', canonicalName)
+          .order('recorded_at', { ascending: false })
           .limit(100),
         supabase
           .from('recent_deaths')
           .select('level, killed_by, death_time')
           .eq('character_name', canonicalName)
           .order('death_time', { ascending: false })
-          .limit(50),
-        supabase
-          .from('login_events')
-          .select('event_type, event_time')
-          .eq('character_name', canonicalName)
-          .order('event_time', { ascending: false })
-          .limit(1)
-          .maybeSingle()
+          .limit(50)
       ]);
 
       // Avatar
       setPlayerAvatar(profileRes?.data?.avatar_url || null);
 
-      // Status Online Preliminar e refinado com login_events
+      // Status Online Preliminar
       const nowMs = Date.now();
       const isRecentlyActive = cData?.last_active ? (() => {
         const activeDate = parseUtcDate(cData.last_active);
@@ -184,16 +183,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       })() : false;
 
       let isOnline = memberData ? Boolean(memberData.is_online) : isRecentlyActive;
-      const lastLoginEvent = loginRes?.data;
-      if (lastLoginEvent) {
-        if (lastLoginEvent.event_type === 'LOGOUT') {
-          isOnline = false;
-        } else if (lastLoginEvent.event_type === 'LOGIN') {
-          const loginDate = parseUtcDate(lastLoginEvent.event_time);
-          const loginDiff = loginDate ? (nowMs - loginDate.getTime()) : Infinity;
-          isOnline = (loginDiff >= 0 && loginDiff < 24 * 60 * 60 * 1000) && (memberData ? Boolean(memberData.is_online) : isRecentlyActive);
-        }
-      }
 
       const rawVoc = cData?.vocation || memberData?.vocation;
       const finalVocation = formatVocation(rawVoc);
@@ -218,11 +207,14 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         setWorldRank(null);
       }
 
-      // Delta de XP e 24h Rush calculado com precisão sem sobrecarga
+      // Delta de XP e 24h Rush calculado com precisão combinando Sessões e Telemetria
       const rawSessions = sessionsRes?.data || [];
       const boundsData = rawSessions
         .filter(s => s.session_end && s.session_end >= fourteenDaysAgo)
-        .reverse();
+        .sort((a, b) => new Date(a.session_start || a.session_end) - new Date(b.session_start || b.session_end));
+
+      const rawTelemetry = (telemetryRes?.data || [])
+        .sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
 
       let currentXP = cData?.xp_total ? Number(cData.xp_total) : 0;
       let currentDelta = 0;
@@ -233,10 +225,17 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       if (currentXP === 0 && boundsData.length > 0) {
         currentXP = Number(boundsData[boundsData.length - 1].end_xp_total || 0);
       }
+      if (currentXP === 0 && rawTelemetry.length > 0) {
+        currentXP = Number(rawTelemetry[rawTelemetry.length - 1].xp_total || 0);
+      }
 
-      const past24hDelta = boundsData
+      const past24hSessions = boundsData
         .filter(s => s.session_end && s.session_end >= twentyFourHoursAgo)
         .reduce((acc, s) => acc + (Number(s.xp_gained) || 0), 0);
+
+      const past24hTelemetry = rawTelemetry
+        .filter(l => l.recorded_at && l.recorded_at >= twentyFourHoursAgo)
+        .reduce((acc, l) => acc + (Number(l.delta_xp) || 0), 0);
 
       const latestArchivedXp = boundsData.length > 0 ? Number(boundsData[boundsData.length - 1].end_xp_total || 0) : 0;
       let unarchivedDelta = 0;
@@ -246,7 +245,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         unarchivedDelta = currentDelta;
       }
 
-      const xpGained24h = Math.max(past24hDelta + unarchivedDelta, currentDelta);
+      const xpGained24h = Math.max(past24hSessions + unarchivedDelta, past24hTelemetry, currentDelta);
       const rusherData = { exp_gained: xpGained24h, xp_gained: xpGained24h };
       setRusher24h(rusherData);
 
@@ -297,10 +296,20 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         if (log.end_level) prevLevel = log.end_level;
       });
 
+      if (prevLevel !== null && finalLevel && finalLevel > prevLevel) {
+        lvlHist.push({
+          type: 'UP',
+          from: prevLevel,
+          to: finalLevel,
+          reason: null,
+          date: cData?.last_active || new Date().toISOString()
+        });
+      }
+
       lvlHist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setLevelHistory(lvlHist);
 
-      // Heatmap (14 dias)
+      // Heatmap (14 dias) - Combina sessões e telemetria de granularidade fina
       const dailyMap = {};
       boundsData.forEach(log => {
         const d = parseUtcDate(log.session_start || log.session_end);
@@ -309,9 +318,23 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         dailyMap[dayStr] = (dailyMap[dayStr] || 0) + (Number(log.xp_gained) || 0);
       });
 
+      const teleDailyMap = {};
+      rawTelemetry.forEach(log => {
+        const dayStr = toBrtDateStr(log.recorded_at);
+        const delta = Number(log.delta_xp || 0);
+        if (dayStr && delta > 0) {
+          teleDailyMap[dayStr] = (teleDailyMap[dayStr] || 0) + delta;
+        }
+      });
+
+      // Mescla com segurança sem duplicar: se já existe em sessões, pega o maior
+      Object.keys(teleDailyMap).forEach(dayStr => {
+        dailyMap[dayStr] = Math.max(dailyMap[dayStr] || 0, teleDailyMap[dayStr]);
+      });
+
       if (currentDelta > 0) {
         const todayStr = toBrtDateStr(new Date());
-        dailyMap[todayStr] = (dailyMap[todayStr] || 0) + currentDelta;
+        dailyMap[todayStr] = Math.max(dailyMap[todayStr] || 0, (dailyMap[todayStr] || 0) + currentDelta);
       }
 
       const hData = [];
@@ -325,12 +348,20 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       setHeatmap(hData);
 
       // Previsão de Up (14 dias)
-      const totalXp14d = boundsData.reduce((acc, log) => acc + (Number(log.xp_gained) || 0), 0) + currentDelta;
+      const totalXp14d = Object.values(dailyMap).reduce((acc, xp) => acc + (Number(xp) || 0), 0);
       let daysSpan = 1;
-      if (boundsData.length > 0) {
-        const oldestTime = parseUtcDate(boundsData[0].session_start || boundsData[0].session_end).getTime();
-        const msPassed = Date.now() - oldestTime;
-        daysSpan = Math.min(14, Math.max(1, msPassed / (1000 * 60 * 60 * 24)));
+      const daysWithActivity = Object.values(dailyMap).filter(xp => xp > 0).length;
+      if (boundsData.length > 0 || rawTelemetry.length > 0) {
+        const firstSessionTime = boundsData[0] ? parseUtcDate(boundsData[0].session_start || boundsData[0].session_end)?.getTime() : Infinity;
+        const firstTeleTime = rawTelemetry[0] ? parseUtcDate(rawTelemetry[0].recorded_at)?.getTime() : Infinity;
+        const oldestTime = Math.min(firstSessionTime || Infinity, firstTeleTime || Infinity);
+        if (oldestTime && oldestTime !== Infinity) {
+          const msPassed = Date.now() - oldestTime;
+          daysSpan = Math.min(14, Math.max(1, Math.round(msPassed / (1000 * 60 * 60 * 24)) || 1));
+        }
+      }
+      if (daysWithActivity > 0 && daysSpan < daysWithActivity) {
+        daysSpan = daysWithActivity;
       }
 
       const avgXpPerDay = totalXp14d > 0 ? Math.floor(totalXp14d / Math.max(1, daysSpan)) : 0;
@@ -366,18 +397,54 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       }
 
       // Telemetria 48h
-      const teleData = boundsData.filter(s => s.session_end && s.session_end >= fortyEightHoursAgo);
+      const teleLogs48h = rawTelemetry.filter(l => l.recorded_at && l.recorded_at >= fortyEightHoursAgo);
+      const teleSessions48h = boundsData.filter(s => s.session_end && s.session_end >= fortyEightHoursAgo);
       let chartData = [];
-      if (teleData.length > 0) {
+
+      if (teleLogs48h.length > 0) {
         let accumulatedXP = 0;
-        teleData.forEach(log => {
+        teleLogs48h.forEach(log => {
+          const d = parseUtcDate(log.recorded_at);
+          const timeLabel = new Intl.DateTimeFormat('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          }).format(d);
+          const delta = Number(log.delta_xp || 0);
+          accumulatedXP += delta;
+          chartData.push({
+            time: timeLabel,
+            xp: accumulatedXP,
+            rawDelta: delta
+          });
+        });
+
+        if (currentDelta > 0) {
+          chartData.push({
+            time: new Intl.DateTimeFormat('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+              day: '2-digit',
+              month: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            }).format(new Date()),
+            xp: accumulatedXP + currentDelta,
+            rawDelta: currentDelta
+          });
+        }
+        setTelemetry(chartData);
+      } else if (teleSessions48h.length > 0) {
+        let accumulatedXP = 0;
+        teleSessions48h.forEach(log => {
           const sStart = parseUtcDate(log.session_start || log.session_end);
           const sEnd = parseUtcDate(log.session_end);
           const xpGained = Number(log.xp_gained || 0);
 
           if (log.session_start && log.session_start !== log.session_end) {
             chartData.push({
-              time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(sStart),
+              time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(sStart),
               xp: accumulatedXP,
               rawDelta: 0
             });
@@ -385,7 +452,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
 
           accumulatedXP += xpGained;
           chartData.push({
-            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(sEnd),
+            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(sEnd),
             xp: accumulatedXP,
             rawDelta: xpGained
           });
@@ -393,7 +460,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
 
         if (currentDelta > 0) {
           chartData.push({
-            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(new Date()),
+            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date()),
             xp: accumulatedXP + currentDelta,
             rawDelta: currentDelta
           });
@@ -404,12 +471,12 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         const start = cData?.last_active ? parseUtcDate(cData.last_active) : new Date(now.getTime() - 30 * 60 * 1000);
         chartData = [
           {
-            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(start),
+            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(start),
             xp: 0,
             rawDelta: 0
           },
           {
-            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(now),
+            time: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(now),
             xp: currentDelta,
             rawDelta: currentDelta
           }
@@ -419,9 +486,21 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         setTelemetry([]);
       }
 
-      // Rotina horária dos últimos 7 dias
+      // Rotina horária dos últimos 7 dias (Sessões + Telemetria)
       const logs7d = boundsData.filter(s => s.session_end && s.session_end >= sevenDaysAgo);
+      const tele7d = rawTelemetry.filter(l => l.recorded_at && l.recorded_at >= sevenDaysAgo);
       const hourMap = new Array(24).fill(0);
+
+      const getBrtH = (d) => {
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Sao_Paulo',
+          hour: 'numeric',
+          hour12: false
+        }).formatToParts(d);
+        const p = parts.find(x => x.type === 'hour');
+        return parseInt(p ? p.value : d.getHours(), 10) % 24;
+      };
+
       if (logs7d.length > 0) {
         logs7d.forEach(l => {
           let xp = Number(l.xp_gained || 0);
@@ -429,16 +508,6 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
 
           const sStart = parseUtcDate(l.session_start || l.session_end);
           const sEnd = parseUtcDate(l.session_end);
-
-          const getBrtH = (d) => {
-            const parts = new Intl.DateTimeFormat('en-US', {
-              timeZone: 'America/Sao_Paulo',
-              hour: 'numeric',
-              hour12: false
-            }).formatToParts(d);
-            const p = parts.find(x => x.type === 'hour');
-            return parseInt(p ? p.value : d.getHours(), 10) % 24;
-          };
 
           const startH = getBrtH(sStart);
           const endH = getBrtH(sEnd);
@@ -456,6 +525,14 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
           activeHours.forEach(h => {
             hourMap[h] += perHourXp;
           });
+        });
+      } else if (tele7d.length > 0) {
+        tele7d.forEach(l => {
+          const delta = Number(l.delta_xp || 0);
+          if (delta > 0) {
+            const h = getBrtH(parseUtcDate(l.recorded_at));
+            hourMap[h] += delta;
+          }
         });
       }
 
@@ -514,6 +591,23 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
           })
           .catch(() => {});
       }
+
+      // C. Refinamento de status via login_events (Assíncrono em segundo plano)
+      supabase
+        .from('login_events')
+        .select('event_type, event_time')
+        .eq('character_name', canonicalName)
+        .order('event_time', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data: lastLoginEvent }) => {
+          if (lastLoginEvent) {
+            if (lastLoginEvent.event_type === 'LOGOUT') {
+              setPlayerInfo(prev => prev ? { ...prev, is_online: false } : prev);
+            }
+          }
+        })
+        .catch(() => {});
 
       // Salva no cache do dashboard (0ms para navegação posterior e histórico)
       const fullSnapshot = {

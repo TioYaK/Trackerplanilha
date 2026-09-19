@@ -108,7 +108,8 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
         profileRes,
         deathsRes,
         huntedRes,
-        sessionsRes
+        sessionsRes,
+        telemetryRes
       ] = await Promise.all([
         supabase.from('current_character_state').select('*').or(`character_name.eq."${targetName}",character_name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
         supabase.from('guild_members').select('*').or(`name.eq."${targetName}",name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
@@ -116,7 +117,8 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
         supabase.from('profiles').select('avatar_url, makers, main_character').or(`main_character.eq."${targetName}",main_character.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
         supabase.from('recent_deaths').select('*').eq('character_name', targetName).order('death_time', { ascending: false }).limit(4),
         supabase.from('hunted_list').select('*').or(`name.eq."${targetName}",name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
-        supabase.from('historical_sessions').select('xp_gained, session_end, end_xp_total').eq('character_name', targetName).order('session_end', { ascending: false }).limit(20)
+        supabase.from('historical_sessions').select('id, xp_gained, session_end, end_xp_total').eq('character_name', targetName).order('id', { ascending: false }).limit(20),
+        supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').eq('character_name', targetName).order('recorded_at', { ascending: false }).limit(50)
       ]);
 
       const cState = cStateRes?.data;
@@ -133,10 +135,14 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
       const xpTotal = cState?.xp_total ? Number(cState.xp_total) : null;
       const lastActive = cState?.last_active || gMem?.last_xp_date || (deathsRes?.data?.[0]?.death_time);
 
-      // Rush 24h calculado instantaneamente com precisão
+      // Rush 24h calculado instantaneamente com precisão combinando sessões e telemetria
       const past24hSessions = (sessionsRes?.data || [])
         .filter(s => s.session_end && s.session_end >= twentyFourHoursAgo)
         .reduce((acc, s) => acc + (Number(s.xp_gained) || 0), 0);
+
+      const past24hTelemetry = (telemetryRes?.data || [])
+        .filter(l => l.recorded_at && l.recorded_at >= twentyFourHoursAgo)
+        .reduce((acc, l) => acc + (Number(l.delta_xp) || 0), 0);
 
       let currentDelta = 0;
       if (cState?.xp_total && cState?.session_start_xp && Number(cState.xp_total) > Number(cState.session_start_xp)) {
@@ -151,7 +157,7 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
         unarchivedDelta = currentDelta;
       }
 
-      const total24hGain = Math.max(past24hSessions + unarchivedDelta, currentDelta);
+      const total24hGain = Math.max(past24hSessions + unarchivedDelta, past24hTelemetry, currentDelta);
       const computedRush = total24hGain > 0 ? { exp_gained: total24hGain } : null;
 
       // 4. Determinação do Mundo
