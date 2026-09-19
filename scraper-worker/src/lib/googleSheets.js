@@ -11,13 +11,26 @@ let docCache = null;
 async function getDoc() {
   if (docCache) return docCache;
   
-  if (!fs.existsSync(CREDENTIALS_PATH)) {
+  let creds = null;
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    try {
+      creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    } catch (e) {}
+  } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    try {
+      creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+    } catch (e) {}
+  } else if (fs.existsSync(CREDENTIALS_PATH)) {
+    try {
+      creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
+    } catch (e) {}
+  }
+
+  if (!creds || !creds.client_email || !creds.private_key) {
     return null; // Retorna nulo graciosamente se as credenciais não existirem
   }
 
   try {
-    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
-
     const jwt = new JWT({
       email: creds.client_email,
       key: creds.private_key,

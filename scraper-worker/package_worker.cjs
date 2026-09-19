@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -16,10 +16,13 @@ if (fs.existsSync(path.join(root, 'scraper-worker/ecosystem.config.cjs'))) {
 fs.cpSync(path.join(root, 'scraper-worker/src'), path.join(staging, 'src'), {
     recursive: true,
     filter: (src) => {
-        const base = path.basename(src);
+        const base = path.basename(src).toLowerCase();
         if (base.startsWith('test_')) return false;
         if (base.includes('profile')) return false;
-        if (base.endsWith('.png')) return false;
+        if (base.endsWith('.png') || base.endsWith('.log')) return false;
+        if (base.includes('credential') || base.includes('secret') || base.includes('.env')) return false;
+        if (base.endsWith('.pem') || base.endsWith('.key') || base.endsWith('.pfx')) return false;
+        if (base.endsWith('.json')) return false; // no loose json allowed in src
         return true;
     }
 });
