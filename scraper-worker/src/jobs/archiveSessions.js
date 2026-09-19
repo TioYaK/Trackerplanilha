@@ -112,11 +112,30 @@ export const runArchiveSessions = async () => {
       const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
       await supabase.from('worker_commands').delete().eq('executed', true).lt('created_at', twoDaysAgo);
 
-      // Limpeza preventiva de sessões históricas com mais de 30 dias
-      await supabase.from('historical_sessions').delete().lt('session_start', thirtyDaysAgo);
+      // Limpeza preventiva de sessões históricas com mais de 30 dias em micro-lotes (evita timeout 57014)
+      for (let i = 0; i < 10; i++) {
+        const { data: oldSess } = await supabase
+          .from('historical_sessions')
+          .select('id')
+          .lt('session_start', thirtyDaysAgo)
+          .limit(200);
+        if (!oldSess || oldSess.length === 0) break;
+        const ids = oldSess.map(s => s.id);
+        await supabase.from('historical_sessions').delete().in('id', ids);
+      }
 
-      // Limpeza preventiva de telemetry_logs com mais de 14 dias (economia de disco massiva)
-      await supabase.from('telemetry_logs').delete().lt('recorded_at', fourteenDaysAgo);
+      // Limpeza preventiva de telemetry_logs com mais de 7 dias em micro-lotes (economia maciça de espaço no Supabase)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      for (let i = 0; i < 15; i++) {
+        const { data: oldLogs } = await supabase
+          .from('telemetry_logs')
+          .select('id')
+          .lt('recorded_at', sevenDaysAgo)
+          .limit(200);
+        if (!oldLogs || oldLogs.length === 0) break;
+        const ids = oldLogs.map(l => l.id);
+        await supabase.from('telemetry_logs').delete().in('id', ids);
+      }
     } catch (cleanErr) {
       console.warn('[ARCHIVE] Aviso na limpeza de retenção:', cleanErr.message);
     }
