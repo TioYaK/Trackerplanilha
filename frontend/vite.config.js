@@ -98,13 +98,34 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-supabase': ['@supabase/supabase-js'],
-          'vendor-icons': ['lucide-react'],
-          'vendor-charts': ['recharts'],
-          'vendor-pdf': ['jspdf', 'html2canvas'],
-          'vendor-utils': ['date-fns', 'canvas-confetti']
+        manualChunks(id) {
+          const norm = id.replace(/\\/g, '/');
+          if (norm.includes('/node_modules/')) {
+            if (
+              norm.includes('/react/') ||
+              norm.includes('/react-dom/') ||
+              norm.includes('/react-is/') ||
+              norm.includes('/scheduler/') ||
+              norm.includes('/prop-types/')
+            ) {
+              return 'vendor-react';
+            }
+            if (norm.includes('/recharts/') || norm.includes('/victory-vendor/') || norm.includes('/d3-')) {
+              return 'vendor-charts';
+            }
+            if (norm.includes('/@supabase/')) {
+              return 'vendor-supabase';
+            }
+            if (norm.includes('/lucide-react/')) {
+              return 'vendor-icons';
+            }
+            if (norm.includes('/jspdf/') || norm.includes('/html2canvas/')) {
+              return 'vendor-pdf';
+            }
+            if (norm.includes('/date-fns/') || norm.includes('/canvas-confetti/')) {
+              return 'vendor-utils';
+            }
+          }
         }
       }
     },

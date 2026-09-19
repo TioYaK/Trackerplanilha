@@ -123,7 +123,7 @@ export default function TopHeader({
     <header className="h-16 bg-[#08090d]/80 border-b border-white/[0.08] px-3 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-40 backdrop-blur-2xl shadow-[0_4px_24px_-4px_rgba(0,0,0,0.6)]">
       
       {/* Esquerda: Botão Menu Mobile & Título Dinâmico */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-3 shrink-0">
         {/* Botão Mobile para Abrir Sidebar */}
         <button
           onClick={onToggleMobile}
@@ -134,16 +134,16 @@ export default function TopHeader({
         </button>
 
         {/* Título e Ícone da Página Ativa */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 hidden sm:flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(212,175,55,0.1)]">
             <CurrentIcon size={18} className={viewInfo.color} />
           </div>
 
-          <div className="flex flex-col min-w-0">
-            <h1 className="text-sm sm:text-base font-bold font-outfit tracking-tight text-gray-100 truncate flex items-center gap-2">
-              <span className="truncate">{viewInfo.title}</span>
+          <div className="flex flex-col">
+            <h1 className="text-sm sm:text-base font-bold font-outfit tracking-tight text-gray-100 flex items-center gap-2 whitespace-nowrap">
+              <span>{viewInfo.title}</span>
             </h1>
-            <span className="text-[10px] text-gray-400 font-mono hidden sm:flex items-center gap-1.5">
+            <span className="text-[10px] text-gray-400 font-mono hidden sm:flex items-center gap-1.5 whitespace-nowrap">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
               RubinOT Server • <strong className="text-amber-400">{activeWorldObj?.name || activeWorld}</strong>
             </span>
@@ -154,8 +154,8 @@ export default function TopHeader({
       {/* Centro/Direita: Status do Enxame & Controles */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         
-        {/* Status do Enxame de Workers (Badge Elitizado) */}
-        <div className="hidden xl:flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-emerald-500/25 text-[11px] font-mono text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.1)]">
+        {/* Status do Enxame de Workers (Badge Elitizado - Visível em telas amplas) */}
+        <div className="hidden 2xl:flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-emerald-500/25 text-[11px] font-mono text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.1)]">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>

@@ -28,11 +28,6 @@ export default function AdBanner({
   const [adFilled, setAdFilled] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  // VIPs e Operadores de Worker têm experiência 100% ad-free (zero publicidade)
-  if (hideIfVip && isPremium) {
-    return null;
-  }
-
   // Considera AdSense configurado quando houver client válido do Google (ca-pub-...)
   const isAdSenseConfigured = client && client.startsWith('ca-pub-') && !client.includes('XXXX');
   
@@ -44,7 +39,7 @@ export default function AdBanner({
         : '6915670740');
 
   useEffect(() => {
-    if (!isAdSenseConfigured || dismissed) return;
+    if (!isAdSenseConfigured || dismissed || (hideIfVip && isPremium)) return;
 
     let checkInterval = null;
 
@@ -102,9 +97,10 @@ export default function AdBanner({
       if (checkInterval) clearInterval(checkInterval);
       if (observer) observer.disconnect();
     };
-  }, [numericSlot, isAdSenseConfigured, dismissed]);
-
-  if (dismissed) return null;
+  }, [numericSlot, isAdSenseConfigured, dismissed, hideIfVip, isPremium]);
+ 
+  // VIPs e Operadores de Worker têm experiência 100% ad-free (executado após todos os hooks)
+  if (dismissed || (hideIfVip && isPremium)) return null;
 
   return (
     <div 
@@ -127,13 +123,17 @@ export default function AdBanner({
         {adFilled ? 'Publicidade Oficial • Google AdSense' : customBadge}
       </div>
 
-      {/* CONTAINER DO GOOGLE ADSENSE (visível para o crawler do Google poder medir o slot) */}
+      {/* CONTAINER DO GOOGLE ADSENSE (visível para o crawler do Google, mas sem ocupar espaço vazio se não preenchido) */}
       {isAdSenseConfigured && (
-        <div className={`w-full overflow-hidden flex items-center justify-center ${adFilled ? 'min-h-[90px] py-1' : (adRef.current?.getAttribute('data-ad-status') === 'unfilled' ? 'hidden' : 'min-h-[1px]')}`}>
+        <div className={`w-full overflow-hidden flex items-center justify-center transition-all ${
+          adFilled 
+            ? 'min-h-[90px] py-1 opacity-100' 
+            : 'h-0 opacity-0 pointer-events-none absolute -top-[9999px]'
+        }`}>
           <ins
             ref={adRef}
             className="adsbygoogle"
-            style={{ display: 'block', width: '100%', minHeight: adFilled ? '90px' : 'auto' }}
+            style={{ display: 'block', width: '100%', minHeight: adFilled ? '90px' : '0px' }}
             data-ad-client={client}
             data-ad-slot={numericSlot}
             data-ad-format={format}

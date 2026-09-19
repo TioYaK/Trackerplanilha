@@ -78,97 +78,23 @@
   </head>
   <body class="bg-tibia-bg text-gray-200" style="background-image: linear-gradient(rgba(17, 17, 17, 0.9), rgba(17, 17, 17, 0.95)), url('/bg.jpg'); background-size: cover; background-attachment: fixed; background-position: center;">
     
-    <!-- Conteúdo Pré-Renderizado Semântico e Editorial para Crawlers, SEO e Google AdSense -->
+    <!-- Container Principal do App React com Loading Splash Elitizado Obsidian Gold -->
     <div id="root">
-      <header style="padding: 24px; text-align: center; border-bottom: 1px solid rgba(255,215,0,0.3);">
-        <h1 style="font-size: 28px; color: #ffd700; margin-bottom: 8px;">Rubinot Tracker • Monitoramento Global & Inteligência de Combate</h1>
-        <p style="color: #bbb; max-width: 800px; margin: 0 auto; font-size: 14px;">
-          Plataforma comunitária aberta de estatísticas em tempo real, rastreamento de combates, histórico de frags e gerenciamento analítico para os 16 servidores oficiais da rede Rubinot.
+      <div style="min-height: 100vh; background: #08090d; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #d4af37; padding: 24px; text-align: center;">
+        <div style="width: 64px; height: 64px; border-radius: 20px; background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.3); display: flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 20px; box-shadow: 0 0 30px rgba(212,175,55,0.15);">
+          👑
+        </div>
+        <h1 style="font-size: 24px; font-weight: 800; letter-spacing: 2px; margin: 0 0 8px 0; background: linear-gradient(135deg, #fce8a6 0%, #d4af37 50%, #997a15 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+          RUBINOT TRACKER
+        </h1>
+        <p style="color: #9ca3af; font-size: 13px; margin: 0 0 24px 0; font-family: monospace;">
+          Central de Inteligência • 16 Servidores
         </p>
-      </header>
-
-      <main style="max-width: 900px; margin: 30px auto; padding: 0 20px; font-family: sans-serif; line-height: 1.6; color: #ddd;">
-        <section style="margin-bottom: 28px;">
-          <h2 style="color: #f3c258; font-size: 20px; margin-bottom: 8px;">Sobre a Plataforma</h2>
-          <p>
-            O <strong>Rubinot Tracker</strong> foi desenvolvido para oferecer à comunidade de jogadores e lideranças de guildas uma visão aprofundada sobre a atividade nos servidores de jogo. Através de uma rede distribuída de coletores de telemetria baseada em arquitetura Zero-Trust, a plataforma processa continuamente listas de jogadores online, histórico de mortes em PvP e PvE, oscilações no ranking de experiência e leilões de personagens.
-          </p>
-        </section>
-
-        <!-- Seção Editorial com Alto Valor Textual (Diretriz Google AdSense) -->
-        <section style="margin-bottom: 28px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,215,0,0.2); border-radius: 8px; padding: 20px;">
-          <h2 style="color: #ffd700; font-size: 20px; margin-bottom: 12px;">Guias Editoriais & Artigos Estratégicos</h2>
-          
-          <article style="margin-bottom: 20px;">
-            <h3 style="color: #f3c258; font-size: 16px; margin-bottom: 4px;">
-              <a href="/guias" style="color: #ffd700; text-decoration: none;">Guia do Character Bazaar: Métricas de Avaliação e Arbitragem</a>
-            </h3>
-            <p style="font-size: 13px; color: #bbb;">
-              Aprenda a analisar além do nível: skills, charms points, quest flags desbloqueadas e a fórmula matemática para identificar verdadeiras pechinchas antes de dar seu lance em Tibia Coins.
-            </p>
-          </article>
-
-          <article style="margin-bottom: 20px;">
-            <h3 style="color: #f3c258; font-size: 16px; margin-bottom: 4px;">
-              <a href="/guias" style="color: #ffd700; text-decoration: none;">Panorama Tático dos 16 Mundos: Retro-PvP, Open-PvP e Optional-PvP</a>
-            </h3>
-            <p style="font-size: 13px; color: #bbb;">
-              Um estudo comparativo aprofundado entre os modos de combate, o impacto das regras de agressão na destruição de suprimentos e as particularidades econômicas de cada servidor Rubinot.
-            </p>
-          </article>
-
-          <article style="margin-bottom: 20px;">
-            <h3 style="color: #f3c258; font-size: 16px; margin-bottom: 4px;">
-              <a href="/guias" style="color: #ffd700; text-decoration: none;">Manual de Alta Eficiência em Party Hunts: Divisão Justa de Loot</a>
-            </h3>
-            <p style="font-size: 13px; color: #bbb;">
-              A matemática do Party Hunt Analyzer explicada: como efetuar o reembolso exato de potions, runas e imbuements para garantir a sustentabilidade financeira do time de 4 vocações.
-            </p>
-          </article>
-
-          <article>
-            <h3 style="color: #f3c258; font-size: 16px; margin-bottom: 4px;">
-              <a href="/guias" style="color: #ffd700; text-decoration: none;">Segurança Cibernética & Proteção de Contas no Rubinot</a>
-            </h3>
-            <p style="font-size: 13px; color: #bbb;">
-              Como proteger seu patrimônio digital: autenticação em duas etapas baseada em aplicativos (TOTP), proteção contra páginas falsas de login (phishing) e gestão segura de Recovery Keys.
-            </p>
-          </article>
-        </section>
-
-        <section style="margin-bottom: 28px;">
-          <h2 style="color: #f3c258; font-size: 20px; margin-bottom: 8px;">Recursos & Módulos Disponíveis</h2>
-          <ul style="list-style-type: square; padding-left: 20px; color: #ccc;">
-            <li><strong>Central de Artigos & Guias:</strong> Tutoriais aprofundados sobre economia, combates e progressão de personagens.</li>
-            <li><strong>Monitor Global de Jogadores:</strong> Acompanhamento de oscilações de população e jogadores ativos em tempo real nos 16 mundos.</li>
-            <li><strong>Mural de Mortes & Histórico Criminal:</strong> Registro detalhado de quem matou e quem morreu, com identificação de assistências e guildas envolvidas.</li>
-            <li><strong>Calculadora de Loot da Party:</strong> Divisão inteligente de suprimentos e lucros de hunts com cálculo automatizado de transferências bancárias.</li>
-            <li><strong>Automação de Recrutamento (Auto-Invites):</strong> Fila segura para emissão automática de convites in-game para personagens recém-recrutados.</li>
-            <li><strong>Bazaar Sniper:</strong> Radar analítico para monitorar leilões de personagens raros e oportunidades no mercado oficial.</li>
-            <li><strong>API REST Pública:</strong> Endpoints documentados para desenvolvedores integrarem bots de Discord e ferramentas externas.</li>
-          </ul>
-        </section>
-
-        <section style="margin-bottom: 28px;">
-          <h2 style="color: #f3c258; font-size: 20px; margin-bottom: 8px;">Servidores Suportados (16 Mundos)</h2>
-          <p>
-            Auroria (Open-PvP), Belaria (Open-PvP), Bellum (Retro-PvP), Drakaria (Open-PvP), Eldrian (Optional-PvP), Elysian (Optional-PvP), Infernum I (Retro-PvP), Infernum II (Retro-PvP), Infernum III (Retro-PvP), Lunarian (Optional-PvP), Malveria (Open-PvP), Mystian (Optional-PvP), Obsidian (Optional-PvP), Solarian (Optional-PvP), Tenebrium (Retro-PvP) e Vesperia (Open-PvP).
-          </p>
-        </section>
-
-        <section style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 18px; font-size: 12px; color: #888;">
-          <p>
-            Links Institucionais & Conformidade: 
-            <a href="/guias" style="color: #ffd700; margin: 0 8px;">Central de Guias & Artigos</a> | 
-            <a href="/privacy" style="color: #ffd700; margin: 0 8px;">Política de Privacidade</a> | 
-            <a href="/terms" style="color: #ffd700; margin: 0 8px;">Termos de Serviço</a> | 
-            <a href="/about" style="color: #ffd700; margin: 0 8px;">Sobre Nós</a> | 
-            <a href="/api" style="color: #ffd700; margin: 0 8px;">API para Desenvolvedores</a> | 
-            <a href="/bazaar" style="color: #ffd700; margin: 0 8px;">Bazaar Sniper</a> | 
-            <a href="/invite" style="color: #ffd700; margin: 0 8px;">Convites In-Game</a>
-          </p>
-        </section>
-      </main>
+        <div style="display: flex; align-items: center; gap: 8px; color: #10b981; font-size: 12px; font-family: monospace; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); padding: 6px 14px; border-radius: 9999px;">
+          <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
+          Carregando Telemetria Global...
+        </div>
+      </div>
     </div>
     <div id="modal-root"></div>
 

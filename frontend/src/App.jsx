@@ -894,8 +894,8 @@ export default function App() {
           onPlayerClick={handlePlayerClick}
         />
       
-      {/* Banner de Publicidade Oficial (nunca exibe em telas de login ou institucionais para cumprir regras do AdSense) */}
-      {!['auth', 'privacy', 'terms', 'about'].includes(currentView) && (
+      {/* Banner de Publicidade Oficial (exibido em subpáginas; na Home há um banner dedicado no fluxo do conteúdo) */}
+      {!['home', 'auth', 'privacy', 'terms', 'about'].includes(currentView) && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-2">
           <AdBanner />
         </div>
