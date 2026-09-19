@@ -463,10 +463,10 @@ export default function GlobalTracker({ onPlayerClick }) {
     try {
       const cleanSearch = (debouncedSearch || '').replace(/["'“”]/g, '').trim();
 
-      // Durante busca por nome omitimos o count: exact para evitar seq scan na tabela de 45k rows
+      // Durante busca por nome omitimos o count; na listagem usamos count: estimated (<1s vs 16s do exact)
       let query = supabase
         .from('current_character_state')
-        .select('character_name, level, vocation, xp_total, last_active, session_start_xp', cleanSearch ? undefined : { count: 'exact' })
+        .select('character_name, level, vocation, xp_total, last_active, session_start_xp', cleanSearch ? undefined : { count: 'estimated' })
         .not('level', 'is', null);
 
       if (cleanSearch) {

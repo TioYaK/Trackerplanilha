@@ -27,6 +27,9 @@ const APP_ROUTES = [
   { id: 'developers', label: 'Documentação da API REST', desc: 'Endpoints para bots e desenvolvedores', icon: Cpu, category: 'Dev' },
 ];
 
+// Cache em memória para buscas globais (TTL 90s)
+const searchCache = new Map();
+
 export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlayerClick }) {
   const { setActiveWorld } = useWorld();
   const [query, setQuery] = useState('');
@@ -65,8 +68,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate, onPlaye
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-// Cache em memória para buscas globais (TTL 90s)
-const searchCache = new Map();
+
 
   // Busca rápida de personagens no Supabase com debounce e cache em memória
   useEffect(() => {
