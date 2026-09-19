@@ -11,7 +11,7 @@ import {
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { parseUtcDate, toBrtDateStr, toBrtTimeStr, toBrtHourNum, formatBrtDateWithWeekday, formatVocation, toTibiaTitleCase } from '../lib/tibiaUtils';
+import { parseUtcDate, toBrtDateStr, toBrtTimeStr, toBrtHourNum, formatBrtDateWithWeekday, sliceXpIntoBrtHours, formatVocation, toTibiaTitleCase } from '../lib/tibiaUtils';
 import { WORLDS_LIST } from '../context/WorldContext';
 
 // Cache em memória de dados do dashboard do jogador (TTL 60s)
@@ -72,7 +72,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
     const rawPlayerName = playerName.trim();
     const targetName = toTibiaTitleCase(rawPlayerName);
     const cacheKey = rawPlayerName.toLowerCase();
-    const storageKey = `rubinot_player_v3_hunts_${cacheKey}`;
+    const storageKey = `rubinot_player_v4_hunts_${cacheKey}`;
 
     // 1. Verificação instantânea em cache (In-Memory e SessionStorage SWR: 0ms de pintura inicial)
     let cached = playerDashboardCache.get(cacheKey);
@@ -134,21 +134,23 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       ] = await Promise.all([
         supabase.from('profiles').select('avatar_url, makers').ilike('main_character', targetName).limit(1).maybeSingle(),
         supabase.from('guild_members').select('name, level, vocation, is_online, rank').ilike('name', targetName).limit(1).maybeSingle(),
-        supabase.from('current_character_state').select('character_name, xp_total, session_start_xp, level, vocation, last_active').ilike('character_name', targetName).limit(1).maybeSingle(),
+        supabase.from('current_character_state').select('character_name, xp_total, session_start_xp, session_start_time, level, vocation, last_active').eq('character_name', targetName).limit(1).maybeSingle(),
         supabase.from('guild_perk_members').select('world, notes').ilike('character_name', targetName).limit(1).maybeSingle(),
-        supabase.from('historical_sessions').select('id, session_start, session_end, duration_minutes, xp_gained, end_level, end_xp_total').ilike('character_name', targetName).order('session_start', { ascending: false }).limit(200),
-        supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').ilike('character_name', targetName).order('recorded_at', { ascending: false }).limit(300),
+        supabase.from('historical_sessions').select('id, session_start, session_end, duration_minutes, xp_gained, end_level, end_xp_total').eq('character_name', targetName).order('session_start', { ascending: false }).limit(200),
+        supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').eq('character_name', targetName).order('recorded_at', { ascending: false }).limit(300),
         supabase.from('recent_deaths').select('level, killed_by, death_time').ilike('character_name', targetName).order('death_time', { ascending: false }).limit(50)
       ]);
 
       let cData = cDataRes?.data;
       let memberData = gMembersRes?.data;
+      let rawSessions = sessionsRes?.data || [];
+      let rawTelemetry = (telemetryRes?.data || []).sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
 
       // Fallback tolerante apenas se a capitalização exata falhar
       if (!cData && !memberData && rawPlayerName.toLowerCase() !== targetName.toLowerCase()) {
         const { data: fallbackChar } = await supabase
           .from('current_character_state')
-          .select('character_name, xp_total, session_start_xp, level, vocation, last_active')
+          .select('character_name, xp_total, session_start_xp, session_start_time, level, vocation, last_active')
           .ilike('character_name', rawPlayerName)
           .limit(1)
           .maybeSingle();
@@ -156,6 +158,16 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       }
 
       const canonicalName = cData?.character_name || memberData?.name || targetName;
+
+      // Se targetName não retornou sessões ou telemetria, tenta com canonicalName se for diferente
+      if ((rawSessions.length === 0 || rawTelemetry.length === 0) && canonicalName.toLowerCase() !== targetName.toLowerCase()) {
+        const [fallbackSess, fallbackTele] = await Promise.all([
+          rawSessions.length === 0 ? supabase.from('historical_sessions').select('id, session_start, session_end, duration_minutes, xp_gained, end_level, end_xp_total').eq('character_name', canonicalName).order('session_start', { ascending: false }).limit(200) : null,
+          rawTelemetry.length === 0 ? supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').eq('character_name', canonicalName).order('recorded_at', { ascending: false }).limit(300) : null
+        ]);
+        if (fallbackSess?.data?.length) rawSessions = fallbackSess.data;
+        if (fallbackTele?.data?.length) rawTelemetry = fallbackTele.data.sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
+      }
 
       // Avatar
       setPlayerAvatar(profileRes?.data?.avatar_url || null);
@@ -195,13 +207,9 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       }
 
       // Delta de XP e 24h Rush calculado com precisão combinando Sessões e Telemetria
-      const rawSessions = sessionsRes?.data || [];
       const boundsData = rawSessions
         .filter(s => s.session_end && s.session_end >= fourteenDaysAgo)
         .sort((a, b) => new Date(a.session_start || a.session_end) - new Date(b.session_start || b.session_end));
-
-      const rawTelemetry = (telemetryRes?.data || [])
-        .sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
 
       let currentXP = cData?.xp_total ? Number(cData.xp_total) : 0;
       let currentDelta = 0;
@@ -324,110 +332,127 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         dailyMap[todayStr] = Math.max(dailyMap[todayStr] || 0, (dailyMap[todayStr] || 0) + currentDelta);
       }
 
-      const hData = [];
-      const now = new Date();
-      for (let i = 13; i >= 0; i--) {
-        const targetDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-        const dayStr = toBrtDateStr(targetDate);
-        const xpMade = dailyMap[dayStr] || 0;
-        hData.push({ date: dayStr, xp: xpMade });
-      }
-      setHeatmap(hData);
-
       // ─── DIÁRIO DE CAÇA & ANÁLISE HORÁRIA ───
       const huntDaysMap = {};
 
-      // 1. Processa logs de telemetria com fuso horário de Brasília
-      rawTelemetry.forEach(l => {
-        const day = toBrtDateStr(l.recorded_at);
-        const delta = Number(l.delta_xp || 0);
-        if (!day || delta <= 0) return;
-        const h = toBrtHourNum(l.recorded_at);
-
-        if (!huntDaysMap[day]) {
-          huntDaysMap[day] = {
-            date: day,
-            totalXp: 0,
-            hours: {},
-            sessions: [],
-            logCount: 0
-          };
-        }
-        huntDaysMap[day].totalXp += delta;
-        huntDaysMap[day].logCount++;
-        huntDaysMap[day].hours[h] = (huntDaysMap[day].hours[h] || 0) + delta;
-      });
-
-      // 2. Desduplicação inteligente de sessões e associação aos dias
+      // 1. Desduplicação inteligente de sessões
       const uniqueSessions = [];
       const seenSessionKeys = new Set();
-      rawSessions.forEach(s => {
-        const key = `${s.session_start}_${s.session_end}_${s.xp_gained}`;
+      rawSessions.forEach(sess => {
+        const key = `${sess.session_start}_${sess.session_end}_${sess.xp_gained}`;
         if (!seenSessionKeys.has(key)) {
           seenSessionKeys.add(key);
-          uniqueSessions.push(s);
+          uniqueSessions.push(sess);
         }
       });
 
+      // 2. Fatiamento temporal exato de todas as sessões fechadas pelos horários reais de caça
       uniqueSessions.forEach(s => {
-        const day = toBrtDateStr(s.session_start || s.session_end);
-        if (!day) return;
-        if (!huntDaysMap[day]) {
-          huntDaysMap[day] = {
-            date: day,
-            totalXp: 0,
-            hours: {},
-            sessions: [],
-            logCount: 0
-          };
-        }
-        huntDaysMap[day].sessions.push(s);
-
-        // Se o dia não tem logs granulares de telemetria, distribui a XP da sessão nas horas abrangidas
         const xpGained = Number(s.xp_gained || 0);
-        if (xpGained > 0 && Object.keys(huntDaysMap[day].hours).length === 0) {
-          const sStart = parseUtcDate(s.session_start || s.session_end);
-          const sEnd = parseUtcDate(s.session_end);
-          const hStart = toBrtHourNum(sStart);
-          const hEnd = toBrtHourNum(sEnd);
-          const hoursSpan = [];
-          if (hStart <= hEnd) {
-            for (let i = hStart; i <= hEnd; i++) hoursSpan.push(i);
-          } else {
-            for (let i = hStart; i <= 23; i++) hoursSpan.push(i);
-            for (let i = 0; i <= hEnd; i++) hoursSpan.push(i);
+        if (xpGained <= 0) return;
+
+        let sStart = parseUtcDate(s.session_start);
+        let sEnd = parseUtcDate(s.session_end);
+
+        if (!sStart && sEnd && s.duration_minutes) {
+          sStart = new Date(sEnd.getTime() - Number(s.duration_minutes) * 60000);
+        }
+        if (!sEnd && sStart && s.duration_minutes) {
+          sEnd = new Date(sStart.getTime() + Number(s.duration_minutes) * 60000);
+        }
+        if (!sStart || !sEnd) return;
+
+        const hourlySlices = sliceXpIntoBrtHours(sStart, sEnd, xpGained);
+
+        Object.entries(hourlySlices).forEach(([dayStr, hours]) => {
+          if (!huntDaysMap[dayStr]) {
+            huntDaysMap[dayStr] = {
+              date: dayStr,
+              totalXp: 0,
+              hours: {},
+              sessions: [],
+              logCount: 0
+            };
           }
-          const perHour = Math.round(xpGained / Math.max(1, hoursSpan.length));
-          hoursSpan.forEach(h => {
-            huntDaysMap[day].hours[h] = (huntDaysMap[day].hours[h] || 0) + perHour;
+          Object.entries(hours).forEach(([h, xp]) => {
+            huntDaysMap[dayStr].hours[h] = (huntDaysMap[dayStr].hours[h] || 0) + xp;
+            huntDaysMap[dayStr].totalXp += xp;
           });
+        });
+
+        // Associa o card da sessão aos dias em que ela ocorreu
+        const daysCovered = new Set([toBrtDateStr(sStart), toBrtDateStr(sEnd)].filter(Boolean));
+        daysCovered.forEach(dayStr => {
+          if (!huntDaysMap[dayStr]) {
+            huntDaysMap[dayStr] = {
+              date: dayStr,
+              totalXp: 0,
+              hours: {},
+              sessions: [],
+              logCount: 0
+            };
+          }
+          huntDaysMap[dayStr].sessions.push(s);
+        });
+      });
+
+      // 3. Processa telemetria granular não coberta pelas sessões fechadas
+      // (Com margem defensiva de 5 minutos para evitar duplicar deltas de fechamento de sessão)
+      rawTelemetry.forEach(l => {
+        const delta = Number(l.delta_xp || 0);
+        if (delta <= 0) return;
+        const lDate = parseUtcDate(l.recorded_at);
+        if (!lDate) return;
+
+        const logMs = lDate.getTime();
+        const isCovered = uniqueSessions.some(s => {
+          const sStart = parseUtcDate(s.session_start);
+          const sEnd = parseUtcDate(s.session_end);
+          if (!sStart && !sEnd) return false;
+          const startMs = (sStart || sEnd).getTime() - 2 * 60 * 1000;
+          const endMs = (sEnd || sStart).getTime() + 5 * 60 * 1000;
+          return logMs >= startMs && logMs <= endMs;
+        });
+
+        if (!isCovered) {
+          const day = toBrtDateStr(lDate);
+          const h = toBrtHourNum(lDate);
+          if (!huntDaysMap[day]) {
+            huntDaysMap[day] = {
+              date: day,
+              totalXp: 0,
+              hours: {},
+              sessions: [],
+              logCount: 0
+            };
+          }
+          huntDaysMap[day].hours[h] = (huntDaysMap[day].hours[h] || 0) + delta;
+          huntDaysMap[day].totalXp += delta;
+          huntDaysMap[day].logCount++;
         }
       });
 
-      // Se a soma de XP das sessões for maior que a soma de logs (ex: dias antigos), prevalece a sessão
-      Object.keys(huntDaysMap).forEach(day => {
-        const dObj = huntDaysMap[day];
-        const sessionSum = dObj.sessions.reduce((acc, s) => acc + (Number(s.xp_gained) || 0), 0);
-        if (sessionSum > dObj.totalXp) {
-          dObj.totalXp = sessionSum;
-        }
-      });
-
-      // Inclui delta ao vivo do dia atual caso esteja ativo
+      // 4. Inclui caçada ao vivo ativa (currentDelta) fatiada do início da sessão até agora
       if (currentDelta > 0) {
-        const todayStr = toBrtDateStr(new Date());
-        const curH = toBrtHourNum(new Date());
-        if (!huntDaysMap[todayStr]) {
-          huntDaysMap[todayStr] = {
-            date: todayStr,
-            totalXp: 0,
-            hours: {},
-            sessions: [],
-            logCount: 0
-          };
-        }
-        huntDaysMap[todayStr].totalXp += currentDelta;
-        huntDaysMap[todayStr].hours[curH] = (huntDaysMap[todayStr].hours[curH] || 0) + currentDelta;
+        const now = new Date();
+        const liveStart = cData?.session_start_time ? parseUtcDate(cData.session_start_time) : new Date(now.getTime() - 30 * 60 * 1000);
+        const liveSlices = sliceXpIntoBrtHours(liveStart, now, currentDelta);
+
+        Object.entries(liveSlices).forEach(([dayStr, hours]) => {
+          if (!huntDaysMap[dayStr]) {
+            huntDaysMap[dayStr] = {
+              date: dayStr,
+              totalXp: 0,
+              hours: {},
+              sessions: [],
+              logCount: 0
+            };
+          }
+          Object.entries(hours).forEach(([h, xp]) => {
+            huntDaysMap[dayStr].hours[h] = (huntDaysMap[dayStr].hours[h] || 0) + xp;
+            huntDaysMap[dayStr].totalXp += xp;
+          });
+        });
       }
 
       const processedHuntDays = Object.keys(huntDaysMap)
@@ -461,6 +486,20 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
 
       setHuntDays(processedHuntDays);
       setSelectedHuntDate(prev => prev && processedHuntDays.some(d => d.date === prev) ? prev : (processedHuntDays[0]?.date || null));
+
+      // Sincroniza dailyMap e heatmap de 14 dias com a precisão dos dias de caça calculados
+      Object.entries(huntDaysMap).forEach(([dayStr, dObj]) => {
+        dailyMap[dayStr] = Math.max(dailyMap[dayStr] || 0, dObj.totalXp);
+      });
+      const hData = [];
+      const now = new Date();
+      for (let i = 13; i >= 0; i--) {
+        const targetDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dayStr = toBrtDateStr(targetDate);
+        const xpMade = huntDaysMap[dayStr]?.totalXp || dailyMap[dayStr] || 0;
+        hData.push({ date: dayStr, xp: xpMade });
+      }
+      setHeatmap(hData);
 
       // Previsão de Up (14 dias)
       const totalXp14d = Object.values(dailyMap).reduce((acc, xp) => acc + (Number(xp) || 0), 0);
@@ -759,7 +798,10 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       try {
         if (typeof window !== 'undefined' && window.sessionStorage) {
           sessionStorage.setItem(storageKey, JSON.stringify(fullSnapshot));
-          try { sessionStorage.removeItem(`rubinot_player_${cacheKey}`); } catch (e) {}
+          try {
+            sessionStorage.removeItem(`rubinot_player_${cacheKey}`);
+            sessionStorage.removeItem(`rubinot_player_v3_hunts_${cacheKey}`);
+          } catch (e) {}
         }
       } catch (e) {}
 

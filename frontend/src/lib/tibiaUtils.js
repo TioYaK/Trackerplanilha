@@ -143,3 +143,59 @@ export const formatBrtDateWithWeekday = (dateStr) => {
   return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} (${weekday})`;
 };
 
+/**
+ * Fatiador temporal de XP por hora cheia no fuso horário de Brasília (UTC-3):
+ * Dado um intervalo de tempo [startUtc, endUtc] e um total de XP ganho,
+ * calcula os minutos exatos gastos em cada hora (00h às 23h) e distribui
+ * a XP proporcionalmente a esses minutos.
+ * Suporta caçadas que cruzam meia-noite perfeitamente.
+ * Retorna { [YYYY-MM-DD]: { [hour0_to_23]: xpAmount } }
+ */
+export const sliceXpIntoBrtHours = (startUtc, endUtc, totalXp) => {
+  if (!startUtc || !endUtc || totalXp <= 0) return {};
+
+  const startMs = parseUtcDate(startUtc)?.getTime();
+  const endMs = parseUtcDate(endUtc)?.getTime();
+  if (!startMs || !endMs) return {};
+
+  if (endMs <= startMs) {
+    const day = toBrtDateStr(endUtc);
+    const h = toBrtHourNum(endUtc);
+    return { [day]: { [h]: totalXp } };
+  }
+
+  const totalDurationMs = endMs - startMs;
+  // BRT é fixo UTC-3 (sem horário de verão)
+  const BRT_OFFSET = -3 * 3600 * 1000;
+  const startBrtMs = startMs + BRT_OFFSET;
+  const endBrtMs = endMs + BRT_OFFSET;
+
+  const firstHourMs = Math.floor(startBrtMs / 3600000) * 3600000;
+  const lastHourMs = Math.floor(endBrtMs / 3600000) * 3600000;
+
+  const result = {};
+
+  for (let hMs = firstHourMs; hMs <= lastHourMs; hMs += 3600000) {
+    const slotStart = Math.max(startBrtMs, hMs);
+    const slotEnd = Math.min(endBrtMs, hMs + 3600000);
+    const slotDurationMs = Math.max(0, slotEnd - slotStart);
+
+    if (slotDurationMs <= 0) continue;
+
+    const proportion = slotDurationMs / totalDurationMs;
+    const hourXp = Math.round(totalXp * proportion);
+
+    const d = new Date(hMs);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${day}`;
+    const hourNum = d.getUTCHours();
+
+    if (!result[dateStr]) result[dateStr] = {};
+    result[dateStr][hourNum] = (result[dateStr][hourNum] || 0) + hourXp;
+  }
+
+  return result;
+};
+
