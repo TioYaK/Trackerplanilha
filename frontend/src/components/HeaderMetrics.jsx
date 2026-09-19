@@ -5,15 +5,38 @@ import { Users, Activity, Crosshair } from 'lucide-react';
 import { isSlotActiveNow } from '../lib/tibiaUtils';
 
 export default function HeaderMetrics({ parties = [] }) {
-  const [metrics, setMetrics] = useState({ total_members: 0, active_members: 0 });
+  const [metrics, setMetrics] = useState(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const cached = sessionStorage.getItem('rubinot_header_metrics');
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return { total_members: 0, active_members: 0 };
+  });
 
   useEffect(() => {
     const fetchMetrics = async () => {
-      const { count: total_members } = await supabase.from('guild_members').select('*', { count: 'exact', head: true });
-      const { count: active_members } = await supabase.from('guild_members')
-        .select('*', { count: 'exact', head: true })
-        .gte('last_xp_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-      setMetrics({ total_members: total_members || 0, active_members: active_members || 0 });
+      try {
+        const [totalRes, activeRes] = await Promise.all([
+          supabase.from('guild_members').select('*', { count: 'exact', head: true }),
+          supabase.from('guild_members')
+            .select('*', { count: 'exact', head: true })
+            .gte('last_xp_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        ]);
+        const newMetrics = {
+          total_members: totalRes.count || 0,
+          active_members: activeRes.count || 0
+        };
+        setMetrics(newMetrics);
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          try {
+            sessionStorage.setItem('rubinot_header_metrics', JSON.stringify(newMetrics));
+          } catch (e) {}
+        }
+      } catch (e) {
+        console.warn('Erro ao buscar métricas de cabeçalho:', e);
+      }
     };
     fetchMetrics();
   }, []);

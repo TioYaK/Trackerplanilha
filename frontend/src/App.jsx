@@ -404,7 +404,15 @@ export default function App() {
   const [currentView, setCurrentView] = useState(() => parseCurrentLocation().view);
   const [selectedPlayer, setSelectedPlayer] = useState(() => parseCurrentLocation().player);
   const [selectedParty, setSelectedParty] = useState(null);
-  const [visibleTabs, setVisibleTabs] = useState(null);
+  const [visibleTabs, setVisibleTabs] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const cached = localStorage.getItem('rubinot_visible_tabs');
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return DEFAULT_VISIBLE_TABS;
+  });
   const [inspectedPlayer, setInspectedPlayer] = useState(null);
   const [inspectedPlayerWorld, setInspectedPlayerWorld] = useState(null);
   const [previousView, setPreviousView] = useState('home');
@@ -507,7 +515,11 @@ export default function App() {
           .select('visible_tabs')
           .eq('id', 1)
           .maybeSingle();
-        setVisibleTabs(data?.visible_tabs ?? DEFAULT_VISIBLE_TABS);
+        const tabs = data?.visible_tabs ?? DEFAULT_VISIBLE_TABS;
+        setVisibleTabs(tabs);
+        try {
+          localStorage.setItem('rubinot_visible_tabs', JSON.stringify(tabs));
+        } catch (e) {}
       } catch (err) {
         setVisibleTabs(DEFAULT_VISIBLE_TABS);
       }

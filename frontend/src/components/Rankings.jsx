@@ -80,8 +80,20 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
   }, [activeWorld]);
 
   const fetchData = async (forceRefresh = false) => {
-    // 0. Cache em memória instantâneo se dados tiverem menos de 60 segundos
-    if (!forceRefresh && rankingsCache.data && (Date.now() - rankingsCache.timestamp < 60000)) {
+    // 0. Cache em memória / sessionStorage instantâneo (SWR 0ms)
+    if (!rankingsCache.data && typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const s = sessionStorage.getItem('rubinot_rankings_cache');
+        if (s) {
+          const parsed = JSON.parse(s);
+          if (Date.now() - parsed.timestamp < 10 * 60 * 1000) {
+            rankingsCache = parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (rankingsCache.data) {
       setTopRushers(rankingsCache.data.topRushers);
       setTopLevels(rankingsCache.data.topLevels);
       setTopParty(rankingsCache.data.topParty);
@@ -89,10 +101,14 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
       setTopFraggers(rankingsCache.data.topFraggers);
       setImortais(rankingsCache.data.imortais);
       setLoading(false);
-      return;
-    }
 
-    setLoading(true);
+      if (!forceRefresh && (Date.now() - rankingsCache.timestamp < 60000)) {
+        return;
+      }
+      // Se tiver mais de 60s, continua em segundo plano para revalidar sem travar a tela
+    } else {
+      setLoading(true);
+    }
 
     try {
       // 1. Consultas principais paralelas de alta velocidade
@@ -261,6 +277,12 @@ export default function Rankings({ isAdmin, onPlayerClick, initialTab }) {
           imortais: aliveRushers
         }
       };
+
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          sessionStorage.setItem('rubinot_rankings_cache', JSON.stringify(rankingsCache));
+        }
+      } catch (e) {}
 
     } catch (err) {
       console.error('Erro ao carregar rankings:', err);

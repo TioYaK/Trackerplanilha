@@ -9,7 +9,12 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    }
+    return false;
+  });
 
   useEffect(() => {
     // Busca a sessão atual

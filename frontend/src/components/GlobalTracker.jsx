@@ -9,6 +9,11 @@ import {
 import { formatVocation } from '../lib/tibiaUtils';
 import { useWorld, WORLDS_LIST } from '../context/WorldContext';
 
+// Cache em memória para afiliações de guilda/hunted (TTL 5 min)
+let cachedAffiliations = null;
+let affiliationsTimestamp = 0;
+const AFFILIATIONS_TTL = 5 * 60 * 1000;
+
 export default function GlobalTracker({ onPlayerClick }) {
   const { selectedWorld, setSelectedWorld, worldConfig } = useWorld();
 
@@ -434,15 +439,30 @@ export default function GlobalTracker({ onPlayerClick }) {
     };
   }, []);
 
-  // Busca lista de afiliações para badges (Guilda Battle Storm & Hunteds)
+  // Busca lista de afiliações para badges (Guilda Battle Storm & Hunteds) com SWR
   const fetchAffiliations = async () => {
+    // Retorno instantâneo do cache em memória (0ms)
+    if (cachedAffiliations) {
+      setGuildSet(cachedAffiliations.guildSet);
+      setHuntedSet(cachedAffiliations.huntedSet);
+      if (Date.now() - affiliationsTimestamp < AFFILIATIONS_TTL) {
+        return;
+      }
+    }
+
     try {
       const [{ data: gData }, { data: hData }] = await Promise.all([
         supabase.from('guild_members').select('name'),
         supabase.from('hunted_list').select('name')
       ]);
-      if (gData) setGuildSet(new Set(gData.filter(g => g?.name).map(g => g.name.toLowerCase())));
-      if (hData) setHuntedSet(new Set(hData.filter(h => h?.name).map(h => h.name.toLowerCase())));
+      const newGuildSet = gData ? new Set(gData.filter(g => g?.name).map(g => g.name.toLowerCase())) : (cachedAffiliations?.guildSet || new Set());
+      const newHuntedSet = hData ? new Set(hData.filter(h => h?.name).map(h => h.name.toLowerCase())) : (cachedAffiliations?.huntedSet || new Set());
+      
+      cachedAffiliations = { guildSet: newGuildSet, huntedSet: newHuntedSet };
+      affiliationsTimestamp = Date.now();
+
+      setGuildSet(newGuildSet);
+      setHuntedSet(newHuntedSet);
     } catch (e) {
       console.warn('Erro ao carregar afiliações:', e);
     }

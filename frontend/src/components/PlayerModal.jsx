@@ -21,6 +21,9 @@ let cachedTotalTracked = {
   timestamp: 0
 };
 
+// Cache de ranking por level em memória (elimina contagens repetidas)
+const levelRankCache = new Map();
+
 export default function PlayerModal({ playerName, initialWorld, onClose, onOpenFull, onVersus }) {
   const { isPremium } = useAuth() || {};
   const [charInfo, setCharInfo] = useState(null);
@@ -100,7 +103,7 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
     try {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // 2. Consultas simultâneas de alta velocidade usando B-Tree indexes (sem a view pesada view_top_rushers_24h)
+      // 2. Consultas simultâneas de alta velocidade usando B-Tree indexes (0ms waterfall, <300ms paralelo)
       const [
         cStateRes,
         gMemRes,
@@ -111,18 +114,30 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
         sessionsRes,
         telemetryRes
       ] = await Promise.all([
-        supabase.from('current_character_state').select('*').or(`character_name.eq."${targetName}",character_name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
-        supabase.from('guild_members').select('*').or(`name.eq."${targetName}",name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
-        supabase.from('guild_perk_members').select('world, notes').or(`character_name.eq."${targetName}",character_name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
-        supabase.from('profiles').select('avatar_url, makers, main_character').or(`main_character.eq."${targetName}",main_character.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
-        supabase.from('recent_deaths').select('*').eq('character_name', targetName).order('death_time', { ascending: false }).limit(4),
-        supabase.from('hunted_list').select('*').or(`name.eq."${targetName}",name.ilike."${rawPlayerName}"`).limit(1).maybeSingle(),
-        supabase.from('historical_sessions').select('id, xp_gained, session_end, end_xp_total').eq('character_name', targetName).order('id', { ascending: false }).limit(20),
-        supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').eq('character_name', targetName).order('recorded_at', { ascending: false }).limit(50)
+        supabase.from('current_character_state').select('character_name, level, vocation, xp_total, last_active, session_start_xp').eq('character_name', targetName).limit(1).maybeSingle(),
+        supabase.from('guild_members').select('name, level, vocation, is_online, rank, last_xp_date').eq('name', targetName).limit(1).maybeSingle(),
+        supabase.from('guild_perk_members').select('world, notes').eq('character_name', targetName).limit(1).maybeSingle(),
+        supabase.from('profiles').select('avatar_url, makers, main_character').eq('main_character', targetName).limit(1).maybeSingle(),
+        supabase.from('recent_deaths').select('character_name, level, killed_by, death_time, is_hunted').eq('character_name', targetName).order('death_time', { ascending: false }).limit(4),
+        supabase.from('hunted_list').select('name').eq('name', targetName).limit(1).maybeSingle(),
+        supabase.from('historical_sessions').select('id, xp_gained, session_end, end_xp_total').eq('character_name', targetName).order('session_end', { ascending: false }).limit(20),
+        supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').eq('character_name', targetName).order('id', { ascending: false }).limit(50)
       ]);
 
-      const cState = cStateRes?.data;
-      const gMem = gMemRes?.data;
+      let cState = cStateRes?.data;
+      let gMem = gMemRes?.data;
+
+      // Fallback tolerante para capitalizações não padronizadas
+      if (!cState && !gMem && rawPlayerName.toLowerCase() !== targetName.toLowerCase()) {
+        const { data: fallbackChar } = await supabase
+          .from('current_character_state')
+          .select('character_name, level, vocation, xp_total, last_active, session_start_xp')
+          .ilike('character_name', rawPlayerName)
+          .limit(1)
+          .maybeSingle();
+        if (fallbackChar) cState = fallbackChar;
+      }
+
       const gPerk = gPerkRes?.data;
       const profile = profileRes?.data;
       const hunted = huntedRes?.data;
@@ -202,21 +217,32 @@ export default function PlayerModal({ playerName, initialWorld, onClose, onOpenF
       setRusherInfo(computedRush);
       setLoading(false);
 
-      // 6. Ranking Global & Total de Jogadores (Assíncrono em segundo plano)
+      // 6. Ranking Global & Total de Jogadores (Assíncrono em segundo plano com memoização)
       let gRank = null;
       if (level) {
-        supabase
-          .from('current_character_state')
-          .select('*', { count: 'exact', head: true })
-          .gt('level', level)
-          .then(({ count: higherCount }) => {
-            gRank = (higherCount || 0) + 1;
-            setGlobalRank(gRank);
-            if (!parsedWorldRank) {
-              setWorldRank(Math.max(1, Math.round(gRank / 16)));
-            }
-          })
-          .catch(() => {});
+        const cachedHigher = levelRankCache.get(level);
+        if (cachedHigher !== undefined) {
+          gRank = cachedHigher + 1;
+          setGlobalRank(gRank);
+          if (!parsedWorldRank) {
+            setWorldRank(Math.max(1, Math.round(gRank / 16)));
+          }
+        } else {
+          supabase
+            .from('current_character_state')
+            .select('*', { count: 'exact', head: true })
+            .gt('level', level)
+            .then(({ count: higherCount }) => {
+              const count = higherCount || 0;
+              levelRankCache.set(level, count);
+              gRank = count + 1;
+              setGlobalRank(gRank);
+              if (!parsedWorldRank) {
+                setWorldRank(Math.max(1, Math.round(gRank / 16)));
+              }
+            })
+            .catch(() => {});
+        }
       }
 
       // 7. Investigação de Makers & Alts (Exclusivo VIP)
