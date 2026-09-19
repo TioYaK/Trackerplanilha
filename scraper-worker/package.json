@@ -1,6 +1,6 @@
 {
   "name": "auroria-telemetry-worker",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "description": "Scraper e Worker distribuído para telemetria de respawns do Auroria",
   "main": "src/index.js",
   "type": "module",

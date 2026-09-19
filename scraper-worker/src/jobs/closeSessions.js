@@ -34,15 +34,17 @@ export const runCloseSessions = async () => {
     }
 
     const sessionsToInsert = [];
-    const statesToReset = [];
 
     for (const player of allInactive) {
       if (player.session_start_xp === null || player.session_start_xp === undefined) {
-        statesToReset.push({
-          character_name: player.character_name,
-          session_start_xp: player.xp_total,
-          session_start_time: player.last_active || new Date().toISOString()
-        });
+        await supabase
+          .from('current_character_state')
+          .update({
+            session_start_xp: player.xp_total,
+            session_start_time: player.last_active || new Date().toISOString()
+          })
+          .eq('character_name', player.character_name)
+          .is('session_start_xp', null);
         continue;
       }
 
@@ -50,6 +52,23 @@ export const runCloseSessions = async () => {
 
       // Só cria uma historical session se o jogador realmente caçou (ganhou XP)
       if (xpGained > 0) {
+        // Trava atômica otimista: apenas um worker consegue avançar o session_start_xp.
+        // Se outro worker concorrente já processou esse personagem, o update afetará 0 linhas.
+        const { data: lockResult, error: lockErr } = await supabase
+          .from('current_character_state')
+          .update({
+            session_start_xp: player.xp_total,
+            session_start_time: player.last_active || new Date().toISOString()
+          })
+          .eq('character_name', player.character_name)
+          .eq('session_start_xp', player.session_start_xp)
+          .select('character_name');
+
+        if (lockErr || !lockResult || lockResult.length === 0) {
+          // Outro worker concorrente já fechou e arquivou esta sessão! Pula com segurança.
+          continue;
+        }
+
         let startTime = parseUtcDate(player.session_start_time);
         const endTime = parseUtcDate(player.last_active) || new Date();
 
@@ -73,17 +92,10 @@ export const runCloseSessions = async () => {
           end_level: player.level,
           created_at: new Date().toISOString()
         });
-
-        // Só reseta quem realmente caçou e encerrou a sessão
-        statesToReset.push({
-          character_name: player.character_name,
-          session_start_xp: player.xp_total,
-          session_start_time: player.last_active
-        });
       }
     }
 
-    // Insere as sessões finalizadas em lotes de 100
+    // Insere as sessões finalizadas em lotes de 100 (garantidas sem duplicatas)
     if (sessionsToInsert.length > 0) {
       for (let i = 0; i < sessionsToInsert.length; i += 100) {
         const chunk = sessionsToInsert.slice(i, i + 100);
@@ -92,28 +104,9 @@ export const runCloseSessions = async () => {
           console.error(`[JOB] Erro ao salvar historical_sessions:`, insertErr.message);
         }
       }
-      console.log(`[JOB] ✅ ${sessionsToInsert.length} sessões finalizadas e salvas em historical_sessions.`);
+      console.log(`[JOB] ✅ ${sessionsToInsert.length} sessões finalizadas e salvas em historical_sessions (sem duplicatas).`);
     } else {
-      console.log(`[JOB] Nenhuma sessão com ganho de XP encontrada para arquivar.`);
-    }
-
-    // Reseta o start_xp e start_time em micro-lotes de 10 para preservar o connection pool
-    if (statesToReset.length > 0) {
-      for (let i = 0; i < statesToReset.length; i += 10) {
-        const chunk = statesToReset.slice(i, i + 10);
-        await Promise.all(
-          chunk.map(state =>
-            supabase
-              .from('current_character_state')
-              .update({
-                session_start_xp: state.session_start_xp,
-                session_start_time: state.session_start_time
-              })
-              .eq('character_name', state.character_name)
-          )
-        );
-      }
-      console.log(`[JOB] ✅ ${statesToReset.length} estados resetados para a próxima hunt.`);
+      console.log(`[JOB] Nenhuma nova sessão com ganho de XP para arquivar.`);
     }
 
   } catch (error) {
