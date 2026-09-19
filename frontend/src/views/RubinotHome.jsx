@@ -383,18 +383,20 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
     <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full animate-fade-in text-gray-100 flex flex-col gap-8">
       
       {/* 1. HERO BANNER: RUBINOT HUB */}
-      <div className="relative overflow-hidden rounded-3xl border-2 border-yellow-500/40 bg-gradient-to-b from-yellow-950/40 via-black/95 to-black p-6 sm:p-10 shadow-2xl backdrop-blur-md">
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#121624]/90 via-[#0a0c14]/95 to-[#06070a] p-6 sm:p-10 shadow-2xl backdrop-blur-2xl">
+        {/* Efeitos de Luz Ambiente & Aurora */}
+        <div className="absolute -top-32 right-10 w-[500px] h-[500px] bg-gradient-to-br from-amber-500/15 via-yellow-600/5 to-transparent rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 left-10 w-[400px] h-[400px] bg-gradient-to-tr from-blue-600/10 via-purple-600/5 to-transparent rounded-full blur-3xl pointer-events-none" />
         
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/50 bg-yellow-500/15 px-3.5 py-1 text-xs font-bold text-yellow-300 uppercase tracking-wider mb-3 shadow-inner">
-              <Sparkles size={14} className="text-yellow-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 px-3.5 py-1 text-xs font-bold text-amber-300 uppercase tracking-widest mb-3 backdrop-blur-md shadow-[0_0_15px_rgba(212,175,55,0.1)]">
+              <Sparkles size={14} className="text-amber-400 animate-pulse" />
               Central Oficial de Inteligência
             </div>
 
-            <h1 className="text-3xl sm:text-5xl font-medieval text-gradient-gold drop-shadow-lg leading-tight">
-              Rubinot <span className="text-white">Central Hub</span>
+            <h1 className="text-3xl sm:text-5xl font-cinzel font-bold text-gradient-gold drop-shadow-xl leading-tight tracking-tight">
+              Rubinot <span className="text-white font-outfit font-extrabold tracking-normal">Central Hub</span>
             </h1>
             
             <p className="text-gray-300 font-sans text-sm sm:text-base mt-2 max-w-2xl leading-relaxed">
@@ -403,25 +405,25 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           </div>
 
           {/* BADGE DE STATUS AO VIVO */}
-          <div className="flex items-center gap-3 bg-black/70 border border-yellow-500/30 rounded-2xl p-4 shadow-xl shrink-0">
+          <div className="flex items-center gap-3.5 bg-white/[0.04] border border-white/10 hover:border-emerald-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-xl shrink-0 transition-all">
             <div className="relative flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></span>
             </div>
             <div>
-              <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
+              <div className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold font-mono">
                 {isGlobal ? 'Rede Ativa (16 Mundos)' : `Servidor ${selectedWorld}`}
               </div>
-              <div className="text-xl font-bold font-medieval text-green-400">
-                {displayedOnlines.toLocaleString('pt-BR')} Onlines
+              <div className="text-xl font-bold font-outfit text-emerald-400 tracking-tight">
+                {displayedOnlines.toLocaleString('pt-BR')} <span className="text-xs font-normal text-gray-300">Onlines</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* SELETOR DE MUNDOS */}
-        <div className="mt-8 pt-6 border-t border-yellow-500/20">
-          <div className="flex items-center gap-2 mb-3 text-xs text-yellow-400/90 font-bold uppercase tracking-wider">
+        <div className="mt-8 pt-6 border-t border-white/[0.08]">
+          <div className="flex items-center gap-2 mb-3 text-xs text-amber-400/90 font-bold uppercase tracking-widest font-mono">
             <Globe size={14} /> Selecionar Servidor:
           </div>
           <div className="flex flex-wrap gap-2">
@@ -431,8 +433,8 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                 onClick={() => setSelectedWorld(w.id)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                   selectedWorld === w.id
-                    ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20 scale-105'
-                    : 'bg-black/60 hover:bg-white/10 text-gray-300 border border-white/10'
+                    ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-extrabold shadow-[0_0_20px_rgba(245,158,11,0.35)] scale-105'
+                    : 'bg-white/[0.03] hover:bg-white/[0.08] text-gray-300 border border-white/[0.08] hover:border-amber-500/30'
                 }`}
               >
                 <span>{w.icon}</span>
@@ -446,55 +448,55 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
       {/* 2. STRIP DE MÉTRICAS EM TEMPO REAL */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         
-        <div className="bg-black/80 border border-yellow-500/30 rounded-2xl p-4 flex items-center gap-4 shadow-lg">
-          <div className="w-12 h-12 rounded-xl bg-blue-950/60 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0">
-            <Users size={24} />
+        <div className="glass-panel glass-card-hover rounded-2xl p-4 sm:p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+            <Users size={22} />
           </div>
           <div>
-            <div className="text-xs text-gray-400 uppercase font-semibold">
+            <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold font-mono">
               {isGlobal ? 'Jogadores Online' : `Online em ${selectedWorld}`}
             </div>
-            <div className="text-2xl font-medieval font-bold text-white">
+            <div className="text-2xl font-outfit font-extrabold text-white tracking-tight tabular-nums">
               {displayedOnlines.toLocaleString('pt-BR')}
             </div>
           </div>
         </div>
 
-        <div className="bg-black/80 border border-yellow-500/30 rounded-2xl p-4 flex items-center gap-4 shadow-lg">
-          <div className="w-12 h-12 rounded-xl bg-red-950/60 border border-red-500/40 flex items-center justify-center text-red-400 shrink-0">
-            <Skull size={24} />
+        <div className="glass-panel glass-card-hover rounded-2xl p-4 sm:p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-400 shrink-0 shadow-[0_0_15px_rgba(239,68,68,0.15)]">
+            <Skull size={22} />
           </div>
           <div>
-            <div className="text-xs text-gray-400 uppercase font-semibold">
+            <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold font-mono">
               {isGlobal ? 'Baixas (24h Global)' : `Baixas (24h ${selectedWorld})`}
             </div>
-            <div className="text-2xl font-medieval font-bold text-red-400">
+            <div className="text-2xl font-outfit font-extrabold text-red-400 tracking-tight tabular-nums">
               {displayedDeaths24h.toLocaleString('pt-BR')}
             </div>
           </div>
         </div>
 
-        <div className="bg-black/80 border border-yellow-500/30 rounded-2xl p-4 flex items-center gap-4 shadow-lg">
-          <div className="w-12 h-12 rounded-xl bg-green-950/60 border border-green-500/40 flex items-center justify-center text-green-400 shrink-0">
-            <Cpu size={24} />
+        <div className="glass-panel glass-card-hover rounded-2xl p-4 sm:p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+            <Cpu size={22} />
           </div>
           <div>
-            <div className="text-xs text-gray-400 uppercase font-semibold">Workers Ativos</div>
-            <div className="text-2xl font-medieval font-bold text-green-400">
-              {activeWorkers > 0 ? activeWorkers : '2'} C2
+            <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold font-mono">Workers Ativos</div>
+            <div className="text-2xl font-outfit font-extrabold text-emerald-400 tracking-tight">
+              {activeWorkers > 0 ? activeWorkers : '4'} C2 <span className="text-xs font-normal text-emerald-500/80">Swarm</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-black/80 border border-yellow-500/30 rounded-2xl p-4 flex items-center gap-4 shadow-lg">
-          <div className="w-12 h-12 rounded-xl bg-purple-950/60 border border-purple-500/40 flex items-center justify-center text-purple-400 shrink-0">
-            <Server size={24} />
+        <div className="glass-panel glass-card-hover rounded-2xl p-4 sm:p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/25 flex items-center justify-center text-purple-400 shrink-0 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
+            <Server size={22} />
           </div>
           <div>
-            <div className="text-xs text-gray-400 uppercase font-semibold">
+            <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold font-mono">
               {isGlobal ? 'Mundos Cobertos' : 'Tipo de PvP'}
             </div>
-            <div className="text-2xl font-medieval font-bold text-purple-300">
+            <div className="text-2xl font-outfit font-extrabold text-purple-300 tracking-tight">
               {isGlobal ? '16 Servidores' : (worldData?.pvp || 'Open PvP')}
             </div>
           </div>
@@ -545,37 +547,37 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* CARD 1: BAZAAR SNIPER MEGA PREMIUM 💎 */}
-        <div className="relative overflow-hidden rounded-2xl border-2 border-yellow-500/50 bg-gradient-to-b from-yellow-950/40 via-black/90 to-black p-6 shadow-2xl flex flex-col justify-between group hover:border-yellow-400 transition-all">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-yellow-500/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="glass-panel glass-card-hover relative overflow-hidden rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col justify-between group">
+          <div className="absolute top-0 right-0 w-44 h-44 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
           
           <div>
             <div className="flex items-center justify-between mb-4">
-              <span className="rounded-full bg-yellow-500/20 border border-yellow-500/40 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-yellow-300 flex items-center gap-1.5">
-                <Gem size={13} className="text-yellow-400" /> Mega Premium 💎
+              <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-0.5 text-[11px] font-bold uppercase tracking-widest text-amber-300 flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.15)]">
+                <Gem size={13} className="text-amber-400" /> Mega Premium 💎
               </span>
-              <span className="text-[10px] text-gray-400 uppercase font-bold">VIP Only</span>
+              <span className="text-[10px] text-amber-400 font-mono font-bold tracking-widest uppercase bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">VIP Only</span>
             </div>
 
-            <h3 className="text-2xl font-medieval text-gradient-gold mb-2 group-hover:text-yellow-300 transition-colors">
+            <h3 className="text-2xl font-cinzel font-bold text-gradient-gold mb-2 group-hover:brightness-110 transition-all">
               Bazaar Sniper Rubinot
             </h3>
             
             <p className="text-xs text-gray-300 font-sans leading-relaxed mb-6">
-              Arbitragem definitiva de leilões. Detecte personagens raros e pechinchas até 60% abaixo da FIPE antes do encerramento!
+              Arbitragem definitiva de leilões. Detecte personagens raros e pechinchas até 60% abaixo da FIPE antes do encerramento com alertas em tempo real.
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <button
               onClick={() => onNavigate('bazaar')}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-700 hover:from-yellow-500 hover:to-amber-600 py-3 text-sm font-bold text-black shadow-lg transition-all active:scale-95"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 py-3 text-sm font-bold text-black shadow-lg shadow-amber-500/20 transition-all active:scale-95 cursor-pointer"
             >
               <Gem size={16} /> Acessar Bazaar Sniper
               <ArrowRight size={16} />
             </button>
             <button
               onClick={() => onNavigate('contribute')}
-              className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-950/40 hover:bg-green-900/50 border border-green-500/40 py-2 text-xs font-bold text-green-400 transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 py-2.5 text-xs font-bold text-emerald-400 transition-all cursor-pointer"
             >
               <Cpu size={14} /> Desbloquear Grátis com Worker
             </button>
@@ -583,16 +585,18 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         </div>
 
         {/* CARD 2: CALCULADORA DE LOOT SPLIT (PÚBLICA) */}
-        <div className="relative overflow-hidden rounded-2xl border border-cyan-500/40 bg-gradient-to-b from-cyan-950/30 via-black/90 to-black p-6 shadow-2xl flex flex-col justify-between group hover:border-cyan-400 transition-all">
+        <div className="glass-panel glass-card-hover relative overflow-hidden rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col justify-between group">
+          <div className="absolute top-0 right-0 w-44 h-44 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+
           <div>
             <div className="flex items-center justify-between mb-4">
-              <span className="rounded-full bg-cyan-500/20 border border-cyan-500/40 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-                <Coins size={13} /> Ferramenta Comunitária
+              <span className="rounded-full bg-cyan-500/15 border border-cyan-500/30 px-3 py-0.5 text-[11px] font-bold uppercase tracking-widest text-cyan-300 flex items-center gap-1.5 shadow-[0_0_10px_rgba(6,182,212,0.15)]">
+                <Coins size={13} className="text-cyan-400" /> Ferramenta de Party
               </span>
-              <span className="text-[10px] text-green-400 uppercase font-bold">100% Grátis</span>
+              <span className="text-[10px] text-emerald-400 font-mono font-bold tracking-widest uppercase bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">100% Grátis</span>
             </div>
 
-            <h3 className="text-2xl font-medieval text-cyan-400 mb-2 group-hover:text-cyan-300 transition-colors">
+            <h3 className="text-2xl font-cinzel font-bold text-white mb-2 group-hover:text-cyan-300 transition-colors">
               Divisão de Loot de Hunt
             </h3>
             
@@ -603,7 +607,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
 
           <button
             onClick={() => onNavigate('loot_splitter')}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-cyan-900/50 hover:bg-cyan-800 border border-cyan-500/50 py-3 text-sm font-bold text-cyan-200 shadow-lg transition-all active:scale-95"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-600/20 transition-all active:scale-95 cursor-pointer"
           >
             <Coins size={16} /> Abrir Calculadora de Loot
             <ArrowRight size={16} />
@@ -611,37 +615,36 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
         </div>
 
         {/* CARD 3: HUNT FINDER 2.0 & CALCULADORA DE TREINO */}
-        <div className="relative overflow-hidden rounded-2xl border border-yellow-500/30 bg-gradient-to-b from-yellow-950/20 via-black/90 to-black p-6 shadow-2xl flex flex-col justify-between group hover:border-yellow-500/60 transition-all">
+        <div className="glass-panel glass-card-hover relative overflow-hidden rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col justify-between group">
+          <div className="absolute top-0 right-0 w-44 h-44 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="rounded-full bg-yellow-500/20 border border-yellow-500/40 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-yellow-400 flex items-center gap-1.5">
-                <Compass size={13} /> Guias & Simuladores
+            <div className="flex items-center justify-between mb-4">
+              <span className="rounded-full bg-purple-500/15 border border-purple-500/30 px-3 py-0.5 text-[11px] font-bold uppercase tracking-widest text-purple-300 flex items-center gap-1.5 shadow-[0_0_10px_rgba(168,85,247,0.15)]">
+                <Compass size={13} className="text-purple-400" /> Guias & Simuladores
               </span>
-              <span className="text-[10px] text-yellow-500/80 uppercase font-bold tracking-wider">Novo Arsenal</span>
+              <span className="text-[10px] text-amber-400 font-mono font-bold tracking-widest uppercase bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Novo Arsenal</span>
             </div>
 
-            <h3 className="text-2xl font-medieval text-white mb-1 group-hover:text-yellow-400 transition-colors">
+            <h3 className="text-2xl font-cinzel font-bold text-white mb-2 group-hover:text-amber-300 transition-colors">
               Hunt Finder & Treino
             </h3>
-            <div className="text-[11px] text-yellow-400/80 font-sans mb-3 flex items-center gap-1">
-              <span>🎯 Respawns mais lucrativos e cálculo de Exercise Weapons</span>
-            </div>
             
             <p className="text-xs text-gray-300 font-sans leading-relaxed mb-6">
               Filtre as melhores hunts para seu level e vocação (Cobras, Issavi, Nagas) e calcule exatamente quantas armas de treino precisa para seu skill meta!
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             <button
               onClick={() => onNavigate('hunt_finder')}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-black/80 hover:bg-yellow-950/50 border border-yellow-500/40 py-2.5 text-xs font-bold text-yellow-400 shadow-lg transition-all active:scale-95"
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-amber-500/40 py-2.5 text-xs font-bold text-amber-300 shadow-lg transition-all active:scale-95 cursor-pointer"
             >
               <Compass size={14} /> Hunt Finder
             </button>
             <button
               onClick={() => onNavigate('exercise_calc')}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 text-black py-2.5 text-xs font-bold shadow-lg transition-all active:scale-95"
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 text-black py-2.5 text-xs font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-95 cursor-pointer"
             >
               <Calculator size={14} /> Calc Treino
             </button>
@@ -654,14 +657,14 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* COLUNA 1: FEED DE MORTES RECENTES */}
-        <div className="bg-tibia-card border-2 border-tibia-border rounded-2xl p-6 shadow-xl flex flex-col">
-          <div className="flex items-center justify-between mb-5 pb-3 border-b border-tibia-border">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-red-950/60 border border-red-500/40 flex items-center justify-center text-red-400">
+        <div className="glass-panel rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col relative overflow-hidden">
+          <div className="flex items-center justify-between mb-5 pb-3 border-b border-white/[0.08]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
                 <Skull size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-medieval font-bold text-white">Mural de Mortes Recentes</h3>
+                <h3 className="text-lg font-cinzel font-bold text-white tracking-wide">Mural de Mortes Recentes</h3>
                 <p className="text-[11px] text-gray-400 font-sans">
                   {isGlobal ? 'Baixas PvP e PvE nos 16 servidores oficiais do Rubinot' : `Baixas PvP e PvE no servidor ${selectedWorld}`}
                 </p>
@@ -670,7 +673,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
             
             <button
               onClick={() => onNavigate('tracker')}
-              className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 font-bold cursor-pointer"
+              className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold cursor-pointer transition-transform hover:translate-x-0.5"
               title="Abrir monitor completo de mortes e frags"
             >
               Ver todas <ChevronRight size={14} />
@@ -695,26 +698,26 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                   <div 
                     key={idx}
                     onClick={() => onPlayerClick && onPlayerClick(d.character_name, selectedWorld !== 'ALL' ? selectedWorld : null)}
-                    className="flex items-center justify-between p-3 rounded-xl bg-black/60 border border-white/5 hover:border-red-500/40 hover:bg-red-950/20 transition-all cursor-pointer group"
+                    className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] hover:border-red-500/40 hover:shadow-[0_0_20px_rgba(239,68,68,0.15)] transition-all cursor-pointer group"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-red-400 font-bold text-xs">💀</span>
+                      <span className="text-red-400 font-bold text-xs select-none">💀</span>
                       <div>
                         <div className="text-sm font-bold text-white group-hover:text-red-400 transition-colors flex items-center gap-2">
-                          <span>{d.character_name}</span>
-                          <span className="text-xs font-normal text-gray-400">(Lvl {d.level || '?'})</span>
-                          <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                            isPvP ? 'bg-red-950/70 text-red-300 border border-red-500/40' : 'bg-blue-950/50 text-blue-300 border border-blue-500/30'
+                          <span className="font-outfit">{d.character_name}</span>
+                          <span className="text-xs font-normal text-gray-400 font-mono">(Lvl {d.level || '?'})</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase font-mono ${
+                            isPvP ? 'bg-red-500/15 text-red-300 border border-red-500/30' : 'bg-blue-500/15 text-blue-300 border border-blue-500/30'
                           }`}>
                             {isPvP ? 'PvP Frag' : 'PvE'}
                           </span>
                           {d.is_guild_member && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
                               Guilda
                             </span>
                           )}
                           {d.is_hunted && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-red-600 text-white">
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-red-600 text-white font-mono shadow-[0_0_8px_rgba(220,38,38,0.6)]">
                               HUNTED
                             </span>
                           )}
@@ -725,7 +728,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                       </div>
                     </div>
 
-                    <div className="text-right text-[11px] text-gray-500 font-sans">
+                    <div className="text-right text-[11px] text-gray-400 font-mono">
                       {safeFormatTime(d.death_time)}
                     </div>
                   </div>
@@ -735,15 +738,15 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
           </div>
         </div>
 
-        {/* COLUNA 2: TOP RUSHERS DO DIA */}
-        <div className="bg-tibia-card border-2 border-tibia-border rounded-2xl p-6 shadow-xl flex flex-col">
-          <div className="flex items-center justify-between mb-5 pb-3 border-b border-tibia-border">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-yellow-950/60 border border-yellow-500/40 flex items-center justify-center text-yellow-400">
+        {/* COLUNA 2: TOP RUSHERS DO DIA (PÓDIO METÁLICO E-SPORTS) */}
+        <div className="glass-panel rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col relative overflow-hidden">
+          <div className="flex items-center justify-between mb-5 pb-3 border-b border-white/[0.08]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
                 <Trophy size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-medieval font-bold text-white">Top Rushers (24h)</h3>
+                <h3 className="text-lg font-cinzel font-bold text-white tracking-wide">Top Rushers (24h)</h3>
                 <p className="text-[11px] text-gray-400 font-sans">
                   {isGlobal ? 'Os maiores ganhos de experiência nos 16 servidores' : `Os maiores rushers de experiência em ${selectedWorld}`}
                 </p>
@@ -751,13 +754,13 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-lg border border-yellow-500/30 text-xs">
+              <div className="flex items-center gap-1 bg-white/[0.03] p-1 rounded-xl border border-white/[0.08] text-xs">
                 {[10, 25, 50].map(lim => (
                   <button
                     key={lim}
                     onClick={() => setRushersLimit(lim)}
-                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
-                      rushersLimit === lim ? 'bg-yellow-500 text-black font-black' : 'text-gray-400 hover:text-white'
+                    className={`px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all ${
+                      rushersLimit === lim ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-black shadow-md font-black' : 'text-gray-400 hover:text-white'
                     }`}
                   >
                     Top {lim}
@@ -766,7 +769,7 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
               </div>
               <button
                 onClick={() => onNavigate('analytics')}
-                className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 font-bold cursor-pointer"
+                className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold cursor-pointer transition-transform hover:translate-x-0.5"
               >
                 Rankings <ChevronRight size={14} />
               </button>
@@ -779,44 +782,64 @@ export default function RubinotHome({ onNavigate, onPlayerClick, isPremium, user
                 Nenhum rusher registrado para este servidor no momento.
               </div>
             ) : (
-              filteredHomeRushers.slice(0, rushersLimit).map((r, idx) => (
-                <div 
-                  key={idx}
-                  onClick={() => onPlayerClick && onPlayerClick(r.character_name || r.name, selectedWorld !== 'ALL' ? selectedWorld : null)}
-                  className="flex items-center justify-between p-3 rounded-xl bg-black/60 border border-white/5 hover:border-yellow-500/40 hover:bg-yellow-950/20 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold ${
-                      idx === 0 ? 'bg-yellow-500 text-black' :
-                      idx === 1 ? 'bg-gray-300 text-black' :
-                      idx === 2 ? 'bg-amber-700 text-white' :
-                      'bg-white/10 text-gray-400'
-                    }`}>
-                      #{idx + 1}
-                    </span>
-                    <div>
-                      <div className="text-sm font-bold text-white group-hover:text-yellow-400 transition-colors">
-                        {r.character_name || r.name}
-                      </div>
-                      <div className="text-[11px] text-gray-400 flex items-center gap-1.5 flex-wrap">
-                        {r.vocation ? <span>{r.vocation} • </span> : null}
-                        {r.level ? <span>Level {r.level}</span> : <span>Top Rusher 24h</span>}
-                        {(!selectedWorld || selectedWorld === 'ALL') && r.world && (
-                          <span className="bg-black/80 border border-white/10 text-yellow-400/90 text-[10px] px-1.5 py-0.2 rounded font-semibold">
-                            {r.world}
-                          </span>
-                        )}
+              filteredHomeRushers.slice(0, rushersLimit).map((r, idx) => {
+                const isFirst = idx === 0;
+                const isSecond = idx === 1;
+                const isThird = idx === 2;
+
+                let rowStyle = 'bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] hover:border-amber-500/30';
+                let rankBadge = 'bg-white/10 text-gray-400';
+                let nameStyle = 'text-white group-hover:text-amber-300';
+
+                if (isFirst) {
+                  rowStyle = 'bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-400/40 hover:border-amber-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.2)]';
+                  rankBadge = 'bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-500 text-black shadow-[0_0_10px_rgba(245,158,11,0.5)]';
+                  nameStyle = 'text-gradient-gold font-bold';
+                } else if (isSecond) {
+                  rowStyle = 'bg-gradient-to-r from-slate-400/15 via-slate-400/5 to-transparent border border-slate-300/30 hover:border-slate-300 hover:shadow-[0_0_15px_rgba(203,213,225,0.2)]';
+                  rankBadge = 'bg-gradient-to-br from-white via-slate-200 to-slate-400 text-black shadow-[0_0_8px_rgba(255,255,255,0.4)]';
+                  nameStyle = 'text-gradient-silver font-bold';
+                } else if (isThird) {
+                  rowStyle = 'bg-gradient-to-r from-amber-800/15 via-amber-800/5 to-transparent border border-amber-700/30 hover:border-amber-700 hover:shadow-[0_0_15px_rgba(180,83,9,0.2)]';
+                  rankBadge = 'bg-gradient-to-br from-amber-500 via-amber-700 to-amber-900 text-white shadow-[0_0_8px_rgba(180,83,9,0.4)]';
+                  nameStyle = 'text-gradient-bronze font-bold';
+                }
+
+                return (
+                  <div 
+                    key={idx}
+                    onClick={() => onPlayerClick && onPlayerClick(r.character_name || r.name, selectedWorld !== 'ALL' ? selectedWorld : null)}
+                    className={`flex items-center justify-between p-3.5 rounded-2xl transition-all cursor-pointer group ${rowStyle}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black ${rankBadge}`}>
+                        #{idx + 1}
+                      </span>
+                      <div>
+                        <div className={`text-sm transition-colors flex items-center gap-1.5 font-outfit ${nameStyle}`}>
+                          <span>{r.character_name || r.name}</span>
+                          {isFirst && <span className="text-xs">👑</span>}
+                        </div>
+                        <div className="text-[11px] text-gray-400 flex items-center gap-1.5 flex-wrap font-mono">
+                          {r.vocation ? <span>{r.vocation} • </span> : null}
+                          {r.level ? <span>Level {r.level}</span> : <span>Top Rusher 24h</span>}
+                          {(!selectedWorld || selectedWorld === 'ALL') && r.world && (
+                            <span className="bg-white/5 border border-white/10 text-amber-400/90 text-[10px] px-1.5 py-0.2 rounded font-semibold">
+                              {r.world}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-green-400 bg-green-950/40 border border-green-500/30 px-2 py-0.5 rounded">
-                      {formatExp(r.exp_gained)} XP
-                    </span>
+                    <div className="text-right">
+                      <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-xl shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                        {formatExp(r.exp_gained)} XP
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
             {filteredHomeRushers.length > rushersLimit && (
               <div className="pt-2 text-center">

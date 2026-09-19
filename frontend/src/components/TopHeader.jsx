@@ -120,7 +120,7 @@ export default function TopHeader({
   };
 
   return (
-    <header className="h-16 bg-black/90 border-b border-tibia-border/60 px-3 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-40 backdrop-blur-md">
+    <header className="h-16 bg-[#08090d]/80 border-b border-white/[0.08] px-3 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-40 backdrop-blur-2xl shadow-[0_4px_24px_-4px_rgba(0,0,0,0.6)]">
       
       {/* Esquerda: Botão Menu Mobile & Título Dinâmico */}
       <div className="flex items-center gap-3 min-w-0">
@@ -135,34 +135,44 @@ export default function TopHeader({
 
         {/* Título e Ícone da Página Ativa */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="p-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20 hidden sm:flex items-center justify-center shrink-0 shadow-sm">
+          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 hidden sm:flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(212,175,55,0.1)]">
             <CurrentIcon size={18} className={viewInfo.color} />
           </div>
 
           <div className="flex flex-col min-w-0">
-            <h1 className="text-sm sm:text-base font-bold text-gray-100 truncate flex items-center gap-2">
+            <h1 className="text-sm sm:text-base font-bold font-outfit tracking-tight text-gray-100 truncate flex items-center gap-2">
               <span className="truncate">{viewInfo.title}</span>
             </h1>
             <span className="text-[10px] text-gray-400 font-mono hidden sm:flex items-center gap-1.5">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
-              RubinOT Server • <strong className="text-yellow-400">{activeWorldObj?.name || activeWorld}</strong>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+              RubinOT Server • <strong className="text-amber-400">{activeWorldObj?.name || activeWorld}</strong>
             </span>
           </div>
         </div>
       </div>
 
-      {/* Direita: Busca Global, Seletor de Mundo, Notificações & Perfil */}
+      {/* Centro/Direita: Status do Enxame & Controles */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         
+        {/* Status do Enxame de Workers (Badge Elitizado) */}
+        <div className="hidden xl:flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-emerald-500/25 text-[11px] font-mono text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.1)]">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="text-gray-300">Swarm:</span>
+          <span className="font-bold text-emerald-400">4 Workers Online</span>
+        </div>
+
         {/* Botão de Busca Global com Atalho Ctrl+K */}
         <button
           onClick={onOpenSearch}
-          className="group flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/70 border border-tibia-border hover:border-yellow-500/60 text-xs text-gray-300 hover:text-white transition-all shadow-inner hover:shadow-yellow-500/10"
+          className="group flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-amber-500/40 text-xs text-gray-300 hover:text-white transition-all shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] hover:shadow-[0_0_15px_rgba(212,175,55,0.12)]"
           title="Buscar Jogadores ou Ferramentas (Ctrl + K)"
         >
-          <Search size={14} className="text-yellow-400 group-hover:scale-110 transition-transform" />
-          <span className="hidden md:inline font-sans">Buscar...</span>
-          <kbd className="hidden md:inline-block px-1.5 py-0.5 text-[9px] font-mono bg-white/10 text-gray-300 rounded border border-white/15">
+          <Search size={14} className="text-amber-400 group-hover:scale-110 transition-transform" />
+          <span className="hidden md:inline font-sans text-gray-400 group-hover:text-gray-200">Buscar...</span>
+          <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[9px] font-mono font-semibold bg-white/10 text-amber-300 rounded border border-white/15">
             Ctrl K
           </kbd>
         </button>
@@ -281,12 +291,12 @@ export default function TopHeader({
         <div className="relative" ref={worldDropdownRef}>
           <button
             onClick={() => setWorldDropdownOpen(prev => !prev)}
-            className="flex items-center gap-2 bg-black/80 hover:bg-black/95 border border-tibia-border hover:border-yellow-500/50 rounded-xl px-3 py-1.5 text-xs text-gray-200 transition-all shadow-sm"
+            className="flex items-center gap-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-amber-500/40 rounded-xl px-3 py-1.5 text-xs text-gray-200 transition-all shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]"
             title="Selecionar Mundo do RubinOT"
           >
             <span className="text-sm">{activeWorldObj?.icon || '🌐'}</span>
             <div className="flex flex-col text-left">
-              <span className="font-bold text-yellow-300 leading-tight">
+              <span className="font-bold text-amber-300 leading-tight font-outfit">
                 {activeWorldObj?.name || activeWorld}
               </span>
             </div>
@@ -295,12 +305,12 @@ export default function TopHeader({
                 {activeWorldObj.type}
               </span>
             )}
-            <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${worldDropdownOpen ? 'rotate-180 text-yellow-400' : ''}`} />
+            <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${worldDropdownOpen ? 'rotate-180 text-amber-400' : ''}`} />
           </button>
 
           {/* Menu Dropdown de Mundos */}
           {worldDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-72 bg-neutral-950 border border-yellow-500/40 rounded-2xl shadow-2xl z-50 overflow-hidden animate-fade-in backdrop-blur-xl">
+            <div className="absolute right-0 mt-2 w-72 bg-[#0c0e14]/95 border border-amber-500/30 rounded-2xl shadow-2xl z-50 overflow-hidden animate-fade-in backdrop-blur-2xl">
               <div className="p-2.5 border-b border-white/10 bg-black/40">
                 <div className="relative">
                   <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
