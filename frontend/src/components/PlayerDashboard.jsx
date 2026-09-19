@@ -72,15 +72,16 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
     const rawPlayerName = playerName.trim();
     const targetName = toTibiaTitleCase(rawPlayerName);
     const cacheKey = rawPlayerName.toLowerCase();
+    const storageKey = `rubinot_player_v3_hunts_${cacheKey}`;
 
     // 1. Verificação instantânea em cache (In-Memory e SessionStorage SWR: 0ms de pintura inicial)
     let cached = playerDashboardCache.get(cacheKey);
     if (!cached && typeof window !== 'undefined' && window.sessionStorage) {
       try {
-        const s = sessionStorage.getItem(`rubinot_player_${cacheKey}`);
+        const s = sessionStorage.getItem(storageKey);
         if (s) {
           const parsed = JSON.parse(s);
-          if (Date.now() - parsed.timestamp < 10 * 60 * 1000) { // 10 min de tolerância SWR
+          if (Date.now() - parsed.timestamp < 10 * 60 * 1000 && Array.isArray(parsed.huntDays)) {
             cached = parsed;
             playerDashboardCache.set(cacheKey, parsed);
           }
@@ -88,7 +89,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       } catch (e) {}
     }
 
-    if (cached) {
+    if (cached && Array.isArray(cached.huntDays)) {
       setPlayerAvatar(cached.playerAvatar);
       setPlayerInfo(cached.playerInfo);
       setWorldRank(cached.worldRank);
@@ -131,13 +132,13 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         telemetryRes,
         deathsRes
       ] = await Promise.all([
-        supabase.from('profiles').select('avatar_url, makers').eq('main_character', targetName).limit(1).maybeSingle(),
-        supabase.from('guild_members').select('name, level, vocation, is_online, rank').eq('name', targetName).limit(1).maybeSingle(),
-        supabase.from('current_character_state').select('character_name, xp_total, session_start_xp, level, vocation, last_active').eq('character_name', targetName).limit(1).maybeSingle(),
-        supabase.from('guild_perk_members').select('world, notes').eq('character_name', targetName).limit(1).maybeSingle(),
-        supabase.from('historical_sessions').select('id, session_start, session_end, duration_minutes, xp_gained, end_level, end_xp_total').eq('character_name', targetName).order('session_start', { ascending: false }).limit(200),
-        supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').eq('character_name', targetName).order('recorded_at', { ascending: false }).limit(300),
-        supabase.from('recent_deaths').select('level, killed_by, death_time').eq('character_name', targetName).order('death_time', { ascending: false }).limit(50)
+        supabase.from('profiles').select('avatar_url, makers').ilike('main_character', targetName).limit(1).maybeSingle(),
+        supabase.from('guild_members').select('name, level, vocation, is_online, rank').ilike('name', targetName).limit(1).maybeSingle(),
+        supabase.from('current_character_state').select('character_name, xp_total, session_start_xp, level, vocation, last_active').ilike('character_name', targetName).limit(1).maybeSingle(),
+        supabase.from('guild_perk_members').select('world, notes').ilike('character_name', targetName).limit(1).maybeSingle(),
+        supabase.from('historical_sessions').select('id, session_start, session_end, duration_minutes, xp_gained, end_level, end_xp_total').ilike('character_name', targetName).order('session_start', { ascending: false }).limit(200),
+        supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').ilike('character_name', targetName).order('recorded_at', { ascending: false }).limit(300),
+        supabase.from('recent_deaths').select('level, killed_by, death_time').ilike('character_name', targetName).order('death_time', { ascending: false }).limit(50)
       ]);
 
       let cData = cDataRes?.data;
@@ -757,7 +758,8 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
       playerDashboardCache.set(cacheKey, fullSnapshot);
       try {
         if (typeof window !== 'undefined' && window.sessionStorage) {
-          sessionStorage.setItem(`rubinot_player_${cacheKey}`, JSON.stringify(fullSnapshot));
+          sessionStorage.setItem(storageKey, JSON.stringify(fullSnapshot));
+          try { sessionStorage.removeItem(`rubinot_player_${cacheKey}`); } catch (e) {}
         }
       } catch (e) {}
 
