@@ -74,20 +74,45 @@ export const runFetchOnlines = async () => {
     
     fs.writeFileSync(CACHE_FILE, JSON.stringify(onlinePlayers));
 
-    // Salvar no banco (dividindo em chunks para nǜo estourar payload)
-    const eventsToInsert = [];
-    loggedIn.forEach(name => eventsToInsert.push({ character_name: name, event_type: 'LOGIN' }));
-    loggedOut.forEach(name => eventsToInsert.push({ character_name: name, event_type: 'LOGOUT' }));
-
-    if (eventsToInsert.length > 0) {
-      for (let i = 0; i < eventsToInsert.length; i += 500) {
-        await supabase.from('login_events').insert(eventsToInsert.slice(i, i + 500));
-      }
-      console.log(`[JOB] Rastreador de Makers: ${loggedIn.length} Logins, ${loggedOut.length} Logouts registrados.`);
-    }
-
     // Atualiza status online dos Hunteds & Radar Tático
     const { data: huntedList } = await supabase.from('hunted_list').select('id, name, reason, is_online');
+    const onlineSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
+
+    // Buscar membros da guilda para filtrar e sincronizar
+    let allGuildMembers = [];
+    let page = 0;
+    while (true) {
+      const { data: gChunk } = await supabase
+        .from('guild_members')
+        .select('name, is_online')
+        .range(page * 1000, (page + 1) * 1000 - 1);
+      if (!gChunk || gChunk.length === 0) break;
+      allGuildMembers.push(...gChunk);
+      if (gChunk.length < 1000) break;
+      page++;
+    }
+
+    // ─── FILTRO DE RETENÇÃO ZERO-BLOAT ───
+    // Registra logins/logouts apenas de quem importa (membros da guilda e alvos hunteds).
+    // Evita acumular milhões de registros descartáveis de players aleatórios nos 16 servidores.
+    const trackedLowerSet = new Set([
+      ...allGuildMembers.map(m => (m.name || '').toLowerCase()),
+      ...(huntedList || []).map(h => (h.name || '').toLowerCase())
+    ]);
+
+    const relevantLoggedIn = loggedIn.filter(name => trackedLowerSet.has(name.toLowerCase()));
+    const relevantLoggedOut = loggedOut.filter(name => trackedLowerSet.has(name.toLowerCase()));
+
+    const eventsToInsert = [];
+    relevantLoggedIn.forEach(name => eventsToInsert.push({ character_name: name, event_type: 'LOGIN' }));
+    relevantLoggedOut.forEach(name => eventsToInsert.push({ character_name: name, event_type: 'LOGOUT' }));
+
+    if (eventsToInsert.length > 0 && supabase) {
+      for (let i = 0; i < eventsToInsert.length; i += 100) {
+        await supabase.from('login_events').insert(eventsToInsert.slice(i, i + 100));
+      }
+      console.log(`[JOB] Rastreador de Makers: ${relevantLoggedIn.length} Logins, ${relevantLoggedOut.length} Logouts de membros/hunteds registrados.`);
+    }
     const onlineSet = new Set(onlinePlayers.map(p => p.toLowerCase()));
 
     if (huntedList && huntedList.length > 0) {
@@ -155,19 +180,6 @@ export const runFetchOnlines = async () => {
     }
 
     // --- SINCRONIZAÇÃO DE STATUS ONLINE E CARIMBO DE ATIVIDADE ---
-    let allGuildMembers = [];
-    let page = 0;
-    while (true) {
-      const { data: gChunk } = await supabase
-        .from('guild_members')
-        .select('name, is_online')
-        .range(page * 1000, (page + 1) * 1000 - 1);
-      if (!gChunk || gChunk.length === 0) break;
-      allGuildMembers.push(...gChunk);
-      if (gChunk.length < 1000) break;
-      page++;
-    }
-
     if (allGuildMembers.length > 0) {
       const activeGuildNames = allGuildMembers
         .filter(m => m && m.name && onlineSet.has(m.name.toLowerCase()))

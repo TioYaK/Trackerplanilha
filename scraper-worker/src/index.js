@@ -274,6 +274,9 @@ const processTask = async (task) => {
         // O id do Shard vem do page_number (1, 2, 3, 4)
         await runFetchRosterShard(task.page_number || 1);
         break;
+      case 'ARCHIVE_SESSIONS':
+        await runArchiveSessions();
+        break;
       case 'UPDATE_WORKERS':
         console.log('[WORKER] 🔄 Comando de Forçar Atualização recebido!');
         await checkForUpdates();
@@ -944,6 +947,24 @@ if (supabase) {
   setInterval(() => {
     runCloseSessions().catch(err => console.error('[CLOSE_SESSIONS] Erro:', err.message));
   }, 10 * 60 * 1000);
+
+  // Guardião do Banco Supabase: Execução preventiva de arquivamento e purga de retenção
+  setTimeout(() => {
+    runArchiveSessions().catch(err => console.error('[ARCHIVE] Erro na limpeza inicial:', err.message));
+  }, 45000);
+
+  // Checagem horária do Server Save (10:00 BRT / 13:00 UTC) para arquivamento diário
+  let lastArchiveDay = null;
+  setInterval(() => {
+    const brtDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const currentHour = brtDate.getHours();
+    const todayStr = brtDate.toISOString().split('T')[0];
+    if (currentHour === 10 && lastArchiveDay !== todayStr) {
+      lastArchiveDay = todayStr;
+      console.log(`[ARCHIVE] ⏰ Server Save (10:00 BRT) detectado! Executando runArchiveSessions...`);
+      runArchiveSessions().catch(err => console.error('[ARCHIVE] Erro no Server Save:', err.message));
+    }
+  }, 15 * 60 * 1000);
 
 // GATILHO DE ALARMES GERAIS (DESKTOP E WEB PUSH NOTIFICATIONS)
 const processedAlarms = new Set();

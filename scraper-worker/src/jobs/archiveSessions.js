@@ -114,6 +114,9 @@ export const runArchiveSessions = async () => {
 
       // Limpeza preventiva de sessões históricas com mais de 30 dias
       await supabase.from('historical_sessions').delete().lt('session_start', thirtyDaysAgo);
+
+      // Limpeza preventiva de telemetry_logs com mais de 14 dias (economia de disco massiva)
+      await supabase.from('telemetry_logs').delete().lt('recorded_at', fourteenDaysAgo);
     } catch (cleanErr) {
       console.warn('[ARCHIVE] Aviso na limpeza de retenção:', cleanErr.message);
     }

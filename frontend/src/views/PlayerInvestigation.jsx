@@ -80,37 +80,37 @@ export default function PlayerInvestigation({ onPlayerClick, onNavigate, isAdmin
     setActiveTarget(targetName);
 
     try {
-      // 1. Busca perfil do alvo em várias fontes otimizadas por índice B-Tree
+      // 1. Busca perfil do alvo com índices B-Tree diretos (.eq exato)
       const [guildRes, stateRes, deathsRes, fragsRes, loginRes, allDeathsRes] = await Promise.all([
         supabase.from('guild_members')
           .select('name, level, vocation, rank, is_online, guild_name')
-          .or(`name.eq.${targetName},name.ilike.${target}`)
+          .eq('name', targetName)
           .limit(1)
           .maybeSingle(),
         supabase.from('current_character_state')
           .select('character_name, level, vocation, last_active, updated_at')
-          .or(`character_name.eq.${targetName},character_name.ilike.${target}`)
+          .eq('character_name', targetName)
           .limit(1)
           .maybeSingle(),
         supabase.from('recent_deaths')
           .select('id, character_name, level, killed_by, death_time, created_at')
-          .or(`character_name.eq.${targetName},character_name.ilike.${target}`)
-          .order('id', { ascending: false })
+          .eq('character_name', targetName)
+          .order('death_time', { ascending: false })
           .limit(30),
         supabase.from('recent_deaths')
           .select('id, character_name, level, killed_by, death_time, created_at')
-          .ilike('killed_by', `%${target}%`)
-          .order('id', { ascending: false })
+          .ilike('killed_by', `%${targetName}%`)
+          .order('death_time', { ascending: false })
           .limit(30),
         supabase.from('login_events')
           .select('event_type, event_time, level, vocation')
-          .or(`character_name.eq.${targetName},character_name.ilike.${target}`)
+          .eq('character_name', targetName)
           .order('event_time', { ascending: false })
           .limit(40),
         supabase.from('recent_deaths')
-          .select('id, character_name, level, killed_by, death_time, created_at')
-          .order('id', { ascending: false })
-          .limit(300)
+          .select('character_name, level, death_time, created_at')
+          .order('death_time', { ascending: false })
+          .limit(100)
       ]);
 
       const profile = {

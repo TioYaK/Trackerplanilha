@@ -3,19 +3,33 @@ import { supabase } from '../lib/supabase';
 import { Target, Activity, Users, Clock, AlertCircle } from 'lucide-react';
 import { parseUtcDate, formatVocation } from '../lib/tibiaUtils';
 
+// Cache em memória para GuildRadar (TTL 45s)
+let radarCache = null;
+let lastRadarFetch = 0;
+
 export default function GuildRadar() {
-  const [hunters, setHunters] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [hunters, setHunters] = useState(() => radarCache || []);
+  const [loading, setLoading] = useState(() => !radarCache);
 
   useEffect(() => {
     const fetchRadar = async () => {
-      setLoading(true);
-      try {
-        // 1. Pega todos os membros da guilda
-        const { data: guildMembers } = await supabase.from('guild_members').select('name, vocation, level');
-        if (!guildMembers || guildMembers.length === 0) return;
+      const nowMs = Date.now();
+      if (radarCache && (nowMs - lastRadarFetch < 45000)) {
+        setHunters(radarCache);
+        setLoading(false);
+        return;
+      }
 
-        // 2. Pega telemetria das �ltimas 2 horas
+      setLoading(!radarCache);
+      try {
+        // 1. Pega membros da guilda com colunas necessárias
+        const { data: guildMembers } = await supabase.from('guild_members').select('name, vocation, level');
+        if (!guildMembers || guildMembers.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        // 2. Pega telemetria das últimas 2 horas
         const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
         
         const memberStats = {};
@@ -31,17 +45,24 @@ export default function GuildRadar() {
           };
         });
 
-        const membersList = guildMembers.map(m => m.name);
+        const membersList = guildMembers.map(m => m.name).filter(Boolean);
         
-        const fetchStates = async () => {
-          const { data } = await supabase
-            .from('current_character_state')
-            .select('*')
-            .gte('last_active', twoHoursAgo);
-          return data || [];
-        };
+        // Em vez de puxar a tabela inteira com select('*'), divide os membros em lotes e busca com .in()
+        const chunks = [];
+        for (let i = 0; i < membersList.length; i += 100) {
+          chunks.push(membersList.slice(i, i + 100));
+        }
 
-        const states = await fetchStates();
+        const stateResults = await Promise.all(
+          chunks.map(chunk =>
+            supabase
+              .from('current_character_state')
+              .select('character_name, xp_total, session_start_xp, last_active, session_start_time, level')
+              .in('character_name', chunk)
+              .gte('last_active', twoHoursAgo)
+          )
+        );
+        const states = stateResults.flatMap(r => r.data || []);
         const now = Date.now();
         const thirtyMinsAgo = now - 30 * 60 * 1000;
 
@@ -70,6 +91,8 @@ export default function GuildRadar() {
            .filter(m => m.isHunting)
            .sort((a, b) => b.xpLastHour - a.xpLastHour);
 
+        radarCache = activeHunters;
+        lastRadarFetch = Date.now();
         setHunters(activeHunters);
       } catch (err) {
         console.error('Erro ao buscar radar:', err);

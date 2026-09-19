@@ -61,6 +61,11 @@ const getRelativeTime = (isoDate) => {
   return new Date(isoDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 };
 
+// Cache em memória para War & Attendance (TTL 30s)
+let cachedDeaths = [];
+let cachedAttendance = [];
+let lastWarFetch = 0;
+
 export default function WarAttendance({ onPlayerClick }) {
   const { activeWorld, setActiveWorld } = useWorld();
   const [selectedWorld, setSelectedWorld] = useState(activeWorld || 'ALL');
@@ -70,9 +75,9 @@ export default function WarAttendance({ onPlayerClick }) {
   const [search, setSearch] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(false);
   
-  const [deaths, setDeaths] = useState([]);
-  const [attendanceData, setAttendanceData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [deaths, setDeaths] = useState(() => cachedDeaths);
+  const [attendanceData, setAttendanceData] = useState(() => cachedAttendance);
+  const [loading, setLoading] = useState(() => cachedDeaths.length === 0);
   const [refreshing, setRefreshing] = useState(false);
 
   // Efeito Sonoro de Combate (Web Audio API sintetizado)
@@ -104,12 +109,14 @@ export default function WarAttendance({ onPlayerClick }) {
     try {
       const { data, error } = await supabase
         .from('recent_deaths')
-        .select('*')
+        .select('id, character_name, level, killed_by, death_time, is_hunted, is_guild_member')
         .order('id', { ascending: false })
-        .limit(250);
+        .limit(150);
 
       if (error) throw error;
-      setDeaths(data || []);
+      const res = data || [];
+      cachedDeaths = res;
+      setDeaths(res);
     } catch (e) {
       console.error('Erro ao buscar mortes do killboard:', e);
     }
@@ -120,20 +127,31 @@ export default function WarAttendance({ onPlayerClick }) {
       const ssDate = new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('guild_attendance')
-        .select('*')
+        .select('id, character_name, minutes_online, date')
         .eq('date', ssDate)
         .order('minutes_online', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      setAttendanceData(data || []);
+      const res = data || [];
+      cachedAttendance = res;
+      setAttendanceData(res);
     } catch (e) {
       console.error('Erro ao buscar attendance:', e);
     }
   };
 
-  const loadAll = async () => {
-    setLoading(true);
+  const loadAll = async (force = false) => {
+    const now = Date.now();
+    if (!force && cachedDeaths.length > 0 && (now - lastWarFetch < 30000)) {
+      setDeaths(cachedDeaths);
+      setAttendanceData(cachedAttendance);
+      setLoading(false);
+      return;
+    }
+
+    if (cachedDeaths.length === 0) setLoading(true);
+    lastWarFetch = now;
     await Promise.all([fetchDeaths(), fetchAttendance()]);
     setLoading(false);
   };
@@ -151,6 +169,7 @@ export default function WarAttendance({ onPlayerClick }) {
 
   const handleManualRefresh = async () => {
     setRefreshing(true);
+    lastWarFetch = Date.now();
     await Promise.all([fetchDeaths(), fetchAttendance()]);
     playWarSound();
     setTimeout(() => setRefreshing(false), 500);

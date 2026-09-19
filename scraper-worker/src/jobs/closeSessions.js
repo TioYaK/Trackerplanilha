@@ -17,24 +17,16 @@ export const runCloseSessions = async () => {
     const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // 1. Paginamos todos os jogadores com atividade recente (últimos 7 dias) que ficaram inativos há mais de 30 min
-    let allInactive = [];
-    let page = 0;
-    while (true) {
-      const { data, error } = await supabase
-        .from('current_character_state')
-        .select('*')
-        .lt('last_active', thirtyMinsAgo)
-        .gte('last_active', sevenDaysAgo)
-        .not('xp_total', 'is', null)
-        .range(page * 1000, (page + 1) * 1000 - 1);
+    // 1. Busca no máximo 150 personagens inativos por ciclo para não sobrecarregar CPU/conexões do Postgres
+    const { data: allInactive, error } = await supabase
+      .from('current_character_state')
+      .select('character_name, xp_total, session_start_xp, session_start_time, last_active, level')
+      .lt('last_active', thirtyMinsAgo)
+      .gte('last_active', sevenDaysAgo)
+      .not('xp_total', 'is', null)
+      .limit(150);
 
-      if (error) throw error;
-      if (!data || data.length === 0) break;
-      allInactive.push(...data);
-      if (data.length < 1000) break;
-      page++;
-    }
+    if (error) throw error;
 
     if (!allInactive || allInactive.length === 0) {
       console.log(`[JOB] Nenhuma sessão inativa para fechar no momento.`);
@@ -91,10 +83,10 @@ export const runCloseSessions = async () => {
       }
     }
 
-    // Insere as sessões finalizadas em lotes de 200
+    // Insere as sessões finalizadas em lotes de 100
     if (sessionsToInsert.length > 0) {
-      for (let i = 0; i < sessionsToInsert.length; i += 200) {
-        const chunk = sessionsToInsert.slice(i, i + 200);
+      for (let i = 0; i < sessionsToInsert.length; i += 100) {
+        const chunk = sessionsToInsert.slice(i, i + 100);
         const { error: insertErr } = await supabase.from('historical_sessions').insert(chunk);
         if (insertErr) {
           console.error(`[JOB] Erro ao salvar historical_sessions:`, insertErr.message);
@@ -105,20 +97,21 @@ export const runCloseSessions = async () => {
       console.log(`[JOB] Nenhuma sessão com ganho de XP encontrada para arquivar.`);
     }
 
-    // Reseta o start_xp e start_time dos inativos em lotes de 100
+    // Reseta o start_xp e start_time em micro-lotes de 10 para preservar o connection pool
     if (statesToReset.length > 0) {
-      for (let i = 0; i < statesToReset.length; i += 100) {
-        const chunk = statesToReset.slice(i, i + 100);
-        const promises = chunk.map(state =>
-          supabase
-            .from('current_character_state')
-            .update({
-              session_start_xp: state.session_start_xp,
-              session_start_time: state.session_start_time
-            })
-            .eq('character_name', state.character_name)
+      for (let i = 0; i < statesToReset.length; i += 10) {
+        const chunk = statesToReset.slice(i, i + 10);
+        await Promise.all(
+          chunk.map(state =>
+            supabase
+              .from('current_character_state')
+              .update({
+                session_start_xp: state.session_start_xp,
+                session_start_time: state.session_start_time
+              })
+              .eq('character_name', state.character_name)
+          )
         );
-        await Promise.all(promises);
       }
       console.log(`[JOB] ✅ ${statesToReset.length} estados resetados para a próxima hunt.`);
     }

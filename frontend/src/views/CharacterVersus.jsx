@@ -122,25 +122,25 @@ export default function CharacterVersus({ initialP1, initialP2, onPlayerClick, o
         supabase
           .from('current_character_state')
           .select('character_name, level, vocation, updated_at')
-          .or(`character_name.eq.${targetName},character_name.ilike.${cleanName}`)
+          .eq('character_name', targetName)
           .limit(1)
           .maybeSingle(),
         supabase
           .from('guild_members')
           .select('name, level, vocation, is_online, guild_name')
-          .or(`name.eq.${targetName},name.ilike.${cleanName}`)
+          .eq('name', targetName)
           .limit(1)
           .maybeSingle(),
         supabase
           .from('recent_deaths')
           .select('level, killed_by, death_time, is_hunted')
-          .or(`character_name.eq.${targetName},character_name.ilike.${cleanName}`)
+          .eq('character_name', targetName)
           .order('death_time', { ascending: false })
           .limit(30),
         supabase
           .from('guild_perk_members')
           .select('world')
-          .or(`character_name.eq.${targetName},character_name.ilike.${cleanName}`)
+          .eq('character_name', targetName)
           .limit(1)
           .maybeSingle()
       ]);
