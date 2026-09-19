@@ -138,7 +138,7 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         supabase.from('guild_perk_members').select('world, notes').ilike('character_name', targetName).limit(1).maybeSingle(),
         supabase.from('historical_sessions').select('id, session_start, session_end, duration_minutes, xp_gained, end_level, end_xp_total').eq('character_name', targetName).order('session_start', { ascending: false }).limit(200),
         supabase.from('telemetry_logs').select('xp_total, delta_xp, recorded_at').eq('character_name', targetName).order('recorded_at', { ascending: false }).limit(300),
-        supabase.from('recent_deaths').select('level, killed_by, death_time').ilike('character_name', targetName).order('death_time', { ascending: false }).limit(50)
+        supabase.from('recent_deaths').select('level, killed_by, death_time').eq('character_name', targetName).order('death_time', { ascending: false }).limit(50)
       ]);
 
       let cData = cDataRes?.data;
@@ -485,6 +485,13 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         });
 
       setHuntDays(processedHuntDays);
+      if (processedHuntDays.length > 0) {
+        const cutoff14d = toBrtDateStr(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000));
+        // Se a caçada mais recente for mais antiga que 14 dias, expande automaticamente para 'all'
+        if (processedHuntDays[0].date < cutoff14d) {
+          setHuntFilterPeriod('all');
+        }
+      }
       setSelectedHuntDate(prev => prev && processedHuntDays.some(d => d.date === prev) ? prev : (processedHuntDays[0]?.date || null));
 
       // Sincroniza dailyMap e heatmap de 14 dias com a precisão dos dias de caça calculados
@@ -1529,8 +1536,23 @@ export default function PlayerDashboard({ playerName, isAdmin, onSelectPlayer, o
         {/* Lista Horizontal de Dias com XP (Scrollável) */}
         {filteredHuntDays.length === 0 ? (
           <div className="bg-black/40 border border-dashed border-white/10 rounded-xl p-8 text-center text-gray-400">
-            <p className="text-sm font-bold">Nenhuma caçada registrada no período ({huntFilterPeriod}).</p>
-            <p className="text-xs text-gray-500 mt-1">Alterne o filtro para "30 Dias" ou "Todos" para verificar registros mais antigos.</p>
+            <p className="text-sm font-bold">Nenhuma caçada registrada no período selecionado ({huntFilterPeriod}).</p>
+            {huntDays.length > 0 ? (
+              <div className="mt-2">
+                <p className="text-xs text-gray-400">
+                  Existem {huntDays.length} {huntDays.length === 1 ? 'dia com caçada registrado' : 'dias com caçadas registrados'} em períodos anteriores.
+                </p>
+                <button
+                  onClick={() => setHuntFilterPeriod('all')}
+                  className="mt-3 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/40 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-yellow-500/10"
+                >
+                  <Calendar size={13} />
+                  Ver todo o histórico de caçadas ({huntDays.length} {huntDays.length === 1 ? 'dia' : 'dias'})
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">Este personagem ainda não possui registros de sessões de caça arquivadas.</p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
